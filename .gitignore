@@ -1,0 +1,5 @@
+/target
+/.pre-commit-config.yaml
+/.sass-cache/
+/dist/
+/.direnv
