@@ -1,4 +1,4 @@
-use std::{fmt::Display, fs::remove_dir, ops::Not};
+use std::{fmt::Display, ops::Not};
 
 use nom::{bytes::complete::tag, multi::separated_list0, IResult};
 
@@ -39,15 +39,24 @@ pub struct Game {
 }
 
 impl Game {
-    fn parse(input: &str) -> IResult<&str, Self> {
-        let (input, _) = parser::lexeme(tag("{"))(input)?;
-        let (input, left) =
-            separated_list0(parser::lexeme(tag(",")), parser::lexeme(Game::parse))(input)?;
-        let (input, _) = parser::lexeme(tag("|"))(input)?;
-        let (input, right) =
-            separated_list0(parser::lexeme(tag(",")), parser::lexeme(Game::parse))(input)?;
-        let (input, _) = parser::lexeme(tag("}"))(input)?;
-        Ok((input, Game { left, right }))
+    fn parser(input: &str) -> IResult<&str, Self> {
+        match parser::i64(input) {
+            Ok((input, num)) => Ok((input, Game::num_to_game(num))),
+            Err(_) => {
+                let (input, _) = parser::lexeme(tag("{"))(input)?;
+                let (input, left) =
+                    separated_list0(parser::lexeme(tag(",")), parser::lexeme(Game::parser))(input)?;
+                let (input, _) = parser::lexeme(tag("|"))(input)?;
+                let (input, right) =
+                    separated_list0(parser::lexeme(tag(",")), parser::lexeme(Game::parser))(input)?;
+                let (input, _) = parser::lexeme(tag("}"))(input)?;
+                Ok((input, Game { left, right }))
+            }
+        }
+    }
+
+    fn parse(input: &str) -> Option<Self> {
+        Self::parser(input).ok().map(|(_, g)| g)
     }
 
     fn zero() -> Game {
@@ -69,12 +78,12 @@ impl Game {
 fn parse_empty_game() {
     let inp = "{|}";
     let exp = ("", Game::zero());
-    assert_eq!(exp, Game::parse(inp).unwrap());
+    assert_eq!(exp, Game::parser(inp).unwrap());
 }
 
 #[test]
 fn parse_left_game() {
-    let inp = "{{|},{|}|}";
+    let inp = "{0,0|}";
     let exp = (
         "",
         Game {
@@ -82,12 +91,12 @@ fn parse_left_game() {
             right: vec![],
         },
     );
-    assert_eq!(exp, Game::parse(inp).unwrap());
+    assert_eq!(exp, Game::parser(inp).unwrap());
 }
 
 #[test]
 fn parse_right_game() {
-    let inp = "{|{|}}";
+    let inp = "{|0}";
     let exp = (
         "",
         Game {
@@ -95,12 +104,12 @@ fn parse_right_game() {
             right: vec![Game::zero()],
         },
     );
-    assert_eq!(exp, Game::parse(inp).unwrap());
+    assert_eq!(exp, Game::parser(inp).unwrap());
 }
 
 #[test]
 fn parse_nested_game() {
-    let inp = "{ {|} | {|} }";
+    let inp = "{0|0}";
     let exp = (
         "",
         Game {
@@ -108,7 +117,7 @@ fn parse_nested_game() {
             right: vec![Game::zero()],
         },
     );
-    assert_eq!(exp, Game::parse(inp).unwrap());
+    assert_eq!(exp, Game::parser(inp).unwrap());
 }
 
 impl Display for Game {
@@ -179,8 +188,62 @@ impl Game {
     }
 
     pub fn canonical_form(self) -> Self {
+        if self == Game::zero() {
+            return self;
+        }
         let g = self.remove_dominated();
-        todo!()
+
+        let left: Vec<Game> = g
+            .left
+            .clone()
+            .into_iter()
+            .map(Self::canonical_form)
+            .collect();
+
+        let right: Vec<Game> = g
+            .right
+            .clone()
+            .into_iter()
+            .map(Self::canonical_form)
+            .collect();
+
+        let left: Vec<Game> = left
+            .into_iter()
+            .flat_map(|l| Self::l_bypass_reversible(&g, &l))
+            .collect();
+        let right: Vec<Game> = right
+            .into_iter()
+            .flat_map(|r| Self::r_bypass_reversible(&g, &r))
+            .collect();
+
+        Game { left, right }
+    }
+
+    fn l_bypass_reversible(g: &Game, gl: &Game) -> Vec<Game> {
+        match gl.right.iter().find(|r| Self::less_eq(r, g)) {
+            None => vec![gl.clone()],
+            Some(glr) => glr.left.clone(),
+        }
+    }
+
+    fn r_bypass_reversible(g: &Game, gr: &Game) -> Vec<Game> {
+        match gr.left.iter().find(|l| Self::greater_eq(l, g)) {
+            None => vec![gr.clone()],
+            Some(glr) => glr.right.clone(),
+        }
+    }
+
+    pub fn num_to_game(num: Num) -> Self {
+        if num == 0 {
+            Game::zero()
+        } else {
+            // FIXME: Add support for negative values
+            assert!(num > 0);
+            Game {
+                left: vec![Game::num_to_game(num - 1)],
+                right: vec![],
+            }
+        }
     }
 }
 
@@ -197,25 +260,24 @@ fn zero_leq_one() {
 #[test]
 fn one_dominates_zero() {
     assert_eq!(
-        Game {
-            left: vec![Game::zero(), Game::one()],
-            right: vec![]
-        }
-        .remove_dominated(),
-        Game {
-            left: vec![Game::one()],
-            right: vec![]
-        }
+        Game::parse("{0,1|}").unwrap().remove_dominated(),
+        Game::parse("{1|}").unwrap()
     )
 }
 
+#[test]
+fn compute_canonical_form() {
+    assert_eq!(
+        Game::parse("{0,1|}").unwrap().canonical_form(),
+        Game::parse("2").unwrap()
+    );
+
+    assert_eq!(
+        Game::parse("{1,2,3|1}").unwrap().canonical_form(),
+        Game::parse("{3|1}").unwrap()
+    );
+}
+
 fn main() {
-    // let g = Game::parse("{{{|}|},{|}|}").unwrap().1;
-    // println!("{}", g);
-
-    // let g = g.remove_dominated();
-    // println!("{}", g);
-
-    println!("{}", Game::zero());
-    println!("{}", Game::one());
+    println!("{}", Game::parse("{1,2,3|1}").unwrap().canonical_form());
 }
