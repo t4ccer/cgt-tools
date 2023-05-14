@@ -120,6 +120,7 @@ fn parse_nested_game() {
     assert_eq!(exp, Game::parser(inp).unwrap());
 }
 
+// TODO: Add support for "known values", like 0, 1, *, etc.
 impl Display for Game {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{{")?;
@@ -236,12 +237,16 @@ impl Game {
     pub fn num_to_game(num: Num) -> Self {
         if num == 0 {
             Game::zero()
-        } else {
-            // FIXME: Add support for negative values
-            assert!(num > 0);
+        } else if num > 0 {
             Game {
                 left: vec![Game::num_to_game(num - 1)],
                 right: vec![],
+            }
+        } else {
+            assert!(num < 0);
+            Game {
+                left: vec![],
+                right: vec![Game::num_to_game(num + 1)],
             }
         }
     }
@@ -273,11 +278,21 @@ fn compute_canonical_form() {
     );
 
     assert_eq!(
+        Game::parse("{2|}").unwrap().canonical_form(),
+        Game::parse("3").unwrap()
+    );
+
+    assert_eq!(
+        Game::parse("{|-2}").unwrap().canonical_form(),
+        Game::parse("-3").unwrap()
+    );
+
+    assert_eq!(
         Game::parse("{1,2,3|1}").unwrap().canonical_form(),
         Game::parse("{3|1}").unwrap()
     );
 }
 
 fn main() {
-    println!("{}", Game::parse("{1,2,3|1}").unwrap().canonical_form());
+    println!("{}", Game::parse("{|-2}").unwrap().canonical_form());
 }
