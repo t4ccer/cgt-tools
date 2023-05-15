@@ -289,3 +289,25 @@ fn compute_canonical_form() {
         Game::parse("{3|1}").unwrap()
     );
 }
+
+impl Game {
+    fn plus(g: &Game, h: &Game) -> Game {
+        let left1 = h.left.iter().map(|hl| Game::plus(g, hl));
+        let left2 = g.left.iter().map(|gl| Game::plus(h, gl));
+        let left = left1.chain(left2).collect();
+
+        let right1 = h.right.iter().map(|hr| Game::plus(g, hr));
+        let right2 = g.right.iter().map(|gr| Game::plus(h, gr));
+        let right = right1.chain(right2).collect();
+
+        Game { left, right }.canonical_form()
+    }
+}
+
+#[test]
+fn simple_game_addtion() {
+    assert_eq!(
+        Game::plus(&Game::parse("{|1}").unwrap(), &Game::parse("{0|}").unwrap()),
+        Game::parse("1").unwrap()
+    );
+}
