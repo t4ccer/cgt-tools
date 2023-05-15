@@ -1,5 +1,6 @@
 use bit_vec::BitVec;
 use lazy_static::{__Deref, lazy_static};
+use queues::{IsQueue, Queue};
 use std::{collections::HashMap, fmt::Display, sync::RwLock};
 
 use crate::game::Game;
@@ -145,10 +146,86 @@ impl Display for Grid {
                 let chr = if self.at(x, y) { '#' } else { '.' };
                 write!(f, "{}", chr)?;
             }
-            write!(f, "\n")?;
+            if y != self.height - 1 {
+                write!(f, "\n")?;
+            }
         }
         Ok(())
     }
+}
+
+impl Grid {
+    /* TODO: Construct resulting grid "moved" to the top left corner
+
+    Now it will return
+
+    #.#
+    #..
+    ###
+
+    But for better caching it should return
+
+    .#
+    ..
+
+    */
+    fn bfs(&self, visited: &mut BitVec, x: usize, y: usize) -> Grid {
+        let mut grid = BitVec::from_elem(self.width * self.height, true);
+        let mut q: Queue<(usize, usize)> = Queue::new();
+        q.add((x, y)).unwrap();
+        while let Ok((qx, qy)) = q.remove() {
+            visited.set(self.width * qy + qx, true);
+            grid.set(self.width * qy + qx, false);
+
+            let directions: [(i64, i64); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
+            for (dx, dy) in directions {
+                let lx = (qx as i64) + dx;
+                let ly = (qy as i64) + dy;
+
+                if lx >= 0
+                    && lx < (self.width as i64)
+                    && ly >= 0
+                    && ly < (self.height as i64)
+                    && !self.at(lx as usize, ly as usize)
+                    && !visited[self.width * (ly as usize) + (lx as usize)]
+                {
+                    q.add((lx as usize, ly as usize)).unwrap();
+                }
+            }
+        }
+        Grid {
+            width: self.width,
+            height: self.height,
+            grid,
+        }
+    }
+
+    pub fn decompositons(&self) -> Vec<Grid> {
+        let mut visited = BitVec::from_elem(self.width * self.height, false);
+        let mut ds = Vec::new();
+
+        for y in 0..self.height {
+            for x in 0..self.width {
+                if !self.at(x, y) && !visited[self.width * y + x] {
+                    ds.push(self.bfs(&mut visited, x, y));
+                }
+            }
+        }
+
+        ds
+    }
+}
+
+#[test]
+fn decomposes_simple_grid() {
+    let grid = Grid::parse(3, 3, "..#|.#.|##.").unwrap();
+    assert_eq!(
+        grid.decompositons(),
+        vec![
+            Grid::parse(3, 3, "..#|.##|###").unwrap(),
+            Grid::parse(3, 3, "###|##.|##.").unwrap(),
+        ]
+    );
 }
 
 // NOTE: This is still not optimal as equivalent game may have different board positions

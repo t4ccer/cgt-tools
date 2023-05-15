@@ -4,20 +4,18 @@ mod grid;
 use grid::*;
 
 fn main() {
-    // let grid = Grid::parse("..#|.#.|##.").unwrap();
-
     // Takes 0.1s with -r
-    let grid = Grid::empty(4, 4);
-    println!("{}", grid);
+    // println!("{}", Grid::empty(4, 4).to_game());
 
-    // for left_move in grid.left_moves() {
-    // 	println!("{left_move}");
-    // }
+    // let grid = Grid::empty(4, 5);
+    // println!("\"{grid}\"\n  Canonical Form: {}", grid.to_game());
 
-    // for right_move in grid.right_moves() {
-    // 	println!("{right_move}");
-    // }
+    let grid = Grid::parse(3, 3, "..#|.#.|##.").unwrap();
+    println!("{}\n", grid);
+    for g in grid.decompositons() {
+        println!("{g}\n");
+    }
 
-    let game = grid.to_game();
-    println!("{}", game);
+    // Takes 30s with -r
+    // println!("{}", Grid::empty(5, 5).to_game());
 }
