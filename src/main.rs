@@ -6,7 +6,7 @@ use grid::*;
 fn main() {
     // let grid = Grid::parse("..#|.#.|##.").unwrap();
 
-    // Takes 3s with -r
+    // Takes 0.1s with -r
     let grid = Grid::empty(4, 4);
     println!("{}", grid);
 
@@ -18,7 +18,6 @@ fn main() {
     // 	println!("{right_move}");
     // }
 
-    // Takes 3s with -r
     let game = grid.to_game();
     println!("{}", game);
 }

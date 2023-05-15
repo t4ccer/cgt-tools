@@ -1,5 +1,6 @@
 use bit_vec::BitVec;
-use std::fmt::Display;
+use lazy_static::{__Deref, lazy_static};
+use std::{collections::HashMap, fmt::Display, sync::RwLock};
 
 use crate::game::Game;
 
@@ -8,7 +9,7 @@ use crate::game::Game;
 
 // FIXME: some bit array here
 #[allow(dead_code)]
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Grid {
     pub width: usize,
     pub height: usize,
@@ -150,7 +151,11 @@ impl Display for Grid {
     }
 }
 
-// // // type Cache = HashMap<Grid, Game>;
+// NOTE: This is still not optimal as equivalent game may have different board positions
+type Cache = HashMap<Grid, Game>;
+lazy_static! {
+    static ref CACHE: RwLock<Cache> = RwLock::new(HashMap::new());
+}
 
 impl Grid {
     /// Get the canonical form of the game
@@ -160,6 +165,12 @@ impl Grid {
 
         if left.is_empty() && right.is_empty() {
             return Game::zero();
+        }
+
+        {
+            if let Some(game) = CACHE.read().unwrap().deref().get(self) {
+                return game.clone();
+            }
         }
 
         let mut left_options: Vec<Game> = Vec::with_capacity(left.len());
@@ -172,11 +183,18 @@ impl Grid {
             right_options.push(right_option.to_game());
         }
 
-        Game {
+        let g = Game {
             left: left_options,
             right: right_options,
         }
-        .canonical_form()
+        .canonical_form();
+
+        {
+            let mut cache = CACHE.write().unwrap();
+            cache.insert(self.clone(), g.clone());
+        }
+
+        g
     }
 }
 

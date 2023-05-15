@@ -2,9 +2,6 @@ use std::{fmt::Display, ops::Not};
 
 use nom::{bytes::complete::tag, multi::separated_list0, IResult};
 
-// TODO: Find rational library
-type Num = i64;
-
 mod parser {
     use nom::{
         character::complete::{self, multispace0},
@@ -234,7 +231,7 @@ impl Game {
         }
     }
 
-    pub fn num_to_game(num: Num) -> Self {
+    pub fn num_to_game(num: i64) -> Self {
         if num == 0 {
             Game::zero()
         } else if num > 0 {
