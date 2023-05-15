@@ -1,4 +1,4 @@
-use std::{fmt::Display, mem::MaybeUninit};
+use std::{collections::HashMap, fmt::Display, mem::MaybeUninit};
 
 use crate::game::Game;
 
@@ -8,41 +8,35 @@ use crate::game::Game;
 // FIXME: some bit array here
 #[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Grid<const W: usize, const H: usize> {
-    pub grid: [[bool; W]; H],
+pub struct Grid {
+    pub grid: Vec<Vec<bool>>,
 }
 
-impl<const W: usize, const H: usize> Grid<W, H> {
-    pub fn empty() -> Self {
-        let grid: [[bool; W]; H] = [[false; W]; H];
-
-        Self { grid }
+impl Grid {
+    pub fn empty(width: usize, height: usize) -> Self {
+        Self {
+            grid: vec![vec![false; width]; height],
+        }
     }
 
     pub fn parse(input: &str) -> Option<Self> {
         // It's safe here, we don't access the array and initialize every field
-        let mut grid: [[bool; W]; H] = unsafe { MaybeUninit::uninit().assume_init() };
-        let mut x = 0;
-        let mut y = 0;
+        let mut grid = Vec::new();
+        let mut row = Vec::new();
 
         for chr in input.chars() {
             if chr == '|' {
-                if x == W {
-                    x = 0;
-                    y += 1;
-                    continue;
-                } else {
-                    // Not a rectangle
-                    return None;
-                }
+                grid.push(row);
+                row = Vec::new();
+                continue;
             }
-            grid[y][x] = match chr {
+            row.push(match chr {
                 '.' => false,
                 '#' => true,
                 _ => return None,
-            };
-            x += 1;
+            });
         }
+        grid.push(row);
         Some(Grid { grid })
     }
 }
@@ -50,18 +44,18 @@ impl<const W: usize, const H: usize> Grid<W, H> {
 #[test]
 fn parse_grid() {
     assert_eq!(
-        Grid::<3, 3>::parse("..#|.#.|##."),
+        Grid::parse("..#|.#.|##."),
         Some(Grid {
-            grid: [
-                [false, false, true],
-                [false, true, false],
-                [true, true, false]
+            grid: vec![
+                vec![false, false, true],
+                vec![false, true, false],
+                vec![true, true, false]
             ]
         })
     );
 }
 
-impl<const W: usize, const H: usize> Grid<W, H> {
+impl Grid {
     fn at(&self, x: usize, y: usize) -> bool {
         self.grid[y][x]
     }
@@ -73,8 +67,17 @@ impl<const W: usize, const H: usize> Grid<W, H> {
     // TODO: Use iterator/generator
     fn moves_for(&self, direction: (usize, usize)) -> Vec<Self> {
         let mut moves = Vec::new();
-        for y in 0..(H - direction.1) {
-            for x in 0..(W - direction.0) {
+        let height = match self.grid.len() {
+            0 => return moves, // If no height then no moves
+            l => l,
+        };
+        let width = match self.grid[0].len() {
+            0 => return moves,
+            l => l,
+        };
+
+        for y in 0..(height - direction.1) {
+            for x in 0..(width - direction.0) {
                 let next_x = x + direction.0;
                 let next_y = y + direction.1;
                 if !self.at(x, y) && !self.at(next_x, next_y) {
@@ -99,22 +102,22 @@ impl<const W: usize, const H: usize> Grid<W, H> {
 
 #[test]
 fn finds_left_moves() {
-    let grid = Grid::<3, 3>::parse("..#|.#.|##.").unwrap();
+    let grid = Grid::parse("..#|.#.|##.").unwrap();
     assert_eq!(
         grid.left_moves(),
         vec![
             Grid {
-                grid: [
-                    [true, false, true],
-                    [true, true, false],
-                    [true, true, false]
+                grid: vec![
+                    vec![true, false, true],
+                    vec![true, true, false],
+                    vec![true, true, false]
                 ]
             },
             Grid {
-                grid: [
-                    [false, false, true],
-                    [false, true, true],
-                    [true, true, true]
+                grid: vec![
+                    vec![false, false, true],
+                    vec![false, true, true],
+                    vec![true, true, true]
                 ]
             }
         ]
@@ -123,23 +126,32 @@ fn finds_left_moves() {
 
 #[test]
 fn finds_right_moves() {
-    let grid = Grid::<3, 3>::parse("..#|.#.|##.").unwrap();
+    let grid = Grid::parse("..#|.#.|##.").unwrap();
     assert_eq!(
         grid.right_moves(),
         vec![Grid {
-            grid: [
-                [true, true, true],
-                [false, true, false],
-                [true, true, false]
+            grid: vec![
+                vec![true, true, true],
+                vec![false, true, false],
+                vec![true, true, false]
             ]
         }]
     );
 }
 
-impl<const W: usize, const H: usize> Display for Grid<W, H> {
+impl Display for Grid {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for y in 0..H {
-            for x in 0..W {
+        let height = match self.grid.len() {
+            0 => return Ok(()), // If no height then no moves
+            l => l,
+        };
+        let width = match self.grid[0].len() {
+            0 => return Ok(()),
+            l => l,
+        };
+
+        for y in 0..height {
+            for x in 0..width {
                 let chr = if self.at(x, y) { '#' } else { '.' };
                 write!(f, "{}", chr)?;
             }
@@ -149,7 +161,9 @@ impl<const W: usize, const H: usize> Display for Grid<W, H> {
     }
 }
 
-impl<const W: usize, const H: usize> Grid<W, H> {
+// // type Cache = HashMap<Grid, Game>;
+
+impl Grid {
     /// Get the canonical form of the game
     pub fn to_game(&self) -> Game {
         let left = self.left_moves();
@@ -175,4 +189,10 @@ impl<const W: usize, const H: usize> Grid<W, H> {
         }
         .canonical_form()
     }
+}
+
+#[test]
+fn finds_simple_game_form() {
+    let grid = Grid::parse("..#|.#.|##.").unwrap();
+    assert_eq!(grid.to_game(), Game::parse("{1|1}").unwrap(),);
 }
