@@ -1,4 +1,5 @@
-use std::{collections::HashMap, fmt::Display, mem::MaybeUninit};
+use bit_vec::BitVec;
+use std::fmt::Display;
 
 use crate::game::Game;
 
@@ -9,75 +10,86 @@ use crate::game::Game;
 #[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Grid {
-    pub grid: Vec<Vec<bool>>,
+    pub width: usize,
+    pub height: usize,
+    pub grid: BitVec,
 }
 
 impl Grid {
     pub fn empty(width: usize, height: usize) -> Self {
         Self {
-            grid: vec![vec![false; width]; height],
+            width,
+            height,
+            grid: BitVec::from_elem(width * height, false),
         }
     }
 
-    pub fn parse(input: &str) -> Option<Self> {
-        // It's safe here, we don't access the array and initialize every field
-        let mut grid = Vec::new();
-        let mut row = Vec::new();
+    pub fn from_arr(width: usize, height: usize, field: &[bool]) -> Self {
+        Grid {
+            width,
+            height,
+            grid: BitVec::from_fn(width * height, |i| field[i]),
+        }
+    }
+
+    pub fn parse(width: usize, height: usize, input: &str) -> Option<Self> {
+        let mut grid = Grid::empty(width, height);
+        let mut x = 0;
+        let mut y = 0;
 
         for chr in input.chars() {
             if chr == '|' {
-                grid.push(row);
-                row = Vec::new();
-                continue;
+                if x == width {
+                    x = 0;
+                    y += 1;
+                    continue;
+                } else {
+                    // Not a rectangle
+                    return None;
+                }
             }
-            row.push(match chr {
-                '.' => false,
-                '#' => true,
-                _ => return None,
-            });
+            grid.grid.set(
+                width * y + x,
+                match chr {
+                    '.' => false,
+                    '#' => true,
+                    _ => return None,
+                },
+            );
+            x += 1;
         }
-        grid.push(row);
-        Some(Grid { grid })
+        Some(grid)
     }
 }
 
 #[test]
 fn parse_grid() {
+    let width = 3;
+    let height = 3;
     assert_eq!(
-        Grid::parse("..#|.#.|##."),
-        Some(Grid {
-            grid: vec![
-                vec![false, false, true],
-                vec![false, true, false],
-                vec![true, true, false]
-            ]
-        })
+        Grid::parse(width, height, "..#|.#.|##."),
+        Some(Grid::from_arr(
+            width,
+            height,
+            &[false, false, true, false, true, false, true, true, false]
+        ))
     );
 }
 
 impl Grid {
     fn at(&self, x: usize, y: usize) -> bool {
-        self.grid[y][x]
+        self.grid[self.width * y + x]
     }
 
     fn set(&mut self, x: usize, y: usize, val: bool) -> () {
-        self.grid[y][x] = val;
+        self.grid.set(self.width * y + x, val);
     }
 
     // TODO: Use iterator/generator
     fn moves_for(&self, direction: (usize, usize)) -> Vec<Self> {
         let mut moves = Vec::new();
-        let height = match self.grid.len() {
-            0 => return moves, // If no height then no moves
-            l => l,
-        };
-        let width = match self.grid[0].len() {
-            0 => return moves,
-            l => l,
-        };
-
-        for y in 0..(height - direction.1) {
-            for x in 0..(width - direction.0) {
+        for y in 0..(self.height - direction.1) {
+            for x in 0..(self.width - direction.0) {
                 let next_x = x + direction.0;
                 let next_y = y + direction.1;
                 if !self.at(x, y) && !self.at(next_x, next_y) {
@@ -102,56 +114,33 @@ impl Grid {
 
 #[test]
 fn finds_left_moves() {
-    let grid = Grid::parse("..#|.#.|##.").unwrap();
+    let width = 3;
+    let height = 3;
+    let grid = Grid::parse(width, height, "..#|.#.|##.").unwrap();
     assert_eq!(
         grid.left_moves(),
         vec![
-            Grid {
-                grid: vec![
-                    vec![true, false, true],
-                    vec![true, true, false],
-                    vec![true, true, false]
-                ]
-            },
-            Grid {
-                grid: vec![
-                    vec![false, false, true],
-                    vec![false, true, true],
-                    vec![true, true, true]
-                ]
-            }
+            Grid::parse(width, height, "#.#|##.|##.").unwrap(),
+            Grid::parse(width, height, "..#|.##|###").unwrap(),
         ]
     );
 }
 
 #[test]
 fn finds_right_moves() {
-    let grid = Grid::parse("..#|.#.|##.").unwrap();
+    let width = 3;
+    let height = 3;
+    let grid = Grid::parse(width, height, "..#|.#.|##.").unwrap();
     assert_eq!(
         grid.right_moves(),
-        vec![Grid {
-            grid: vec![
-                vec![true, true, true],
-                vec![false, true, false],
-                vec![true, true, false]
-            ]
-        }]
+        vec![Grid::parse(width, height, "###|.#.|##.").unwrap(),]
     );
 }
 
 impl Display for Grid {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let height = match self.grid.len() {
-            0 => return Ok(()), // If no height then no moves
-            l => l,
-        };
-        let width = match self.grid[0].len() {
-            0 => return Ok(()),
-            l => l,
-        };
-
-        for y in 0..height {
-            for x in 0..width {
+        for y in 0..self.height {
+            for x in 0..self.width {
                 let chr = if self.at(x, y) { '#' } else { '.' };
                 write!(f, "{}", chr)?;
             }
@@ -161,7 +150,7 @@ impl Display for Grid {
     }
 }
 
-// // type Cache = HashMap<Grid, Game>;
+// // // type Cache = HashMap<Grid, Game>;
 
 impl Grid {
     /// Get the canonical form of the game
@@ -193,6 +182,6 @@ impl Grid {
 
 #[test]
 fn finds_simple_game_form() {
-    let grid = Grid::parse("..#|.#.|##.").unwrap();
+    let grid = Grid::parse(3, 3, "..#|.#.|##.").unwrap();
     assert_eq!(grid.to_game(), Game::parse("{1|1}").unwrap(),);
 }

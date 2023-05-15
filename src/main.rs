@@ -4,11 +4,11 @@ mod grid;
 use grid::*;
 
 fn main() {
-    let grid = Grid::parse("..#|.#.|##.").unwrap();
+    // let grid = Grid::parse("..#|.#.|##.").unwrap();
 
     // Takes 3s with -r
-    // let grid = Grid::empty(4, 4);
-    // println!("{}", grid);
+    let grid = Grid::empty(4, 4);
+    println!("{}", grid);
 
     // for left_move in grid.left_moves() {
     // 	println!("{left_move}");
