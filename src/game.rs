@@ -1,6 +1,5 @@
-use std::{fmt::Display, ops::Not};
-
 use nom::{bytes::complete::tag, multi::separated_list0, IResult};
+use std::{fmt::Display, ops::Not};
 
 mod parser {
     use nom::{
@@ -291,7 +290,7 @@ fn compute_canonical_form() {
 }
 
 impl Game {
-    fn plus(g: &Game, h: &Game) -> Game {
+    pub fn plus(g: &Game, h: &Game) -> Game {
         let left1 = h.left.iter().map(|hl| Game::plus(g, hl));
         let left2 = g.left.iter().map(|gl| Game::plus(h, gl));
         let left = left1.chain(left2).collect();

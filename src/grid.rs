@@ -1,12 +1,10 @@
 use bit_vec::BitVec;
 use lazy_static::{__Deref, lazy_static};
 use queues::{IsQueue, Queue};
+use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 use std::{collections::HashMap, fmt::Display, sync::RwLock};
 
 use crate::game::Game;
-
-// mod bool_array;
-// use bool_array;
 
 // FIXME: some bit array here
 #[allow(dead_code)]
@@ -126,6 +124,27 @@ impl Grid {
 
     pub fn right_moves(&self) -> Vec<Self> {
         self.moves_for((1, 0))
+    }
+
+    fn has_moves_for(&self, direction: (usize, usize)) -> bool {
+        for y in 0..(self.height - direction.1) {
+            for x in 0..(self.width - direction.0) {
+                let next_x = x + direction.0;
+                let next_y = y + direction.1;
+                if !self.at(x, y) && !self.at(next_x, next_y) {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    pub fn has_left_moves(&self) -> bool {
+        self.has_moves_for((0, 1))
+    }
+
+    pub fn has_right_moves(&self) -> bool {
+        self.has_moves_for((1, 0))
     }
 }
 
@@ -328,20 +347,19 @@ lazy_static! {
 }
 
 impl Grid {
-    /// Get the canonical form of the game
-    pub fn to_game(&self) -> Game {
-        let left_moves = self.left_moves();
-        let right_moves = self.right_moves();
-
-        if left_moves.is_empty() && right_moves.is_empty() {
+    fn decomp_to_game(grid: &Grid) -> Game {
+        if !grid.has_left_moves() && !grid.has_left_moves() {
             return Game::zero();
         }
 
         {
-            if let Some(game) = CACHE.read().unwrap().deref().get(self) {
+            if let Some(game) = CACHE.read().unwrap().deref().get(grid) {
                 return game.clone();
             }
         }
+
+        let left_moves = grid.left_moves();
+        let right_moves = grid.right_moves();
 
         let mut left_options: Vec<Game> = Vec::with_capacity(left_moves.len());
         for left_move in left_moves {
@@ -353,18 +371,43 @@ impl Grid {
             right_options.push(right_move.to_game());
         }
 
-        let g = Game {
+        Game {
             left: left_options,
             right: right_options,
         }
-        .canonical_form();
+        .canonical_form()
+    }
 
-        {
-            let mut cache = CACHE.write().unwrap();
-            cache.insert(self.clone(), g.clone());
+    /// Get the canonical form of the game
+    pub fn to_game(&self) -> Game {
+        if !self.has_left_moves() && !self.has_right_moves() {
+            return Game::zero();
         }
 
-        g
+        {
+            if let Some(game) = CACHE.read().unwrap().deref().get(self) {
+                return game.clone();
+            }
+        }
+
+        self.decompositons()
+            .par_iter()
+            .map(|grid| {
+                let g = Grid::decomp_to_game(grid);
+                {
+                    let mut cache = CACHE.write().unwrap();
+                    cache.insert(self.clone(), g.clone());
+                }
+                g
+            })
+            .reduce(
+                || Game::zero(),
+                |mut acc: Game, g: Game| {
+                    acc = Game::plus(&g, &acc);
+                    acc
+                },
+            )
+            .canonical_form()
     }
 }
 
