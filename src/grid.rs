@@ -34,6 +34,21 @@ impl Grid {
         }
     }
 
+    /// Parses a grid from '.#' notation
+    ///
+    /// # Arguments
+    ///
+    /// * `width` - Grid width
+    ///
+    /// * `height` - Grid height
+    ///
+    /// * `input` - '.#' notation with '|' as rows separator
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// Grid::parse(3, 3, "..#|.#.|##.").unwrap()
+    /// ```
     pub fn parse(width: usize, height: usize, input: &str) -> Option<Self> {
         let mut grid = Grid::empty(width, height);
         let mut x = 0;
@@ -277,6 +292,7 @@ impl Grid {
         .move_top_left()
     }
 
+    /// Get decompisitons of given position
     pub fn decompositons(&self) -> Vec<Grid> {
         let mut visited = BitVec::from_elem(self.width * self.height, false);
         let mut ds = Vec::new();
