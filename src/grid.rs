@@ -155,20 +155,96 @@ impl Display for Grid {
 }
 
 impl Grid {
-    /* TODO: Construct resulting grid "moved" to the top left corner
+    /// Remove filled rows and columns from the edges
+    pub fn move_top_left(&self) -> Grid {
+        let mut filled_top_rows = 0;
+        for y in 0..self.height {
+            let mut should_break = false;
+            for x in 0..self.width {
+                // If empty space then break
+                if !self.at(x, y) {
+                    should_break = true;
+                    break;
+                }
+            }
+            if should_break {
+                break;
+            }
+            filled_top_rows += 1;
+        }
+        let filled_top_rows = filled_top_rows;
 
-    Now it will return
+        let mut filled_bottom_rows = 0;
+        for y in 0..self.height {
+            let mut should_break = false;
+            for x in 0..self.width {
+                // If empty space then break
+                if !self.at(x, self.height - y - 1) {
+                    should_break = true;
+                    break;
+                }
+            }
+            if should_break {
+                break;
+            }
+            filled_bottom_rows += 1;
+        }
+        let filled_bottom_rows = filled_bottom_rows;
 
-    #.#
-    #..
-    ###
+        let mut filled_left_cols = 0;
+        for x in 0..self.width {
+            let mut should_break = false;
+            for y in 0..self.height {
+                // If empty space then break
+                if !self.at(x, y) {
+                    should_break = true;
+                    break;
+                }
+            }
+            if should_break {
+                break;
+            }
+            filled_left_cols += 1;
+        }
+        let filled_left_cols = filled_left_cols;
 
-    But for better caching it should return
+        let mut filled_right_cols = 0;
+        for x in 0..self.width {
+            let mut should_break = false;
+            for y in 0..self.height {
+                // If empty space then break
+                if !self.at(self.width - x - 1, y) {
+                    should_break = true;
+                    break;
+                }
+            }
+            if should_break {
+                break;
+            }
+            filled_right_cols += 1;
+        }
+        let filled_right_cols = filled_right_cols;
 
-    .#
-    ..
+        let minimized_width = self.width - filled_left_cols - filled_right_cols;
+        let minimized_height = self.height - filled_top_rows - filled_bottom_rows;
 
-    */
+        let mut grid = BitVec::from_elem(minimized_width * minimized_height, false);
+        for y in filled_top_rows..(self.height - filled_bottom_rows) {
+            for x in filled_left_cols..(self.width - filled_right_cols) {
+                grid.set(
+                    minimized_width * (y - filled_top_rows) + (x - filled_left_cols),
+                    self.at(x, y),
+                );
+            }
+        }
+
+        Grid {
+            width: minimized_width,
+            height: minimized_height,
+            grid,
+        }
+    }
+
     fn bfs(&self, visited: &mut BitVec, x: usize, y: usize) -> Grid {
         let mut grid = BitVec::from_elem(self.width * self.height, true);
         let mut q: Queue<(usize, usize)> = Queue::new();
@@ -198,6 +274,7 @@ impl Grid {
             height: self.height,
             grid,
         }
+        .move_top_left()
     }
 
     pub fn decompositons(&self) -> Vec<Grid> {
@@ -222,8 +299,8 @@ fn decomposes_simple_grid() {
     assert_eq!(
         grid.decompositons(),
         vec![
-            Grid::parse(3, 3, "..#|.##|###").unwrap(),
-            Grid::parse(3, 3, "###|##.|##.").unwrap(),
+            Grid::parse(2, 2, "..|.#").unwrap(),
+            Grid::parse(1, 2, ".|.").unwrap(),
         ]
     );
 }
@@ -237,10 +314,10 @@ lazy_static! {
 impl Grid {
     /// Get the canonical form of the game
     pub fn to_game(&self) -> Game {
-        let left = self.left_moves();
-        let right = self.right_moves();
+        let left_moves = self.left_moves();
+        let right_moves = self.right_moves();
 
-        if left.is_empty() && right.is_empty() {
+        if left_moves.is_empty() && right_moves.is_empty() {
             return Game::zero();
         }
 
@@ -250,14 +327,14 @@ impl Grid {
             }
         }
 
-        let mut left_options: Vec<Game> = Vec::with_capacity(left.len());
-        for left_option in left {
-            left_options.push(left_option.to_game());
+        let mut left_options: Vec<Game> = Vec::with_capacity(left_moves.len());
+        for left_move in left_moves {
+            left_options.push(left_move.to_game());
         }
 
-        let mut right_options: Vec<Game> = Vec::with_capacity(right.len());
-        for right_option in right {
-            right_options.push(right_option.to_game());
+        let mut right_options: Vec<Game> = Vec::with_capacity(right_moves.len());
+        for right_move in right_moves {
+            right_options.push(right_move.to_game());
         }
 
         let g = Game {
