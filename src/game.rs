@@ -1,5 +1,6 @@
+use lazy_static::{__Deref, lazy_static};
 use nom::{bytes::complete::tag, multi::separated_list0, IResult};
-use std::{fmt::Display, ops::Not};
+use std::{collections::HashMap, fmt::Display, sync::RwLock};
 
 mod parser {
     use nom::{
@@ -28,7 +29,7 @@ mod parser {
 }
 
 #[allow(dead_code)]
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Game {
     pub left: Vec<Game>,
     pub right: Vec<Game>,
@@ -138,14 +139,18 @@ impl Display for Game {
     }
 }
 
+lazy_static! {
+    static ref CANONICAL_FORM_CACHE: RwLock<HashMap<Game, Game>> = RwLock::new(HashMap::new());
+}
+
 impl Game {
     fn greater_eq(lhs: &Game, rhs: &Game) -> bool {
         Self::less_eq(rhs, lhs)
     }
 
     fn less_eq(g: &Game, h: &Game) -> bool {
-        g.left.iter().any(|gl| Self::less_eq(h, gl)).not()
-            && h.right.iter().any(|hr| Self::less_eq(hr, g)).not()
+        g.left.iter().all(|gl| !Self::less_eq(h, gl))
+            && h.right.iter().all(|hr| !Self::less_eq(hr, g))
     }
 
     fn confused(lhs: &Game, rhs: &Game) -> bool {
@@ -188,6 +193,13 @@ impl Game {
         if self == Game::zero() {
             return self;
         }
+
+        {
+            if let Some(game) = CANONICAL_FORM_CACHE.read().unwrap().deref().get(&self) {
+                return game.clone();
+            }
+        }
+
         let g = self.remove_dominated();
 
         let left: Vec<Game> = g
@@ -213,7 +225,14 @@ impl Game {
             .flat_map(|r| Self::r_bypass_reversible(&g, &r))
             .collect();
 
-        Game { left, right }
+        let canonical_form = Game { left, right };
+
+        {
+            let mut cache = CANONICAL_FORM_CACHE.write().unwrap();
+            cache.insert(self.clone(), canonical_form.clone());
+        }
+
+        canonical_form
     }
 
     fn l_bypass_reversible(g: &Game, gl: &Game) -> Vec<Game> {
@@ -308,5 +327,12 @@ fn simple_game_addtion() {
     assert_eq!(
         Game::plus(&Game::parse("{|1}").unwrap(), &Game::parse("{0|}").unwrap()),
         Game::parse("1").unwrap()
+    );
+
+    assert_eq!(
+	Game::plus(
+	    &Game::parse("{{{{{{|}|}|}|{{{{|}|}|}|{|}}},{{{{|}|}|}|{|}}|{{{{|}|}|}|{|}},{{{{{|}|}|}|{|}}|{|}}},{|}|{|},{{{|}|{{|}|{|{|{|}}}}},{{|}|{|{|{|}}}}|{{|}|{|{|{|}}}},{{{|}|{|{|{|}}}}|{|{|{|}}}}}}").unwrap(),
+            &Game::parse("{{{{|}|}|{{{|}|}|}}|{{{|}|}|{{{|}|}|}}}").unwrap()),
+        Game::parse("{{{{{|}|}|{{{|}|}|}}|{{{|}|}|{{{|}|}|}}},{{{{{{{|}|}|}|}|{{{{{|}|}|}|}|}},{{{{{{|}|}|}|}|{{{{{|}|}|}|}|}}|{{{{{|}|}|}|}|{{{{{|}|}|}|}|}}}|{{{{{{{|}|}|}|}|{{{{{|}|}|}|}|}}|{{{{{|}|}|}|}|{{{{{|}|}|}|}|}}}|{{{{|}|}|{{{|}|}|}}|{{{|}|}|{{{|}|}|}}}}},{{{{{{{|}|}|}|}|{{{{{|}|}|}|}|}}|{{{{{|}|}|}|}|{{{{{|}|}|}|}|}}}|{{{{|}|}|{{{|}|}|}}|{{{|}|}|{{{|}|}|}}}}|{{{{{{{|}|}|}|}|{{{{{|}|}|}|}|}}|{{{{{|}|}|}|}|{{{{{|}|}|}|}|}}}|{{{{|}|}|{{{|}|}|}}|{{{|}|}|{{{|}|}|}}}},{{{{{{{{|}|}|}|}|{{{{{|}|}|}|}|}}|{{{{{|}|}|}|}|{{{{{|}|}|}|}|}}}|{{{{|}|}|{{{|}|}|}}|{{{|}|}|{{{|}|}|}}}}|{{{|}|}|{{{|}|}|}},{{{{|}|}|{{{|}|}|}}|{{{|}|}|{{{|}|}|}}}}}|{{{{{|}|}|{{{|}|}|}},{{{{|}|}|{{{|}|}|}}|{{{|}|}|{{{|}|}|}}}|{{{{{|}|}|{{{|}|}|}}|{{{|}|}|{{{|}|}|}}}|{{{|{|}}|{|}}|{{|{|}}|{|}}}}},{{{{{|}|}|{{{|}|}|}}|{{{|}|}|{{{|}|}|}}}|{{{|{|}}|{|}}|{{|{|}}|{|}}}}|{{{{{|}|}|{{{|}|}|}}|{{{|}|}|{{{|}|}|}}}|{{{|{|}}|{|}}|{{|{|}}|{|}}}},{{{{{{|}|}|{{{|}|}|}}|{{{|}|}|{{{|}|}|}}}|{{{|{|}}|{|}}|{{|{|}}|{|}}}}|{{|{|}}|{|}},{{{|{|}}|{|}}|{{|{|}}|{|}}}}},{{{{|}|}|{{{|}|}|}}|{{{|}|}|{{{|}|}|}}}}").unwrap(),
     );
 }

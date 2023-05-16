@@ -3,3 +3,6 @@
 /.sass-cache/
 /dist/
 /.direnv
+/flamegraph.svg
+/perf.data
+/perf.data.old

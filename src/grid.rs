@@ -103,6 +103,11 @@ impl Grid {
     // TODO: Use iterator/generator
     fn moves_for(&self, direction: (usize, usize)) -> Vec<Self> {
         let mut moves = Vec::new();
+
+        if self.height == 0 || self.width == 0 {
+            return moves;
+        }
+
         for y in 0..(self.height - direction.1) {
             for x in 0..(self.width - direction.0) {
                 let next_x = x + direction.0;
@@ -127,6 +132,10 @@ impl Grid {
     }
 
     fn has_moves_for(&self, direction: (usize, usize)) -> bool {
+        if self.height == 0 || self.width == 0 {
+            return false;
+        }
+
         for y in 0..(self.height - direction.1) {
             for x in 0..(self.width - direction.0) {
                 let next_x = x + direction.0;
@@ -208,6 +217,10 @@ impl Grid {
         }
         let filled_top_rows = filled_top_rows;
 
+        if filled_top_rows == self.height {
+            return Grid::empty(0, 0);
+        }
+
         let mut filled_bottom_rows = 0;
         for y in 0..self.height {
             let mut should_break = false;
@@ -241,6 +254,10 @@ impl Grid {
             filled_left_cols += 1;
         }
         let filled_left_cols = filled_left_cols;
+
+        if filled_left_cols == self.width {
+            return Grid::empty(0, 0);
+        }
 
         let mut filled_right_cols = 0;
         for x in 0..self.width {
@@ -347,67 +364,34 @@ lazy_static! {
 }
 
 impl Grid {
-    fn decomp_to_game(grid: &Grid) -> Game {
-        if !grid.has_left_moves() && !grid.has_left_moves() {
-            return Game::zero();
-        }
+    pub fn to_game(&self) -> Game {
+        let grid = self.move_top_left();
 
         {
-            if let Some(game) = CACHE.read().unwrap().deref().get(grid) {
+            if let Some(game) = CACHE.read().unwrap().deref().get(&grid) {
                 return game.clone();
             }
         }
 
-        let left_moves = grid.left_moves();
-        let right_moves = grid.right_moves();
-
-        let mut left_options: Vec<Game> = Vec::with_capacity(left_moves.len());
-        for left_move in left_moves {
-            left_options.push(left_move.to_game());
+        if !grid.has_left_moves() && !grid.has_right_moves() {
+            return Game::zero();
         }
 
-        let mut right_options: Vec<Game> = Vec::with_capacity(right_moves.len());
-        for right_move in right_moves {
-            right_options.push(right_move.to_game());
-        }
+        let left_options = grid.left_moves().iter().map(Grid::to_game).collect();
+        let right_options = grid.right_moves().iter().map(Grid::to_game).collect();
 
-        Game {
+        let g = Game {
             left: left_options,
             right: right_options,
         }
-        .canonical_form()
-    }
-
-    /// Get the canonical form of the game
-    pub fn to_game(&self) -> Game {
-        if !self.has_left_moves() && !self.has_right_moves() {
-            return Game::zero();
-        }
+        .canonical_form();
 
         {
-            if let Some(game) = CACHE.read().unwrap().deref().get(self) {
-                return game.clone();
-            }
+            let mut cache = CACHE.write().unwrap();
+            cache.insert(grid.clone(), g.clone());
         }
 
-        self.decompositons()
-            .par_iter()
-            .map(|grid| {
-                let g = Grid::decomp_to_game(grid);
-                {
-                    let mut cache = CACHE.write().unwrap();
-                    cache.insert(self.clone(), g.clone());
-                }
-                g
-            })
-            .reduce(
-                || Game::zero(),
-                |mut acc: Game, g: Game| {
-                    acc = Game::plus(&g, &acc);
-                    acc
-                },
-            )
-            .canonical_form()
+        g
     }
 }
 

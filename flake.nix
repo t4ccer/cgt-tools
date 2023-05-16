@@ -54,6 +54,7 @@
           nativeBuildInputs = [
             pkgs.alejandra
             pkgs.fd
+            pkgs.cargo-flamegraph
 
             (pkgs.rust-bin.fromRustupToolchain {
               channel = "stable";
