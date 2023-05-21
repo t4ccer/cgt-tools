@@ -9,6 +9,7 @@ repository = "https://github.com/t4ccer/cgrs"
 
 [dependencies]
 bit-vec = "0.6.3"
+gcd = "2.3.0"
 itertools = "0.10.5"
 lazy_static = "1.4.0"
 nom = "7.1.3"
