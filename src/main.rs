@@ -1,23 +1,23 @@
-mod game;
-mod grid;
+#![feature(extend_one)]
+// mod game;
+// mod grid;
+mod canonical_short_game;
+mod dyadic_rational_number;
 
-use game::*;
-use grid::*;
+// use game::*;
+use canonical_short_game::*;
+// use grid::*;
 
 fn main() {
+    let gs = GameStorage::new();
+    println!("{:?}", gs.zero_id);
+    println!("{:?}", gs.star_id);
     // ./target/release/cg  0.54s user 0.04s system 99% cpu 0.575 total
-    // println!("{}", Grid::to_game(&Grid::empty(5, 4)));
+    // println!("{}", Grid::empty(5, 5).to_game());
+    // println!("{}", Grid::empty(5, 4).reduce());
 
     // let grid = Grid::empty(3, 3);
     // println!("{}", grid.to_game());
-
-    println!(
-        "{}",
-        Game::plus(
-            &Game::parse("{{{{{{|}|}|}|{{{{|}|}|}|{|}}},{{{{|}|}|}|{|}}|{{{{|}|}|}|{|}},{{{{{|}|}|}|{|}}|{|}}},{|}|{|},{{{|}|{{|}|{|{|{|}}}}},{{|}|{|{|{|}}}}|{{|}|{|{|{|}}}},{{{|}|{|{|{|}}}}|{|{|{|}}}}}}").unwrap(),
-            &Game::parse("{{{{|}|}|{{{|}|}|}}|{{{|}|}|{{{|}|}|}}}").unwrap()
-        )
-    );
 
     // for m in grid.right_moves() {
     // println!("{}\n", m.move_top_left());

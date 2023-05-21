@@ -57,7 +57,7 @@
             pkgs.cargo-flamegraph
 
             (pkgs.rust-bin.fromRustupToolchain {
-              channel = "stable";
+              channel = "nightly";
               components = ["rust-analyzer" "rust-src" "rustfmt" "rustc" "cargo"];
             })
           ];

@@ -1,7 +1,6 @@
 use bit_vec::BitVec;
 use lazy_static::{__Deref, lazy_static};
 use queues::{IsQueue, Queue};
-use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 use std::{collections::HashMap, fmt::Display, sync::RwLock};
 
 use crate::game::Game;
@@ -296,14 +295,15 @@ impl Grid {
         }
     }
 
-    fn bfs(&self, visited: &mut BitVec, x: usize, y: usize) -> Grid {
+    fn bfs(&self, visited: &mut BitVec, x: usize, y: usize) -> Option<Grid> {
         let mut grid = BitVec::from_elem(self.width * self.height, true);
         let mut q: Queue<(usize, usize)> = Queue::new();
+        let mut size = 0;
         q.add((x, y)).unwrap();
         while let Ok((qx, qy)) = q.remove() {
             visited.set(self.width * qy + qx, true);
             grid.set(self.width * qy + qx, false);
-
+            size += 1;
             let directions: [(i64, i64); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
             for (dx, dy) in directions {
                 let lx = (qx as i64) + dx;
@@ -320,12 +320,18 @@ impl Grid {
                 }
             }
         }
-        Grid {
-            width: self.width,
-            height: self.height,
-            grid,
+        if size < 2 {
+            None
+        } else {
+            Some(
+                Grid {
+                    width: self.width,
+                    height: self.height,
+                    grid,
+                }
+                .move_top_left(),
+            )
         }
-        .move_top_left()
     }
 
     /// Get decompisitons of given position
@@ -336,7 +342,9 @@ impl Grid {
         for y in 0..self.height {
             for x in 0..self.width {
                 if !self.at(x, y) && !visited[self.width * y + x] {
-                    ds.push(self.bfs(&mut visited, x, y));
+                    if let Some(g) = self.bfs(&mut visited, x, y) {
+                        ds.push(g);
+                    }
                 }
             }
         }
@@ -364,6 +372,43 @@ lazy_static! {
 }
 
 impl Grid {
+    /// Like `to_game` but decomposes the game
+    pub fn reduce(&self) -> Game {
+        let decomp = self.decompositons();
+        if decomp.len() == 0 {
+            Game::zero()
+        } else {
+            let mut result = Game::zero();
+            for component in decomp {
+                let component = component.reduce2();
+                result = Game::plus(&result, &component)
+            }
+            result
+        }
+    }
+
+    fn reduce2(&self) -> Game {
+        let grid = self.move_top_left();
+
+        {
+            if let Some(game) = CACHE.read().unwrap().deref().get(&grid) {
+                return game.clone();
+            }
+        }
+
+        let result = Game {
+            left: self.left_moves().iter().map(Self::reduce).collect(),
+            right: self.right_moves().iter().map(Self::reduce).collect(),
+        };
+
+        {
+            let mut cache = CACHE.write().unwrap();
+            cache.insert(grid, result.clone());
+        }
+
+        result
+    }
+
     pub fn to_game(&self) -> Game {
         let grid = self.move_top_left();
 
@@ -399,4 +444,7 @@ impl Grid {
 fn finds_simple_game_form() {
     let grid = Grid::parse(3, 3, "..#|.#.|##.").unwrap();
     assert_eq!(grid.to_game(), Game::parse("{1|1}").unwrap(),);
+
+    let grid = Grid::empty(4, 5);
+    assert_eq!(grid.to_game(), Game::parse("{|0}").unwrap(),);
 }
