@@ -67,6 +67,15 @@ impl Hasher {
     }
 }
 
+#[test]
+fn hash_works() {
+    assert_eq!(Hasher::hash(0), -8130816);
+    assert_eq!(Hasher::hash(12), -8226735);
+    assert_eq!(Hasher::hash(-42), 364656);
+    assert_eq!(Hasher::hash(1337), -10294144);
+    assert_eq!(Hasher::hash(482364747), 1588849805);
+}
+
 #[derive(Debug)]
 struct Nus {
     number: DyadicRationalNumber,
@@ -126,11 +135,8 @@ fn copy_slice<T>(src: &[T], src_start: usize, dst: &mut [T], dst_start: usize, l
 where
     T: Clone,
 {
-    // let start = ((offset_at as usize) & SECTOR_MASK) + 2;
-    // let prev_options_end = start + (i as usize) - 1;
     let src_end = src_start + len;
     let es = &src[src_start..=src_end];
-
     for (idx, e) in es.iter().cloned().enumerate() {
         dst[dst_start + idx] = e;
     }
@@ -398,11 +404,46 @@ impl GameStorage {
     }
 }
 
+impl GameStorage {
+    fn get_left_options_no(&self, game_id: u32) -> u32 {
+        (self.data[(game_id >> SECTOR_BITS) as usize][((game_id + 1) as usize) & SECTOR_MASK]
+            & NUM_LO_MASK)
+            >> NUM_LO_SHIFT
+    }
+
+    pub fn get_left_options(&self, game_id: u32) -> impl Iterator<Item = u32> + '_ {
+        let no_left_options = self.get_left_options_no(game_id);
+        (0..no_left_options).map(move |idx| {
+            self.data[(game_id >> SECTOR_BITS) as usize][(game_id + 2 + idx) as usize & SECTOR_MASK]
+        })
+    }
+
+    fn get_right_options_no(&self, game_id: u32) -> u32 {
+        self.data[(game_id >> SECTOR_BITS) as usize][((game_id + 1) as usize) & SECTOR_MASK]
+            & NUM_RO_MASK
+    }
+
+    pub fn get_right_options(&self, game_id: u32) -> impl Iterator<Item = u32> + '_ {
+        let no_left_options = self.get_left_options_no(game_id);
+        let no_right_options = self.get_right_options_no(game_id);
+        (0..no_right_options).map(move |idx| {
+            self.data[(game_id >> SECTOR_BITS) as usize]
+                [(game_id + 2 + no_left_options + idx) as usize & SECTOR_MASK]
+                .clone()
+        })
+    }
+}
+
 #[test]
-fn hash_works() {
-    assert_eq!(Hasher::hash(0), -8130816);
-    assert_eq!(Hasher::hash(12), -8226735);
-    assert_eq!(Hasher::hash(-42), 364656);
-    assert_eq!(Hasher::hash(1337), -10294144);
-    assert_eq!(Hasher::hash(482364747), 1588849805);
+fn correct_star_options() {
+    let gs = GameStorage::new();
+    // * = {0|0}
+    assert_eq!(
+        gs.get_left_options(gs.star_id).collect::<Vec<_>>(),
+        vec![gs.zero_id]
+    );
+    assert_eq!(
+        gs.get_right_options(gs.star_id).collect::<Vec<_>>(),
+        vec![gs.zero_id]
+    );
 }

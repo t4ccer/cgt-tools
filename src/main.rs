@@ -12,6 +12,10 @@ fn main() {
     let gs = GameStorage::new();
     println!("{:?}", gs.zero_id);
     println!("{:?}", gs.star_id);
+
+    let foo: Vec<u32> = gs.get_right_options(gs.star_id).collect();
+    println!("{:?}", foo);
+
     // ./target/release/cg  0.54s user 0.04s system 99% cpu 0.575 total
     // println!("{}", Grid::empty(5, 5).to_game());
     // println!("{}", Grid::empty(5, 4).reduce());
