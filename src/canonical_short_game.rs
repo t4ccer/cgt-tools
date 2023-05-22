@@ -1,5 +1,10 @@
-use std::{fmt::Display, ops::Neg};
+use std::{
+    cmp::{self, Ordering},
+    fmt::Display,
+    ops::Neg,
+};
 
+use itertools::Itertools;
 use num_derive::FromPrimitive;
 
 use crate::dyadic_rational_number::DyadicRationalNumber;
@@ -269,7 +274,7 @@ impl GameStorage {
     pub fn construct_integer(&mut self, val: i32) -> u32 {
         let num_lo = if val > 0 { 1 } else { 0 };
         let num_ro = if val < 0 { 1 } else { 0 };
-        let sign = if val >= 0 { 1 } else { 0 };
+        let sign = if val >= 0 { 1 } else { -1 };
         let mut offset_at;
 
         let mut last_defined = val;
@@ -572,6 +577,52 @@ impl GameStorage {
         offset_at
     }
 
+    /// Function is mutable to store the cache result
+    fn birthday(&mut self, id: u32) -> i32 {
+        if self.is_number_up_star(id) {
+            let den_exp = self.get_den_exp_part(id);
+            let up_mag = self.get_up_multiple_part(id).abs();
+            let nimber = self.get_nimber_part(id);
+
+            let number_birthday: i32;
+            if self.is_extended_record(id) {
+                todo!()
+            } else {
+                let num_mag = self.get_small_numerator_part(id).abs();
+                number_birthday = if den_exp == 0 {
+                    num_mag
+                } else {
+                    1 + (num_mag >> den_exp) as i32 + den_exp as i32
+                }
+            }
+
+            let up_star_birthday: i32 = if up_mag > 0 && nimber == 0 {
+                up_mag + 1
+            } else if (up_mag & 1) == 1 && nimber != 1 {
+                up_mag + (nimber ^ 1)
+            } else {
+                up_mag + nimber
+            };
+            return number_birthday + up_star_birthday;
+        }
+        let birthday = self.lookup_op_result(Operation::Birthday, id, -1i32 as u32);
+        if let Some(birthday) = birthday {
+            return birthday as i32;
+        }
+        let mut birthday: i32 = 0;
+
+        // We need to `collect` or borrow checker will complain
+        for left_opt in self.get_left_options(id).collect::<Vec<_>>() {
+            birthday = cmp::max(birthday, self.birthday(left_opt) + 1);
+        }
+        for right_opt in self.get_right_options(id).collect::<Vec<_>>() {
+            birthday = cmp::max(birthday, self.birthday(right_opt) + 1);
+        }
+
+        self.store_op_result(Operation::Birthday, id, -1i32 as u32, birthday as u32);
+        birthday
+    }
+
     fn get_small_numerator_part(&self, id: u32) -> i32 {
         self.data[(id >> SECTOR_BITS) as usize][(id as usize - 1) & SECTOR_MASK] as i32
     }
@@ -628,6 +679,12 @@ impl GameStorage {
             (self.data[(id >> SECTOR_BITS) as usize][(id as usize - 2) & SECTOR_MASK] & NIMBER_MASK)
                 as i32
         }
+    }
+
+    fn is_nimber(&self, id: u32) -> bool {
+        self.is_number_up_star(id)
+            && self.get_number_part(id) == DyadicRationalNumber::from(0)
+            && self.get_up_multiple_part(id) == 0
     }
 
     pub fn is_number_up_star(&self, id: u32) -> bool {
@@ -940,6 +997,322 @@ impl GameStorage {
         self.op_table_result[hc] = result;
     }
 
+    fn eliminate_duplicate_options(gs: &[u32]) -> Vec<u32> {
+        gs.iter().sorted().dedup().cloned().collect()
+    }
+
+    fn mex(&self, opts: &[u32]) -> i32 {
+        let mut i = 0;
+        let mut mex = 0;
+
+        for opt in opts {
+            i += 1;
+            if !self.is_nimber(*opt) {
+                // FIXME: Use None
+                return -1;
+            } else if self.get_nimber_part(*opt) == mex {
+                mex += 1;
+            } else {
+                // It's a nimber, but exceeds mex.  We've found the true
+                // mex - *provided* everything that remains is a nimber.
+                break;
+            }
+        }
+
+        for opt in opts[i..].iter() {
+            if !self.is_nimber(*opt) {
+                return -1;
+            }
+        }
+
+        mex
+    }
+
+    fn construct_from_options(&mut self, ls: &[u32], rs: &[u32]) -> u32 {
+        let ls = Self::eliminate_duplicate_options(ls);
+        let rs = Self::eliminate_duplicate_options(rs);
+
+        let left_mex = self.mex(&ls);
+        if left_mex >= 0 {
+            let right_mex = self.mex(&rs);
+            if left_mex == right_mex {
+                let nus = Nus {
+                    number: DyadicRationalNumber::from(0),
+                    up_multiple: 0,
+                    nimber: left_mex,
+                };
+                return self.construct_nus(&nus);
+            }
+        }
+
+        let ls = self.bypass_reversible_options_l(&ls, &rs);
+        let rs = self.bypass_reversible_options_r(&ls, &rs);
+
+        let ls = self.eliminate_dominated_options(&ls, true);
+        let rs = self.eliminate_dominated_options(&rs, false);
+
+        self.construct_from_canonical_options(ls, rs)
+    }
+
+    fn eliminate_dominated_options(
+        &mut self,
+        options: &[u32],
+        eliminate_smaller_options: bool,
+    ) -> Vec<u32> {
+        let mut options = options.to_vec();
+        for i in 0..options.len() {
+            if options[i] == -1i32 as u32 {
+                continue;
+            }
+            for j in 0..i {
+                if options[j] == -1i32 as u32 {
+                    continue;
+                }
+                if eliminate_smaller_options && self.leq(options[i], options[j])
+                    || !eliminate_smaller_options && self.leq(options[j], options[i])
+                {
+                    options[i] = -1i32 as u32;
+                    break;
+                }
+                if eliminate_smaller_options && self.leq(options[j], options[i])
+                    || !eliminate_smaller_options && self.leq(options[i], options[j])
+                {
+                    options[j] = -1i32 as u32;
+                }
+            }
+        }
+        Self::pack(&options)
+    }
+
+    fn pack(options: &[u32]) -> Vec<u32> {
+        options
+            .iter()
+            .cloned()
+            .filter(|o| *o != -1i32 as u32)
+            .collect()
+    }
+
+    fn bypass_reversible_options_l(
+        &mut self,
+        left_options: &[u32],
+        right_options: &[u32],
+    ) -> Vec<u32> {
+        let mut left_options: Vec<u32> = left_options.to_vec();
+        let gLs = left_options.clone();
+        let mut i = 0;
+        loop {
+            if i >= gLs.len() {
+                break;
+            }
+            let gL = gLs[i];
+            for gLR in self.get_right_options(gL).collect::<Vec<_>>().iter() {
+                if self.leq_arrays(*gLR, &left_options, right_options) {
+                    let mut new_left_options: Vec<u32> = Vec::with_capacity(
+                        left_options.len() - 1 + self.get_left_options_no(*gLR) as usize,
+                    );
+                    for k in 0..i {
+                        new_left_options[k] = left_options[k];
+                    }
+                    for k in (i + 1)..(left_options.len()) {
+                        new_left_options[k - 1] = left_options[k];
+                    }
+                    for (k, gLRL) in self.get_left_options(*gLR).enumerate() {
+                        if left_options.contains(&gLRL) {
+                            new_left_options[left_options.len() - 1 + k] = -1i32 as u32;
+                        } else {
+                            new_left_options[left_options.len() - 1 + k] = gLRL;
+                        }
+                    }
+                    left_options = new_left_options;
+                    i -= 1;
+                    break;
+                }
+            }
+            i += 1;
+        }
+        Self::pack(&left_options)
+    }
+
+    fn bypass_reversible_options_r(
+        &mut self,
+        left_options: &[u32],
+        right_options: &[u32],
+    ) -> Vec<u32> {
+        let mut right_options: Vec<u32> = right_options.to_vec();
+        let gRs = right_options.clone();
+        let mut i = 0;
+        loop {
+            if i >= gRs.len() {
+                break;
+            }
+            let gR = gRs[i];
+            for gRL in self.get_left_options(gR).collect::<Vec<_>>().iter() {
+                if self.leq_arrays(*gRL, left_options, &right_options) {
+                    let mut new_right_options: Vec<u32> = Vec::with_capacity(
+                        right_options.len() - 1 + self.get_right_options_no(*gRL) as usize,
+                    );
+                    for k in 0..i {
+                        new_right_options[k] = right_options[k];
+                    }
+                    for k in (i + 1)..(right_options.len()) {
+                        new_right_options[k - 1] = right_options[k];
+                    }
+                    for (k, gRLR) in self.get_left_options(*gRL).enumerate() {
+                        if right_options.contains(&gRLR) {
+                            new_right_options[right_options.len() - 1 + k] = -1i32 as u32;
+                        } else {
+                            new_right_options[right_options.len() - 1 + k] = gRLR;
+                        }
+                    }
+                    right_options = new_right_options;
+                    i -= 1;
+                    break;
+                }
+            }
+            i += 1;
+        }
+        Self::pack(&right_options)
+    }
+
+    /// Return false if `H <= GL` for some left option `GL` of `G` or `HR <= G` for some right
+    /// option `HR` of `H`. Otherwise return true.
+    fn leq_arrays(&mut self, id: u32, ls: &[u32], rs: &[u32]) -> bool {
+        for r_opt in rs {
+            // NOTE: Aaron uses different comparasion function here
+            if self.leq(*r_opt, id) {
+                return false;
+            }
+        }
+
+        let sector = &self.data[(id >> SECTOR_BITS) as usize].clone();
+        let sector_offset = (id as usize) & SECTOR_MASK;
+        let num_lo = (sector[sector_offset + 1] & NUM_LO_MASK) >> NUM_LO_SHIFT;
+
+        for i in 0..num_lo {
+            if self.geq_arrays(sector[sector_offset + 2 + i as usize], ls, rs) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// Return false if `GR <= H` or `G <= HL`. Otherwise return true.
+    fn geq_arrays(&mut self, id: u32, ls: &[u32], rs: &[u32]) -> bool {
+        for l_opt in ls {
+            if self.leq(id, *l_opt) {
+                return false;
+            }
+        }
+
+        let sector = &self.data[(id >> SECTOR_BITS) as usize].clone();
+        let sector_offset = (id as usize) & SECTOR_MASK;
+        let num_lo = (sector[sector_offset + 1] & NUM_LO_MASK) >> NUM_LO_SHIFT;
+        let num_ro = sector[sector_offset + 1] & NUM_RO_MASK;
+
+        for i in 0..num_ro {
+            if self.leq_arrays(
+                sector[sector_offset + 2 + num_lo as usize + i as usize],
+                ls,
+                rs,
+            ) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    pub fn add(&mut self, gid: u32, hid: u32) -> u32 {
+        if self.is_number_up_star(gid) && self.is_number_up_star(hid) {
+            if self.is_extended_record(gid) || self.is_extended_record(hid) {
+                todo!()
+            } else {
+                let g_num = self.get_small_numerator_part(gid);
+                let g_den = self.get_den_exp_part(gid);
+
+                let h_num = self.get_small_numerator_part(hid);
+                let h_den = self.get_den_exp_part(hid);
+
+                let mut sum_den;
+                let mut sum_num;
+
+                if g_den >= h_den {
+                    sum_den = g_den;
+                    sum_num = g_num + (h_num << (g_den - h_den));
+                } else {
+                    sum_den = h_den;
+                    sum_num = h_num + (g_num << (h_den - g_den));
+                }
+
+                // If numerator is even we can half it and reduce exponent of denominator
+                while (sum_num & 1) == 0 && sum_den > 0 {
+                    sum_num >>= 1;
+                    sum_den -= 1;
+                }
+
+                let nus = Nus {
+                    number: DyadicRationalNumber::rational(sum_num, 1 << sum_den).unwrap(),
+                    up_multiple: self.get_up_multiple_part(gid) + self.get_up_multiple_part(hid),
+                    nimber: self.get_nimber_part(gid) ^ self.get_nimber_part(hid),
+                };
+                return self.construct_nus(&nus);
+            }
+        }
+        if let Some(result) = self.lookup_op_result(Operation::Sum, gid, hid) {
+            return result;
+        }
+
+        let h_start_left_opts = if self.is_number(gid) {
+            0
+        } else {
+            self.get_left_options_no(gid)
+        };
+
+        let h_start_right_opts = if self.is_number(gid) {
+            0
+        } else {
+            self.get_right_options_no(gid)
+        };
+
+        let g_start_left_opts = if self.is_number(hid) {
+            0
+        } else {
+            self.get_left_options_no(hid)
+        };
+
+        let g_start_right_opts = if self.is_number(hid) {
+            0
+        } else {
+            self.get_right_options_no(hid)
+        };
+
+        let mut new_left_opts = vec![0; (h_start_left_opts + g_start_left_opts) as usize];
+        let mut new_right_opts = vec![0; (h_start_right_opts + g_start_right_opts) as usize];
+
+        if !self.is_number(gid) {
+            for (idx, l) in self.get_left_options(gid).enumerate().collect::<Vec<_>>() {
+                new_left_opts[idx] = self.add(l, hid);
+            }
+            for (idx, r) in self.get_right_options(gid).enumerate().collect::<Vec<_>>() {
+                new_right_opts[idx] = self.add(r, hid);
+            }
+        }
+
+        if !self.is_number(hid) {
+            for (idx, l) in self.get_left_options(hid).enumerate().collect::<Vec<_>>() {
+                new_left_opts[idx + h_start_left_opts as usize] = self.add(gid, l);
+            }
+            for (idx, r) in self.get_right_options(hid).enumerate().collect::<Vec<_>>() {
+                new_right_opts[idx + h_start_right_opts as usize] = self.add(gid, r);
+            }
+        }
+
+        let result = self.construct_from_options(&new_left_opts, &new_right_opts);
+        self.store_op_result(Operation::Sum, gid, hid, result);
+        result
+    }
+
     pub fn get_negative(&mut self, id: u32) -> u32 {
         if self.is_number_up_star(id) {
             let nus = Nus {
@@ -1030,6 +1403,7 @@ fn constructs_integers() {
     let mut gs = GameStorage::new();
     assert_eq!(gs.construct_integer(4), 33);
     assert_eq!(gs.construct_integer(0x1000), 24585);
+    assert_eq!(gs.construct_integer(-3), 24603);
 }
 
 #[test]
@@ -1069,6 +1443,18 @@ impl GameStorage {
                 .clone()
         })
     }
+
+    pub fn sorted_left_options(&mut self, game_id: u32) -> Vec<u32> {
+        let mut options = self.get_left_options(game_id).collect::<Vec<_>>();
+        options.sort_by(|gid, hid| self.compare(*gid, *hid));
+        options
+    }
+
+    pub fn sorted_right_options(&mut self, game_id: u32) -> Vec<u32> {
+        let mut options = self.get_right_options(game_id).collect::<Vec<_>>();
+        options.sort_by(|gid, hid| self.compare(*gid, *hid));
+        options
+    }
 }
 
 #[test]
@@ -1085,15 +1471,93 @@ fn correct_star_options() {
     );
 }
 
-// impl GameStorage {
-//     fn compare(gid: u32, hid: u32) -> i32 {
-// 	if gid == hid {
-// 	    return 0;
-// 	}
+impl GameStorage {
+    /// Inputs MUST be equal length
+    fn compare_opts(&mut self, gs: &[u32], hs: &[u32]) -> Ordering {
+        assert!(gs.len() == gs.len(), "Inputs are not equal length");
+        for (g, h) in gs.iter().zip(hs) {
+            let cmp = self.compare(*h, *h);
+            match cmp {
+                Ordering::Equal => continue,
+                _ => return cmp,
+            }
+        }
+        Ordering::Equal
+    }
 
-// 	panic!("Unreachable")
-//     }
-// }
+    /// Function is mutable because cache stuff
+    fn compare(&mut self, gid: u32, hid: u32) -> Ordering {
+        if gid == hid {
+            return Ordering::Equal;
+        }
+
+        let mut cmp: i32 = self.birthday(gid) - self.birthday(hid);
+        if cmp != 0 {
+            return Ord::cmp(&cmp, &0);
+        }
+
+        cmp = self.get_left_options_no(gid) as i32 - self.get_left_options_no(hid) as i32;
+        if cmp != 0 {
+            return Ord::cmp(&cmp, &0);
+        }
+
+        cmp = self.get_right_options_no(gid) as i32 - self.get_right_options_no(hid) as i32;
+        if cmp != 0 {
+            return Ord::cmp(&cmp, &0);
+        }
+
+        let ls = self.sorted_left_options(gid);
+        let rs = self.sorted_left_options(gid);
+        let cmp = self.compare_opts(&ls, &rs);
+        if cmp != Ordering::Equal {
+            return cmp;
+        }
+
+        let ls = self.sorted_right_options(gid);
+        let rs = self.sorted_right_options(gid);
+        let cmp = self.compare_opts(&ls, &rs);
+        if cmp != Ordering::Equal {
+            return cmp;
+        }
+
+        panic!("compare: Unreachable")
+    }
+
+    pub fn leq(&mut self, gid: u32, hid: u32) -> bool {
+        match self.compare(gid, hid) {
+            Ordering::Less => true,
+            Ordering::Equal => true,
+            Ordering::Greater => false,
+        }
+    }
+}
+
+#[test]
+fn compare_works() {
+    let mut gs = GameStorage::new();
+    assert_eq!(gs.compare(gs.zero_id, gs.zero_id), Ordering::Equal);
+    assert_eq!(gs.compare(gs.star_id, gs.star_id), Ordering::Equal);
+    assert_eq!(gs.compare(gs.zero_id, gs.star_id), Ordering::Less);
+    assert_eq!(gs.compare(gs.star_id, gs.zero_id), Ordering::Greater);
+}
+
+#[test]
+fn addition_works() {
+    let mut gs = GameStorage::new();
+
+    let zero = gs.construct_integer(0);
+    assert_eq!(gs.add(zero, zero), zero);
+
+    let one = gs.construct_integer(1);
+    let two = gs.construct_integer(2);
+    assert_eq!(gs.add(one, one), two);
+
+    let minus_one = gs.construct_integer(-1);
+    assert_eq!(gs.add(one, minus_one), zero);
+
+    let half = gs.construct_rational(DyadicRationalNumber::rational(1, 2).unwrap());
+    assert_eq!(gs.add(half, half), one);
+}
 
 // pub struct Game<'a> {
 //     storage: &'a GameStorage,
