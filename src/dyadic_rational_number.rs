@@ -1,4 +1,7 @@
-use std::ops::{Add, AddAssign, DivAssign, Neg, Sub};
+use std::{
+    fmt::Display,
+    ops::{Add, AddAssign, DivAssign, Neg, Sub},
+};
 
 use gcd::Gcd;
 
@@ -152,4 +155,15 @@ fn denominator_exponent_works() {
             .denominator_exponent(),
         3
     );
+}
+
+impl Display for DyadicRationalNumber {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(int) = self.to_integer() {
+            write!(f, "{}", int)?;
+        } else {
+            write!(f, "{}/{}", self.numerator(), self.denominator())?;
+        }
+        return Ok(());
+    }
 }

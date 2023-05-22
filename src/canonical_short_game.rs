@@ -1,6 +1,7 @@
 use std::{
     cmp::{self, Ordering},
     fmt::Display,
+    io::Write,
     ops::Neg,
 };
 
@@ -698,6 +699,30 @@ impl GameStorage {
             && self.get_up_multiple_part(id) == 0
     }
 
+    // pub fn is_number_tiny(&self, id: u32) -> bool {
+    //     let lo: Vec<u32> = self.get_left_options(id).collect();
+    //     let ro: Vec<u32> = self.get_right_options(id).collect();
+
+    //     lo.len() == 1
+    //         && ro.len() == 1
+    //         && (self.is_number(lo[0]) && {
+    //             let rlo: Vec<u32> = self.get_left_options(ro[0]).collect();
+    //             let rro: Vec<u32> = self.get_right_options(ro[0]).collect();
+    //             rlo.len() == 1
+    //                 && rro.len() == 1
+    //                 && lo[0] == rlo[0]
+    //                 && self.mean(rro[0]) < self.mean(lo[0])
+    //         })
+    // }
+
+    // pub fn mean(&self, id: u32) -> DyadicRationalNumber {
+    // 	if self.is_number_up_star(id) {
+    // 	    self.get_number_part(id)
+    // 	} else {
+
+    // 	}
+    // }
+
     fn lookup_op_result(&self, operation: Operation, gid: u32, hid: u32) -> Option<u32> {
         let operation_s = operation as u32;
         let hc: usize = ((operation_s ^ gid ^ hid) as usize) & self.op_table_mask;
@@ -1098,17 +1123,17 @@ impl GameStorage {
         right_options: &[u32],
     ) -> Vec<u32> {
         let mut left_options: Vec<u32> = left_options.to_vec();
-        let gLs = left_options.clone();
+        let g_ls = left_options.clone();
         let mut i = 0;
         loop {
-            if i >= gLs.len() {
+            if i >= g_ls.len() {
                 break;
             }
-            let gL = gLs[i];
-            for gLR in self.get_right_options(gL).collect::<Vec<_>>().iter() {
-                if self.leq_arrays(*gLR, &left_options, right_options) {
+            let g_l = g_ls[i];
+            for g_lr in self.get_right_options(g_l).collect::<Vec<_>>().iter() {
+                if self.leq_arrays(*g_lr, &left_options, right_options) {
                     let mut new_left_options: Vec<u32> = Vec::with_capacity(
-                        left_options.len() - 1 + self.get_left_options_no(*gLR) as usize,
+                        left_options.len() - 1 + self.get_left_options_no(*g_lr) as usize,
                     );
                     for k in 0..i {
                         new_left_options[k] = left_options[k];
@@ -1116,11 +1141,11 @@ impl GameStorage {
                     for k in (i + 1)..(left_options.len()) {
                         new_left_options[k - 1] = left_options[k];
                     }
-                    for (k, gLRL) in self.get_left_options(*gLR).enumerate() {
-                        if left_options.contains(&gLRL) {
+                    for (k, g_lrl) in self.get_left_options(*g_lr).enumerate() {
+                        if left_options.contains(&g_lrl) {
                             new_left_options[left_options.len() - 1 + k] = -1i32 as u32;
                         } else {
-                            new_left_options[left_options.len() - 1 + k] = gLRL;
+                            new_left_options[left_options.len() - 1 + k] = g_lrl;
                         }
                     }
                     left_options = new_left_options;
@@ -1139,17 +1164,17 @@ impl GameStorage {
         right_options: &[u32],
     ) -> Vec<u32> {
         let mut right_options: Vec<u32> = right_options.to_vec();
-        let gRs = right_options.clone();
+        let g_rs = right_options.clone();
         let mut i = 0;
         loop {
-            if i >= gRs.len() {
+            if i >= g_rs.len() {
                 break;
             }
-            let gR = gRs[i];
-            for gRL in self.get_left_options(gR).collect::<Vec<_>>().iter() {
-                if self.leq_arrays(*gRL, left_options, &right_options) {
+            let g_r = g_rs[i];
+            for g_rl in self.get_left_options(g_r).collect::<Vec<_>>().iter() {
+                if self.leq_arrays(*g_rl, left_options, &right_options) {
                     let mut new_right_options: Vec<u32> = Vec::with_capacity(
-                        right_options.len() - 1 + self.get_right_options_no(*gRL) as usize,
+                        right_options.len() - 1 + self.get_right_options_no(*g_rl) as usize,
                     );
                     for k in 0..i {
                         new_right_options[k] = right_options[k];
@@ -1157,11 +1182,11 @@ impl GameStorage {
                     for k in (i + 1)..(right_options.len()) {
                         new_right_options[k - 1] = right_options[k];
                     }
-                    for (k, gRLR) in self.get_left_options(*gRL).enumerate() {
-                        if right_options.contains(&gRLR) {
+                    for (k, g_rlr) in self.get_left_options(*g_rl).enumerate() {
+                        if right_options.contains(&g_rlr) {
                             new_right_options[right_options.len() - 1 + k] = -1i32 as u32;
                         } else {
-                            new_right_options[right_options.len() - 1 + k] = gRLR;
+                            new_right_options[right_options.len() - 1 + k] = g_rlr;
                         }
                     }
                     right_options = new_right_options;
@@ -1559,72 +1584,73 @@ fn addition_works() {
     assert_eq!(gs.add(half, half), one);
 }
 
-// pub struct Game<'a> {
-//     storage: &'a GameStorage,
-//     id: u32,
-// }
+impl GameStorage {
+    pub fn display_game<W>(&mut self, game_id: u32, f: &mut W) -> Result<(), std::fmt::Error>
+    where
+        W: std::fmt::Write,
+    {
+        if self.zero_id == game_id {
+            write!(f, "0")?;
+            return Ok(());
+        }
 
-// impl<'a> Game<'a> {
-//     pub fn try_from_id(storage: &'a GameStorage, id: u32) -> Option<Self> {
-//         // FIXME: Check if id is in storage
-//         Some(Game { storage, id })
-//     }
+        if self.is_number(game_id) {
+            let num = self.get_number_part(game_id);
+            write!(f, "{}", num)?;
+            return Ok(());
+        }
 
-//     pub fn options(&'a self, player: Player) -> Vec<Game<'a>> {
-//         match player {
-//             Player::Left => self
-//                 .storage
-//                 .get_left_options(self.id)
-//                 .map(|id| Game::try_from_id(self.storage, id).unwrap())
-//                 .collect(),
-//             Player::Right => self
-//                 .storage
-//                 .get_right_options(self.id)
-//                 .map(|id| Game::try_from_id(self.storage, id).unwrap())
-//                 .collect(),
-//         }
-//     }
+        let lo = self.sorted_left_options(game_id);
+        let ro = self.sorted_right_options(game_id);
 
-//     // pub fn sorted_options(&'a self, player: Player) -> Vec<Game<'a>> {
-//     // 	let mut options = self.options(player);
-//     // 	options.sort();
-//     // 	options
-//     // }
+        write!(f, "{{")?;
+        for (idx, l) in lo.iter().enumerate() {
+            if idx > 0 {
+                write!(f, ", ")?;
+            }
+            self.display_game(*l, f)?;
+        }
 
-//     pub fn is_number_tiny(&self) -> bool {
-//         todo!()
-//     }
+        write!(f, "|")?;
 
-//     pub fn is_number(&self) -> bool {
-//         todo!()
-//     }
-// }
+        for (idx, r) in ro.iter().enumerate() {
+            if idx > 0 {
+                write!(f, ", ")?;
+            }
+            self.display_game(*r, f)?;
+        }
+        write!(f, "}}")?;
 
-// impl<'a> Neg for Game<'a> {
-//     type Output = Self;
+        Ok(())
+    }
+}
 
-//     fn neg(self) -> Self::Output {
-//         let id = self.storage.get_negative(self.id);
-//         Self {
-//             storage: self.storage,
-//             id,
-//         }
-//     }
-// }
+#[test]
+fn pretty_printing_works() {
+    let mut gs = GameStorage::new();
 
-// impl<'a> Display for Game<'a> {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         let lo = self.options(Player::Left);
-//         let ro = self.options(Player::Right);
+    let mut buf = String::new();
+    let zero = gs.construct_integer(0);
+    gs.display_game(zero, &mut buf).unwrap();
+    assert_eq!(buf, "0".to_string());
 
-//         if self.is_number_tiny() {
-//             let (string, transalte, subscript) = if lo[0].is_number() {
-//                 ("Tiny", lo[0], -ro[0].options(Player::Right)[0] + lo[0])
-//             } else {
-//                 ("Miny", ro[0], lo[0].options(Player::Left)[0] - ro[0])
-//             };
-//         }
+    let mut buf = String::new();
+    let fourty_two = gs.construct_integer(42);
+    gs.display_game(fourty_two, &mut buf).unwrap();
+    assert_eq!(buf, "42".to_string());
 
-//         todo!()
-//     }
-// }
+    let mut buf = String::new();
+    let fourty_two = gs.construct_rational(DyadicRationalNumber::rational(1, 4).unwrap());
+    gs.display_game(fourty_two, &mut buf).unwrap();
+    assert_eq!(buf, "1/4".to_string());
+
+    let mut buf = String::new();
+    let star = gs.construct_nimber(DyadicRationalNumber::from(0), 1);
+    gs.display_game(star, &mut buf).unwrap();
+    assert_eq!(buf, "{0|0}".to_string());
+
+    let mut buf = String::new();
+    let star = gs.construct_nimber(DyadicRationalNumber::from(0), 2);
+    gs.display_game(star, &mut buf).unwrap();
+    assert_eq!(buf, "{0, {0|0}|0, {0|0}}".to_string());
+}
