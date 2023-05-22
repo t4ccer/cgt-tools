@@ -172,7 +172,7 @@ where
     T: Clone,
 {
     let src_end = src_start + len;
-    let es = &src[src_start..=src_end];
+    let es = &src[src_start..src_end];
     for (idx, e) in es.iter().cloned().enumerate() {
         dst[dst_start + idx] = e;
     }
@@ -197,6 +197,12 @@ pub struct GameStorage {
     // known IDs
     pub zero_id: u32,
     pub star_id: u32,
+    pub up_id: u32,
+    pub up_star_id: u32,
+    pub one_id: u32,
+    pub negative_one_id: u32,
+    pub two_id: u32,
+    pub negative_two_id: u32,
 }
 
 impl GameStorage {
@@ -766,10 +772,12 @@ impl GameStorage {
                             break;
                         }
                     }
-                    for i in 0..num_ro {
-                        if right_options[i] != sector[sector_offset + 2 + num_lo + i as usize] {
-                            matches = false;
-                            break;
+                    if matches {
+                        for i in 0..num_ro {
+                            if right_options[i] != sector[sector_offset + 2 + num_lo + i as usize] {
+                                matches = false;
+                                break;
+                            }
                         }
                     }
                 }
@@ -942,7 +950,7 @@ impl GameStorage {
             self.data
                 .get_unchecked_mut((offset >> SECTOR_BITS) as usize)
         };
-        let sector_offset = (offset as usize & SECTOR_MASK);
+        let sector_offset = (offset & SECTOR_MASK as u32) as usize;
         copy_slice(left_options, 0, sector, sector_offset + 2, num_lo);
         copy_slice(right_options, 0, sector, sector_offset + 2 + num_lo, num_ro);
 
@@ -959,8 +967,8 @@ impl GameStorage {
         offset
     }
 
-    // This function ASSUMES that the supplied arrays contain no dominated or reversible options.
-    // Passing unsimplified arrays to this method will "seriously screw up everything"
+    /// This function ASSUMES that the supplied arrays contain no dominated or reversible options.
+    /// Passing unsimplified arrays to this method will "seriously screw up everything"
     fn construct_from_canonical_options(
         &mut self,
         mut left_options: Vec<u32>,
@@ -1010,6 +1018,17 @@ impl GameStorage {
             sector_offset + 2 + left_options.len(),
             right_options.len(),
         );
+
+        let option_hash = Self::hash_options(
+            left_options.len() as u32,
+            &left_options,
+            0,
+            right_options.len() as u32,
+            &right_options,
+            0,
+        );
+        self.write_to_index(option_hash, offset);
+
         offset
     }
 
@@ -1053,7 +1072,7 @@ impl GameStorage {
         mex
     }
 
-    fn construct_from_options(&mut self, ls: &[u32], rs: &[u32]) -> u32 {
+    pub fn construct_from_options(&mut self, ls: &[u32], rs: &[u32]) -> u32 {
         let ls = Self::eliminate_duplicate_options(ls);
         let rs = Self::eliminate_duplicate_options(rs);
 
@@ -1070,8 +1089,8 @@ impl GameStorage {
             }
         }
 
-        let ls = self.bypass_reversible_options_l(&ls, &rs);
-        let rs = self.bypass_reversible_options_r(&ls, &rs);
+        let ls = self.bypass_reversible_options_l(ls, &rs);
+        let rs = self.bypass_reversible_options_r(&ls, rs);
 
         let ls = self.eliminate_dominated_options(&ls, true);
         let rs = self.eliminate_dominated_options(&rs, false);
@@ -1119,33 +1138,39 @@ impl GameStorage {
 
     fn bypass_reversible_options_l(
         &mut self,
-        left_options: &[u32],
+        mut left_options: Vec<u32>,
         right_options: &[u32],
     ) -> Vec<u32> {
-        let mut left_options: Vec<u32> = left_options.to_vec();
-        let g_ls = left_options.clone();
-        let mut i = 0;
+        let mut i: i64 = 0;
         loop {
-            if i >= g_ls.len() {
+            if (i as usize) >= left_options.len() {
                 break;
             }
-            let g_l = g_ls[i];
-            for g_lr in self.get_right_options(g_l).collect::<Vec<_>>().iter() {
-                if self.leq_arrays(*g_lr, &left_options, right_options) {
-                    let mut new_left_options: Vec<u32> = Vec::with_capacity(
-                        left_options.len() - 1 + self.get_left_options_no(*g_lr) as usize,
-                    );
-                    for k in 0..i {
+            if left_options[i as usize] == -1i32 as u32 {
+                continue;
+            }
+            let g_lrs = self
+                .get_right_options(left_options[i as usize])
+                .collect::<Vec<_>>();
+            for j in 0..self.get_right_options_no(left_options[i as usize]) {
+                let g_lr = g_lrs[j as usize];
+                if self.leq_arrays(g_lr, &left_options, right_options) {
+                    let mut new_left_options =
+                        vec![
+                            -1i32 as u32;
+                            left_options.len() + self.get_left_options_no(g_lr) as usize - 1
+                        ];
+                    for k in 0..(i as usize) {
                         new_left_options[k] = left_options[k];
                     }
-                    for k in (i + 1)..(left_options.len()) {
+                    for k in (i as usize + 1)..left_options.len() {
                         new_left_options[k - 1] = left_options[k];
                     }
-                    for (k, g_lrl) in self.get_left_options(*g_lr).enumerate() {
+                    for (k, g_lrl) in self.get_left_options(g_lr).enumerate() {
                         if left_options.contains(&g_lrl) {
-                            new_left_options[left_options.len() - 1 + k] = -1i32 as u32;
+                            new_left_options[left_options.len() + k - 1] = -1i32 as u32;
                         } else {
-                            new_left_options[left_options.len() - 1 + k] = g_lrl;
+                            new_left_options[left_options.len() + k - 1] = g_lrl;
                         }
                     }
                     left_options = new_left_options;
@@ -1161,32 +1186,38 @@ impl GameStorage {
     fn bypass_reversible_options_r(
         &mut self,
         left_options: &[u32],
-        right_options: &[u32],
+        mut right_options: Vec<u32>,
     ) -> Vec<u32> {
-        let mut right_options: Vec<u32> = right_options.to_vec();
-        let g_rs = right_options.clone();
-        let mut i = 0;
+        let mut i: i64 = 0;
         loop {
-            if i >= g_rs.len() {
+            if (i as usize) >= right_options.len() {
                 break;
             }
-            let g_r = g_rs[i];
-            for g_rl in self.get_left_options(g_r).collect::<Vec<_>>().iter() {
-                if self.leq_arrays(*g_rl, left_options, &right_options) {
-                    let mut new_right_options: Vec<u32> = Vec::with_capacity(
-                        right_options.len() - 1 + self.get_right_options_no(*g_rl) as usize,
-                    );
-                    for k in 0..i {
+            if right_options[i as usize] == -1i32 as u32 {
+                continue;
+            }
+            let g_rls = self
+                .get_left_options(right_options[i as usize])
+                .collect::<Vec<_>>();
+            for j in 0..self.get_left_options_no(right_options[i as usize]) {
+                let g_rl = g_rls[j as usize];
+                if self.leq_arrays(g_rl, left_options, &right_options) {
+                    let mut new_right_options =
+                        vec![
+                            -1i32 as u32;
+                            right_options.len() + self.get_right_options_no(g_rl) as usize - 1
+                        ];
+                    for k in 0..(i as usize) {
                         new_right_options[k] = right_options[k];
                     }
-                    for k in (i + 1)..(right_options.len()) {
+                    for k in (i as usize + 1)..right_options.len() {
                         new_right_options[k - 1] = right_options[k];
                     }
-                    for (k, g_rlr) in self.get_left_options(*g_rl).enumerate() {
+                    for (k, g_rlr) in self.get_right_options(g_rl).enumerate() {
                         if right_options.contains(&g_rlr) {
-                            new_right_options[right_options.len() - 1 + k] = -1i32 as u32;
+                            new_right_options[right_options.len() + k - 1] = -1i32 as u32;
                         } else {
-                            new_right_options[right_options.len() - 1 + k] = g_rlr;
+                            new_right_options[right_options.len() + k - 1] = g_rlr;
                         }
                     }
                     right_options = new_right_options;
@@ -1393,7 +1424,13 @@ impl GameStorage {
             op_table_h: vec![0; DEFAULT_OP_TABLE_SIZE],
             op_table_result: vec![0; DEFAULT_OP_TABLE_SIZE],
             zero_id: 3, // constructed by hand below
-            star_id: 0, // Set below
+            star_id: 0,
+            up_id: 0,
+            up_star_id: 0,
+            one_id: 0,
+            negative_one_id: 0,
+            two_id: 0,
+            negative_two_id: 0, // Set below
         };
 
         // Don't use `construct_integer`
@@ -1418,6 +1455,25 @@ impl GameStorage {
         res.next_offset += 5;
 
         res.star_id = res.construct_nimber(DyadicRationalNumber::from(0), 1);
+
+        let up = Nus {
+            number: DyadicRationalNumber::from(0),
+            up_multiple: 1,
+            nimber: 0,
+        };
+        res.up_id = res.construct_nus(&up);
+
+        let up_star = Nus {
+            number: DyadicRationalNumber::from(0),
+            up_multiple: 1,
+            nimber: 1,
+        };
+        res.up_star_id = res.construct_nus(&up_star);
+
+        res.one_id = res.construct_integer(1);
+        res.negative_one_id = res.construct_integer(-1);
+        res.two_id = res.construct_integer(2);
+        res.negative_two_id = res.construct_integer(-2);
 
         res
     }
@@ -1501,7 +1557,7 @@ impl GameStorage {
     fn compare_opts(&mut self, gs: &[u32], hs: &[u32]) -> Ordering {
         assert!(gs.len() == gs.len(), "Inputs are not equal length");
         for (g, h) in gs.iter().zip(hs) {
-            let cmp = self.compare(*h, *h);
+            let cmp = self.compare(*g, *h);
             match cmp {
                 Ordering::Equal => continue,
                 _ => return cmp,
@@ -1532,19 +1588,20 @@ impl GameStorage {
         }
 
         let ls = self.sorted_left_options(gid);
-        let rs = self.sorted_left_options(gid);
+        let rs = self.sorted_left_options(hid);
         let cmp = self.compare_opts(&ls, &rs);
         if cmp != Ordering::Equal {
             return cmp;
         }
 
         let ls = self.sorted_right_options(gid);
-        let rs = self.sorted_right_options(gid);
+        let rs = self.sorted_right_options(hid);
         let cmp = self.compare_opts(&ls, &rs);
         if cmp != Ordering::Equal {
             return cmp;
         }
 
+        dbg!(gid, self.game_to_str(gid), hid, self.game_to_str(hid));
         panic!("compare: Unreachable")
     }
 
@@ -1622,6 +1679,12 @@ impl GameStorage {
         write!(f, "}}")?;
 
         Ok(())
+    }
+
+    fn game_to_str(&mut self, game_id: u32) -> String {
+        let mut buf = String::new();
+        self.display_game(game_id, &mut buf).unwrap();
+        buf
     }
 }
 

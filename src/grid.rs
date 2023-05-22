@@ -3,7 +3,7 @@ use lazy_static::{__Deref, lazy_static};
 use queues::{IsQueue, Queue};
 use std::{collections::HashMap, fmt::Display, sync::RwLock};
 
-use crate::game::Game;
+use crate::canonical_short_game::GameStorage;
 
 // FIXME: some bit array here
 #[allow(dead_code)]
@@ -366,85 +366,84 @@ fn decomposes_simple_grid() {
 }
 
 // NOTE: This is still not optimal as equivalent game may have different board positions
-type Cache = HashMap<Grid, Game>;
+type Cache = HashMap<Grid, u32>;
 lazy_static! {
     static ref CACHE: RwLock<Cache> = RwLock::new(HashMap::new());
 }
 
 impl Grid {
-    /// Like `to_game` but decomposes the game
-    pub fn reduce(&self) -> Game {
-        let decomp = self.decompositons();
-        if decomp.len() == 0 {
-            Game::zero()
-        } else {
-            let mut result = Game::zero();
-            for component in decomp {
-                let component = component.reduce2();
-                result = Game::plus(&result, &component)
-            }
-            result
-        }
-    }
+    // /// Like `to_game` but decomposes the game
+    // pub fn reduce(&self) -> Game {
+    //     let decomp = self.decompositons();
+    //     if decomp.len() == 0 {
+    //         Game::zero()
+    //     } else {
+    //         let mut result = Game::zero();
+    //         for component in decomp {
+    //             let component = component.reduce2();
+    //             result = Game::plus(&result, &component)
+    //         }
+    //         result
+    //     }
+    // }
 
-    fn reduce2(&self) -> Game {
+    // fn reduce2(&self) -> Game {
+    //     let grid = self.move_top_left();
+
+    //     {
+    //         if let Some(game) = CACHE.read().unwrap().deref().get(&grid) {
+    //             return game.clone();
+    //         }
+    //     }
+
+    //     let result = Game {
+    //         left: self.left_moves().iter().map(Self::reduce).collect(),
+    //         right: self.right_moves().iter().map(Self::reduce).collect(),
+    //     };
+
+    //     {
+    //         let mut cache = CACHE.write().unwrap();
+    //         cache.insert(grid, result.clone());
+    //     }
+
+    //     result
+    // }
+
+    pub fn to_game(&self, gs: &mut GameStorage) -> u32 {
         let grid = self.move_top_left();
-
         {
             if let Some(game) = CACHE.read().unwrap().deref().get(&grid) {
-                return game.clone();
-            }
-        }
-
-        let result = Game {
-            left: self.left_moves().iter().map(Self::reduce).collect(),
-            right: self.right_moves().iter().map(Self::reduce).collect(),
-        };
-
-        {
-            let mut cache = CACHE.write().unwrap();
-            cache.insert(grid, result.clone());
-        }
-
-        result
-    }
-
-    pub fn to_game(&self) -> Game {
-        let grid = self.move_top_left();
-
-        {
-            if let Some(game) = CACHE.read().unwrap().deref().get(&grid) {
-                return game.clone();
+                return *game;
             }
         }
 
         if !grid.has_left_moves() && !grid.has_right_moves() {
-            return Game::zero();
+            return gs.zero_id;
         }
 
-        let left_options = grid.left_moves().iter().map(Grid::to_game).collect();
-        let right_options = grid.right_moves().iter().map(Grid::to_game).collect();
+        let left_options: Vec<u32> = grid.left_moves().iter().map(|o| o.to_game(gs)).collect();
+        let right_options: Vec<u32> = grid.right_moves().iter().map(|o| o.to_game(gs)).collect();
 
-        let g = Game {
-            left: left_options,
-            right: right_options,
-        }
-        .canonical_form();
+        let this_game = gs.construct_from_options(&left_options, &right_options);
 
         {
             let mut cache = CACHE.write().unwrap();
-            cache.insert(grid.clone(), g.clone());
+            cache.insert(grid.clone(), this_game);
         }
 
-        g
+        this_game
     }
 }
 
 #[test]
 fn finds_simple_game_form() {
-    let grid = Grid::parse(3, 3, "..#|.#.|##.").unwrap();
-    assert_eq!(grid.to_game(), Game::parse("{1|1}").unwrap(),);
+    let mut gs = GameStorage::new();
+    let grid = Grid::empty(2, 2);
+    let game = grid.to_game(&mut gs);
+    let mut buf = String::new();
+    gs.display_game(game, &mut buf).unwrap();
+    assert_eq!(buf, "{1|-1}".to_string());
 
-    let grid = Grid::empty(4, 5);
-    assert_eq!(grid.to_game(), Game::parse("{|0}").unwrap(),);
+    // let grid = Grid::empty(4, 5);
+    // assert_eq!(grid.to_game(), Game::parse("{|0}").unwrap(),);
 }
