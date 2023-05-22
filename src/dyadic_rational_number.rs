@@ -1,4 +1,4 @@
-use std::ops::{Add, AddAssign, DivAssign};
+use std::ops::{Add, AddAssign, DivAssign, Neg, Sub};
 
 use gcd::Gcd;
 
@@ -66,6 +66,14 @@ impl DyadicRationalNumber {
         )
     }
 
+    pub fn step(&self, n: i32) -> Self {
+        DyadicRationalNumber {
+            numerator: self.numerator + n,
+            denominator: self.denominator,
+        }
+        .normalized()
+    }
+
     /// Convert to intger if it's an integer
     pub fn to_integer(&self) -> Option<i32> {
         if self.denominator == 1 {
@@ -73,6 +81,12 @@ impl DyadicRationalNumber {
         } else {
             None
         }
+    }
+
+    pub fn mean(&self, rhs: &Self) -> Self {
+        let mut res = *self + *rhs;
+        res.denominator *= 2;
+        res.normalized()
     }
 }
 
@@ -97,11 +111,30 @@ impl Add for DyadicRationalNumber {
     }
 }
 
+impl Sub for DyadicRationalNumber {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        self + (-rhs)
+    }
+}
+
 impl AddAssign for DyadicRationalNumber {
     fn add_assign(&mut self, rhs: Self) {
         self.numerator = self.numerator() * rhs.denominator + self.denominator * rhs.numerator;
         self.denominator = self.denominator() * rhs.denominator();
         self.normalize();
+    }
+}
+
+impl Neg for DyadicRationalNumber {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        DyadicRationalNumber {
+            numerator: -self.numerator,
+            denominator: self.denominator,
+        }
     }
 }
 

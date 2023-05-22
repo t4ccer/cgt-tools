@@ -6,15 +6,16 @@ mod dyadic_rational_number;
 
 // use game::*;
 use canonical_short_game::*;
+
+use crate::dyadic_rational_number::DyadicRationalNumber;
 // use grid::*;
 
 fn main() {
-    let gs = GameStorage::new();
+    let mut gs = GameStorage::new();
     println!("{:?}", gs.zero_id);
     println!("{:?}", gs.star_id);
 
-    let foo: Vec<u32> = gs.get_right_options(gs.star_id).collect();
-    println!("{:?}", foo);
+    gs.construct_rational(DyadicRationalNumber::rational(1, 2).unwrap());
 
     // ./target/release/cg  0.54s user 0.04s system 99% cpu 0.575 total
     // println!("{}", Grid::empty(5, 5).to_game());
