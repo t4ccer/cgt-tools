@@ -337,6 +337,7 @@ impl GameStorage {
             return self.construct_integer(int);
         }
 
+	// These steps are missimplemented
         let left_option = self.construct_rational(number.step(-1));
         let right_option = self.construct_rational(number.step(1));
         let offset = self.write_nus_record_execpt_options(&Nus::from(number), 1, 1);

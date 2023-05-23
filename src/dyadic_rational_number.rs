@@ -1,116 +1,153 @@
 use std::{
     fmt::Display,
-    ops::{Add, AddAssign, DivAssign, Neg, Sub},
+    ops::{Add, AddAssign, Neg, Sub},
 };
 
-use gcd::Gcd;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Hash, Clone, Copy, PartialEq, Eq)]
 pub struct DyadicRationalNumber {
-    numerator: i32,
-    denominator: i32,
+    numerator: i64,
+    denominator_exponent: u32,
 }
 
 impl DyadicRationalNumber {
-    pub fn numerator(&self) -> i32 {
+    pub fn new(numerator: i64, denominator_exponent: u32) -> DyadicRationalNumber {
+        DyadicRationalNumber {
+            numerator,
+            denominator_exponent,
+        }
+        .normalized()
+    }
+
+    pub fn numerator(&self) -> i64 {
         self.numerator
     }
 
-    pub fn denominator(&self) -> i32 {
-        self.denominator
+    pub fn denominator(&self) -> u128 {
+        // 2^self.denominator_exponent, but as bitshift
+        1 << self.denominator_exponent
     }
 
-    pub fn denominator_exponent(&self) -> i32 {
-        self.denominator().trailing_zeros() as i32
+    pub fn denominator_exponent(&self) -> u32 {
+        self.denominator_exponent
     }
 
     fn normalized(&self) -> Self {
-        let d = Gcd::gcd(
-            self.numerator().abs() as u32,
-            self.denominator().abs() as u32,
-        );
-
-        DyadicRationalNumber {
-            numerator: self.numerator / (d as i32),
-            denominator: self.denominator / (d as i32),
-        }
+        let mut res = self.clone();
+        res.normalize();
+        res
     }
 
+    /// Internal function to normalize numbers
     fn normalize(&mut self) {
-        let d = Gcd::gcd(
-            self.numerator().abs() as u32,
-            self.denominator().abs() as u32,
-        );
-
-        self.numerator.div_assign(d as i32);
-        self.denominator.div_assign(d as i32);
+        // [2*(n)]/[2*d] = n/d
+        while self.numerator % 2 == 0 && self.denominator_exponent != 0 {
+            self.numerator >>= 1;
+            self.denominator_exponent -= 1;
+        }
     }
 
-    pub fn rational(numerator: i32, denominator: i32) -> Option<Self> {
-        if denominator == 0 {
-            return None;
-        }
-        if numerator == 0 {
-            return Some(DyadicRationalNumber {
-                numerator: 0,
-                denominator: 1,
-            });
-        }
-
-        let sign = numerator.signum() * denominator.signum();
-
-        // FIXME: Check if fraction is dyadic
-        Some(
-            DyadicRationalNumber {
-                numerator: numerator.abs() * sign,
-                denominator: denominator.abs(),
-            }
-            .normalized(),
-        )
-    }
-
-    pub fn step(&self, n: i32) -> Self {
+    /// Add to numerator. It is **NOT** addition function
+    pub fn step(&self, n: i64) -> Self {
         DyadicRationalNumber {
+            // numerator: self.numerator + (n << self.denominator_exponent),
             numerator: self.numerator + n,
-            denominator: self.denominator,
+            denominator_exponent: self.denominator_exponent,
         }
         .normalized()
     }
 
     /// Convert to intger if it's an integer
-    pub fn to_integer(&self) -> Option<i32> {
-        if self.denominator == 1 {
+    pub fn to_integer(&self) -> Option<i64> {
+        // exponent == 0 => denominator == 1 => It's an integer
+        if self.denominator_exponent == 0 {
             Some(self.numerator)
         } else {
             None
         }
     }
 
+    /// Arithmetic mean of two rationals
     pub fn mean(&self, rhs: &Self) -> Self {
         let mut res = *self + *rhs;
-        res.denominator *= 2;
+        res.denominator_exponent <<= 1;
         res.normalized()
     }
 }
 
-impl From<i32> for DyadicRationalNumber {
-    fn from(value: i32) -> Self {
-        Self {
-            numerator: value,
-            denominator: 1,
+#[test]
+fn step_works() {
+    assert_eq!(
+        DyadicRationalNumber {
+            numerator: 1,
+            denominator_exponent: 1,
+        }
+        .normalized()
+        .step(1),
+        DyadicRationalNumber {
+            numerator: 1,
+            denominator_exponent: 0,
+        }
+        .normalized()
+    );
+}
+
+impl From<i64> for DyadicRationalNumber {
+    fn from(value: i64) -> Self {
+        Self::new(value, 0)
+    }
+}
+
+impl PartialOrd for DyadicRationalNumber {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for DyadicRationalNumber {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        if self.denominator_exponent <= other.denominator_exponent {
+            i64::cmp(
+                &(self.numerator << (other.denominator_exponent - self.denominator_exponent)),
+                &other.numerator,
+            )
+        } else {
+            i64::cmp(
+                &self.numerator,
+                &(other.numerator << (self.denominator_exponent - other.denominator_exponent)),
+            )
         }
     }
 }
 
-impl Add for DyadicRationalNumber {
-    type Output = Self;
+impl Add for &DyadicRationalNumber {
+    type Output = DyadicRationalNumber;
 
-    fn add(self, rhs: Self) -> Self::Output {
-        DyadicRationalNumber {
-            numerator: self.numerator() * rhs.denominator + self.denominator * rhs.numerator,
-            denominator: self.denominator() * rhs.denominator(),
+    fn add(self, rhs: &DyadicRationalNumber) -> DyadicRationalNumber {
+        let denominator_exponent;
+        let numerator;
+        if self.denominator_exponent >= rhs.denominator_exponent {
+            denominator_exponent = self.denominator_exponent;
+            numerator = self.numerator
+                + (rhs.numerator << (self.denominator_exponent - rhs.denominator_exponent))
+        } else {
+            denominator_exponent = rhs.denominator_exponent;
+            numerator = rhs.numerator
+                + (self.numerator << (rhs.denominator_exponent - self.denominator_exponent))
         }
-        .normalized()
+        let mut res = DyadicRationalNumber {
+            numerator,
+            denominator_exponent,
+        };
+        res.normalize();
+        res
+    }
+}
+
+impl Add for DyadicRationalNumber {
+    type Output = DyadicRationalNumber;
+
+    fn add(self, rhs: DyadicRationalNumber) -> DyadicRationalNumber {
+        &self + &rhs
     }
 }
 
@@ -123,10 +160,11 @@ impl Sub for DyadicRationalNumber {
 }
 
 impl AddAssign for DyadicRationalNumber {
-    fn add_assign(&mut self, rhs: Self) {
-        self.numerator = self.numerator() * rhs.denominator + self.denominator * rhs.numerator;
-        self.denominator = self.denominator() * rhs.denominator();
-        self.normalize();
+    fn add_assign(&mut self, rhs: DyadicRationalNumber) {
+        let lhs: &DyadicRationalNumber = self;
+        let new: DyadicRationalNumber = lhs + &rhs;
+        self.numerator = new.numerator;
+        self.denominator_exponent = new.denominator_exponent;
     }
 }
 
@@ -136,24 +174,28 @@ impl Neg for DyadicRationalNumber {
     fn neg(self) -> Self::Output {
         DyadicRationalNumber {
             numerator: -self.numerator,
-            denominator: self.denominator,
+            denominator_exponent: self.denominator_exponent,
         }
     }
 }
 
 #[test]
-fn denominator_exponent_works() {
+fn denominator_works() {
     assert_eq!(
-        DyadicRationalNumber::rational(52, 1)
-            .unwrap()
-            .denominator_exponent(),
+        DyadicRationalNumber {
+            numerator: 0,
+            denominator_exponent: 0
+        }
+        .denominator_exponent(),
         0
     );
     assert_eq!(
-        DyadicRationalNumber::rational(1, 8)
-            .unwrap()
-            .denominator_exponent(),
-        3
+        DyadicRationalNumber {
+            numerator: 3,
+            denominator_exponent: 3
+        }
+        .denominator(),
+        8
     );
 }
 

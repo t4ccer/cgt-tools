@@ -1,23 +1,24 @@
 #![feature(extend_one)]
-// mod game;
-mod canonical_short_game;
-mod dyadic_rational_number;
-mod grid;
 
-// use game::*;
-use canonical_short_game::*;
-use grid::*;
-
+use crate::canonical_game::GameBackend;
 use crate::dyadic_rational_number::DyadicRationalNumber;
-// use grid::*;
+
+mod canonical_game;
+mod dyadic_rational_number;
 
 fn main() {
-    let mut gs = GameStorage::new();
-    let grid = Grid::empty(4, 3);
-    let game = grid.to_game(&mut gs);
-    let mut buf = String::new();
-    gs.display_game(game, &mut buf).unwrap();
-    println!("{}", buf);
+    let mut b = GameBackend::new();
+    let id = b.construct_rational(DyadicRationalNumber::new(3, 4));
+    let game = b.get_game(id);
+    println!("{:?}", &game);
+    println!("{}", &game.nus.unwrap());
+
+    // let mut gs = GameStorage::new();
+    // let grid = Grid::empty(4, 3);
+    // let game = grid.to_game(&mut gs);
+    // let mut buf = String::new();
+    // gs.display_game(game, &mut buf).unwrap();
+    // println!("{}", buf);
 
     // println!("{:?}", gs.zero_id);
     // println!("{:?}", gs.star_id);
