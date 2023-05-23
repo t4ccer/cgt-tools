@@ -55,6 +55,7 @@
             pkgs.alejandra
             pkgs.fd
             pkgs.cargo-flamegraph
+            pkgs.cargo-tarpaulin
 
             (pkgs.rust-bin.fromRustupToolchain {
               channel = "nightly";

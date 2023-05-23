@@ -50,8 +50,12 @@ impl Display for Nus {
 
         if self.up_multiple == 1 {
             write!(f, "^")?;
-        } else if self.up_multiple != 0 {
+        } else if self.up_multiple == -1 {
+            write!(f, "v")?;
+        } else if self.up_multiple > 0 {
             write!(f, "^{}", self.up_multiple)?;
+        } else if self.up_multiple < 0 {
+            write!(f, "v{}", self.up_multiple.abs())?;
         }
 
         if self.nimber == 1 {
@@ -110,9 +114,94 @@ impl GameBackend {
         self.known_games[game_id.0].clone()
     }
 
+    pub fn construct_nus(&mut self, nus: &Nus) -> GameId {
+        let parity: u32 = (nus.up_multiple & 1) as u32;
+        let sign = if nus.up_multiple >= 0 { 1 } else { -1 };
+        let number_option = self.construct_rational(nus.number);
+        let mut last_defined = nus.up_multiple;
+        let last_defined_id;
+
+        loop {
+            if last_defined == 0 {
+                last_defined_id = None;
+                break;
+            }
+            let tmp_nus = Nus {
+                number: nus.number,
+                up_multiple: last_defined,
+                nimber: nus.nimber ^ parity ^ ((last_defined & 1) as u32),
+            };
+            if let Some(id) = self.get_game_id_by_nus(&tmp_nus) {
+                last_defined_id = Some(id);
+                break;
+            }
+            last_defined -= sign;
+        }
+
+        let mut last_defined_id =
+            last_defined_id.unwrap_or(self.construct_nimber(nus.number, nus.nimber ^ parity));
+
+        let mut i = last_defined + sign;
+        loop {
+            if i == nus.up_multiple + sign {
+                break;
+            }
+
+            let current_nimber = nus.nimber ^ parity ^ (i as u32 & 1);
+            let new_nus = Nus {
+                number: nus.number,
+                up_multiple: i,
+                nimber: current_nimber,
+            };
+            let new_options;
+
+            if i == 1 && current_nimber == 1 {
+                // special case for n^*
+                let star_option = self.construct_nus(&Nus {
+                    number: nus.number,
+                    up_multiple: 0,
+                    nimber: 1,
+                });
+                new_options = Options {
+                    left: vec![number_option, star_option],
+                    right: vec![number_option],
+                };
+            } else if i == -1 && current_nimber == 1 {
+                // special case for nv*
+                let star_option = self.construct_nus(&Nus {
+                    number: nus.number,
+                    up_multiple: 0,
+                    nimber: 1,
+                });
+                new_options = Options {
+                    left: vec![number_option],
+                    right: vec![number_option, star_option],
+                };
+            } else if i > 0 {
+                new_options = Options {
+                    left: vec![number_option],
+                    right: vec![last_defined_id],
+                };
+            } else {
+                new_options = Options {
+                    left: vec![last_defined_id],
+                    right: vec![number_option],
+                };
+            }
+
+            let new_game = Game {
+                nus: Some(new_nus),
+                options: new_options,
+            };
+            last_defined_id = self.add_new_game(new_game);
+            i += sign;
+        }
+
+        last_defined_id
+    }
+
     /// Create a game equal to a rational number
     pub fn construct_rational(&mut self, rational: DyadicRationalNumber) -> GameId {
-        dbg!(rational);
         // Return id if already constructed
         let nus = Nus::rational(rational);
         if let Some(id) = self.get_game_id_by_nus(&nus) {
@@ -159,6 +248,7 @@ impl GameBackend {
             }
             last_defined -= 1;
         }
+        let last_defined = last_defined;
 
         // If no previous nimbers, then the first option is the number, i.e. [rational + *0]
         let mut last_defined_id = last_defined_id.unwrap_or(self.construct_rational(rational));
@@ -170,6 +260,7 @@ impl GameBackend {
                 up_multiple: 0,
                 nimber: i,
             };
+
             let mut options = Options {
                 left: previous_nimber.options.left,
                 right: previous_nimber.options.right,
@@ -279,4 +370,33 @@ fn constructs_nimbers() {
     let star_id = b.construct_nimber(DyadicRationalNumber::from(1), 4);
     let star = b.get_game(star_id);
     assert_eq!(format!("{}", &star.nus.unwrap()), "1*4".to_string());
+}
+
+#[test]
+fn constructs_up() {
+    let mut b = GameBackend::new();
+
+    let up_id = b.construct_nus(&Nus {
+        number: DyadicRationalNumber::from(0),
+        up_multiple: 1,
+        nimber: 0,
+    });
+    let up = b.get_game(up_id);
+    assert_eq!(format!("{}", &up.nus.unwrap()), "^".to_string());
+
+    let up_star_id = b.construct_nus(&Nus {
+        number: DyadicRationalNumber::from(0),
+        up_multiple: 1,
+        nimber: 1,
+    });
+    let up_star = b.get_game(up_star_id);
+    assert_eq!(format!("{}", &up_star.nus.unwrap()), "^*".to_string());
+
+    let down_id = b.construct_nus(&Nus {
+        number: DyadicRationalNumber::from(0),
+        up_multiple: -3,
+        nimber: 0,
+    });
+    let down = b.get_game(down_id);
+    assert_eq!(format!("{}", &down.nus.unwrap()), "v3".to_string());
 }
