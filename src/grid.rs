@@ -1,9 +1,9 @@
 use bit_vec::BitVec;
 use lazy_static::{__Deref, lazy_static};
 use queues::{IsQueue, Queue};
-use std::{collections::HashMap, fmt::Display, sync::RwLock};
+use std::{cmp::Ordering, collections::HashMap, fmt::Display, sync::RwLock};
 
-use crate::canonical_short_game::GameStorage;
+use crate::canonical_game::{GameBackend, GameId, Options};
 
 // FIXME: some bit array here
 #[allow(dead_code)]
@@ -366,7 +366,7 @@ fn decomposes_simple_grid() {
 }
 
 // NOTE: This is still not optimal as equivalent game may have different board positions
-type Cache = HashMap<Grid, u32>;
+type Cache = HashMap<Grid, GameId>;
 lazy_static! {
     static ref CACHE: RwLock<Cache> = RwLock::new(HashMap::new());
 }
@@ -409,7 +409,7 @@ impl Grid {
     //     result
     // }
 
-    pub fn to_game(&self, gs: &mut GameStorage) -> u32 {
+    pub fn to_game(&self, gs: &mut GameBackend) -> GameId {
         let grid = self.move_top_left();
         {
             if let Some(game) = CACHE.read().unwrap().deref().get(&grid) {
@@ -421,11 +421,12 @@ impl Grid {
             return gs.zero_id;
         }
 
-        let left_options: Vec<u32> = grid.left_moves().iter().map(|o| o.to_game(gs)).collect();
-        let right_options: Vec<u32> = grid.right_moves().iter().map(|o| o.to_game(gs)).collect();
+        let options = Options {
+            left: grid.left_moves().iter().map(|o| o.to_game(gs)).collect(),
+            right: grid.right_moves().iter().map(|o| o.to_game(gs)).collect(),
+        };
 
-        let this_game = gs.construct_from_options(&left_options, &right_options);
-
+        let this_game = gs.construct_from_options(options.clone());
         {
             let mut cache = CACHE.write().unwrap();
             cache.insert(grid.clone(), this_game);
@@ -437,13 +438,21 @@ impl Grid {
 
 #[test]
 fn finds_simple_game_form() {
-    let mut gs = GameStorage::new();
-    let grid = Grid::empty(2, 2);
-    let game = grid.to_game(&mut gs);
-    let mut buf = String::new();
-    gs.display_game(game, &mut buf).unwrap();
-    assert_eq!(buf, "{1|-1}".to_string());
+    let mut b = GameBackend::new();
 
-    // let grid = Grid::empty(4, 5);
-    // assert_eq!(grid.to_game(), Game::parse("{|0}").unwrap(),);
+    let grid = Grid::empty(2, 1);
+    let game_id = grid.to_game(&mut b);
+    assert_eq!(b.dump_game(game_id), "-1".to_string());
+
+    let grid = Grid::empty(1, 2);
+    let game_id = grid.to_game(&mut b);
+    assert_eq!(b.dump_game(game_id), "1".to_string());
+
+    let grid = Grid::empty(2, 2);
+    let game_id = grid.to_game(&mut b);
+    assert_eq!(b.dump_game(game_id), "{1|-1}".to_string());
+
+    let grid = Grid::empty(4, 1);
+    let game_id = grid.to_game(&mut b);
+    assert_eq!(b.dump_game(game_id), "-2".to_string());
 }

@@ -851,7 +851,7 @@ impl GameStorage {
             && num_ro == 1
             && self.is_number(left_options[0])
             && self.is_number(right_options[0])
-            && self.compare_number_parts(left_options[0], right_options[0]) < 0
+            && self.compare_number_parts(left_options[0], right_options[0]) < 0 
         {
             // We're a number but not an integer.  Conveniently, since the
             // option lists are canonicalized, the value of this game is the
@@ -886,7 +886,7 @@ impl GameStorage {
             // Flip of the previous one
             number = self.get_number_part(right_options[0]);
             up_multiple = -1;
-            nimber = 1;
+            nimber = 1; 
         } else if num_lo == 1
             && num_ro == 1
             && self.is_number(left_options[0])
@@ -912,7 +912,7 @@ impl GameStorage {
             number = self.get_number_part(left_options[0]);
             up_multiple = self.get_up_multiple_part(left_options[0]) - 1;
             nimber = self.get_nimber_part(left_options[0]) ^ 1;
-        } else if num_lo >= 1
+        } else if num_lo >= 1 // NOTE: HERE
             && num_ro >= 1
             && num_lo == num_ro
             && self.is_number(left_options[0])
@@ -1202,7 +1202,7 @@ impl GameStorage {
                 .collect::<Vec<_>>();
             for j in 0..self.get_left_options_no(right_options[i as usize]) {
                 let g_rl = g_rls[j as usize];
-                if self.leq_arrays(g_rl, left_options, &right_options) {
+                if self.geq_arrays(g_rl, left_options, &right_options) {
                     let mut new_right_options =
                         vec![
                             -1i32 as u32;
