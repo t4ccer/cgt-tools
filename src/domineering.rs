@@ -1,9 +1,9 @@
 use bit_vec::BitVec;
 use lazy_static::{__Deref, lazy_static};
 use queues::{IsQueue, Queue};
-use std::{cmp::Ordering, collections::HashMap, fmt::Display, sync::RwLock};
+use std::{collections::HashMap, fmt::Display, sync::RwLock};
 
-use crate::canonical_game::{GameBackend, GameId, Options};
+use crate::short_canonical_game::{GameBackend, GameId, Options};
 
 // FIXME: some bit array here
 #[allow(dead_code)]
@@ -15,6 +15,7 @@ pub struct Grid {
 }
 
 impl Grid {
+    /// Creates empty grid with given size
     pub fn empty(width: usize, height: usize) -> Self {
         Self {
             width,
@@ -23,6 +24,17 @@ impl Grid {
         }
     }
 
+    /// Creates a grid from given array of bools
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - Lineralized grid of size `width * height`, empty if if value is `false`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// cgt::domineering::Grid::from_arr(2, 3, &[true, true, false, false, false, true]);
+    /// ```
     pub fn from_arr(width: usize, height: usize, field: &[bool]) -> Self {
         Grid {
             width,
@@ -31,20 +43,16 @@ impl Grid {
         }
     }
 
-    /// Parses a grid from '.#' notation
+    /// Parses a grid from `.#` notation
     ///
     /// # Arguments
     ///
-    /// * `width` - Grid width
-    ///
-    /// * `height` - Grid height
-    ///
-    /// * `input` - '.#' notation with '|' as rows separator
+    /// * `input` - `.#` notation with `|` as rows separator
     ///
     /// # Examples
     ///
     /// ```
-    /// Grid::parse(3, 3, "..#|.#.|##.").unwrap()
+    /// cgt::domineering::Grid::parse(3, 3, "..#|.#.|##.").unwrap();
     /// ```
     pub fn parse(width: usize, height: usize, input: &str) -> Option<Self> {
         let mut grid = Grid::empty(width, height);
@@ -99,18 +107,17 @@ impl Grid {
         self.grid.set(self.width * y + x, val);
     }
 
-    // TODO: Use iterator/generator
-    fn moves_for(&self, direction: (usize, usize)) -> Vec<Self> {
+    fn moves_for<const DIR_X: usize, const DIR_Y: usize>(&self) -> Vec<Self> {
         let mut moves = Vec::new();
 
         if self.height == 0 || self.width == 0 {
             return moves;
         }
 
-        for y in 0..(self.height - direction.1) {
-            for x in 0..(self.width - direction.0) {
-                let next_x = x + direction.0;
-                let next_y = y + direction.1;
+        for y in 0..(self.height - DIR_Y) {
+            for x in 0..(self.width - DIR_X) {
+                let next_x = x + DIR_X;
+                let next_y = y + DIR_Y;
                 if !self.at(x, y) && !self.at(next_x, next_y) {
                     let mut new_grid = self.clone();
                     new_grid.set(x, y, true);
@@ -123,36 +130,11 @@ impl Grid {
     }
 
     pub fn left_moves(&self) -> Vec<Self> {
-        self.moves_for((0, 1))
+        self.moves_for::<0, 1>()
     }
 
     pub fn right_moves(&self) -> Vec<Self> {
-        self.moves_for((1, 0))
-    }
-
-    fn has_moves_for(&self, direction: (usize, usize)) -> bool {
-        if self.height == 0 || self.width == 0 {
-            return false;
-        }
-
-        for y in 0..(self.height - direction.1) {
-            for x in 0..(self.width - direction.0) {
-                let next_x = x + direction.0;
-                let next_y = y + direction.1;
-                if !self.at(x, y) && !self.at(next_x, next_y) {
-                    return true;
-                }
-            }
-        }
-        false
-    }
-
-    pub fn has_left_moves(&self) -> bool {
-        self.has_moves_for((0, 1))
-    }
-
-    pub fn has_right_moves(&self) -> bool {
-        self.has_moves_for((1, 0))
+        self.moves_for::<1, 0>()
     }
 }
 
@@ -372,119 +354,133 @@ lazy_static! {
 }
 
 impl Grid {
-    // /// Like `to_game` but decomposes the game
-    // pub fn reduce(&self) -> Game {
-    //     let decomp = self.decompositons();
-    //     if decomp.len() == 0 {
-    //         Game::zero()
-    //     } else {
-    //         let mut result = Game::zero();
-    //         for component in decomp {
-    //             let component = component.reduce2();
-    //             result = Game::plus(&result, &component)
-    //         }
-    //         result
-    //     }
-    // }
+    fn lookup(&self) -> Option<GameId> {
+        CACHE.read().unwrap().deref().get(self).copied()
+    }
 
-    // fn reduce2(&self) -> Game {
-    //     let grid = self.move_top_left();
+    fn cache(self, id: GameId) {
+        let mut cache = CACHE.write().unwrap();
+        cache.insert(self, id);
+    }
 
-    //     {
-    //         if let Some(game) = CACHE.read().unwrap().deref().get(&grid) {
-    //             return game.clone();
-    //         }
-    //     }
-
-    //     let result = Game {
-    //         left: self.left_moves().iter().map(Self::reduce).collect(),
-    //         right: self.right_moves().iter().map(Self::reduce).collect(),
-    //     };
-
-    //     {
-    //         let mut cache = CACHE.write().unwrap();
-    //         cache.insert(grid, result.clone());
-    //     }
-
-    //     result
-    // }
-
-    pub fn to_game(&self, gs: &mut GameBackend) -> GameId {
+    /// Get the canonical form of the position
+    ///
+    /// # Arguments
+    ///
+    /// `gb` - Shared cache of short combinatorial games
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let mut gb = cgt::short_canonical_game::GameBackend::new();
+    /// let grid = cgt::domineering::Grid::parse(2, 2, ".#|..").unwrap();
+    /// let game_id = grid.canonical_form(&mut gb);
+    /// assert_eq!(gb.dump_game_to_str(game_id), "*".to_string());
+    /// ```
+    pub fn canonical_form(&self, gb: &mut GameBackend) -> GameId {
         let grid = self.move_top_left();
-        {
-            if let Some(game) = CACHE.read().unwrap().deref().get(&grid) {
-                return *game;
-            }
+        if let Some(id) = grid.lookup() {
+            return id;
         }
 
-        if !grid.has_left_moves() && !grid.has_right_moves() {
-            return gs.zero_id;
+        let left_moves = grid.left_moves();
+        let right_moves = grid.right_moves();
+
+        // NOTE: We don't cache games without moves, not sure if it's worth it
+        if left_moves.is_empty() && right_moves.is_empty() {
+            return gb.zero_id;
         }
 
         let options = Options {
-            left: grid.left_moves().iter().map(|o| o.to_game(gs)).collect(),
-            right: grid.right_moves().iter().map(|o| o.to_game(gs)).collect(),
+            left: left_moves.iter().map(|o| o.canonical_form(gb)).collect(),
+            right: right_moves.iter().map(|o| o.canonical_form(gb)).collect(),
         };
 
-        let this_game = gs.construct_from_options(options.clone());
-
-        {
-            let mut cache = CACHE.write().unwrap();
-            cache.insert(grid.clone(), this_game);
-        }
-
-        this_game
+        let canonical_form = gb.construct_from_options(options);
+        self.clone().cache(canonical_form);
+        canonical_form
     }
 }
 
+// Values confirmed with gcsuite
+
 #[test]
-fn finds_simple_game_form() {
+fn finds_canonical_form_of_one() {
     let mut b = GameBackend::new();
-
-    // Values confirmed with gcsuite
-
-    let grid = Grid::empty(2, 1);
-    let game_id = grid.to_game(&mut b);
-    assert_eq!(b.dump_game(game_id), "-1".to_string());
-
     let grid = Grid::empty(1, 2);
-    let game_id = grid.to_game(&mut b);
-    assert_eq!(b.dump_game(game_id), "1".to_string());
+    let game_id = grid.canonical_form(&mut b);
+    assert_eq!(b.dump_game_to_str(game_id), "1".to_string());
+}
 
+#[test]
+fn finds_canonical_form_of_minus_one() {
+    let mut b = GameBackend::new();
+    let grid = Grid::empty(2, 1);
+    let game_id = grid.canonical_form(&mut b);
+    assert_eq!(b.dump_game_to_str(game_id), "-1".to_string());
+}
+
+#[test]
+fn finds_canonical_form_of_two_by_two() {
+    let mut b = GameBackend::new();
     let grid = Grid::empty(2, 2);
-    let game_id = grid.to_game(&mut b);
-    assert_eq!(b.dump_game(game_id), "{1|-1}".to_string());
+    let game_id = grid.canonical_form(&mut b);
+    assert_eq!(b.dump_game_to_str(game_id), "{1|-1}".to_string());
+}
 
+#[test]
+fn finds_canonical_form_of_two_by_two_with_noise() {
+    let mut b = GameBackend::new();
     let grid = Grid::parse(3, 3, "..#|..#|##.").unwrap();
-    let game_id = grid.to_game(&mut b);
-    assert_eq!(b.dump_game(game_id), "{1|-1}".to_string());
+    let game_id = grid.canonical_form(&mut b);
+    assert_eq!(b.dump_game_to_str(game_id), "{1|-1}".to_string());
+}
 
+#[test]
+fn finds_canonical_form_of_minus_two() {
+    let mut b = GameBackend::new();
     let grid = Grid::empty(4, 1);
-    let game_id = grid.to_game(&mut b);
-    assert_eq!(b.dump_game(game_id), "-2".to_string());
+    let game_id = grid.canonical_form(&mut b);
+    assert_eq!(b.dump_game_to_str(game_id), "-2".to_string());
+}
 
+#[test]
+fn finds_canonical_form_of_l_shape() {
+    let mut b = GameBackend::new();
     let grid = Grid::parse(2, 2, ".#|..").unwrap();
-    let game_id = grid.to_game(&mut b);
-    assert_eq!(b.dump_game(game_id), "*".to_string());
+    let game_id = grid.canonical_form(&mut b);
+    assert_eq!(b.dump_game_to_str(game_id), "*".to_string());
+}
 
+#[test]
+fn finds_canonical_form_of_long_l_shape() {
+    let mut b = GameBackend::new();
     let grid = Grid::parse(3, 3, ".##|.##|...").unwrap();
-    let game_id = grid.to_game(&mut b);
-    assert_eq!(b.dump_game(game_id), "0".to_string());
+    let game_id = grid.canonical_form(&mut b);
+    assert_eq!(b.dump_game_to_str(game_id), "0".to_string());
+}
 
+#[test]
+fn finds_canonical_form_of_weird_l_shape() {
+    let mut b = GameBackend::new();
     let grid = Grid::parse(3, 3, "..#|..#|...").unwrap();
-    let game_id = grid.to_game(&mut b);
-    assert_eq!(b.dump_game(game_id), "{1/2|-2}".to_string());
+    let game_id = grid.canonical_form(&mut b);
+    assert_eq!(b.dump_game_to_str(game_id), "{1/2|-2}".to_string());
+}
 
+#[test]
+fn finds_canonical_form_of_three_by_three() {
+    let mut b = GameBackend::new();
     let grid = Grid::empty(3, 3);
-    let game_id = grid.to_game(&mut b);
-    assert_eq!(b.dump_game(game_id), "{1|-1}".to_string());
+    let game_id = grid.canonical_form(&mut b);
+    assert_eq!(b.dump_game_to_str(game_id), "{1|-1}".to_string());
+}
 
-    // FIXME
-    // Options are alright but NUS is empty
+#[test]
+fn finds_canonical_form_of_num_nim_sum() {
+    // There was a bug in here so here's test case
+    let mut b = GameBackend::new();
     let grid = Grid::parse(4, 2, ".#.#|.#..").unwrap();
-    let game_id = grid.to_game(&mut b);
-    println!("{}", b.dump_options(&b.get_game(game_id).options)); // This is wrong
-    println!("{}", b.dump_game(game_id)); // This is OK
-    println!("{:?}", &b.get_game(game_id));
-    assert_eq!(b.dump_game(game_id), "1*".to_string());
+    let game_id = grid.canonical_form(&mut b);
+    assert_eq!(b.dump_game_to_str(game_id), "1*".to_string());
 }

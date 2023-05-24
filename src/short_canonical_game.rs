@@ -971,7 +971,7 @@ impl GameBackend {
         last_defined_id
     }
 
-    fn dump_game_impl<W>(&self, id: GameId, f: &mut W) -> fmt::Result
+    pub fn dump_game<W>(&self, id: GameId, f: &mut W) -> fmt::Result
     where
         W: Write,
     {
@@ -979,12 +979,12 @@ impl GameBackend {
         if let Some(nus) = game.nus {
             write!(f, "{}", nus)?;
         } else {
-            self.dump_options_impl(&game.options, f)?;
+            self.dump_options(&game.options, f)?;
         }
         Ok(())
     }
 
-    pub fn dump_options_impl<W>(&self, options: &Options, f: &mut W) -> fmt::Result
+    pub fn dump_options<W>(&self, options: &Options, f: &mut W) -> fmt::Result
     where
         W: Write,
     {
@@ -993,28 +993,28 @@ impl GameBackend {
             if idx != 0 {
                 write!(f, ",")?;
             }
-            self.dump_game_impl(*l, f)?;
+            self.dump_game(*l, f)?;
         }
         write!(f, "|")?;
         for (idx, r) in options.right.iter().enumerate() {
             if idx != 0 {
                 write!(f, ",")?;
             }
-            self.dump_game_impl(*r, f)?;
+            self.dump_game(*r, f)?;
         }
         write!(f, "}}")?;
         Ok(())
     }
 
-    pub(crate) fn dump_options(&self, options: &Options) -> String {
+    pub fn dump_options_to_str(&self, options: &Options) -> String {
         let mut buf = String::new();
-        self.dump_options_impl(options, &mut buf).unwrap();
+        self.dump_options(options, &mut buf).unwrap();
         buf
     }
 
-    pub(crate) fn dump_game(&self, id: GameId) -> String {
+    pub fn dump_game_to_str(&self, id: GameId) -> String {
         let mut buf = String::new();
-        self.dump_game_impl(id, &mut buf).unwrap();
+        self.dump_game(id, &mut buf).unwrap();
         buf
     }
 
@@ -1168,26 +1168,26 @@ fn simplifies_options() {
         right: vec![b.star_id],
     };
     let left_id = b.construct_from_options(options_l);
-    assert_eq!(b.dump_game(left_id), "{1|*}".to_string());
+    assert_eq!(b.dump_game_to_str(left_id), "{1|*}".to_string());
 
     let options = Options {
         left: vec![left_id],
         right: vec![b.zero_id],
     };
     let id = b.construct_from_options(options);
-    assert_eq!(b.dump_game(id), "*".to_string());
+    assert_eq!(b.dump_game_to_str(id), "*".to_string());
 
     let options = Options {
         left: vec![],
         right: vec![b.negative_one_id, b.negative_one_id, b.zero_id],
     };
     let id = b.construct_from_options(options);
-    assert_eq!(b.dump_game(id), "-2".to_string());
+    assert_eq!(b.dump_game_to_str(id), "-2".to_string());
 
     let options = Options {
         left: vec![b.zero_id, b.negative_one_id],
         right: vec![b.one_id],
     };
     let id = b.construct_from_options(options);
-    assert_eq!(b.dump_game(id), "1/2".to_string());
+    assert_eq!(b.dump_game_to_str(id), "1/2".to_string());
 }

@@ -1,12 +1,5 @@
-#![feature(extend_one)]
-
-use crate::canonical_game::GameBackend;
-use crate::dyadic_rational_number::DyadicRationalNumber;
-use crate::grid::Grid;
-
-mod canonical_game;
-mod dyadic_rational_number;
-mod grid;
+use cgt::domineering::Grid;
+use cgt::short_canonical_game::GameBackend;
 
 fn main() {
     let mut b = GameBackend::new();
@@ -21,13 +14,13 @@ fn main() {
             grid_arr[grid_idx] = ((i >> grid_idx) & 1) == 1;
         }
         let grid = Grid::from_arr(width, height, &grid_arr);
-        let game = grid.to_game(&mut b);
+        let game = grid.canonical_form(&mut b);
         if i % 1000 == 0 || i == total - 1 {
             let progress = format!("{}", i);
             let pad_len = total_len - (progress.len() as u32);
             let pad = "0".repeat(pad_len as usize);
             eprintln!("{}{}/{}", pad, progress, total - 1);
         }
-        println!("{}\n{}\n", grid, b.dump_game(game));
+        println!("{}\n{}\n", grid, b.dump_game_to_str(game));
     }
 }
