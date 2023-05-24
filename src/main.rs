@@ -10,8 +10,8 @@ mod grid;
 
 fn main() {
     let mut b = GameBackend::new();
-    let width = 3;
-    let height = 3;
+    let width = 4;
+    let height = 4;
 
     for i in 0u64..(1 << (width * height)) {
         let mut grid_arr = vec![false; width * height];

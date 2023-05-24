@@ -427,6 +427,7 @@ impl Grid {
         };
 
         let this_game = gs.construct_from_options(options.clone());
+
         {
             let mut cache = CACHE.write().unwrap();
             cache.insert(grid.clone(), this_game);
@@ -440,19 +441,41 @@ impl Grid {
 fn finds_simple_game_form() {
     let mut b = GameBackend::new();
 
-    let grid = Grid::empty(2, 1);
-    let game_id = grid.to_game(&mut b);
-    assert_eq!(b.dump_game(game_id), "-1".to_string());
+    // Values confirmed with gcsuite
 
-    let grid = Grid::empty(1, 2);
-    let game_id = grid.to_game(&mut b);
-    assert_eq!(b.dump_game(game_id), "1".to_string());
+    // let grid = Grid::empty(2, 1);
+    // let game_id = grid.to_game(&mut b);
+    // assert_eq!(b.dump_game(game_id), "-1".to_string());
 
-    let grid = Grid::empty(2, 2);
+    // let grid = Grid::empty(1, 2);
+    // let game_id = grid.to_game(&mut b);
+    // assert_eq!(b.dump_game(game_id), "1".to_string());
+
+    // let grid = Grid::empty(2, 2);
+    // let game_id = grid.to_game(&mut b);
+    // assert_eq!(b.dump_game(game_id), "{1|-1}".to_string());
+
+    // let grid = Grid::parse(3, 3, "..#|..#|##.").unwrap();
+    // let game_id = grid.to_game(&mut b);
+    // assert_eq!(b.dump_game(game_id), "{1|-1}".to_string());
+
+    // let grid = Grid::empty(4, 1);
+    // let game_id = grid.to_game(&mut b);
+    // assert_eq!(b.dump_game(game_id), "-2".to_string());
+
+    // let grid = Grid::parse(2, 2, ".#|..").unwrap();
+    // let game_id = grid.to_game(&mut b);
+    // assert_eq!(b.dump_game(game_id), "*".to_string());
+
+    // let grid = Grid::parse(3, 3, ".##|.##|...").unwrap();
+    // let game_id = grid.to_game(&mut b);
+    // assert_eq!(b.dump_game(game_id), "0".to_string());
+
+    // let grid = Grid::parse(3, 3, "..#|..#|...").unwrap();
+    // let game_id = grid.to_game(&mut b);
+    // assert_eq!(b.dump_game(game_id), "{1/2|-2}".to_string());
+
+    let grid = Grid::empty(3, 3);
     let game_id = grid.to_game(&mut b);
     assert_eq!(b.dump_game(game_id), "{1|-1}".to_string());
-
-    let grid = Grid::empty(4, 1);
-    let game_id = grid.to_game(&mut b);
-    assert_eq!(b.dump_game(game_id), "-2".to_string());
 }

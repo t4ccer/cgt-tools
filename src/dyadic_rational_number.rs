@@ -69,8 +69,9 @@ impl DyadicRationalNumber {
     /// Arithmetic mean of two rationals
     pub fn mean(&self, rhs: &Self) -> Self {
         let mut res = *self + *rhs;
-        res.denominator_exponent <<= 1;
-        res.normalized()
+        res.denominator_exponent += 1; // divide by 2
+        res.normalize();
+        res
     }
 }
 
