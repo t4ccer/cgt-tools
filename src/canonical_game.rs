@@ -315,7 +315,6 @@ impl GameBackend {
 
         let left_mex = self.mex(&options.left);
         let right_mex = self.mex(&options.right);
-
         if let (Some(left_mex), Some(right_mex)) = (left_mex, right_mex) {
             if left_mex == right_mex {
                 let nus = Nus {
@@ -711,6 +710,7 @@ impl GameBackend {
             && num_ro == 1
             && self.get_game(options.left[0]).is_number()
             && self.get_game(options.right[0]).is_number_up_star()
+            && !self.get_game(options.right[0]).is_number()
             && self.compare_number_parts(options.left[0], options.right[0]) == 0
             && self.get_game(options.right[0]).nus.unwrap().up_multiple >= 0
         {
@@ -722,8 +722,9 @@ impl GameBackend {
             && num_ro == 1
             && self.get_game(options.right[0]).is_number()
             && self.get_game(options.left[0]).is_number_up_star()
+            && !self.get_game(options.left[0]).is_number()
             && self.compare_number_parts(options.left[0], options.right[0]) == 0
-            && self.get_game(options.left[0]).nus.unwrap().up_multiple >= 0
+            && self.get_game(options.left[0]).nus.unwrap().up_multiple <= 0
         {
             // This is of the form n + {0|G} where G is a number-up-star of up multiple >= 0.
             number = self.get_game(options.left[0]).nus.unwrap().number;
@@ -738,11 +739,10 @@ impl GameBackend {
             for i in 0..num_lo {
                 let l_id = options.left[i];
                 let l = self.get_game(l_id);
-
                 let r_id = options.right[i];
 
                 if l_id != r_id
-                    || l.is_number_up_star()
+                    || !l.is_number_up_star()
                     || self.compare_number_parts(l_id, r_id) != 0
                 {
                     return None;
@@ -1163,26 +1163,26 @@ fn nimber_is_its_negative() {
 fn simplifies_options() {
     let mut b = GameBackend::new();
 
-    // let options_l = Options {
-    //     left: vec![b.one_id],
-    //     right: vec![b.star_id],
-    // };
-    // let left_id = b.construct_from_options(options_l);
-    // assert_eq!(b.dump_game(left_id), "{1|*}".to_string());
+    let options_l = Options {
+        left: vec![b.one_id],
+        right: vec![b.star_id],
+    };
+    let left_id = b.construct_from_options(options_l);
+    assert_eq!(b.dump_game(left_id), "{1|*}".to_string());
 
-    // let options = Options {
-    //     left: vec![left_id],
-    //     right: vec![b.zero_id],
-    // };
-    // let id = b.construct_from_options(options);
-    // assert_eq!(b.dump_game(id), "*".to_string());
+    let options = Options {
+        left: vec![left_id],
+        right: vec![b.zero_id],
+    };
+    let id = b.construct_from_options(options);
+    assert_eq!(b.dump_game(id), "*".to_string());
 
-    // let options = Options {
-    //     left: vec![],
-    //     right: vec![b.negative_one_id, b.negative_one_id, b.zero_id],
-    // };
-    // let id = b.construct_from_options(options);
-    // assert_eq!(b.dump_game(id), "-2".to_string());
+    let options = Options {
+        left: vec![],
+        right: vec![b.negative_one_id, b.negative_one_id, b.zero_id],
+    };
+    let id = b.construct_from_options(options);
+    assert_eq!(b.dump_game(id), "-2".to_string());
 
     let options = Options {
         left: vec![b.zero_id, b.negative_one_id],
