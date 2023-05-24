@@ -1,11 +1,11 @@
 [package]
-name = "cg"
+name = "cgt"
 version = "0.1.0"
 edition = "2021"
 authors = ["Tomasz Maciosowski <t4ccer@gmail.com>"]
 license = "AGPL-3.0"
 readme = "README.md"
-repository = "https://github.com/t4ccer/cgrs"
+repository = "https://github.com/t4ccer/cgt-rs"
 
 [dependencies]
 bit-vec = "0.6.3"
