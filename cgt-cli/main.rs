@@ -33,7 +33,6 @@ fn main() -> Result<()> {
 
     let grid_tiles = args.width * args.height;
     let max_grid_tiles = 8 * std::mem::size_of::<usize>();
-
     if grid_tiles > max_grid_tiles {
         Err(anyhow!(
             "Size of grid (width * height) is {}, but it cannot exceed {}",
@@ -43,12 +42,10 @@ fn main() -> Result<()> {
     }
 
     let max_last_id = 1 << grid_tiles;
-
     let last_id: usize = match args.last_id {
         None => max_last_id,
         Some(last_id) => last_id,
     };
-
     if last_id > max_last_id {
         Err(anyhow!(
             "last-id is {}, but for this grid it cannot exceed {}",
@@ -58,7 +55,6 @@ fn main() -> Result<()> {
     }
 
     let total_len: u32 = last_id.ilog10() + 1;
-
     let mut b = GameBackend::new();
     for i in args.start_id..last_id {
         let mut grid_arr = vec![false; grid_tiles];

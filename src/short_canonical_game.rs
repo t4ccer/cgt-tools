@@ -7,9 +7,11 @@ use std::{
 
 use crate::dyadic_rational_number::DyadicRationalNumber;
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct GameId(usize);
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub struct Game {
     pub nus: Option<Nus>,
@@ -39,6 +41,7 @@ impl Game {
     }
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub struct Nus {
     pub number: DyadicRationalNumber,
@@ -96,6 +99,7 @@ impl Display for Nus {
     }
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub struct Options {
     pub left: Vec<GameId>,
@@ -112,6 +116,7 @@ impl Options {
     }
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug)]
 pub struct GameBackend {
     known_games: Vec<Game>,

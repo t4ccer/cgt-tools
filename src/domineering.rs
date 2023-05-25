@@ -6,7 +6,7 @@ use std::{collections::HashMap, fmt::Display, sync::RwLock};
 use crate::short_canonical_game::{GameBackend, GameId, Options};
 
 // FIXME: some bit array here
-#[allow(dead_code)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Grid {
     pub width: usize,
