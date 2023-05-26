@@ -121,6 +121,18 @@ impl Ord for DyadicRationalNumber {
     }
 }
 
+#[test]
+fn half_is_less_than_forty_two() {
+    let half = DyadicRationalNumber::new(1, 1);
+    let forty_two = DyadicRationalNumber::new(42, 0);
+    assert!(half <= forty_two);
+    assert!(half < forty_two);
+    assert!(half != forty_two);
+    assert!(forty_two >= half);
+    assert!(forty_two > half);
+    assert!(forty_two != half);
+}
+
 impl Add for &DyadicRationalNumber {
     type Output = DyadicRationalNumber;
 
@@ -151,6 +163,14 @@ impl Add for DyadicRationalNumber {
     fn add(self, rhs: DyadicRationalNumber) -> DyadicRationalNumber {
         &self + &rhs
     }
+}
+
+#[test]
+fn one_plus_half() {
+    let one = DyadicRationalNumber::new(1, 0);
+    let half = DyadicRationalNumber::new(1, 1);
+    assert_eq!(one + half, DyadicRationalNumber::new(3, 1));
+    assert_eq!(half + one, DyadicRationalNumber::new(3, 1));
 }
 
 impl Sub for DyadicRationalNumber {

@@ -163,6 +163,12 @@ impl Grid {
 }
 
 #[test]
+#[should_panic]
+fn grid_max_size_is_respected() {
+    Grid::empty(10, 10).unwrap();
+}
+
+#[test]
 fn parse_grid() {
     let width = 3;
     let height = 3;
