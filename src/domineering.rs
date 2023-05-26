@@ -1,6 +1,5 @@
-use lazy_static::{__Deref, lazy_static};
 use queues::{IsQueue, Queue};
-use std::{collections::HashMap, fmt::Display, sync::RwLock};
+use std::{collections::HashMap, fmt::Display, ops::Deref, sync::RwLock};
 
 use crate::short_canonical_game::{GameBackend, GameId, Options};
 
@@ -194,7 +193,8 @@ fn set_works() {
 
 impl Grid {
     fn at(&self, x: u8, y: u8) -> bool {
-        (self.grid >> (self.width * y + x)) & 1 == 1
+        let n = self.width as GridBits * y as GridBits + x as GridBits;
+        (self.grid >> n) & 1 == 1
     }
 
     fn set(&mut self, x: u8, y: u8, val: bool) -> () {
@@ -435,22 +435,29 @@ fn decomposes_simple_grid() {
     );
 }
 
-// NOTE: This is still not optimal as equivalent game may have different board positions
-type Cache = HashMap<Grid, GameId>;
-lazy_static! {
-    static ref CACHE: RwLock<Cache> = RwLock::new(HashMap::new());
+// TODO: Once we have RwLock in GameStorage so it can be immutable, move it inside here
+pub struct GridCache {
+    cache: RwLock<HashMap<Grid, GameId>>,
+}
+
+impl GridCache {
+    pub fn new() -> Self {
+        GridCache {
+            cache: RwLock::new(HashMap::new()),
+        }
+    }
+
+    fn get(&self, grid: &Grid) -> Option<GameId> {
+        self.cache.read().unwrap().deref().get(grid).copied()
+    }
+
+    fn insert(&self, grid: Grid, id: GameId) {
+        let mut cache = self.cache.write().unwrap();
+        cache.insert(grid, id);
+    }
 }
 
 impl Grid {
-    fn lookup(&self) -> Option<GameId> {
-        CACHE.read().unwrap().deref().get(self).copied()
-    }
-
-    fn cache(self, id: GameId) {
-        let mut cache = CACHE.write().unwrap();
-        cache.insert(self, id);
-    }
-
     /// Get the canonical form of the position
     ///
     /// # Arguments
@@ -460,14 +467,15 @@ impl Grid {
     /// # Examples
     ///
     /// ```
+    /// let cache = cgt::domineering::GridCache::new();
     /// let mut gb = cgt::short_canonical_game::GameBackend::new();
     /// let grid = cgt::domineering::Grid::parse(2, 2, ".#|..").unwrap();
-    /// let game_id = grid.canonical_form(&mut gb);
+    /// let game_id = grid.canonical_form(&mut gb, &cache);
     /// assert_eq!(gb.dump_game_to_str(game_id), "*".to_string());
     /// ```
-    pub fn canonical_form(&self, gb: &mut GameBackend) -> GameId {
+    pub fn canonical_form(&self, gb: &mut GameBackend, cache: &GridCache) -> GameId {
         let grid = self.move_top_left();
-        if let Some(id) = grid.lookup() {
+        if let Some(id) = cache.get(&grid) {
             return id;
         }
 
@@ -480,12 +488,18 @@ impl Grid {
         }
 
         let options = Options {
-            left: left_moves.iter().map(|o| o.canonical_form(gb)).collect(),
-            right: right_moves.iter().map(|o| o.canonical_form(gb)).collect(),
+            left: left_moves
+                .iter()
+                .map(|o| o.canonical_form(gb, cache))
+                .collect(),
+            right: right_moves
+                .iter()
+                .map(|o| o.canonical_form(gb, cache))
+                .collect(),
         };
 
         let canonical_form = gb.construct_from_options(options);
-        self.clone().cache(canonical_form);
+        cache.insert(self.clone(), canonical_form);
         canonical_form
     }
 }
@@ -494,81 +508,90 @@ impl Grid {
 
 #[test]
 fn finds_canonical_form_of_one() {
+    let cache = GridCache::new();
     let mut b = GameBackend::new();
     let grid = Grid::empty(1, 2).unwrap();
-    let game_id = grid.canonical_form(&mut b);
+    let game_id = grid.canonical_form(&mut b, &cache);
     assert_eq!(b.dump_game_to_str(game_id), "1".to_string());
 }
 
 #[test]
 fn finds_canonical_form_of_minus_one() {
+    let cache = GridCache::new();
     let mut b = GameBackend::new();
     let grid = Grid::empty(2, 1).unwrap();
-    let game_id = grid.canonical_form(&mut b);
+    let game_id = grid.canonical_form(&mut b, &cache);
     assert_eq!(b.dump_game_to_str(game_id), "-1".to_string());
 }
 
 #[test]
 fn finds_canonical_form_of_two_by_two() {
+    let cache = GridCache::new();
     let mut b = GameBackend::new();
     let grid = Grid::empty(2, 2).unwrap();
-    let game_id = grid.canonical_form(&mut b);
+    let game_id = grid.canonical_form(&mut b, &cache);
     assert_eq!(b.dump_game_to_str(game_id), "{1|-1}".to_string());
 }
 
 #[test]
 fn finds_canonical_form_of_two_by_two_with_noise() {
+    let cache = GridCache::new();
     let mut b = GameBackend::new();
     let grid = Grid::parse(3, 3, "..#|..#|##.").unwrap();
-    let game_id = grid.canonical_form(&mut b);
+    let game_id = grid.canonical_form(&mut b, &cache);
     assert_eq!(b.dump_game_to_str(game_id), "{1|-1}".to_string());
 }
 
 #[test]
 fn finds_canonical_form_of_minus_two() {
+    let cache = GridCache::new();
     let mut b = GameBackend::new();
     let grid = Grid::empty(4, 1).unwrap();
-    let game_id = grid.canonical_form(&mut b);
+    let game_id = grid.canonical_form(&mut b, &cache);
     assert_eq!(b.dump_game_to_str(game_id), "-2".to_string());
 }
 
 #[test]
 fn finds_canonical_form_of_l_shape() {
+    let cache = GridCache::new();
     let mut b = GameBackend::new();
     let grid = Grid::parse(2, 2, ".#|..").unwrap();
-    let game_id = grid.canonical_form(&mut b);
+    let game_id = grid.canonical_form(&mut b, &cache);
     assert_eq!(b.dump_game_to_str(game_id), "*".to_string());
 }
 
 #[test]
 fn finds_canonical_form_of_long_l_shape() {
+    let cache = GridCache::new();
     let mut b = GameBackend::new();
     let grid = Grid::parse(3, 3, ".##|.##|...").unwrap();
-    let game_id = grid.canonical_form(&mut b);
+    let game_id = grid.canonical_form(&mut b, &cache);
     assert_eq!(b.dump_game_to_str(game_id), "0".to_string());
 }
 
 #[test]
 fn finds_canonical_form_of_weird_l_shape() {
+    let cache = GridCache::new();
     let mut b = GameBackend::new();
     let grid = Grid::parse(3, 3, "..#|..#|...").unwrap();
-    let game_id = grid.canonical_form(&mut b);
+    let game_id = grid.canonical_form(&mut b, &cache);
     assert_eq!(b.dump_game_to_str(game_id), "{1/2|-2}".to_string());
 }
 
 #[test]
 fn finds_canonical_form_of_three_by_three() {
+    let cache = GridCache::new();
     let mut b = GameBackend::new();
     let grid = Grid::empty(3, 3).unwrap();
-    let game_id = grid.canonical_form(&mut b);
+    let game_id = grid.canonical_form(&mut b, &cache);
     assert_eq!(b.dump_game_to_str(game_id), "{1|-1}".to_string());
 }
 
 #[test]
 fn finds_canonical_form_of_num_nim_sum() {
-    // There was a bug in here so here's test case
+    let cache = GridCache::new();
     let mut b = GameBackend::new();
     let grid = Grid::parse(4, 2, ".#.#|.#..").unwrap();
-    let game_id = grid.canonical_form(&mut b);
+    let game_id = grid.canonical_form(&mut b, &cache);
     assert_eq!(b.dump_game_to_str(game_id), "1*".to_string());
 }

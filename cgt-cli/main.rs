@@ -1,6 +1,7 @@
 use anyhow::anyhow;
 use anyhow::Result;
 use cgt::domineering::Grid;
+use cgt::domineering::GridCache;
 use cgt::short_canonical_game::GameBackend;
 use clap::Parser;
 
@@ -48,17 +49,18 @@ fn main() -> Result<()> {
     }
 
     let total_len: u32 = last_id.ilog10() + 1;
-    let mut b = GameBackend::new();
+    let mut game_backend = GameBackend::new();
+    let cache = GridCache::new();
     for i in args.start_id..last_id {
         let grid = Grid::from_number(args.width, args.height, i).unwrap();
-        let game = grid.canonical_form(&mut b);
+        let game = grid.canonical_form(&mut game_backend, &cache);
         if i % args.progress_step == 0 || i == last_id - 1 {
             let progress = format!("{}", i);
             let pad_len = total_len - (progress.len() as u32);
             let pad = "0".repeat(pad_len as usize);
             eprintln!("{}{}/{}", pad, progress, last_id - 1);
         }
-        println!("{}\n{}\n", grid, b.dump_game_to_str(game));
+        println!("{}\n{}\n", grid, game_backend.dump_game_to_str(game));
     }
 
     Ok(())
