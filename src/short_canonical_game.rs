@@ -124,6 +124,7 @@ pub struct GameBackend {
     options_index: HashMap<Options, GameId>,
     negative_index: HashMap<GameId, GameId>,
     birthday_index: HashMap<GameId, i64>,
+    leq_index: HashMap<(GameId, GameId), bool>,
     pub zero_id: GameId,
     pub star_id: GameId,
     pub up_id: GameId,
@@ -454,6 +455,11 @@ impl GameBackend {
                 }
             }
         }
+
+        if let Some(leq) = self.leq_index.get(&(lhs, rhs)) {
+            return *leq;
+        }
+
         let mut leq = true;
 
         if !lhs_game.is_number() {
@@ -473,6 +479,8 @@ impl GameBackend {
                 }
             }
         }
+
+        self.leq_index.insert((lhs, rhs), leq);
 
         leq
     }
@@ -1031,6 +1039,7 @@ impl GameBackend {
             options_index: HashMap::new(),
             negative_index: HashMap::new(),
             birthday_index: HashMap::new(),
+            leq_index: HashMap::new(),
             zero_id: GameId(0), // Set below
             star_id: GameId(0),
             up_id: GameId(0),
