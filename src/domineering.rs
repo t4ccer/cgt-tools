@@ -1,27 +1,108 @@
-use bit_vec::BitVec;
 use lazy_static::{__Deref, lazy_static};
 use queues::{IsQueue, Queue};
 use std::{collections::HashMap, fmt::Display, sync::RwLock};
 
 use crate::short_canonical_game::{GameBackend, GameId, Options};
 
-// FIXME: some bit array here
+pub type GridBits = u64;
+
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Grid {
-    pub width: usize,
-    pub height: usize,
-    pub grid: BitVec,
+    pub width: u8,
+    pub height: u8,
+    pub grid: GridBits,
+}
+
+/// Convert bits in a number to an array but in reverse order
+pub fn bits_to_arr(num: GridBits) -> [bool; 64] {
+    let mut grid = [false; 64];
+    for grid_idx in 0..64 {
+        grid[grid_idx] = ((num >> grid_idx) & 1) == 1;
+    }
+    grid
+}
+
+#[test]
+fn bits_to_arr_works() {
+    assert_eq!(
+        bits_to_arr(0b1011001),
+        [
+            true, false, false, true, true, false, true, false, false, false, false, false, false,
+            false, false, false, false, false, false, false, false, false, false, false, false,
+            false, false, false, false, false, false, false, false, false, false, false, false,
+            false, false, false, false, false, false, false, false, false, false, false, false,
+            false, false, false, false, false, false, false, false, false, false, false, false,
+            false, false, false
+        ]
+    );
+}
+
+pub fn arr_to_bits(grid: &[bool]) -> GridBits {
+    assert!(
+        grid.len() <= 8 * std::mem::size_of::<GridBits>(),
+        "grid cannot have more than 64 elements"
+    );
+    let mut res: GridBits = 0;
+    for i in (0..grid.len()).rev() {
+        res <<= 1;
+        res |= grid[i] as GridBits;
+    }
+    res
+}
+
+#[test]
+fn bits_to_arr_to_bits_roundtrip() {
+    let inp = 3874328;
+    assert_eq!(inp, arr_to_bits(&bits_to_arr(inp)),);
+}
+
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub enum GridError {
+    TooLarge,
+    CouldNotParse,
 }
 
 impl Grid {
+    /// Check if dimensions are small enough to fit in the fixed-size bit representation
+    fn check_dimensions(width: u8, height: u8) -> Result<(), GridError> {
+        if (width as usize * height as usize) > 8 * std::mem::size_of::<GridBits>() {
+            Err(GridError::TooLarge)?
+        }
+        Ok(())
+    }
+
     /// Creates empty grid with given size
-    pub fn empty(width: usize, height: usize) -> Self {
-        Self {
+    pub fn empty(width: u8, height: u8) -> Result<Self, GridError> {
+        Self::check_dimensions(width, height)?;
+
+        Ok(Self {
             width,
             height,
-            grid: BitVec::from_elem(width * height, false),
-        }
+            grid: 0,
+        })
+    }
+
+    /// Creates filled grid with given size
+    pub fn filled(width: u8, height: u8) -> Result<Self, GridError> {
+        Self::check_dimensions(width, height)?;
+
+        Ok(Self {
+            width,
+            height,
+            grid: GridBits::MAX,
+        })
+    }
+
+    /// Create a grid that correspondes to given size and id
+    pub fn from_number(width: u8, height: u8, grid_id: GridBits) -> Result<Self, GridError> {
+        Self::check_dimensions(width, height)?;
+        Ok(Grid {
+            width,
+            height,
+            grid: grid_id,
+        })
     }
 
     /// Creates a grid from given array of bools
@@ -35,12 +116,8 @@ impl Grid {
     /// ```
     /// cgt::domineering::Grid::from_arr(2, 3, &[true, true, false, false, false, true]);
     /// ```
-    pub fn from_arr(width: usize, height: usize, field: &[bool]) -> Self {
-        Grid {
-            width,
-            height,
-            grid: BitVec::from_fn(width * height, |i| field[i]),
-        }
+    pub fn from_arr(width: u8, height: u8, field: &[bool]) -> Result<Self, GridError> {
+        Self::from_number(width, height, arr_to_bits(field))
     }
 
     /// Parses a grid from `.#` notation
@@ -54,8 +131,8 @@ impl Grid {
     /// ```
     /// cgt::domineering::Grid::parse(3, 3, "..#|.#.|##.").unwrap();
     /// ```
-    pub fn parse(width: usize, height: usize, input: &str) -> Option<Self> {
-        let mut grid = Grid::empty(width, height);
+    pub fn parse(width: u8, height: u8, input: &str) -> Result<Self, GridError> {
+        let mut grid = Grid::empty(width, height)?;
         let mut x = 0;
         let mut y = 0;
 
@@ -67,20 +144,21 @@ impl Grid {
                     continue;
                 } else {
                     // Not a rectangle
-                    return None;
+                    Err(GridError::CouldNotParse)?;
                 }
             }
-            grid.grid.set(
-                width * y + x,
+            grid.set(
+                x,
+                y,
                 match chr {
                     '.' => false,
                     '#' => true,
-                    _ => return None,
+                    _ => Err(GridError::CouldNotParse)?,
                 },
             );
             x += 1;
         }
-        Some(grid)
+        Ok(grid)
     }
 }
 
@@ -89,25 +167,37 @@ fn parse_grid() {
     let width = 3;
     let height = 3;
     assert_eq!(
-        Grid::parse(width, height, "..#|.#.|##."),
-        Some(Grid::from_arr(
+        Grid::parse(width, height, "..#|.#.|##.").unwrap(),
+        Grid::from_arr(
             width,
             height,
             &[false, false, true, false, true, false, true, true, false]
-        ))
+        )
+        .unwrap()
     );
 }
 
+#[test]
+fn set_works() {
+    let mut grid = Grid::parse(3, 2, ".#.|##.").unwrap();
+    grid.set(2, 1, true);
+    grid.set(0, 0, true);
+    grid.set(1, 0, false);
+    assert_eq!(&format!("{}", grid), "#..|###",);
+}
+
 impl Grid {
-    fn at(&self, x: usize, y: usize) -> bool {
-        self.grid[self.width * y + x]
+    fn at(&self, x: u8, y: u8) -> bool {
+        (self.grid >> (self.width * y + x)) & 1 == 1
     }
 
-    fn set(&mut self, x: usize, y: usize, val: bool) -> () {
-        self.grid.set(self.width * y + x, val);
+    fn set(&mut self, x: u8, y: u8, val: bool) -> () {
+        let val = val as GridBits;
+        let n = self.width as GridBits * y as GridBits + x as GridBits;
+        self.grid = (self.grid & !(1 << n)) | (val << n);
     }
 
-    fn moves_for<const DIR_X: usize, const DIR_Y: usize>(&self) -> Vec<Self> {
+    fn moves_for<const DIR_X: u8, const DIR_Y: u8>(&self) -> Vec<Self> {
         let mut moves = Vec::new();
 
         if self.height == 0 || self.width == 0 {
@@ -178,6 +268,12 @@ impl Display for Grid {
     }
 }
 
+#[test]
+fn parse_display_roundtrip() {
+    let inp = "...|#.#|##.|###";
+    assert_eq!(&format!("{}", Grid::parse(3, 4, inp).unwrap()), inp,);
+}
+
 impl Grid {
     /// Remove filled rows and columns from the edges
     pub fn move_top_left(&self) -> Grid {
@@ -199,7 +295,7 @@ impl Grid {
         let filled_top_rows = filled_top_rows;
 
         if filled_top_rows == self.height {
-            return Grid::empty(0, 0);
+            return Grid::empty(0, 0).unwrap();
         }
 
         let mut filled_bottom_rows = 0;
@@ -237,7 +333,7 @@ impl Grid {
         let filled_left_cols = filled_left_cols;
 
         if filled_left_cols == self.width {
-            return Grid::empty(0, 0);
+            return Grid::empty(0, 0).unwrap();
         }
 
         let mut filled_right_cols = 0;
@@ -260,31 +356,24 @@ impl Grid {
         let minimized_width = self.width - filled_left_cols - filled_right_cols;
         let minimized_height = self.height - filled_top_rows - filled_bottom_rows;
 
-        let mut grid = BitVec::from_elem(minimized_width * minimized_height, false);
+        let mut grid = Grid::empty(minimized_width, minimized_height).unwrap();
         for y in filled_top_rows..(self.height - filled_bottom_rows) {
             for x in filled_left_cols..(self.width - filled_right_cols) {
-                grid.set(
-                    minimized_width * (y - filled_top_rows) + (x - filled_left_cols),
-                    self.at(x, y),
-                );
+                grid.set(x - filled_left_cols, y - filled_top_rows, self.at(x, y));
             }
         }
-
-        Grid {
-            width: minimized_width,
-            height: minimized_height,
-            grid,
-        }
+        grid
     }
 
-    fn bfs(&self, visited: &mut BitVec, x: usize, y: usize) -> Option<Grid> {
-        let mut grid = BitVec::from_elem(self.width * self.height, true);
-        let mut q: Queue<(usize, usize)> = Queue::new();
+    fn bfs(&self, visited: &mut Grid, x: u8, y: u8) -> Option<Grid> {
+        let mut grid = Grid::filled(self.width, self.height).unwrap();
+
+        let mut q: Queue<(u8, u8)> = Queue::new();
         let mut size = 0;
         q.add((x, y)).unwrap();
         while let Ok((qx, qy)) = q.remove() {
-            visited.set(self.width * qy + qx, true);
-            grid.set(self.width * qy + qx, false);
+            visited.set(qx, qy, true);
+            grid.set(qx, qy, false);
             size += 1;
             let directions: [(i64, i64); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
             for (dx, dy) in directions {
@@ -295,35 +384,28 @@ impl Grid {
                     && lx < (self.width as i64)
                     && ly >= 0
                     && ly < (self.height as i64)
-                    && !self.at(lx as usize, ly as usize)
-                    && !visited[self.width * (ly as usize) + (lx as usize)]
+                    && !self.at(lx as u8, ly as u8)
+                    && !visited.at(lx as u8, ly as u8)
                 {
-                    q.add((lx as usize, ly as usize)).unwrap();
+                    q.add((lx as u8, ly as u8)).unwrap();
                 }
             }
         }
         if size < 2 {
             None
         } else {
-            Some(
-                Grid {
-                    width: self.width,
-                    height: self.height,
-                    grid,
-                }
-                .move_top_left(),
-            )
+            Some(grid.move_top_left())
         }
     }
 
     /// Get decompisitons of given position
     pub fn decompositons(&self) -> Vec<Grid> {
-        let mut visited = BitVec::from_elem(self.width * self.height, false);
+        let mut visited = Grid::empty(self.width, self.height).unwrap();
         let mut ds = Vec::new();
 
         for y in 0..self.height {
             for x in 0..self.width {
-                if !self.at(x, y) && !visited[self.width * y + x] {
+                if !self.at(x, y) && !visited.at(x, y) {
                     if let Some(g) = self.bfs(&mut visited, x, y) {
                         ds.push(g);
                     }
@@ -407,7 +489,7 @@ impl Grid {
 #[test]
 fn finds_canonical_form_of_one() {
     let mut b = GameBackend::new();
-    let grid = Grid::empty(1, 2);
+    let grid = Grid::empty(1, 2).unwrap();
     let game_id = grid.canonical_form(&mut b);
     assert_eq!(b.dump_game_to_str(game_id), "1".to_string());
 }
@@ -415,7 +497,7 @@ fn finds_canonical_form_of_one() {
 #[test]
 fn finds_canonical_form_of_minus_one() {
     let mut b = GameBackend::new();
-    let grid = Grid::empty(2, 1);
+    let grid = Grid::empty(2, 1).unwrap();
     let game_id = grid.canonical_form(&mut b);
     assert_eq!(b.dump_game_to_str(game_id), "-1".to_string());
 }
@@ -423,7 +505,7 @@ fn finds_canonical_form_of_minus_one() {
 #[test]
 fn finds_canonical_form_of_two_by_two() {
     let mut b = GameBackend::new();
-    let grid = Grid::empty(2, 2);
+    let grid = Grid::empty(2, 2).unwrap();
     let game_id = grid.canonical_form(&mut b);
     assert_eq!(b.dump_game_to_str(game_id), "{1|-1}".to_string());
 }
@@ -439,7 +521,7 @@ fn finds_canonical_form_of_two_by_two_with_noise() {
 #[test]
 fn finds_canonical_form_of_minus_two() {
     let mut b = GameBackend::new();
-    let grid = Grid::empty(4, 1);
+    let grid = Grid::empty(4, 1).unwrap();
     let game_id = grid.canonical_form(&mut b);
     assert_eq!(b.dump_game_to_str(game_id), "-2".to_string());
 }
@@ -471,7 +553,7 @@ fn finds_canonical_form_of_weird_l_shape() {
 #[test]
 fn finds_canonical_form_of_three_by_three() {
     let mut b = GameBackend::new();
-    let grid = Grid::empty(3, 3);
+    let grid = Grid::empty(3, 3).unwrap();
     let game_id = grid.canonical_form(&mut b);
     assert_eq!(b.dump_game_to_str(game_id), "{1|-1}".to_string());
 }
