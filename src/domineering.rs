@@ -1,4 +1,5 @@
-use queues::{IsQueue, Queue};
+extern crate alloc;
+use alloc::collections::vec_deque::VecDeque;
 use std::{collections::HashMap, fmt::Display, ops::Deref, sync::RwLock};
 
 use crate::short_canonical_game::{GameBackend, GameId, Options};
@@ -374,10 +375,11 @@ impl Grid {
     fn bfs(&self, visited: &mut Grid, x: u8, y: u8) -> Option<Grid> {
         let mut grid = Grid::filled(self.width, self.height).unwrap();
 
-        let mut q: Queue<(u8, u8)> = Queue::new();
+        let mut q: VecDeque<(u8, u8)> =
+            VecDeque::with_capacity(self.width as usize * self.height as usize);
         let mut size = 0;
-        q.add((x, y)).unwrap();
-        while let Ok((qx, qy)) = q.remove() {
+        q.push_back((x, y));
+        while let Some((qx, qy)) = q.pop_front() {
             visited.set(qx, qy, true);
             grid.set(qx, qy, false);
             size += 1;
@@ -393,7 +395,7 @@ impl Grid {
                     && !self.at(lx as u8, ly as u8)
                     && !visited.at(lx as u8, ly as u8)
                 {
-                    q.add((lx as u8, ly as u8)).unwrap();
+                    q.push_back((lx as u8, ly as u8));
                 }
             }
         }
