@@ -479,28 +479,33 @@ impl Grid {
             return id;
         }
 
-        let left_moves = grid.left_moves();
-        let right_moves = grid.right_moves();
+        let mut result = gb.zero_id;
+        for grid in grid.decompositons() {
+            if let Some(id) = cache.get(&grid) {
+                result = gb.construct_sum(id, result);
+                continue;
+            }
 
-        // NOTE: We don't cache games without moves, not sure if it's worth it
-        if left_moves.is_empty() && right_moves.is_empty() {
-            return gb.zero_id;
+            let options = Options {
+                left: grid
+                    .left_moves()
+                    .iter()
+                    .map(|o| o.canonical_form(gb, cache))
+                    .collect(),
+                right: grid
+                    .right_moves()
+                    .iter()
+                    .map(|o| o.canonical_form(gb, cache))
+                    .collect(),
+            };
+
+            let canonical_form = gb.construct_from_options(options);
+            cache.insert(grid.clone(), canonical_form);
+            result = gb.construct_sum(canonical_form, result);
         }
 
-        let options = Options {
-            left: left_moves
-                .iter()
-                .map(|o| o.canonical_form(gb, cache))
-                .collect(),
-            right: right_moves
-                .iter()
-                .map(|o| o.canonical_form(gb, cache))
-                .collect(),
-        };
-
-        let canonical_form = gb.construct_from_options(options);
-        cache.insert(self.clone(), canonical_form);
-        canonical_form
+        cache.insert(grid.clone(), result);
+        result
     }
 }
 

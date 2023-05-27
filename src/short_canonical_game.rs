@@ -1,8 +1,7 @@
 use std::{
     cmp::{self, Ordering},
     collections::HashMap,
-    fmt::Write,
-    fmt::{self, Display},
+    fmt::{self, Display, Write},
     ops::Add,
 };
 
@@ -30,7 +29,7 @@ impl Game {
     pub fn is_number(&self) -> bool {
         match &self.nus {
             None => false,
-            Some(nus) => nus.up_multiple == 0 && nus.nimber == Nimber::from(0),
+            Some(nus) => nus.is_number(),
         }
     }
 
@@ -38,7 +37,7 @@ impl Game {
     pub fn is_nimber(&self) -> bool {
         match &self.nus {
             None => false,
-            Some(nus) => nus.number == DyadicRationalNumber::from(0) && nus.up_multiple == 0,
+            Some(nus) => nus.is_nimber(),
         }
     }
 }
@@ -66,6 +65,14 @@ impl Nus {
             up_multiple: 0,
             nimber: Nimber::from(0),
         }
+    }
+
+    pub fn is_number(&self) -> bool {
+        self.up_multiple == 0 && self.nimber == Nimber::from(0)
+    }
+
+    pub fn is_nimber(&self) -> bool {
+        self.number == DyadicRationalNumber::from(0) && self.up_multiple == 0
     }
 }
 
@@ -302,7 +309,7 @@ impl GameBackend {
                 options.left.push(self.construct_sum(gid, h_l));
             }
             for h_r in h.options.right {
-                options.left.push(self.construct_sum(gid, h_r));
+                options.right.push(self.construct_sum(gid, h_r));
             }
         }
 
@@ -1059,6 +1066,24 @@ impl GameBackend {
         last_defined_id
     }
 
+    pub fn temperature(&self, id: GameId) -> DyadicRationalNumber {
+        let game = self.get_game(id);
+        match &game.nus {
+            Some(nus) => {
+                if nus.is_number() {
+                    // It's a number k/2^n, so the temperature is -1/2^n
+                    DyadicRationalNumber::new(-1, nus.number.denominator_exponent())
+                } else {
+                    // It's a number plus a nonzero infinitesimal
+                    DyadicRationalNumber::from(0)
+                }
+            }
+            None => {
+                todo!()
+            }
+        }
+    }
+
     pub fn dump_game<W>(&self, id: GameId, f: &mut W) -> fmt::Result
     where
         W: Write,
@@ -1280,4 +1305,19 @@ fn simplifies_options() {
     };
     let id = b.construct_from_options(options);
     assert_eq!(b.dump_game_to_str(id), "1/2".to_string());
+}
+
+#[test]
+fn sum_works() {
+    let mut b = GameBackend::new();
+    let one_zero = b.construct_from_options(Options {
+        left: vec![b.one_id],
+        right: vec![b.zero_id],
+    });
+    let zero_one = b.construct_from_options(Options {
+        left: vec![b.zero_id],
+        right: vec![b.one_id],
+    });
+    let sum = b.construct_sum(one_zero, zero_one);
+    assert_eq!(&b.dump_game_to_str(sum), "{3/2|1/2}");
 }
