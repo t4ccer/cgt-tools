@@ -9,10 +9,13 @@ repository = "https://github.com/t4ccer/cgt-rs"
 description = "Library to work with Combinatorial Games"
 
 [dependencies]
+gcd = "2.3.0"
+itertools = "0.10.5"
+num-rational = { version = "0.4.1", default-features = false, features = ["std"]}
 serde = { version = "1.0.163", features = ["std", "derive"], optional = true}
 
 [features]
-serde = ["dep:serde"]
+serde = ["dep:serde", "num-rational/serde"]
 
 [workspace]
 members = ["cgt-cli"]

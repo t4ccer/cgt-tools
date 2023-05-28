@@ -23,19 +23,22 @@ impl DyadicRationalNumber {
         self.numerator
     }
 
-    pub fn denominator(&self) -> u128 {
-        // 2^self.denominator_exponent, but as bitshift
-        1 << self.denominator_exponent
+    pub fn denominator(&self) -> Option<u128> {
+        if self.denominator_exponent as usize >= std::mem::size_of::<u128>() * 8 {
+            None
+        } else {
+            // 2^self.denominator_exponent, but as bitshift
+            Some(1 << self.denominator_exponent)
+        }
     }
 
     pub fn denominator_exponent(&self) -> u32 {
         self.denominator_exponent
     }
 
-    fn normalized(&self) -> Self {
-        let mut res = self.clone();
-        res.normalize();
-        res
+    fn normalized(mut self) -> Self {
+        self.normalize();
+        self
     }
 
     /// Internal function to normalize numbers
@@ -71,8 +74,7 @@ impl DyadicRationalNumber {
     pub fn mean(&self, rhs: &Self) -> Self {
         let mut res = *self + *rhs;
         res.denominator_exponent += 1; // divide by 2
-        res.normalize();
-        res
+        res.normalized()
     }
 }
 
@@ -148,12 +150,11 @@ impl Add for &DyadicRationalNumber {
             numerator = rhs.numerator
                 + (self.numerator << (rhs.denominator_exponent - self.denominator_exponent))
         }
-        let mut res = DyadicRationalNumber {
+        DyadicRationalNumber {
             numerator,
             denominator_exponent,
-        };
-        res.normalize();
-        res
+        }
+        .normalized()
     }
 }
 
@@ -216,7 +217,8 @@ fn denominator_works() {
             numerator: 3,
             denominator_exponent: 3
         }
-        .denominator(),
+        .denominator()
+        .unwrap(),
         8
     );
 }
@@ -225,9 +227,20 @@ impl Display for DyadicRationalNumber {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(int) = self.to_integer() {
             write!(f, "{}", int)?;
+        } else if let Some(denum) = self.denominator() {
+            write!(f, "{}/{}", self.numerator(), denum)?;
         } else {
-            write!(f, "{}/{}", self.numerator(), self.denominator())?;
+            write!(f, "{}/2^{}", self.numerator(), self.denominator_exponent())?;
         }
         return Ok(());
     }
+}
+
+#[test]
+fn dyadic_rationals_pretty() {
+    assert_eq!(format!("{}", DyadicRationalNumber::new(3, 8)), "3/256");
+    assert_eq!(
+        format!("{}", DyadicRationalNumber::new(21, 200)),
+        "21/2^200"
+    );
 }

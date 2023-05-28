@@ -53,14 +53,20 @@ fn main() -> Result<()> {
     let cache = GridCache::new();
     for i in args.start_id..last_id {
         let grid = Grid::from_number(args.width, args.height, i).unwrap();
+        println!("{}", grid);
+
         let game = grid.canonical_form(&mut game_backend, &cache);
+        println!("{}", game_backend.dump_game_to_str(game));
+
+        let temp = game_backend.temperature(game);
+        println!("{}\n", temp);
+
         if i % args.progress_step == 0 || i == last_id - 1 {
             let progress = format!("{}", i);
             let pad_len = total_len - (progress.len() as u32);
             let pad = "0".repeat(pad_len as usize);
             eprintln!("{}{}/{}", pad, progress, last_id - 1);
         }
-        println!("{}\n{}\n", grid, game_backend.dump_game_to_str(game));
     }
 
     Ok(())

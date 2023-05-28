@@ -602,3 +602,16 @@ fn finds_canonical_form_of_num_nim_sum() {
     let game_id = grid.canonical_form(&mut b, &cache);
     assert_eq!(b.dump_game_to_str(game_id), "1*".to_string());
 }
+
+#[test]
+fn finds_temperature_of_four_by_four_grid() {
+    use crate::rational::Rational;
+
+    let cache = GridCache::new();
+    let mut b = GameBackend::new();
+    let grid = Grid::parse(4, 4, "#...|....|....|....").unwrap();
+    let game_id = grid.canonical_form(&mut b, &cache);
+    let temp = b.temperature(game_id);
+    assert_eq!(&b.dump_game_to_str(game_id), "{1*|-1*}");
+    assert_eq!(temp, Rational::from(1));
+}

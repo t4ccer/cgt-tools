@@ -5,8 +5,10 @@ use std::{
     ops::Add,
 };
 
-use crate::dyadic_rational_number::DyadicRationalNumber;
-use crate::nimber::Nimber;
+use crate::{
+    dyadic_rational_number::DyadicRationalNumber, rational::Rational, thermograph::Thermograph,
+};
+use crate::{nimber::Nimber, trajectory::Trajectory};
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -1066,21 +1068,69 @@ impl GameBackend {
         last_defined_id
     }
 
-    pub fn temperature(&self, id: GameId) -> DyadicRationalNumber {
+    pub fn thermograph(&mut self, id: GameId) -> Thermograph {
+        let g = self.get_game(id);
+        match &g.nus {
+            None => self.thermograph_from_options(&g.options),
+            Some(nus) => {
+                if let Some(int) = nus.number.to_integer() && nus.is_number() {
+		    Thermograph::with_mast(Rational::new(int, 1))
+		} else {
+		    if nus.up_multiple == 0 || (nus.nimber == Nimber::from(1) && nus.up_multiple.abs() == 1) {
+			// This looks like 0 or * (depending on whether nimberPart is 0 or 1).
+			let new_id = self.construct_nus(&Nus{
+			    number: nus.number,
+			    up_multiple: 0,
+			    nimber: Nimber::from(nus.nimber.get().cmp(&0) as u32), // signum(nus.nimber)
+			});
+			let new_game = self.get_game(new_id);
+			self.thermograph_from_options(&new_game.options)
+		    } else {
+			let new_id = self.construct_nus(&Nus{
+			    number: nus.number,
+			    up_multiple: nus.up_multiple.cmp(&0) as i32, // signum(nus.up_multiple)
+			    nimber: Nimber::from(0),
+			});
+			let new_game = self.get_game(new_id);
+			self.thermograph_from_options(&new_game.options)
+		    }
+		}
+            }
+        }
+    }
+
+    pub(crate) fn thermograph_from_options(&mut self, options: &Options) -> Thermograph {
+        let mut left_scaffold = Trajectory::new_constant(Rational::NegativeInfinity);
+        let mut right_scaffold = Trajectory::new_constant(Rational::PositiveInfinity);
+
+        for left_move in &options.left {
+            left_scaffold = left_scaffold.max(&self.thermograph(*left_move).right_wall);
+        }
+        for right_move in &options.right {
+            right_scaffold = right_scaffold.min(&self.thermograph(*right_move).left_wall);
+        }
+
+        left_scaffold = left_scaffold.tilt(Rational::from(-1));
+        right_scaffold = right_scaffold.tilt(Rational::from(1));
+
+        Thermograph::thermographic_intersection(left_scaffold, right_scaffold)
+    }
+
+    pub fn temperature(&mut self, id: GameId) -> Rational {
         let game = self.get_game(id);
         match &game.nus {
             Some(nus) => {
                 if nus.is_number() {
                     // It's a number k/2^n, so the temperature is -1/2^n
-                    DyadicRationalNumber::new(-1, nus.number.denominator_exponent())
+                    // DyadicRationalNumber::new(-1, nus.number.denominator_exponent())
+                    Rational::new(-1, nus.number.denominator().unwrap() as u32)
                 } else {
-                    // It's a number plus a nonzero infinitesimal
-                    DyadicRationalNumber::from(0)
+                    // It's a number plus a nonzero infinitesimal, thus the temperature is 0
+                    // DyadicRationalNumber::from(0)
+                    Rational::from(0)
                 }
             }
-            None => {
-                todo!()
-            }
+            None => self.thermograph(id).get_temperature(),
         }
     }
 
@@ -1320,4 +1370,15 @@ fn sum_works() {
     });
     let sum = b.construct_sum(one_zero, zero_one);
     assert_eq!(&b.dump_game_to_str(sum), "{3/2|1/2}");
+}
+
+#[test]
+fn temp_of_one_minus_one_is_one() {
+    let mut b = GameBackend::new();
+    let options = Options {
+        left: vec![b.one_id],
+        right: vec![b.negative_one_id],
+    };
+    let g = b.construct_from_options(options);
+    assert_eq!(b.temperature(g), Rational::from(1));
 }
