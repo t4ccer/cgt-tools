@@ -8,10 +8,9 @@ use std::{
 };
 
 use crate::{
-    dyadic_rational_number::DyadicRationalNumber, rational::Rational, rw_hash_map::RwHashMap,
-    thermograph::Thermograph,
+    dyadic_rational_number::DyadicRationalNumber, nimber::Nimber, rational::Rational,
+    rw_hash_map::RwHashMap, thermograph::Thermograph, trajectory::Trajectory,
 };
-use crate::{nimber::Nimber, trajectory::Trajectory};
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
