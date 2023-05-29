@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use cgt::domineering::{Grid, GridCache};
+use cgt::domineering::{Position, TranspositionTable};
 use clap::Parser;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use std::io::{self, Write};
@@ -50,7 +50,7 @@ fn main() -> Result<()> {
 
     let total_len: u32 = last_id.ilog10() + 1;
 
-    let cache = GridCache::new();
+    let cache = TranspositionTable::new();
     let stdout = io::stdout();
     let stderr = io::stderr();
 
@@ -65,7 +65,7 @@ fn main() -> Result<()> {
     };
 
     (args.start_id..last_id).into_par_iter().for_each(|i| {
-        let grid = Grid::from_number(args.width, args.height, i).unwrap();
+        let grid = Position::from_number(args.width, args.height, i).unwrap();
         let game = grid.canonical_form(&cache);
         let temp = cache.game_backend.temperature(game);
         let to_write = format!(

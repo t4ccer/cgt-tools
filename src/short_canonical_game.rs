@@ -1,8 +1,6 @@
 use std::{
     cmp::{self, Ordering},
     fmt::{self, Display, Write},
-    fs::File,
-    io::{BufReader, Read},
     ops::Add,
     sync::RwLock,
 };
@@ -20,7 +18,7 @@ pub struct GameId(usize);
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub struct Game {
     pub nus: Option<Nus>,
-    pub options: Options,
+    pub options: Moves,
 }
 
 impl Game {
@@ -136,14 +134,14 @@ impl Display for Nus {
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
-pub struct Options {
+pub struct Moves {
     pub left: Vec<GameId>,
     pub right: Vec<GameId>,
 }
 
-impl Options {
+impl Moves {
     pub fn empty() -> Self {
-        Options {
+        Moves {
             left: Vec::new(),
             right: Vec::new(),
         }
@@ -163,7 +161,7 @@ impl Options {
 pub struct GameBackend {
     known_games: RwLock<Vec<Game>>,
     nus_index: RwHashMap<Nus, GameId>,
-    options_index: RwHashMap<Options, GameId>,
+    options_index: RwHashMap<Moves, GameId>,
     negative_index: RwHashMap<GameId, GameId>,
     birthday_index: RwHashMap<GameId, i64>,
     leq_index: RwHashMap<(GameId, GameId), bool>,
@@ -213,7 +211,7 @@ impl GameBackend {
         self.nus_index.get(nus)
     }
 
-    fn get_game_id_by_options(&self, options: &Options) -> Option<GameId> {
+    fn get_game_id_by_options(&self, options: &Moves) -> Option<GameId> {
         self.options_index.get(options)
     }
 
@@ -272,7 +270,7 @@ impl GameBackend {
             .map(|left_id| self.construct_negative(*left_id))
             .collect::<Vec<_>>();
 
-        let neg_options = Options {
+        let neg_options = Moves {
             left: new_left_options,
             right: new_right_options,
         };
@@ -301,7 +299,7 @@ impl GameBackend {
 
         // By the number translation theorem
 
-        let mut options = Options::empty();
+        let mut options = Moves::empty();
 
         if !g.is_number() {
             for g_l in g.options.left {
@@ -393,19 +391,19 @@ impl GameBackend {
         cat_options(&options)
     }
 
-    fn canonicalize_options(&self, options: Options) -> Options {
+    fn canonicalize_options(&self, options: Moves) -> Moves {
         let options = self.bypass_reversible_options_l(options);
         let options = self.bypass_reversible_options_r(options);
 
         let left = self.eliminate_dominated_options(&options.left, true);
         let right = self.eliminate_dominated_options(&options.right, false);
 
-        let options = Options { left, right };
+        let options = Moves { left, right };
         options
     }
 
     /// Safe function to construct a game from a list of options
-    pub fn construct_from_options(&self, mut options: Options) -> GameId {
+    pub fn construct_from_options(&self, mut options: Moves) -> GameId {
         options.eliminate_duplicates();
 
         let left_mex = self.mex(&options.left);
@@ -625,7 +623,7 @@ impl GameBackend {
     }
 
     // TODO: Write it in "Rust way"
-    fn bypass_reversible_options_l(&self, options: Options) -> Options {
+    fn bypass_reversible_options_l(&self, options: Moves) -> Moves {
         let mut i: i64 = 0;
 
         let mut left_options: Vec<Option<GameId>> =
@@ -669,13 +667,13 @@ impl GameBackend {
 
             i += 1;
         }
-        Options {
+        Moves {
             left: cat_options(&left_options),
             right: options.right,
         }
     }
 
-    fn bypass_reversible_options_r(&self, options: Options) -> Options {
+    fn bypass_reversible_options_r(&self, options: Moves) -> Moves {
         let mut i: i64 = 0;
 
         let left_options: Vec<Option<GameId>> = options.left.iter().cloned().map(Some).collect();
@@ -719,7 +717,7 @@ impl GameBackend {
 
             i += 1;
         }
-        Options {
+        Moves {
             left: options.left,
             right: cat_options(&right_options),
         }
@@ -727,7 +725,7 @@ impl GameBackend {
 
     /// Construct a game from list of left and right moves
     /// Unsafe if input is non canonical
-    fn construct_from_canonical_options(&self, mut options: Options) -> GameId {
+    fn construct_from_canonical_options(&self, mut options: Moves) -> GameId {
         options.left.sort();
         options.right.sort();
 
@@ -744,7 +742,7 @@ impl GameBackend {
         self.add_new_game(game)
     }
 
-    fn construct_as_nus_entry(&self, options: &Options) -> Option<GameId> {
+    fn construct_as_nus_entry(&self, options: &Moves) -> Option<GameId> {
         let number: DyadicRationalNumber;
         let up_multiple: i32;
         let nimber: Nimber;
@@ -922,7 +920,7 @@ impl GameBackend {
                     up_multiple: 0,
                     nimber: Nimber::from(1),
                 });
-                new_options = Options {
+                new_options = Moves {
                     left: vec![number_option, star_option],
                     right: vec![number_option],
                 };
@@ -933,17 +931,17 @@ impl GameBackend {
                     up_multiple: 0,
                     nimber: Nimber::from(1),
                 });
-                new_options = Options {
+                new_options = Moves {
                     left: vec![number_option],
                     right: vec![number_option, star_option],
                 };
             } else if i > 0 {
-                new_options = Options {
+                new_options = Moves {
                     left: vec![number_option],
                     right: vec![last_defined_id],
                 };
             } else {
-                new_options = Options {
+                new_options = Moves {
                     left: vec![last_defined_id],
                     right: vec![number_option],
                 };
@@ -978,7 +976,7 @@ impl GameBackend {
         let right_option = self.construct_rational(rational.step(1));
         let game = Game {
             nus: Some(nus),
-            options: Options {
+            options: Moves {
                 left: vec![left_option],
                 right: vec![right_option],
             },
@@ -1021,7 +1019,7 @@ impl GameBackend {
                 nimber: Nimber::from(i),
             };
 
-            let mut options = Options {
+            let mut options = Moves {
                 left: previous_nimber.options.left,
                 right: previous_nimber.options.right,
             };
@@ -1062,7 +1060,7 @@ impl GameBackend {
             let prev = self.get_game_id_by_nus(&Nus::integer(i - sign)).unwrap();
             let new_game = Game {
                 nus: Some(Nus::integer(i)),
-                options: Options {
+                options: Moves {
                     left: (if sign > 0 { vec![prev] } else { vec![] }),
                     right: (if sign > 0 { vec![] } else { vec![prev] }),
                 },
@@ -1113,7 +1111,7 @@ impl GameBackend {
         thermograph
     }
 
-    pub(crate) fn thermograph_from_options(&self, options: &Options) -> Thermograph {
+    pub(crate) fn thermograph_from_options(&self, options: &Moves) -> Thermograph {
         let mut left_scaffold = Trajectory::new_constant(Rational::NegativeInfinity);
         let mut right_scaffold = Trajectory::new_constant(Rational::PositiveInfinity);
 
@@ -1161,7 +1159,7 @@ impl GameBackend {
         Ok(())
     }
 
-    pub fn dump_options<W>(&self, options: &Options, f: &mut W) -> fmt::Result
+    pub fn dump_options<W>(&self, options: &Moves, f: &mut W) -> fmt::Result
     where
         W: Write,
     {
@@ -1183,7 +1181,7 @@ impl GameBackend {
         Ok(())
     }
 
-    pub fn dump_options_to_str(&self, options: &Options) -> String {
+    pub fn dump_options_to_str(&self, options: &Moves) -> String {
         let mut buf = String::new();
         self.dump_options(options, &mut buf).unwrap();
         buf
@@ -1219,7 +1217,7 @@ impl GameBackend {
         // Construct 0 by hand - special case, don't use construct_* here
         let zero = Game {
             nus: Some(Nus::integer(0)),
-            options: Options {
+            options: Moves {
                 left: Vec::new(),
                 right: Vec::new(),
             },
@@ -1343,28 +1341,28 @@ fn nimber_is_its_negative() {
 fn simplifies_options() {
     let b = GameBackend::new();
 
-    let options_l = Options {
+    let options_l = Moves {
         left: vec![b.one_id],
         right: vec![b.star_id],
     };
     let left_id = b.construct_from_options(options_l);
     assert_eq!(b.dump_game_to_str(left_id), "{1|*}".to_string());
 
-    let options = Options {
+    let options = Moves {
         left: vec![left_id],
         right: vec![b.zero_id],
     };
     let id = b.construct_from_options(options);
     assert_eq!(b.dump_game_to_str(id), "*".to_string());
 
-    let options = Options {
+    let options = Moves {
         left: vec![],
         right: vec![b.negative_one_id, b.negative_one_id, b.zero_id],
     };
     let id = b.construct_from_options(options);
     assert_eq!(b.dump_game_to_str(id), "-2".to_string());
 
-    let options = Options {
+    let options = Moves {
         left: vec![b.zero_id, b.negative_one_id],
         right: vec![b.one_id],
     };
@@ -1375,11 +1373,11 @@ fn simplifies_options() {
 #[test]
 fn sum_works() {
     let b = GameBackend::new();
-    let one_zero = b.construct_from_options(Options {
+    let one_zero = b.construct_from_options(Moves {
         left: vec![b.one_id],
         right: vec![b.zero_id],
     });
-    let zero_one = b.construct_from_options(Options {
+    let zero_one = b.construct_from_options(Moves {
         left: vec![b.zero_id],
         right: vec![b.one_id],
     });
@@ -1390,46 +1388,10 @@ fn sum_works() {
 #[test]
 fn temp_of_one_minus_one_is_one() {
     let b = GameBackend::new();
-    let options = Options {
+    let options = Moves {
         left: vec![b.one_id],
         right: vec![b.negative_one_id],
     };
     let g = b.construct_from_options(options);
     assert_eq!(b.temperature(g), Rational::from(1));
-}
-
-#[derive(Debug)]
-pub enum GameBackendFileError {
-    DecodeError(Box<bincode::ErrorKind>),
-    FileError(std::io::Error),
-}
-
-impl From<Box<bincode::ErrorKind>> for GameBackendFileError {
-    fn from(value: Box<bincode::ErrorKind>) -> Self {
-        GameBackendFileError::DecodeError(value)
-    }
-}
-
-impl From<std::io::Error> for GameBackendFileError {
-    fn from(value: std::io::Error) -> Self {
-        GameBackendFileError::FileError(value)
-    }
-}
-
-impl GameBackend {
-    pub fn save_to_file(&self, filepath: &str) -> Result<(), GameBackendFileError> {
-        let serialized = bincode::serialize(self)?;
-        let mut f = File::create(filepath)?;
-        std::io::Write::write_all(&mut f, &serialized)?;
-        Ok(())
-    }
-
-    pub fn load_from_file(filepath: &str) -> Result<Self, GameBackendFileError> {
-        let f = File::open(filepath)?;
-        let mut reader = BufReader::new(f);
-        let mut buffer = Vec::new();
-        reader.read_to_end(&mut buffer)?;
-        let res = bincode::deserialize::<Self>(&buffer)?;
-        Ok(res)
-    }
 }

@@ -4,14 +4,14 @@ use std::fmt::Display;
 
 use crate::{
     rw_hash_map::RwHashMap,
-    short_canonical_game::{GameBackend, GameId, Options},
+    short_canonical_game::{GameBackend, GameId, Moves},
 };
 
 pub type GridBits = u64;
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub struct Grid {
+pub struct Position {
     pub width: u8,
     pub height: u8,
     pub grid: GridBits,
@@ -62,22 +62,22 @@ fn bits_to_arr_to_bits_roundtrip() {
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub enum GridError {
+pub enum PositionError {
     TooLarge,
     CouldNotParse,
 }
 
-impl Grid {
+impl Position {
     /// Check if dimensions are small enough to fit in the fixed-size bit representation
-    fn check_dimensions(width: u8, height: u8) -> Result<(), GridError> {
+    fn check_dimensions(width: u8, height: u8) -> Result<(), PositionError> {
         if (width as usize * height as usize) > 8 * std::mem::size_of::<GridBits>() {
-            Err(GridError::TooLarge)?
+            Err(PositionError::TooLarge)?
         }
         Ok(())
     }
 
     /// Creates empty grid with given size
-    pub fn empty(width: u8, height: u8) -> Result<Self, GridError> {
+    pub fn empty(width: u8, height: u8) -> Result<Self, PositionError> {
         Self::check_dimensions(width, height)?;
 
         Ok(Self {
@@ -88,7 +88,7 @@ impl Grid {
     }
 
     /// Creates filled grid with given size
-    pub fn filled(width: u8, height: u8) -> Result<Self, GridError> {
+    pub fn filled(width: u8, height: u8) -> Result<Self, PositionError> {
         Self::check_dimensions(width, height)?;
 
         Ok(Self {
@@ -99,9 +99,9 @@ impl Grid {
     }
 
     /// Create a grid that correspondes to given size and id
-    pub fn from_number(width: u8, height: u8, grid_id: GridBits) -> Result<Self, GridError> {
+    pub fn from_number(width: u8, height: u8, grid_id: GridBits) -> Result<Self, PositionError> {
         Self::check_dimensions(width, height)?;
-        Ok(Grid {
+        Ok(Position {
             width,
             height,
             grid: grid_id,
@@ -117,9 +117,9 @@ impl Grid {
     /// # Examples
     ///
     /// ```
-    /// cgt::domineering::Grid::from_arr(2, 3, &[true, true, false, false, false, true]);
+    /// cgt::domineering::Position::from_arr(2, 3, &[true, true, false, false, false, true]);
     /// ```
-    pub fn from_arr(width: u8, height: u8, field: &[bool]) -> Result<Self, GridError> {
+    pub fn from_arr(width: u8, height: u8, field: &[bool]) -> Result<Self, PositionError> {
         Self::from_number(width, height, arr_to_bits(field))
     }
 
@@ -132,10 +132,10 @@ impl Grid {
     /// # Examples
     ///
     /// ```
-    /// cgt::domineering::Grid::parse(3, 3, "..#|.#.|##.").unwrap();
+    /// cgt::domineering::Position::parse(3, 3, "..#|.#.|##.").unwrap();
     /// ```
-    pub fn parse(width: u8, height: u8, input: &str) -> Result<Self, GridError> {
-        let mut grid = Grid::empty(width, height)?;
+    pub fn parse(width: u8, height: u8, input: &str) -> Result<Self, PositionError> {
+        let mut grid = Position::empty(width, height)?;
         let mut x = 0;
         let mut y = 0;
 
@@ -147,7 +147,7 @@ impl Grid {
                     continue;
                 } else {
                     // Not a rectangle
-                    Err(GridError::CouldNotParse)?;
+                    Err(PositionError::CouldNotParse)?;
                 }
             }
             grid.set(
@@ -156,7 +156,7 @@ impl Grid {
                 match chr {
                     '.' => false,
                     '#' => true,
-                    _ => Err(GridError::CouldNotParse)?,
+                    _ => Err(PositionError::CouldNotParse)?,
                 },
             );
             x += 1;
@@ -168,7 +168,7 @@ impl Grid {
 #[test]
 #[should_panic]
 fn grid_max_size_is_respected() {
-    Grid::empty(10, 10).unwrap();
+    Position::empty(10, 10).unwrap();
 }
 
 #[test]
@@ -176,8 +176,8 @@ fn parse_grid() {
     let width = 3;
     let height = 3;
     assert_eq!(
-        Grid::parse(width, height, "..#|.#.|##.").unwrap(),
-        Grid::from_arr(
+        Position::parse(width, height, "..#|.#.|##.").unwrap(),
+        Position::from_arr(
             width,
             height,
             &[false, false, true, false, true, false, true, true, false]
@@ -188,14 +188,14 @@ fn parse_grid() {
 
 #[test]
 fn set_works() {
-    let mut grid = Grid::parse(3, 2, ".#.|##.").unwrap();
+    let mut grid = Position::parse(3, 2, ".#.|##.").unwrap();
     grid.set(2, 1, true);
     grid.set(0, 0, true);
     grid.set(1, 0, false);
     assert_eq!(&format!("{}", grid), "#..|###",);
 }
 
-impl Grid {
+impl Position {
     #[inline]
     fn at(&self, x: u8, y: u8) -> bool {
         let n = self.width as GridBits * y as GridBits + x as GridBits;
@@ -244,12 +244,12 @@ impl Grid {
 fn finds_left_moves() {
     let width = 3;
     let height = 3;
-    let grid = Grid::parse(width, height, "..#|.#.|##.").unwrap();
+    let grid = Position::parse(width, height, "..#|.#.|##.").unwrap();
     assert_eq!(
         grid.left_moves(),
         vec![
-            Grid::parse(width, height, "#.#|##.|##.").unwrap(),
-            Grid::parse(width, height, "..#|.##|###").unwrap(),
+            Position::parse(width, height, "#.#|##.|##.").unwrap(),
+            Position::parse(width, height, "..#|.##|###").unwrap(),
         ]
     );
 }
@@ -258,14 +258,14 @@ fn finds_left_moves() {
 fn finds_right_moves() {
     let width = 3;
     let height = 3;
-    let grid = Grid::parse(width, height, "..#|.#.|##.").unwrap();
+    let grid = Position::parse(width, height, "..#|.#.|##.").unwrap();
     assert_eq!(
         grid.right_moves(),
-        vec![Grid::parse(width, height, "###|.#.|##.").unwrap(),]
+        vec![Position::parse(width, height, "###|.#.|##.").unwrap(),]
     );
 }
 
-impl Display for Grid {
+impl Display for Position {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for y in 0..self.height {
             for x in 0..self.width {
@@ -283,12 +283,12 @@ impl Display for Grid {
 #[test]
 fn parse_display_roundtrip() {
     let inp = "...|#.#|##.|###";
-    assert_eq!(&format!("{}", Grid::parse(3, 4, inp).unwrap()), inp,);
+    assert_eq!(&format!("{}", Position::parse(3, 4, inp).unwrap()), inp,);
 }
 
-impl Grid {
+impl Position {
     /// Remove filled rows and columns from the edges
-    pub fn move_top_left(&self) -> Grid {
+    pub fn move_top_left(&self) -> Position {
         let mut filled_top_rows = 0;
         for y in 0..self.height {
             let mut should_break = false;
@@ -307,7 +307,7 @@ impl Grid {
         let filled_top_rows = filled_top_rows;
 
         if filled_top_rows == self.height {
-            return Grid::empty(0, 0).unwrap();
+            return Position::empty(0, 0).unwrap();
         }
 
         let mut filled_bottom_rows = 0;
@@ -345,7 +345,7 @@ impl Grid {
         let filled_left_cols = filled_left_cols;
 
         if filled_left_cols == self.width {
-            return Grid::empty(0, 0).unwrap();
+            return Position::empty(0, 0).unwrap();
         }
 
         let mut filled_right_cols = 0;
@@ -368,7 +368,7 @@ impl Grid {
         let minimized_width = self.width - filled_left_cols - filled_right_cols;
         let minimized_height = self.height - filled_top_rows - filled_bottom_rows;
 
-        let mut grid = Grid::empty(minimized_width, minimized_height).unwrap();
+        let mut grid = Position::empty(minimized_width, minimized_height).unwrap();
         for y in filled_top_rows..(self.height - filled_bottom_rows) {
             for x in filled_left_cols..(self.width - filled_right_cols) {
                 grid.set(x - filled_left_cols, y - filled_top_rows, self.at(x, y));
@@ -377,8 +377,8 @@ impl Grid {
         grid
     }
 
-    fn bfs(&self, visited: &mut Grid, x: u8, y: u8) -> Option<Grid> {
-        let mut grid = Grid::filled(self.width, self.height).unwrap();
+    fn bfs(&self, visited: &mut Position, x: u8, y: u8) -> Option<Position> {
+        let mut grid = Position::filled(self.width, self.height).unwrap();
 
         let mut q: VecDeque<(u8, u8)> =
             VecDeque::with_capacity(self.width as usize * self.height as usize);
@@ -412,8 +412,8 @@ impl Grid {
     }
 
     /// Get decompisitons of given position
-    pub fn decompositons(&self) -> Vec<Grid> {
-        let mut visited = Grid::empty(self.width, self.height).unwrap();
+    pub fn decompositons(&self) -> Vec<Position> {
+        let mut visited = Position::empty(self.width, self.height).unwrap();
         let mut ds = Vec::new();
 
         for y in 0..self.height {
@@ -432,22 +432,22 @@ impl Grid {
 
 #[test]
 fn decomposes_simple_grid() {
-    let grid = Grid::parse(3, 3, "..#|.#.|##.").unwrap();
+    let grid = Position::parse(3, 3, "..#|.#.|##.").unwrap();
     assert_eq!(
         grid.decompositons(),
         vec![
-            Grid::parse(2, 2, "..|.#").unwrap(),
-            Grid::parse(1, 2, ".|.").unwrap(),
+            Position::parse(2, 2, "..|.#").unwrap(),
+            Position::parse(1, 2, ".|.").unwrap(),
         ]
     );
 }
 
-pub struct GridCache {
-    grids: RwHashMap<Grid, GameId>,
+pub struct TranspositionTable {
+    grids: RwHashMap<Position, GameId>,
     pub game_backend: GameBackend,
 }
 
-impl GridCache {
+impl TranspositionTable {
     #[inline]
     pub fn new() -> Self {
         Self::with_game_backend(GameBackend::new())
@@ -455,14 +455,14 @@ impl GridCache {
 
     #[inline]
     pub fn with_game_backend(game_backend: GameBackend) -> Self {
-        GridCache {
+        TranspositionTable {
             grids: RwHashMap::new(),
             game_backend,
         }
     }
 }
 
-impl Grid {
+impl Position {
     /// Get the canonical form of the position
     ///
     /// # Arguments
@@ -472,12 +472,12 @@ impl Grid {
     /// # Examples
     ///
     /// ```
-    /// let cache = cgt::domineering::GridCache::new();
-    /// let grid = cgt::domineering::Grid::parse(2, 2, ".#|..").unwrap();
+    /// let cache = cgt::domineering::TranspositionTable::new();
+    /// let grid = cgt::domineering::Position::parse(2, 2, ".#|..").unwrap();
     /// let game_id = grid.canonical_form(&cache);
     /// assert_eq!(cache.game_backend.dump_game_to_str(game_id), "*".to_string());
     /// ```
-    pub fn canonical_form(&self, cache: &GridCache) -> GameId {
+    pub fn canonical_form(&self, cache: &TranspositionTable) -> GameId {
         let grid = self.move_top_left();
         if let Some(id) = cache.grids.get(&grid) {
             return id;
@@ -490,7 +490,7 @@ impl Grid {
                 continue;
             }
 
-            let options = Options {
+            let options = Moves {
                 left: grid
                     .left_moves()
                     .iter()
@@ -516,8 +516,8 @@ impl Grid {
 // Values confirmed with gcsuite
 
 #[cfg(test)]
-fn test_grid_canonical_form(grid: Grid, canonical_form: &str) {
-    let cache = GridCache::new();
+fn test_grid_canonical_form(grid: Position, canonical_form: &str) {
+    let cache = TranspositionTable::new();
     let game_id = grid.canonical_form(&cache);
     assert_eq!(
         &cache.game_backend.dump_game_to_str(game_id),
@@ -527,60 +527,60 @@ fn test_grid_canonical_form(grid: Grid, canonical_form: &str) {
 
 #[test]
 fn finds_canonical_form_of_one() {
-    test_grid_canonical_form(Grid::empty(1, 2).unwrap(), "1");
+    test_grid_canonical_form(Position::empty(1, 2).unwrap(), "1");
 }
 
 #[test]
 fn finds_canonical_form_of_minus_one() {
-    test_grid_canonical_form(Grid::empty(2, 1).unwrap(), "-1");
+    test_grid_canonical_form(Position::empty(2, 1).unwrap(), "-1");
 }
 
 #[test]
 fn finds_canonical_form_of_two_by_two() {
-    test_grid_canonical_form(Grid::empty(2, 2).unwrap(), "{1|-1}");
+    test_grid_canonical_form(Position::empty(2, 2).unwrap(), "{1|-1}");
 }
 
 #[test]
 fn finds_canonical_form_of_two_by_two_with_noise() {
-    test_grid_canonical_form(Grid::parse(3, 3, "..#|..#|##.").unwrap(), "{1|-1}");
+    test_grid_canonical_form(Position::parse(3, 3, "..#|..#|##.").unwrap(), "{1|-1}");
 }
 
 #[test]
 fn finds_canonical_form_of_minus_two() {
-    test_grid_canonical_form(Grid::empty(4, 1).unwrap(), "-2");
+    test_grid_canonical_form(Position::empty(4, 1).unwrap(), "-2");
 }
 
 #[test]
 fn finds_canonical_form_of_l_shape() {
-    test_grid_canonical_form(Grid::parse(2, 2, ".#|..").unwrap(), "*");
+    test_grid_canonical_form(Position::parse(2, 2, ".#|..").unwrap(), "*");
 }
 
 #[test]
 fn finds_canonical_form_of_long_l_shape() {
-    test_grid_canonical_form(Grid::parse(3, 3, ".##|.##|...").unwrap(), "0");
+    test_grid_canonical_form(Position::parse(3, 3, ".##|.##|...").unwrap(), "0");
 }
 
 #[test]
 fn finds_canonical_form_of_weird_l_shape() {
-    test_grid_canonical_form(Grid::parse(3, 3, "..#|..#|...").unwrap(), "{1/2|-2}");
+    test_grid_canonical_form(Position::parse(3, 3, "..#|..#|...").unwrap(), "{1/2|-2}");
 }
 
 #[test]
 fn finds_canonical_form_of_three_by_three() {
-    test_grid_canonical_form(Grid::empty(3, 3).unwrap(), "{1|-1}");
+    test_grid_canonical_form(Position::empty(3, 3).unwrap(), "{1|-1}");
 }
 
 #[test]
 fn finds_canonical_form_of_num_nim_sum() {
-    test_grid_canonical_form(Grid::parse(4, 2, ".#.#|.#..").unwrap(), "1*");
+    test_grid_canonical_form(Position::parse(4, 2, ".#.#|.#..").unwrap(), "1*");
 }
 
 #[test]
 fn finds_temperature_of_four_by_four_grid() {
     use crate::rational::Rational;
 
-    let cache = GridCache::new();
-    let grid = Grid::parse(4, 4, "#...|....|....|....").unwrap();
+    let cache = TranspositionTable::new();
+    let grid = Position::parse(4, 4, "#...|....|....|....").unwrap();
     let game_id = grid.canonical_form(&cache);
     let temp = cache.game_backend.temperature(game_id);
     assert_eq!(&cache.game_backend.dump_game_to_str(game_id), "{1*|-1*}");
