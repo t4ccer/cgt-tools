@@ -55,15 +55,16 @@ fn main() -> Result<()> {
 
     let total_len: u32 = last_id.ilog10() + 1;
 
-    let cache_file_path = "game-backend.bin";
+    // let cache_file_path = "game-backend.bin";
 
-    let game_backend = match GameBackend::load_from_file(cache_file_path) {
-        Err(e) => {
-            eprintln!("Could not load cache, creating fresh one: {e:?}");
-            GameBackend::new()
-        }
-        Ok(b) => b,
-    };
+    let game_backend = GameBackend::new();
+    // let game_backend = match GameBackend::load_from_file(cache_file_path) {
+    //     Err(e) => {
+    //         eprintln!("Could not load cache, creating fresh one: {e:?}");
+    //         GameBackend::new()
+    //     }
+    //     Ok(b) => b,
+    // };
 
     let cache = GridCache::new();
     let stdout = io::stdout();
@@ -92,10 +93,10 @@ fn main() -> Result<()> {
         }
     });
 
-    match game_backend.save_to_file(cache_file_path) {
-        Ok(()) => (),
-        Err(e) => eprintln!("Could not save cache. {e:?}"),
-    }
+    // match game_backend.save_to_file(cache_file_path) {
+    //     Ok(()) => (),
+    //     Err(e) => eprintln!("Could not save cache. {e:?}"),
+    // }
 
     Ok(())
 }
