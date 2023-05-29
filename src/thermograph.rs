@@ -19,17 +19,6 @@ impl Thermograph {
         }
     }
 
-    pub fn new(left_wall: Trajectory, right_wall: Trajectory) -> Option<Self> {
-        if right_wall.leq(&left_wall) {
-            Some(Thermograph {
-                left_wall,
-                right_wall,
-            })
-        } else {
-            None
-        }
-    }
-
     pub fn get_temperature(&self) -> Rational {
         let left = self.get_left_temperature();
         let right = self.get_right_temperature();

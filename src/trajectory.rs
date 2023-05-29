@@ -90,10 +90,6 @@ impl Trajectory {
         self.x_intercepts.get(0).unwrap()
     }
 
-    pub(crate) fn leq(&self, rhs: &Trajectory) -> bool {
-        todo!()
-    }
-
     // NOTE: This may be wrong
     /// Gets the value of this trajectory at the specified point.
     pub fn value_at(&self, r: &Rational) -> Rational {
