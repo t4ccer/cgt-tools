@@ -9,8 +9,6 @@ Combinatorial Game Theory (very in progress) library in Rust.
 
 ## TODO List
 
-- [ ] Game addition
-- [ ] Finding canonical form by decomposition
 - [ ] Multithreading
 - [ ] Using direct references
 

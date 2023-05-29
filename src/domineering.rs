@@ -475,7 +475,7 @@ impl Grid {
     /// let game_id = grid.canonical_form(&mut gb, &cache);
     /// assert_eq!(gb.dump_game_to_str(game_id), "*".to_string());
     /// ```
-    pub fn canonical_form(&self, gb: &mut GameBackend, cache: &GridCache) -> GameId {
+    pub fn canonical_form(&self, gb: &GameBackend, cache: &GridCache) -> GameId {
         let grid = self.move_top_left();
         if let Some(id) = cache.get(&grid) {
             return id;

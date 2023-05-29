@@ -1,14 +1,15 @@
 use std::{
     cmp::{self, Ordering},
-    collections::HashMap,
     fmt::{self, Display, Write},
     fs::File,
     io::{BufReader, Read},
     ops::Add,
+    sync::RwLock,
 };
 
 use crate::{
-    dyadic_rational_number::DyadicRationalNumber, rational::Rational, thermograph::Thermograph,
+    dyadic_rational_number::DyadicRationalNumber, rational::Rational, rw_hash_map::RwHashMap,
+    thermograph::Thermograph,
 };
 use crate::{nimber::Nimber, trajectory::Trajectory};
 
@@ -161,14 +162,14 @@ impl Options {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug)]
 pub struct GameBackend {
-    known_games: Vec<Game>,
-    nus_index: HashMap<Nus, GameId>,
-    options_index: HashMap<Options, GameId>,
-    negative_index: HashMap<GameId, GameId>,
-    birthday_index: HashMap<GameId, i64>,
-    leq_index: HashMap<(GameId, GameId), bool>,
-    add_index: HashMap<(GameId, GameId), GameId>,
-    thermograph_index: HashMap<GameId, Thermograph>,
+    known_games: RwLock<Vec<Game>>,
+    nus_index: RwHashMap<Nus, GameId>,
+    options_index: RwHashMap<Options, GameId>,
+    negative_index: RwHashMap<GameId, GameId>,
+    birthday_index: RwHashMap<GameId, i64>,
+    leq_index: RwHashMap<(GameId, GameId), bool>,
+    add_index: RwHashMap<(GameId, GameId), GameId>,
+    thermograph_index: RwHashMap<GameId, Thermograph>,
     pub zero_id: GameId,
     pub star_id: GameId,
     pub up_id: GameId,
@@ -188,18 +189,22 @@ where
 
 impl GameBackend {
     /// Add new game to the index
-    fn add_new_game(&mut self, game: Game) -> GameId {
+    fn add_new_game(&self, game: Game) -> GameId {
         // Check if already present
         if let Some(id) = game.nus.clone().and_then(|nus| self.nus_index.get(&nus)) {
-            return *id;
+            return id;
         }
         if let Some(id) = self.options_index.get(&game.options) {
-            return *id;
+            return id;
         }
 
-        // Current length is the next di
-        let id = GameId(self.known_games.len());
-        self.known_games.push(game.clone());
+        let id = {
+            let mut known_games = self.known_games.write().unwrap();
+            // Current length is the next index
+            let id = GameId(known_games.len());
+            known_games.push(game.clone());
+            id
+        };
 
         // Populate indices
         game.nus.map(|nus| self.nus_index.insert(nus, id));
@@ -208,15 +213,15 @@ impl GameBackend {
     }
 
     fn get_game_id_by_nus(&self, nus: &Nus) -> Option<GameId> {
-        self.nus_index.get(nus).copied()
+        self.nus_index.get(nus)
     }
 
     fn get_game_id_by_options(&self, options: &Options) -> Option<GameId> {
-        self.options_index.get(options).cloned()
+        self.options_index.get(options)
     }
 
     pub fn get_game(&self, game_id: GameId) -> Game {
-        self.known_games[game_id.0].clone()
+        self.known_games.read().unwrap()[game_id.0].clone()
     }
 
     fn compare_number_parts(&self, gid: GameId, hid: GameId) -> i32 {
@@ -240,7 +245,7 @@ impl GameBackend {
     }
 
     /// Construct a negative of given game
-    pub fn construct_negative(&mut self, game_id: GameId) -> GameId {
+    pub fn construct_negative(&self, game_id: GameId) -> GameId {
         // If game is a nus, just take the negative of components
         let game = self.get_game(game_id);
         if let Some(nus) = game.nus {
@@ -253,7 +258,7 @@ impl GameBackend {
         }
 
         if let Some(neg_id) = self.negative_index.get(&game_id) {
-            return *neg_id;
+            return neg_id;
         }
 
         let new_left_options = game
@@ -283,7 +288,7 @@ impl GameBackend {
 
     // TODO: Rename args
     /// Construct a sum of two games
-    pub fn construct_sum(&mut self, gid: GameId, hid: GameId) -> GameId {
+    pub fn construct_sum(&self, gid: GameId, hid: GameId) -> GameId {
         let g = self.get_game(gid);
         let h = self.get_game(hid);
 
@@ -292,7 +297,7 @@ impl GameBackend {
         }
 
         if let Some(result) = self.add_index.get(&(gid, hid)) {
-            return *result;
+            return result;
         }
 
         // We want to return { GL+H, G+HL | GR+H, G+HR }
@@ -358,7 +363,7 @@ impl GameBackend {
     }
 
     fn eliminate_dominated_options(
-        &mut self,
+        &self,
         moves: &[GameId],
         eliminate_smaller_options: bool,
     ) -> Vec<GameId> {
@@ -391,7 +396,7 @@ impl GameBackend {
         cat_options(&options)
     }
 
-    fn canonicalize_options(&mut self, options: Options) -> Options {
+    fn canonicalize_options(&self, options: Options) -> Options {
         let options = self.bypass_reversible_options_l(options);
         let options = self.bypass_reversible_options_r(options);
 
@@ -403,7 +408,7 @@ impl GameBackend {
     }
 
     /// Safe function to construct a game from a list of options
-    pub fn construct_from_options(&mut self, mut options: Options) -> GameId {
+    pub fn construct_from_options(&self, mut options: Options) -> GameId {
         options.eliminate_duplicates();
 
         let left_mex = self.mex(&options.left);
@@ -425,7 +430,7 @@ impl GameBackend {
     }
 
     /// Inputs MUST be equal length
-    fn compare_opts(&mut self, gs: &[GameId], hs: &[GameId]) -> Ordering {
+    fn compare_opts(&self, gs: &[GameId], hs: &[GameId]) -> Ordering {
         debug_assert!(gs.len() == gs.len(), "Inputs are not equal length");
         for (g, h) in gs.iter().zip(hs) {
             let cmp = self.compare(*g, *h);
@@ -437,7 +442,7 @@ impl GameBackend {
         Ordering::Equal
     }
 
-    fn birthday(&mut self, id: GameId) -> i64 {
+    fn birthday(&self, id: GameId) -> i64 {
         let game = self.get_game(id);
         if let Some(nus) = &game.nus {
             let den_exp = nus.number.denominator_exponent();
@@ -464,7 +469,7 @@ impl GameBackend {
         }
 
         if let Some(birthday) = self.birthday_index.get(&id) {
-            return *birthday;
+            return birthday;
         }
 
         let mut birthday: i64 = 0;
@@ -479,7 +484,7 @@ impl GameBackend {
         birthday
     }
 
-    pub fn compare(&mut self, lhs: GameId, rhs: GameId) -> Ordering {
+    pub fn compare(&self, lhs: GameId, rhs: GameId) -> Ordering {
         if lhs == rhs {
             return Ordering::Equal;
         }
@@ -516,7 +521,7 @@ impl GameBackend {
         panic!("compare: Unreachable")
     }
 
-    pub fn leq(&mut self, lhs: GameId, rhs: GameId) -> bool {
+    pub fn leq(&self, lhs: GameId, rhs: GameId) -> bool {
         if lhs == rhs {
             return true;
         }
@@ -544,7 +549,7 @@ impl GameBackend {
         }
 
         if let Some(leq) = self.leq_index.get(&(lhs, rhs)) {
-            return *leq;
+            return leq;
         }
 
         let mut leq = true;
@@ -575,7 +580,7 @@ impl GameBackend {
     /// Return false if `H <= GL` for some left option `GL` of `G` or `HR <= G` for some right
     /// option `HR` of `H`. Otherwise return true.
     fn leq_arrays(
-        &mut self,
+        &self,
         game_id: GameId,
         left_options: &[Option<GameId>],
         right_options: &[Option<GameId>],
@@ -599,7 +604,7 @@ impl GameBackend {
     }
 
     fn geq_arrays(
-        &mut self,
+        &self,
         game_id: GameId,
         left_options: &[Option<GameId>],
         right_options: &[Option<GameId>],
@@ -623,7 +628,7 @@ impl GameBackend {
     }
 
     // TODO: Write it in "Rust way"
-    fn bypass_reversible_options_l(&mut self, options: Options) -> Options {
+    fn bypass_reversible_options_l(&self, options: Options) -> Options {
         let mut i: i64 = 0;
 
         let mut left_options: Vec<Option<GameId>> =
@@ -673,7 +678,7 @@ impl GameBackend {
         }
     }
 
-    fn bypass_reversible_options_r(&mut self, options: Options) -> Options {
+    fn bypass_reversible_options_r(&self, options: Options) -> Options {
         let mut i: i64 = 0;
 
         let left_options: Vec<Option<GameId>> = options.left.iter().cloned().map(Some).collect();
@@ -725,7 +730,7 @@ impl GameBackend {
 
     /// Construct a game from list of left and right moves
     /// Unsafe if input is non canonical
-    fn construct_from_canonical_options(&mut self, mut options: Options) -> GameId {
+    fn construct_from_canonical_options(&self, mut options: Options) -> GameId {
         options.left.sort();
         options.right.sort();
 
@@ -742,7 +747,7 @@ impl GameBackend {
         self.add_new_game(game)
     }
 
-    fn construct_as_nus_entry(&mut self, options: &Options) -> Option<GameId> {
+    fn construct_as_nus_entry(&self, options: &Options) -> Option<GameId> {
         let number: DyadicRationalNumber;
         let up_multiple: i32;
         let nimber: Nimber;
@@ -872,7 +877,7 @@ impl GameBackend {
         Some(self.add_new_game(game))
     }
 
-    pub fn construct_nus(&mut self, nus: &Nus) -> GameId {
+    pub fn construct_nus(&self, nus: &Nus) -> GameId {
         let parity: u32 = (nus.up_multiple & 1) as u32;
         let sign = if nus.up_multiple >= 0 { 1 } else { -1 };
         let number_option = self.construct_rational(nus.number);
@@ -959,7 +964,7 @@ impl GameBackend {
     }
 
     /// Create a game equal to a rational number
-    pub fn construct_rational(&mut self, rational: DyadicRationalNumber) -> GameId {
+    pub fn construct_rational(&self, rational: DyadicRationalNumber) -> GameId {
         // Return id if already constructed
         let nus = Nus::rational(rational);
         if let Some(id) = self.get_game_id_by_nus(&nus) {
@@ -986,7 +991,7 @@ impl GameBackend {
     }
 
     /// Create a game equal to a rational number plus a nimber
-    pub fn construct_nimber(&mut self, rational: DyadicRationalNumber, nimber: Nimber) -> GameId {
+    pub fn construct_nimber(&self, rational: DyadicRationalNumber, nimber: Nimber) -> GameId {
         // Find last defined nimber smaller than the requested one
         let mut last_defined = nimber.get();
         let mut last_defined_id = None;
@@ -1036,7 +1041,7 @@ impl GameBackend {
     }
 
     /// Create a game equal to an integer number
-    pub fn construct_integer(&mut self, number: i64) -> GameId {
+    pub fn construct_integer(&self, number: i64) -> GameId {
         let sign = if number >= 0 { 1 } else { -1 };
 
         // Find last defined game equal to integer smaller/greater (see sign) to the 'number'
@@ -1071,7 +1076,7 @@ impl GameBackend {
         last_defined_id
     }
 
-    pub fn thermograph(&mut self, id: GameId) -> Thermograph {
+    pub fn thermograph(&self, id: GameId) -> Thermograph {
         let g = self.get_game(id);
         let thermograph = match &g.nus {
             None => {
@@ -1111,7 +1116,7 @@ impl GameBackend {
         thermograph
     }
 
-    pub(crate) fn thermograph_from_options(&mut self, options: &Options) -> Thermograph {
+    pub(crate) fn thermograph_from_options(&self, options: &Options) -> Thermograph {
         let mut left_scaffold = Trajectory::new_constant(Rational::NegativeInfinity);
         let mut right_scaffold = Trajectory::new_constant(Rational::PositiveInfinity);
 
@@ -1128,7 +1133,7 @@ impl GameBackend {
         Thermograph::thermographic_intersection(left_scaffold, right_scaffold)
     }
 
-    pub fn temperature(&mut self, id: GameId) -> Rational {
+    pub fn temperature(&self, id: GameId) -> Rational {
         let game = self.get_game(id);
         match &game.nus {
             Some(nus) => {
@@ -1196,14 +1201,14 @@ impl GameBackend {
     /// Initialize new game storage
     pub fn new() -> GameBackend {
         let mut res = GameBackend {
-            known_games: Vec::new(),
-            nus_index: HashMap::new(),
-            options_index: HashMap::new(),
-            negative_index: HashMap::new(),
-            birthday_index: HashMap::new(),
-            leq_index: HashMap::new(),
-            add_index: HashMap::new(),
-            thermograph_index: HashMap::new(),
+            known_games: RwLock::new(Vec::new()),
+            nus_index: RwHashMap::new(),
+            options_index: RwHashMap::new(),
+            negative_index: RwHashMap::new(),
+            birthday_index: RwHashMap::new(),
+            leq_index: RwHashMap::new(),
+            add_index: RwHashMap::new(),
+            thermograph_index: RwHashMap::new(),
             zero_id: GameId(0), // Set below
             star_id: GameId(0),
             up_id: GameId(0),
@@ -1251,7 +1256,7 @@ impl GameBackend {
 
 #[test]
 fn constructs_integers() {
-    let mut b = GameBackend::new();
+    let b = GameBackend::new();
 
     let eight_id = b.construct_integer(8);
     let eight = b.get_game(eight_id);
@@ -1270,7 +1275,7 @@ fn constructs_integers() {
 
 #[test]
 fn constructs_rationals() {
-    let mut b = GameBackend::new();
+    let b = GameBackend::new();
 
     let rational = DyadicRationalNumber::new(3, 4);
     let three_sixteenth_id = b.construct_rational(rational);
@@ -1286,7 +1291,7 @@ fn constructs_rationals() {
 
 #[test]
 fn constructs_nimbers() {
-    let mut b = GameBackend::new();
+    let b = GameBackend::new();
 
     let star_id = b.construct_nimber(DyadicRationalNumber::from(1), Nimber::from(4));
     let star = b.get_game(star_id);
@@ -1298,7 +1303,7 @@ fn constructs_nimbers() {
 
 #[test]
 fn constructs_up() {
-    let mut b = GameBackend::new();
+    let b = GameBackend::new();
 
     let up_id = b.construct_nus(&Nus {
         number: DyadicRationalNumber::from(0),
@@ -1327,7 +1332,7 @@ fn constructs_up() {
 
 #[test]
 fn nimber_is_its_negative() {
-    let mut b = GameBackend::new();
+    let b = GameBackend::new();
 
     let star_id = b.construct_nimber(DyadicRationalNumber::from(0), Nimber::from(4));
     let star = b.get_game(star_id);
@@ -1339,7 +1344,7 @@ fn nimber_is_its_negative() {
 
 #[test]
 fn simplifies_options() {
-    let mut b = GameBackend::new();
+    let b = GameBackend::new();
 
     let options_l = Options {
         left: vec![b.one_id],
@@ -1372,7 +1377,7 @@ fn simplifies_options() {
 
 #[test]
 fn sum_works() {
-    let mut b = GameBackend::new();
+    let b = GameBackend::new();
     let one_zero = b.construct_from_options(Options {
         left: vec![b.one_id],
         right: vec![b.zero_id],
@@ -1387,7 +1392,7 @@ fn sum_works() {
 
 #[test]
 fn temp_of_one_minus_one_is_one() {
-    let mut b = GameBackend::new();
+    let b = GameBackend::new();
     let options = Options {
         left: vec![b.one_id],
         right: vec![b.negative_one_id],
