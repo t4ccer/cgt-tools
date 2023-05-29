@@ -49,7 +49,17 @@ fn main() -> Result<()> {
     }
 
     let total_len: u32 = last_id.ilog10() + 1;
-    let mut game_backend = GameBackend::new();
+
+    let cache_file_path = "game-backend.bin";
+
+    let mut game_backend = match GameBackend::load_from_file(cache_file_path) {
+        Err(e) => {
+            eprintln!("Could not load cache, creating fresh one: {e:?}");
+            GameBackend::new()
+        }
+        Ok(b) => b,
+    };
+
     let cache = GridCache::new();
     for i in args.start_id..last_id {
         let grid = Grid::from_number(args.width, args.height, i).unwrap();
@@ -67,6 +77,11 @@ fn main() -> Result<()> {
             let pad = "0".repeat(pad_len as usize);
             eprintln!("{}{}/{}", pad, progress, last_id - 1);
         }
+    }
+
+    match game_backend.save_to_file(cache_file_path) {
+        Ok(()) => (),
+        Err(e) => eprintln!("Could not save cache. {e:?}"),
     }
 
     Ok(())

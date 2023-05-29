@@ -2,13 +2,13 @@ use std::{
     cmp::{self, Ordering},
     collections::HashMap,
     fmt::{self, Display, Write},
+    fs::File,
+    io::{BufReader, Read},
     ops::Add,
 };
 
 use crate::{
-    dyadic_rational_number::DyadicRationalNumber,
-    rational::Rational,
-    thermograph::{self, Thermograph},
+    dyadic_rational_number::DyadicRationalNumber, rational::Rational, thermograph::Thermograph,
 };
 use crate::{nimber::Nimber, trajectory::Trajectory};
 
@@ -1394,4 +1394,40 @@ fn temp_of_one_minus_one_is_one() {
     };
     let g = b.construct_from_options(options);
     assert_eq!(b.temperature(g), Rational::from(1));
+}
+
+#[derive(Debug)]
+pub enum GameBackendFileError {
+    DecodeError(Box<bincode::ErrorKind>),
+    FileError(std::io::Error),
+}
+
+impl From<Box<bincode::ErrorKind>> for GameBackendFileError {
+    fn from(value: Box<bincode::ErrorKind>) -> Self {
+        GameBackendFileError::DecodeError(value)
+    }
+}
+
+impl From<std::io::Error> for GameBackendFileError {
+    fn from(value: std::io::Error) -> Self {
+        GameBackendFileError::FileError(value)
+    }
+}
+
+impl GameBackend {
+    pub fn save_to_file(&self, filepath: &str) -> Result<(), GameBackendFileError> {
+        let serialized = bincode::serialize(self)?;
+        let mut f = File::create(filepath)?;
+        std::io::Write::write_all(&mut f, &serialized)?;
+        Ok(())
+    }
+
+    pub fn load_from_file(filepath: &str) -> Result<Self, GameBackendFileError> {
+        let f = File::open(filepath)?;
+        let mut reader = BufReader::new(f);
+        let mut buffer = Vec::new();
+        reader.read_to_end(&mut buffer)?;
+        let res = bincode::deserialize::<Self>(&buffer)?;
+        Ok(res)
+    }
 }
