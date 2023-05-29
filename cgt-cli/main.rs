@@ -53,7 +53,17 @@ fn main() -> Result<()> {
     let cache = GridCache::new();
     let stdout = io::stdout();
     let stderr = io::stderr();
+
     let progress = AtomicU64::new(0);
+
+    let print_progress = |p: u64| {
+        let progress = format!("{}", p);
+        let pad_len = total_len - (progress.len() as u32);
+        let pad = "0".repeat(pad_len as usize);
+        let to_write = format!("{}{}/{}\n", pad, progress, last_id);
+        stderr.lock().write_all(to_write.as_bytes()).unwrap();
+    };
+
     (args.start_id..last_id).into_par_iter().for_each(|i| {
         let grid = Grid::from_number(args.width, args.height, i).unwrap();
         let game = grid.canonical_form(&cache);
@@ -67,14 +77,11 @@ fn main() -> Result<()> {
         stdout.lock().write_all(to_write.as_bytes()).unwrap();
 
         let progress = progress.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        if progress % args.progress_step == 0 || progress == last_id - 1 {
-            let progress = format!("{}", progress);
-            let pad_len = total_len - (progress.len() as u32);
-            let pad = "0".repeat(pad_len as usize);
-            let to_write = format!("{}{}/{}\n", pad, progress, last_id - 1);
-            stderr.lock().write_all(to_write.as_bytes()).unwrap();
+        if progress % args.progress_step == 0 {
+            print_progress(progress);
         }
     });
+    print_progress(progress.load(std::sync::atomic::Ordering::SeqCst));
 
     Ok(())
 }

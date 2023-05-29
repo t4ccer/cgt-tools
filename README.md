@@ -9,8 +9,7 @@ Combinatorial Game Theory (very in progress) library in Rust.
 
 ## TODO List
 
-- [ ] Multithreading
-- [ ] Using direct references
+- [ ] Using direct references instead of `GameId` indices
 
 ## License
 
