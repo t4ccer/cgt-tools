@@ -6,7 +6,9 @@ use std::{
 };
 
 use crate::{
-    dyadic_rational_number::DyadicRationalNumber, rational::Rational, thermograph::Thermograph,
+    dyadic_rational_number::DyadicRationalNumber,
+    rational::Rational,
+    thermograph::{self, Thermograph},
 };
 use crate::{nimber::Nimber, trajectory::Trajectory};
 
@@ -166,6 +168,7 @@ pub struct GameBackend {
     birthday_index: HashMap<GameId, i64>,
     leq_index: HashMap<(GameId, GameId), bool>,
     add_index: HashMap<(GameId, GameId), GameId>,
+    thermograph_index: HashMap<GameId, Thermograph>,
     pub zero_id: GameId,
     pub star_id: GameId,
     pub up_id: GameId,
@@ -1070,8 +1073,13 @@ impl GameBackend {
 
     pub fn thermograph(&mut self, id: GameId) -> Thermograph {
         let g = self.get_game(id);
-        match &g.nus {
-            None => self.thermograph_from_options(&g.options),
+        let thermograph = match &g.nus {
+            None => {
+                if let Some(thermograph) = self.thermograph_index.get(&id) {
+                    return thermograph.clone();
+                }
+                self.thermograph_from_options(&g.options)
+            }
             Some(nus) => {
                 if let Some(int) = nus.number.to_integer() && nus.is_number() {
 		    Thermograph::with_mast(Rational::new(int, 1))
@@ -1096,7 +1104,11 @@ impl GameBackend {
 		    }
 		}
             }
-        }
+        };
+
+        self.thermograph_index.insert(id, thermograph.clone());
+
+        thermograph
     }
 
     pub(crate) fn thermograph_from_options(&mut self, options: &Options) -> Thermograph {
@@ -1191,6 +1203,7 @@ impl GameBackend {
             birthday_index: HashMap::new(),
             leq_index: HashMap::new(),
             add_index: HashMap::new(),
+            thermograph_index: HashMap::new(),
             zero_id: GameId(0), // Set below
             star_id: GameId(0),
             up_id: GameId(0),
