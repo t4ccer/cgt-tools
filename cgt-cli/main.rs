@@ -4,6 +4,11 @@ use cgt::domineering::Grid;
 use cgt::domineering::GridCache;
 use cgt::short_canonical_game::GameBackend;
 use clap::Parser;
+use rayon::prelude::IntoParallelIterator;
+use rayon::prelude::ParallelIterator;
+use std::io;
+use std::io::Write;
+use std::sync::atomic::AtomicU64;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about)]
@@ -52,7 +57,7 @@ fn main() -> Result<()> {
 
     let cache_file_path = "game-backend.bin";
 
-    let mut game_backend = match GameBackend::load_from_file(cache_file_path) {
+    let game_backend = match GameBackend::load_from_file(cache_file_path) {
         Err(e) => {
             eprintln!("Could not load cache, creating fresh one: {e:?}");
             GameBackend::new()
@@ -61,23 +66,31 @@ fn main() -> Result<()> {
     };
 
     let cache = GridCache::new();
-    for i in args.start_id..last_id {
+    let stdout = io::stdout();
+    let stderr = io::stderr();
+    let progress = AtomicU64::new(0);
+    (args.start_id..last_id).into_par_iter().for_each(|i| {
         let grid = Grid::from_number(args.width, args.height, i).unwrap();
-        println!("{}", grid);
-
-        let game = grid.canonical_form(&mut game_backend, &cache);
-        println!("{}", game_backend.dump_game_to_str(game));
-
+        let game = grid.canonical_form(&game_backend, &cache);
         let temp = game_backend.temperature(game);
-        println!("{}\n", temp);
-
-        if i % args.progress_step == 0 || i == last_id - 1 {
-            let progress = format!("{}", i);
+        let to_write = format!(
+            "{}\n{}\n{}\n\n",
+            grid,
+            game_backend.dump_game_to_str(game),
+            temp
+        );
+        {
+            stdout.lock().write_all(to_write.as_bytes()).unwrap();
+        }
+        let progress = progress.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        if progress % args.progress_step == 0 || progress == last_id - 1 {
+            let progress = format!("{}", progress);
             let pad_len = total_len - (progress.len() as u32);
             let pad = "0".repeat(pad_len as usize);
-            eprintln!("{}{}/{}", pad, progress, last_id - 1);
+            let to_write = format!("{}{}/{}\n", pad, progress, last_id - 1);
+            stderr.lock().write_all(to_write.as_bytes()).unwrap();
         }
-    }
+    });
 
     match game_backend.save_to_file(cache_file_path) {
         Ok(()) => (),

@@ -190,6 +190,9 @@ where
 impl GameBackend {
     /// Add new game to the index
     fn add_new_game(&self, game: Game) -> GameId {
+        // Locking here guarantees that no two threads will try to insert the same game
+        let mut known_games = self.known_games.write().unwrap();
+
         // Check if already present
         if let Some(id) = game.nus.clone().and_then(|nus| self.nus_index.get(&nus)) {
             return id;
@@ -198,13 +201,8 @@ impl GameBackend {
             return id;
         }
 
-        let id = {
-            let mut known_games = self.known_games.write().unwrap();
-            // Current length is the next index
-            let id = GameId(known_games.len());
-            known_games.push(game.clone());
-            id
-        };
+        let id = GameId(known_games.len());
+        known_games.push(game.clone());
 
         // Populate indices
         game.nus.map(|nus| self.nus_index.insert(nus, id));
