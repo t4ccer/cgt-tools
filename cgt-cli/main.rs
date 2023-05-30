@@ -65,16 +65,25 @@ fn main() -> Result<()> {
     };
 
     (args.start_id..last_id).into_par_iter().for_each(|i| {
-        let grid = Position::from_number(args.width, args.height, i).unwrap();
-        let game = grid.canonical_form(&cache);
-        let temp = cache.game_backend.temperature(game);
-        let to_write = format!(
-            "{}\n{}\n{}\n\n",
-            grid,
-            cache.game_backend.dump_game_to_str(game),
-            temp
-        );
-        stdout.lock().write_all(to_write.as_bytes()).unwrap();
+        let i = last_id - i - 1;
+        let grid = Position::from_number(args.width, args.height, i)
+            .unwrap()
+            .move_top_left();
+        let decompositions = grid.decompositons();
+
+        // We're interested only in positions without decompositions
+        // (G + H)_t <= max(G_t, H_t)
+        if decompositions.len() == 1 {
+            let game = Position::canonical_from_from_decompositions(decompositions, &cache);
+            let temp = cache.game_backend.temperature(game);
+            let to_write = format!(
+                "{}\n{}\n{}\n\n",
+                grid,
+                cache.game_backend.dump_game_to_str(game),
+                temp
+            );
+            stdout.lock().write_all(to_write.as_bytes()).unwrap();
+        }
 
         let progress = progress.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         if progress % args.progress_step == 0 {

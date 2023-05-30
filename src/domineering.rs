@@ -377,17 +377,15 @@ impl Position {
         grid
     }
 
-    fn bfs(&self, visited: &mut Position, x: u8, y: u8) -> Option<Position> {
+    fn bfs(&self, visited: &mut Position, x: u8, y: u8) -> Position {
         let mut grid = Position::filled(self.width, self.height).unwrap();
 
         let mut q: VecDeque<(u8, u8)> =
             VecDeque::with_capacity(self.width as usize * self.height as usize);
-        let mut size = 0;
         q.push_back((x, y));
         while let Some((qx, qy)) = q.pop_front() {
             visited.set(qx, qy, true);
             grid.set(qx, qy, false);
-            size += 1;
             let directions: [(i64, i64); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
             for (dx, dy) in directions {
                 let lx = (qx as i64) + dx;
@@ -404,11 +402,7 @@ impl Position {
                 }
             }
         }
-        if size < 2 {
-            None
-        } else {
-            Some(grid.move_top_left())
-        }
+        grid.move_top_left()
     }
 
     /// Get decompisitons of given position
@@ -419,9 +413,7 @@ impl Position {
         for y in 0..self.height {
             for x in 0..self.width {
                 if !self.at(x, y) && !visited.at(x, y) {
-                    if let Some(g) = self.bfs(&mut visited, x, y) {
-                        ds.push(g);
-                    }
+                    ds.push(self.bfs(&mut visited, x, y));
                 }
             }
         }
@@ -483,8 +475,17 @@ impl Position {
             return id;
         }
 
+        let result = Self::canonical_from_from_decompositions(grid.decompositons(), cache);
+        cache.grids.insert(grid, result);
+        result
+    }
+
+    pub fn canonical_from_from_decompositions(
+        decompositions: Vec<Position>,
+        cache: &TranspositionTable,
+    ) -> GameId {
         let mut result = cache.game_backend.zero_id;
-        for grid in grid.decompositons() {
+        for grid in decompositions {
             if let Some(id) = cache.grids.get(&grid) {
                 result = cache.game_backend.construct_sum(id, result);
                 continue;
@@ -508,7 +509,6 @@ impl Position {
             result = cache.game_backend.construct_sum(canonical_form, result);
         }
 
-        cache.grids.insert(grid, result);
         result
     }
 }
