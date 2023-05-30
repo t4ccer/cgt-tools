@@ -1,13 +1,13 @@
+use crate::{
+    dyadic_rational_number::DyadicRationalNumber, nimber::Nimber, rational::Rational,
+    rw_hash_map::RwHashMap, thermograph::Thermograph, trajectory::Trajectory,
+};
+use elsa::sync::FrozenVec;
 use std::{
     cmp::{self, Ordering},
     fmt::{self, Display, Write},
     ops::Add,
-    sync::RwLock,
-};
-
-use crate::{
-    dyadic_rational_number::DyadicRationalNumber, nimber::Nimber, rational::Rational,
-    rw_hash_map::RwHashMap, thermograph::Thermograph, trajectory::Trajectory,
+    sync::Mutex,
 };
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -156,10 +156,11 @@ impl Moves {
     }
 }
 
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug)]
+// #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+// #[derive(Debug)]
 pub struct GameBackend {
-    known_games: RwLock<Vec<Game>>,
+    add_game_lock: Mutex<()>,
+    known_games: FrozenVec<Box<Game>>,
     nus_index: RwHashMap<Nus, GameId>,
     options_index: RwHashMap<Moves, GameId>,
     negative_index: RwHashMap<GameId, GameId>,
@@ -188,7 +189,7 @@ impl GameBackend {
     /// Add new game to the index
     fn add_new_game(&self, game: Game) -> GameId {
         // Locking here guarantees that no two threads will try to insert the same game
-        let mut known_games = self.known_games.write().unwrap();
+        let lock = self.add_game_lock.lock().unwrap();
 
         // Check if already present
         if let Some(id) = game.nus.clone().and_then(|nus| self.nus_index.get(&nus)) {
@@ -198,12 +199,13 @@ impl GameBackend {
             return id;
         }
 
-        let id = GameId(known_games.len());
-        known_games.push(game.clone());
+        let id = GameId(self.known_games.push_get_index(Box::new(game.clone())));
 
         // Populate indices
         game.nus.map(|nus| self.nus_index.insert(nus, id));
         self.options_index.insert(game.options, id);
+
+        drop(lock);
         id
     }
 
@@ -215,16 +217,16 @@ impl GameBackend {
         self.options_index.get(options)
     }
 
-    pub fn get_game(&self, game_id: GameId) -> Game {
-        self.known_games.read().unwrap()[game_id.0].clone()
+    pub fn get_game(&self, game_id: GameId) -> &Game {
+        self.known_games.get(game_id.0).unwrap()
     }
 
     fn compare_number_parts(&self, gid: GameId, hid: GameId) -> i32 {
-        let g = self.get_game(gid).nus.unwrap().number;
+        let g = self.get_game(gid).nus.as_ref().unwrap().number;
         let g_num = g.numerator();
         let g_den_exp = g.denominator_exponent();
 
-        let h = self.get_game(hid).nus.unwrap().number;
+        let h = self.get_game(hid).nus.as_ref().unwrap().number;
         let h_num = h.numerator();
         let h_den_exp = h.denominator_exponent();
 
@@ -243,7 +245,7 @@ impl GameBackend {
     pub fn construct_negative(&self, game_id: GameId) -> GameId {
         // If game is a nus, just take the negative of components
         let game = self.get_game(game_id);
-        if let Some(nus) = game.nus {
+        if let Some(nus) = &game.nus {
             let neg_nus = Nus {
                 number: -nus.number,
                 up_multiple: -nus.up_multiple,
@@ -302,19 +304,19 @@ impl GameBackend {
         let mut options = Moves::empty();
 
         if !g.is_number() {
-            for g_l in g.options.left {
-                options.left.push(self.construct_sum(g_l, hid));
+            for g_l in &g.options.left {
+                options.left.push(self.construct_sum(*g_l, hid));
             }
-            for g_r in g.options.right {
-                options.right.push(self.construct_sum(g_r, hid));
+            for g_r in &g.options.right {
+                options.right.push(self.construct_sum(*g_r, hid));
             }
         }
         if !h.is_number() {
-            for h_l in h.options.left {
-                options.left.push(self.construct_sum(gid, h_l));
+            for h_l in &h.options.left {
+                options.left.push(self.construct_sum(gid, *h_l));
             }
-            for h_r in h.options.right {
-                options.right.push(self.construct_sum(gid, h_r));
+            for h_r in &h.options.right {
+                options.right.push(self.construct_sum(gid, *h_r));
             }
         }
 
@@ -338,7 +340,7 @@ impl GameBackend {
                 return None;
             }
 
-            if game.nus.unwrap().nimber == Nimber::from(mex) {
+            if game.nus.as_ref().unwrap().nimber == Nimber::from(mex) {
                 mex += 1;
             } else {
                 // It's a nimber, but exceeds mex.  We've found the true
@@ -468,11 +470,11 @@ impl GameBackend {
         }
 
         let mut birthday: i64 = 0;
-        for left_opt in game.options.left {
-            birthday = cmp::max(birthday, self.birthday(left_opt) + 1);
+        for left_opt in &game.options.left {
+            birthday = cmp::max(birthday, self.birthday(*left_opt) + 1);
         }
-        for right_opt in game.options.right {
-            birthday = cmp::max(birthday, self.birthday(right_opt) + 1);
+        for right_opt in &game.options.right {
+            birthday = cmp::max(birthday, self.birthday(*right_opt) + 1);
         }
         self.birthday_index.insert(id, birthday);
 
@@ -589,8 +591,8 @@ impl GameBackend {
         }
 
         let game = self.get_game(game_id);
-        for l_opt in game.options.left {
-            if self.geq_arrays(l_opt, left_options, right_options) {
+        for l_opt in &game.options.left {
+            if self.geq_arrays(*l_opt, left_options, right_options) {
                 return false;
             }
         }
@@ -613,8 +615,8 @@ impl GameBackend {
         }
 
         let game = self.get_game(game_id);
-        for r_opt in game.options.right {
-            if self.leq_arrays(r_opt, left_options, right_options) {
+        for r_opt in &game.options.right {
+            if self.leq_arrays(*r_opt, left_options, right_options) {
                 return false;
             }
         }
@@ -641,9 +643,9 @@ impl GameBackend {
                 }
                 Some(id) => self.get_game(id),
             };
-            for g_lr_id in g_l.options.right {
-                let g_lr = self.get_game(g_lr_id);
-                if self.leq_arrays(g_lr_id, &left_options, &right_options) {
+            for g_lr_id in &g_l.options.right {
+                let g_lr = self.get_game(*g_lr_id);
+                if self.leq_arrays(*g_lr_id, &left_options, &right_options) {
                     let mut new_left_options: Vec<Option<GameId>> =
                         vec![None; left_options.len() + g_lr.options.left.len() as usize - 1];
                     for k in 0..(i as usize) {
@@ -691,9 +693,9 @@ impl GameBackend {
                 }
                 Some(id) => self.get_game(id),
             };
-            for g_rl_id in g_r.options.left {
-                let g_rl = self.get_game(g_rl_id);
-                if self.geq_arrays(g_rl_id, &left_options, &right_options) {
+            for g_rl_id in &g_r.options.left {
+                let g_rl = self.get_game(*g_rl_id);
+                if self.geq_arrays(*g_rl_id, &left_options, &right_options) {
                     let mut new_right_options: Vec<Option<GameId>> =
                         vec![None; right_options.len() + g_rl.options.right.len() as usize - 1];
                     for k in 0..(i as usize) {
@@ -757,15 +759,15 @@ impl GameBackend {
                 // We assume that entry is normalized, no left options, thus there must be only one
                 // right entry that's a number
                 debug_assert!(num_ro == 1, "Entry not normalized");
-                number = self.get_game(options.right[0]).nus.unwrap().number
+                number = self.get_game(options.right[0]).nus.as_ref().unwrap().number
                     - DyadicRationalNumber::from(1);
             }
             up_multiple = 0;
             nimber = Nimber::from(0);
         } else if num_ro == 0 {
             debug_assert!(num_lo == 1, "Entry not normalized");
-            number =
-                self.get_game(options.left[0]).nus.unwrap().number + DyadicRationalNumber::from(1);
+            number = self.get_game(options.left[0]).nus.as_ref().unwrap().number
+                + DyadicRationalNumber::from(1);
             up_multiple = 0;
             nimber = Nimber::from(0);
         } else if num_lo == 1
@@ -777,8 +779,8 @@ impl GameBackend {
             // We're a number but not an integer.  Conveniently, since the
             // option lists are canonicalized, the value of this game is the
             // mean of its left & right options.
-            let l_num = self.get_game(options.left[0]).nus.unwrap().number;
-            let r_num = self.get_game(options.right[0]).nus.unwrap().number;
+            let l_num = self.get_game(options.left[0]).nus.as_ref().unwrap().number;
+            let r_num = self.get_game(options.right[0]).nus.as_ref().unwrap().number;
             number = DyadicRationalNumber::mean(&l_num, &r_num);
             up_multiple = 0;
             nimber = Nimber::from(0);
@@ -788,10 +790,16 @@ impl GameBackend {
             && options.left[0] == options.right[0]
             && self.get_game(options.left[1]).is_number_up_star()
             && self.compare_number_parts(options.left[0], options.left[1]) == 0
-            && self.get_game(options.left[1]).nus.unwrap().up_multiple == 0
-            && self.get_game(options.left[1]).nus.unwrap().nimber == Nimber::from(1)
+            && self
+                .get_game(options.left[1])
+                .nus
+                .as_ref()
+                .unwrap()
+                .up_multiple
+                == 0
+            && self.get_game(options.left[1]).nus.as_ref().unwrap().nimber == Nimber::from(1)
         {
-            number = self.get_game(options.left[0]).nus.unwrap().number;
+            number = self.get_game(options.left[0]).nus.as_ref().unwrap().number;
             up_multiple = 1;
             nimber = Nimber::from(1);
         } else if num_lo == 1
@@ -800,10 +808,16 @@ impl GameBackend {
             && options.left[0] == options.right[0]
             && self.get_game(options.right[1]).is_number_up_star()
             && self.compare_number_parts(options.right[0], options.right[1]) == 0
-            && self.get_game(options.right[1]).nus.unwrap().up_multiple == 0
-            && self.get_game(options.right[1]).nus.unwrap().nimber == Nimber::from(1)
+            && self
+                .get_game(options.right[1])
+                .nus
+                .as_ref()
+                .unwrap()
+                .up_multiple
+                == 0
+            && self.get_game(options.right[1]).nus.as_ref().unwrap().nimber == Nimber::from(1)
         {
-            number = self.get_game(options.right[0]).nus.unwrap().number;
+            number = self.get_game(options.right[0]).nus.as_ref().unwrap().number;
             up_multiple = -1;
             nimber = Nimber::from(1);
         } else if num_lo == 1
@@ -812,24 +826,48 @@ impl GameBackend {
             && self.get_game(options.right[0]).is_number_up_star()
             && !self.get_game(options.right[0]).is_number()
             && self.compare_number_parts(options.left[0], options.right[0]) == 0
-            && self.get_game(options.right[0]).nus.unwrap().up_multiple >= 0
+            && self
+                .get_game(options.right[0])
+                .nus
+                .as_ref()
+                .unwrap()
+                .up_multiple
+                >= 0
         {
             // This is of the form n + {0|G} where G is a number-up-star of up multiple >= 0.
-            number = self.get_game(options.left[0]).nus.unwrap().number;
-            up_multiple = self.get_game(options.right[0]).nus.unwrap().up_multiple + 1;
-            nimber = self.get_game(options.right[0]).nus.unwrap().nimber + Nimber::from(1);
+            number = self.get_game(options.left[0]).nus.as_ref().unwrap().number;
+            up_multiple = self
+                .get_game(options.right[0])
+                .nus
+                .as_ref()
+                .unwrap()
+                .up_multiple
+                + 1;
+            nimber = self.get_game(options.right[0]).nus.as_ref().unwrap().nimber + Nimber::from(1);
         } else if num_lo == 1
             && num_ro == 1
             && self.get_game(options.right[0]).is_number()
             && self.get_game(options.left[0]).is_number_up_star()
             && !self.get_game(options.left[0]).is_number()
             && self.compare_number_parts(options.left[0], options.right[0]) == 0
-            && self.get_game(options.left[0]).nus.unwrap().up_multiple <= 0
+            && self
+                .get_game(options.left[0])
+                .nus
+                .as_ref()
+                .unwrap()
+                .up_multiple
+                <= 0
         {
             // This is of the form n + {0|G} where G is a number-up-star of up multiple >= 0.
-            number = self.get_game(options.left[0]).nus.unwrap().number;
-            up_multiple = self.get_game(options.left[0]).nus.unwrap().up_multiple - 1;
-            nimber = self.get_game(options.left[0]).nus.unwrap().nimber + Nimber::from(1);
+            number = self.get_game(options.left[0]).nus.as_ref().unwrap().number;
+            up_multiple = self
+                .get_game(options.left[0])
+                .nus
+                .as_ref()
+                .unwrap()
+                .up_multiple
+                - 1;
+            nimber = self.get_game(options.left[0]).nus.as_ref().unwrap().nimber + Nimber::from(1);
         } else if num_lo >= 1
             && num_lo == num_ro
             && self.get_game(options.left[0]).is_number()
@@ -847,13 +885,13 @@ impl GameBackend {
                 {
                     return None;
                 }
-                let l_nus = l.nus.unwrap();
+                let l_nus = l.nus.as_ref().unwrap();
                 if l_nus.up_multiple != 0 || l_nus.nimber.get() != (i as u32) {
                     return None;
                 }
             }
             // It's a nimber
-            number = self.get_game(options.left[0]).nus.unwrap().number;
+            number = self.get_game(options.left[0]).nus.as_ref().unwrap().number;
             up_multiple = 0;
             nimber = Nimber::from(num_lo as u32);
         } else {
@@ -1020,8 +1058,8 @@ impl GameBackend {
             };
 
             let mut options = Moves {
-                left: previous_nimber.options.left,
-                right: previous_nimber.options.right,
+                left: previous_nimber.options.left.clone(),
+                right: previous_nimber.options.right.clone(),
             };
             options.left.push(last_defined_id);
             options.right.push(last_defined_id);
@@ -1151,7 +1189,7 @@ impl GameBackend {
         W: Write,
     {
         let game = self.get_game(id);
-        if let Some(nus) = game.nus {
+        if let Some(nus) = &game.nus {
             write!(f, "{}", nus)?;
         } else {
             self.dump_options(&game.options, f)?;
@@ -1196,7 +1234,8 @@ impl GameBackend {
     /// Initialize new game storage
     pub fn new() -> GameBackend {
         let mut res = GameBackend {
-            known_games: RwLock::new(Vec::new()),
+            add_game_lock: Mutex::new(()),
+            known_games: FrozenVec::new(),
             nus_index: RwHashMap::new(),
             options_index: RwHashMap::new(),
             negative_index: RwHashMap::new(),
@@ -1255,12 +1294,12 @@ fn constructs_integers() {
 
     let eight_id = b.construct_integer(8);
     let eight = b.get_game(eight_id);
-    assert_eq!(format!("{}", &eight.nus.unwrap()), "8".to_string());
+    assert_eq!(format!("{}", eight.nus.as_ref().unwrap()), "8".to_string());
 
     let minus_forty_two_id = b.construct_integer(-42);
     let minus_forty_two = b.get_game(minus_forty_two_id);
     assert_eq!(
-        format!("{}", &minus_forty_two.nus.unwrap()),
+        format!("{}", minus_forty_two.nus.as_ref().unwrap()),
         "-42".to_string()
     );
 
@@ -1276,7 +1315,7 @@ fn constructs_rationals() {
     let three_sixteenth_id = b.construct_rational(rational);
     let three_sixteenth = b.get_game(three_sixteenth_id);
     assert_eq!(
-        format!("{}", &three_sixteenth.nus.unwrap()),
+        format!("{}", three_sixteenth.nus.as_ref().unwrap()),
         "3/16".to_string()
     );
 
@@ -1290,7 +1329,7 @@ fn constructs_nimbers() {
 
     let star_id = b.construct_nimber(DyadicRationalNumber::from(1), Nimber::from(4));
     let star = b.get_game(star_id);
-    assert_eq!(format!("{}", &star.nus.unwrap()), "1*4".to_string());
+    assert_eq!(format!("{}", star.nus.as_ref().unwrap()), "1*4".to_string());
 
     let duplicate = b.construct_nimber(DyadicRationalNumber::from(1), Nimber::from(4));
     assert_eq!(star_id, duplicate);
@@ -1306,7 +1345,7 @@ fn constructs_up() {
         nimber: Nimber::from(0),
     });
     let up = b.get_game(up_id);
-    assert_eq!(format!("{}", &up.nus.unwrap()), "^".to_string());
+    assert_eq!(format!("{}", up.nus.as_ref().unwrap()), "^".to_string());
 
     let up_star_id = b.construct_nus(&Nus {
         number: DyadicRationalNumber::from(0),
@@ -1314,7 +1353,10 @@ fn constructs_up() {
         nimber: Nimber::from(1),
     });
     let up_star = b.get_game(up_star_id);
-    assert_eq!(format!("{}", &up_star.nus.unwrap()), "^*".to_string());
+    assert_eq!(
+        format!("{}", up_star.nus.as_ref().unwrap()),
+        "^*".to_string()
+    );
 
     let down_id = b.construct_nus(&Nus {
         number: DyadicRationalNumber::from(0),
@@ -1322,7 +1364,7 @@ fn constructs_up() {
         nimber: Nimber::from(0),
     });
     let down = b.get_game(down_id);
-    assert_eq!(format!("{}", &down.nus.unwrap()), "v3".to_string());
+    assert_eq!(format!("{}", down.nus.as_ref().unwrap()), "v3".to_string());
 }
 
 #[test]
@@ -1331,7 +1373,7 @@ fn nimber_is_its_negative() {
 
     let star_id = b.construct_nimber(DyadicRationalNumber::from(0), Nimber::from(4));
     let star = b.get_game(star_id);
-    assert_eq!(format!("{}", &star.nus.unwrap()), "*4".to_string());
+    assert_eq!(format!("{}", star.nus.as_ref().unwrap()), "*4".to_string());
 
     let neg_star_id = b.construct_negative(star_id);
     assert_eq!(star_id, neg_star_id);
