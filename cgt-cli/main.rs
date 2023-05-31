@@ -79,7 +79,7 @@ fn main() -> Result<()> {
             let to_write = format!(
                 "{}\n{}\n{}\n\n",
                 grid,
-                cache.game_backend.dump_game_to_str(game),
+                cache.game_backend.print_game_to_str(game),
                 temp
             );
             stdout.lock().write_all(to_write.as_bytes()).unwrap();

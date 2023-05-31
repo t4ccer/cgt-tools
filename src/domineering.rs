@@ -1,3 +1,5 @@
+//! Domineering game
+
 extern crate alloc;
 use alloc::collections::vec_deque::VecDeque;
 use std::fmt::Display;
@@ -9,15 +11,16 @@ use crate::{
 
 pub type GridBits = u64;
 
+/// A Domineering position on a rectengular grid.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Position {
-    pub width: u8,
-    pub height: u8,
-    pub grid: GridBits,
+    width: u8,
+    height: u8,
+    grid: GridBits,
 }
 
-/// Convert bits in a number to an array but in reverse order
+/// Convert bits in a number to an array but in reverse order.
 pub fn bits_to_arr(num: GridBits) -> [bool; 64] {
     let mut grid = [false; 64];
     for grid_idx in 0..64 {
@@ -68,7 +71,7 @@ pub enum PositionError {
 }
 
 impl Position {
-    /// Check if dimensions are small enough to fit in the fixed-size bit representation
+    /// Check if dimensions are small enough to fit in the fixed-size bit representation.
     fn check_dimensions(width: u8, height: u8) -> Result<(), PositionError> {
         if (width as usize * height as usize) > 8 * std::mem::size_of::<GridBits>() {
             Err(PositionError::TooLarge)?
@@ -76,54 +79,43 @@ impl Position {
         Ok(())
     }
 
-    /// Creates empty grid with given size
-    pub fn empty(width: u8, height: u8) -> Result<Self, PositionError> {
-        Self::check_dimensions(width, height)?;
+    /// Creates empty grid with given size.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cgt::domineering::Position;
+    /// assert_eq!(&format!("{}", Position::empty(2, 3).unwrap()), "..|..|..");
+    /// ```
+    pub fn empty(width: u8, height: u8) -> Result<Position, PositionError> {
+        Position::check_dimensions(width, height)?;
 
-        Ok(Self {
+        Ok(Position {
             width,
             height,
             grid: 0,
         })
     }
 
-    /// Creates filled grid with given size
-    pub fn filled(width: u8, height: u8) -> Result<Self, PositionError> {
-        Self::check_dimensions(width, height)?;
+    /// Creates filled grid with given size.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cgt::domineering::Position;
+    /// assert_eq!(&format!("{}", Position::filled(3, 2).unwrap()), "###|###");
+    /// ```
+    pub fn filled(width: u8, height: u8) -> Result<Position, PositionError> {
+        Position::check_dimensions(width, height)?;
 
-        Ok(Self {
+        Ok(Position {
             width,
             height,
             grid: GridBits::MAX,
         })
     }
 
-    /// Create a grid that correspondes to given size and id
-    pub fn from_number(width: u8, height: u8, grid_id: GridBits) -> Result<Self, PositionError> {
-        Self::check_dimensions(width, height)?;
-        Ok(Position {
-            width,
-            height,
-            grid: grid_id,
-        })
-    }
-
-    /// Creates a grid from given array of bools
-    ///
-    /// # Arguments
-    ///
-    /// * `input` - Lineralized grid of size `width * height`, empty if if value is `false`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// cgt::domineering::Position::from_arr(2, 3, &[true, true, false, false, false, true]);
-    /// ```
-    pub fn from_arr(width: u8, height: u8, field: &[bool]) -> Result<Self, PositionError> {
-        Self::from_number(width, height, arr_to_bits(field))
-    }
-
-    /// Parses a grid from `.#` notation
+    /// Parses a grid from `.#` notation.
     ///
     /// # Arguments
     ///
@@ -132,9 +124,10 @@ impl Position {
     /// # Examples
     ///
     /// ```
-    /// cgt::domineering::Position::parse(3, 3, "..#|.#.|##.").unwrap();
+    /// use cgt::domineering::Position;
+    /// Position::parse(3, 3, "..#|.#.|##.").unwrap();
     /// ```
-    pub fn parse(width: u8, height: u8, input: &str) -> Result<Self, PositionError> {
+    pub fn parse(width: u8, height: u8, input: &str) -> Result<Position, PositionError> {
         let mut grid = Position::empty(width, height)?;
         let mut x = 0;
         let mut y = 0;
@@ -162,6 +155,49 @@ impl Position {
             x += 1;
         }
         Ok(grid)
+    }
+
+    /// Create a grid that correspondes to given size and "internal id".
+    ///
+    /// # Arguments
+    ///
+    /// `grid_id` - A number that represents empty and taken grid tiles. Starting from left and the
+    /// lowest bit, if bit is 1 then tile is filled, otherwise the tile is empty.
+    /// Bits outside grid size are ignored
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cgt::domineering::Position;
+    /// assert_eq!(&format!("{}", Position::from_number(3, 2, 0b101110).unwrap()), ".##|#.#");
+    /// ```
+    pub fn from_number(
+        width: u8,
+        height: u8,
+        grid_id: GridBits,
+    ) -> Result<Position, PositionError> {
+        Position::check_dimensions(width, height)?;
+        Ok(Position {
+            width,
+            height,
+            grid: grid_id,
+        })
+    }
+
+    /// Creates a grid from given array of bools.
+    ///
+    /// # Arguments
+    ///
+    /// * `grid` - Lineralized grid of size `width * height`, empty if if value is `false`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cgt::domineering::Position;
+    /// Position::from_arr(2, 3, &[true, true, false, false, false, true]).unwrap();
+    /// ```
+    pub fn from_arr(width: u8, height: u8, grid: &[bool]) -> Result<Position, PositionError> {
+        Position::from_number(width, height, arr_to_bits(grid))
     }
 }
 
@@ -209,7 +245,7 @@ impl Position {
         self.grid = (self.grid & !(1 << n)) | (val << n);
     }
 
-    fn moves_for<const DIR_X: u8, const DIR_Y: u8>(&self) -> Vec<Self> {
+    fn moves_for<const DIR_X: u8, const DIR_Y: u8>(&self) -> Vec<Position> {
         let mut moves = Vec::new();
 
         if self.height == 0 || self.width == 0 {
@@ -231,38 +267,44 @@ impl Position {
         moves
     }
 
-    pub fn left_moves(&self) -> Vec<Self> {
+    /// Get moves for the Left player as positions she can move to.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cgt::domineering::Position;
+    /// let width = 3;
+    /// let height = 3;
+    /// let position = Position::parse(width, height, "..#|.#.|##.").unwrap();
+    /// assert_eq!(
+    ///     position.left_moves(),
+    ///     vec![
+    ///         Position::parse(width, height, "#.#|##.|##.").unwrap(),
+    ///         Position::parse(width, height, "..#|.##|###").unwrap(),
+    ///     ]
+    /// );
+    /// ```
+    pub fn left_moves(&self) -> Vec<Position> {
         self.moves_for::<0, 1>()
     }
 
-    pub fn right_moves(&self) -> Vec<Self> {
+    /// Get moves for the Right player as positions he can move to.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cgt::domineering::Position;
+    /// let width = 3;
+    /// let height = 3;
+    /// let position = Position::parse(width, height, "..#|.#.|##.").unwrap();
+    /// assert_eq!(
+    ///     position.right_moves(),
+    ///     vec![Position::parse(width, height, "###|.#.|##.").unwrap(),]
+    /// );
+    /// ```
+    pub fn right_moves(&self) -> Vec<Position> {
         self.moves_for::<1, 0>()
     }
-}
-
-#[test]
-fn finds_left_moves() {
-    let width = 3;
-    let height = 3;
-    let grid = Position::parse(width, height, "..#|.#.|##.").unwrap();
-    assert_eq!(
-        grid.left_moves(),
-        vec![
-            Position::parse(width, height, "#.#|##.|##.").unwrap(),
-            Position::parse(width, height, "..#|.##|###").unwrap(),
-        ]
-    );
-}
-
-#[test]
-fn finds_right_moves() {
-    let width = 3;
-    let height = 3;
-    let grid = Position::parse(width, height, "..#|.#.|##.").unwrap();
-    assert_eq!(
-        grid.right_moves(),
-        vec![Position::parse(width, height, "###|.#.|##.").unwrap(),]
-    );
 }
 
 impl Display for Position {
@@ -288,6 +330,13 @@ fn parse_display_roundtrip() {
 
 impl Position {
     /// Remove filled rows and columns from the edges
+    ///
+    /// # Examples
+    /// ```
+    /// use cgt::domineering::Position;
+    /// let position = Position::parse(3, 3, "###|.#.|##.").unwrap();
+    /// assert_eq!(&format!("{}", position.move_top_left()), ".#.|##.");
+    /// ```
     pub fn move_top_left(&self) -> Position {
         let mut filled_top_rows = 0;
         for y in 0..self.height {
@@ -406,6 +455,23 @@ impl Position {
     }
 
     /// Get decompisitons of given position
+    ///
+    /// # Examples
+    /// ```
+    /// // ..#   ..#   ###
+    /// // .#. = .## + ##.
+    /// // ##.   ###   ##.
+    ///
+    /// use cgt::domineering::Position;
+    /// let position = Position::parse(3, 3, "..#|.#.|##.").unwrap();
+    /// assert_eq!(
+    ///    position.decompositons(),
+    ///    vec![
+    ///        Position::parse(2, 2, "..|.#").unwrap(),
+    ///        Position::parse(1, 2, ".|.").unwrap(),
+    ///    ]
+    /// );
+    /// ```
     pub fn decompositons(&self) -> Vec<Position> {
         let mut visited = Position::empty(self.width, self.height).unwrap();
         let mut ds = Vec::new();
@@ -422,52 +488,50 @@ impl Position {
     }
 }
 
-#[test]
-fn decomposes_simple_grid() {
-    let grid = Position::parse(3, 3, "..#|.#.|##.").unwrap();
-    assert_eq!(
-        grid.decompositons(),
-        vec![
-            Position::parse(2, 2, "..|.#").unwrap(),
-            Position::parse(1, 2, ".|.").unwrap(),
-        ]
-    );
-}
-
+/// Transaction table (cache) of domineering positions and canonical forms.
 pub struct TranspositionTable {
     grids: RwHashMap<Position, GameId>,
-    pub game_backend: GameBackend,
+    game_backend: GameBackend,
 }
 
 impl TranspositionTable {
+    /// Create new empty transposition table.
     #[inline]
-    pub fn new() -> Self {
-        Self::with_game_backend(GameBackend::new())
+    pub fn new() -> TranspositionTable {
+        TranspositionTable::with_game_backend(GameBackend::new())
     }
 
+    /// Create new transposition table with pre-existing game backend.
+    /// Useful if you load game backend from file, or re-use it from earlier computations.
     #[inline]
-    pub fn with_game_backend(game_backend: GameBackend) -> Self {
+    pub fn with_game_backend(game_backend: GameBackend) -> TranspositionTable {
         TranspositionTable {
             grids: RwHashMap::new(),
             game_backend,
         }
     }
+
+    /// Get the underlying game storage backend.
+    pub fn game_backend(&self) -> &GameBackend {
+        &self.game_backend
+    }
 }
 
 impl Position {
-    /// Get the canonical form of the position
+    /// Get the canonical form of the position.
     ///
     /// # Arguments
     ///
-    /// `cache` - Shared cache of short combinatorial games
+    /// `cache` - Shared cache of short combinatorial games.
     ///
     /// # Examples
     ///
     /// ```
-    /// let cache = cgt::domineering::TranspositionTable::new();
-    /// let grid = cgt::domineering::Position::parse(2, 2, ".#|..").unwrap();
-    /// let game_id = grid.canonical_form(&cache);
-    /// assert_eq!(cache.game_backend.dump_game_to_str(game_id), "*".to_string());
+    /// use cgt::domineering::{TranspositionTable, Position};
+    /// let cache = TranspositionTable::new();
+    /// let position = Position::parse(2, 2, ".#|..").unwrap();
+    /// let game = position.canonical_form(&cache);
+    /// assert_eq!(&cache.game_backend().print_game_to_str(game), "*");
     /// ```
     pub fn canonical_form(&self, cache: &TranspositionTable) -> GameId {
         let grid = self.move_top_left();
@@ -475,11 +539,13 @@ impl Position {
             return id;
         }
 
-        let result = Self::canonical_from_from_decompositions(grid.decompositons(), cache);
+        let result = Position::canonical_from_from_decompositions(grid.decompositons(), cache);
         cache.grids.insert(grid, result);
         result
     }
 
+    /// Get the canonical from from the decompositon of the position rather than from the position itself.
+    /// Useful if you obtain decompositions before deciding whether to calculate the canonical form.
     pub fn canonical_from_from_decompositions(
         decompositions: Vec<Position>,
         cache: &TranspositionTable,
@@ -491,7 +557,7 @@ impl Position {
                 continue;
             }
 
-            let options = Moves {
+            let moves = Moves {
                 left: grid
                     .left_moves()
                     .iter()
@@ -504,7 +570,7 @@ impl Position {
                     .collect(),
             };
 
-            let canonical_form = cache.game_backend.construct_from_options(options);
+            let canonical_form = cache.game_backend.construct_from_moves(moves);
             cache.grids.insert(grid, canonical_form);
             result = cache.game_backend.construct_sum(canonical_form, result);
         }
@@ -520,7 +586,7 @@ fn test_grid_canonical_form(grid: Position, canonical_form: &str) {
     let cache = TranspositionTable::new();
     let game_id = grid.canonical_form(&cache);
     assert_eq!(
-        &cache.game_backend.dump_game_to_str(game_id),
+        &cache.game_backend.print_game_to_str(game_id),
         canonical_form
     );
 }
@@ -583,6 +649,6 @@ fn finds_temperature_of_four_by_four_grid() {
     let grid = Position::parse(4, 4, "#...|....|....|....").unwrap();
     let game_id = grid.canonical_form(&cache);
     let temp = cache.game_backend.temperature(game_id);
-    assert_eq!(&cache.game_backend.dump_game_to_str(game_id), "{1*|-1*}");
+    assert_eq!(&cache.game_backend.print_game_to_str(game_id), "{1*|-1*}");
     assert_eq!(temp, Rational::from(1));
 }
