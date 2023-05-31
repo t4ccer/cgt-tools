@@ -59,7 +59,7 @@
             pkgs.cargo-modules
 
             (pkgs.rust-bin.fromRustupToolchain {
-              channel = "nightly";
+              channel = "stable";
               components = ["rust-analyzer" "rust-src" "rustfmt" "rustc" "cargo"];
             })
           ];

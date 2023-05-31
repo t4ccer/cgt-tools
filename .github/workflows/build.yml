@@ -1,35 +1,61 @@
 name: Build
 
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
+  release:
+    types: [created]
 
 jobs:
   build:
     name: cgt-rs build
-    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        os: ["ubuntu-latest", "windows-latest"]
+
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Install toolchain
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: nightly
-          override: true
+          toolchain: stable
           components: rustfmt
 
+      - name: Add mingw64 to path for x86_64-gnu
+        if: matrix.os == 'windows-latest'
+        run: echo "C:\msys64\mingw64\bin" >> $GITHUB_PATH
+        shell: bash
+
       - name: Build
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --release
+        run: cargo build --release --all
 
       - name: Test
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
+        run: cargo test
 
-      - name: Formatting
-        uses: actions-rs/cargo@v1
+      - name: Archive
+        shell: bash
+        run: |
+          staging="cgt_${{ matrix.os }}_${{ github.event.release.tag_name }}"
+          mkdir -p "$staging"
+
+          cp {README.md,LICENSE} "$staging/"
+
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            cp target/release/cgt-cli.exe "$staging/"
+            7z a "$staging.zip" "$staging"
+            echo "ASSET=$staging.zip" >> $GITHUB_ENV
+          else
+            cp target/release/cgt-cli "$staging/"
+            tar czf "$staging.tar.gz" "$staging"
+            echo "ASSET=$staging.tar.gz" >> $GITHUB_ENV
+          fi
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: github.event_name == 'release'
         with:
-          command: fmt
-          args: --all -- --check
+          files: ${{ env.ASSET }}

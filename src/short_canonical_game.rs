@@ -1099,28 +1099,30 @@ impl GameBackend {
                 self.thermograph_from_moves(&g.moves)
             }
             Some(nus) => {
-                if let Some(int) = nus.number.to_integer() && nus.is_number() {
-		    Thermograph::with_mast(Rational::new(int, 1))
-		} else {
-		    if nus.up_multiple == 0 || (nus.nimber == Nimber::from(1) && nus.up_multiple.abs() == 1) {
-			// This looks like 0 or * (depending on whether nimberPart is 0 or 1).
-			let new_id = self.construct_nus(&Nus{
-			    number: nus.number,
-			    up_multiple: 0,
-			    nimber: Nimber::from(nus.nimber.get().cmp(&0) as u32), // signum(nus.nimber)
-			});
-			let new_game = self.get_game(new_id);
-			self.thermograph_from_moves(&new_game.moves)
-		    } else {
-			let new_id = self.construct_nus(&Nus{
-			    number: nus.number,
-			    up_multiple: nus.up_multiple.cmp(&0) as i32, // signum(nus.up_multiple)
-			    nimber: Nimber::from(0),
-			});
-			let new_game = self.get_game(new_id);
-			self.thermograph_from_moves(&new_game.moves)
-		    }
-		}
+                if nus.number.to_integer().is_some() && nus.is_number() {
+                    Thermograph::with_mast(Rational::new(nus.number.to_integer().unwrap(), 1))
+                } else {
+                    if nus.up_multiple == 0
+                        || (nus.nimber == Nimber::from(1) && nus.up_multiple.abs() == 1)
+                    {
+                        // This looks like 0 or * (depending on whether nimberPart is 0 or 1).
+                        let new_id = self.construct_nus(&Nus {
+                            number: nus.number,
+                            up_multiple: 0,
+                            nimber: Nimber::from(nus.nimber.get().cmp(&0) as u32), // signum(nus.nimber)
+                        });
+                        let new_game = self.get_game(new_id);
+                        self.thermograph_from_moves(&new_game.moves)
+                    } else {
+                        let new_id = self.construct_nus(&Nus {
+                            number: nus.number,
+                            up_multiple: nus.up_multiple.cmp(&0) as i32, // signum(nus.up_multiple)
+                            nimber: Nimber::from(0),
+                        });
+                        let new_game = self.get_game(new_id);
+                        self.thermograph_from_moves(&new_game.moves)
+                    }
+                }
             }
         };
 

@@ -1,5 +1,3 @@
-#![feature(let_chains)]
-
 pub mod domineering;
 pub mod dyadic_rational_number;
 pub mod nimber;

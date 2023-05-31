@@ -139,12 +139,9 @@ impl Trajectory {
         new_slope: &Rational,
         new_x_intercept: &Rational,
     ) {
-        if new_cp == &Rational::from(-1) || cps.last().is_some_and(|last_cp| last_cp == new_cp) {
+        if new_cp == &Rational::from(-1) || (!cps.is_empty() && cps.last().unwrap() == new_cp) {
             return;
-        } else if slopes
-            .last()
-            .is_some_and(|last_slope| last_slope == new_slope)
-        {
+        } else if !slopes.is_empty() && slopes.last().unwrap() == new_slope {
             // The x-intercept must also be the same (since the trajectory is connected).
             // So just set the critical point higher.
             debug_assert_eq!(new_x_intercept, &x_intercepts[slopes.len() - 1]);

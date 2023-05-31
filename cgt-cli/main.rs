@@ -75,11 +75,11 @@ fn main() -> Result<()> {
         // (G + H)_t <= max(G_t, H_t)
         if decompositions.len() == 1 {
             let game = Position::canonical_from_from_decompositions(decompositions, &cache);
-            let temp = cache.game_backend.temperature(game);
+            let temp = cache.game_backend().temperature(game);
             let to_write = format!(
                 "{}\n{}\n{}\n\n",
                 grid,
-                cache.game_backend.print_game_to_str(game),
+                cache.game_backend().print_game_to_str(game),
                 temp
             );
             stdout.lock().write_all(to_write.as_bytes()).unwrap();
