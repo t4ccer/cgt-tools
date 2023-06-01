@@ -2,10 +2,14 @@ use anyhow::{bail, Context, Result};
 use cgt::domineering::{Position, TranspositionTable};
 use cgt::rational::Rational;
 use cgt::to_from_file::ToFromFile;
+use chrono::{DateTime, Utc};
 use clap::Parser;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use std::io::{self, Write};
 use std::sync::atomic::AtomicU64;
+use std::sync::{Arc, Mutex};
+use std::time::SystemTime;
+use std::{thread, time};
 
 mod anyhow_utils;
 
@@ -34,9 +38,9 @@ struct Args {
     #[arg(long, default_value = None)]
     last_id: Option<u64>,
 
-    /// How often to log progress
-    #[arg(long, default_value_t = 1000)]
-    progress_step: u64,
+    /// How often to log progress in seconds
+    #[arg(long, default_value_t = 5)]
+    progress_interval: u64,
 
     /// Path to read the cache
     #[arg(long, default_value = None)]
@@ -53,6 +57,38 @@ struct Args {
     /// Compute positions with decompositions
     #[arg(long, default_value_t = false)]
     include_decompositions: bool,
+}
+
+struct ProgressTracker {
+    cache: TranspositionTable,
+    args: Args,
+    iteration: AtomicU64,
+    saved: AtomicU64,
+    highest_temp: Mutex<Rational>,
+    start_time: SystemTime,
+}
+
+impl ProgressTracker {
+    fn new(cache: TranspositionTable, args: Args) -> ProgressTracker {
+        ProgressTracker {
+            cache,
+            args,
+            iteration: AtomicU64::new(0),
+            saved: AtomicU64::new(0),
+            highest_temp: Mutex::new(Rational::NegativeInfinity),
+            start_time: SystemTime::now(),
+        }
+    }
+
+    fn next_iteration(&self) {
+        self.iteration
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    fn new_saved(&self) {
+        self.saved
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    }
 }
 
 fn main() -> Result<()> {
@@ -74,10 +110,8 @@ fn main() -> Result<()> {
         );
     }
 
-    let total_len: u32 = last_id.ilog10() + 1;
-
     let cache = match args.cache_read_path {
-        Some(file_path) => match TranspositionTable::load_from_file(&file_path) {
+        Some(ref file_path) => match TranspositionTable::load_from_file(&file_path) {
             Err(err) => {
                 anyhow_utils::warn(
                     err,
@@ -97,76 +131,144 @@ fn main() -> Result<()> {
     };
 
     let stdout = io::stdout();
+
+    let progress_tracker = Arc::new(ProgressTracker::new(cache, args));
+
+    let progress_tracker_cpy = progress_tracker.clone();
+    let progress_pid = thread::spawn(move || progress_report(progress_tracker_cpy));
+
+    (progress_tracker.args.start_id..last_id)
+        .into_par_iter()
+        .for_each(|i| {
+            progress_tracker.next_iteration();
+            let i = last_id - i - 1;
+
+            let grid =
+                Position::from_number(progress_tracker.args.width, progress_tracker.args.height, i)
+                    .unwrap()
+                    .move_top_left();
+            let decompositions = grid.decompositons();
+
+            // We may want to skip decompositions since we have:
+            // (G + H)_t <= max(G_t, H_t)
+            // where G_t is the temperature of game G
+            if decompositions.len() != 1 && !progress_tracker.args.include_decompositions {
+                return;
+            }
+
+            let game = Position::canonical_from_from_decompositions(
+                decompositions,
+                &progress_tracker.cache,
+            );
+            let temp = progress_tracker.cache.game_backend().temperature(game);
+
+            if let Some(temperature_threshold) = &progress_tracker.args.temperature_threshold {
+                if &temp <= temperature_threshold {
+                    return;
+                }
+            }
+
+            let to_write = format!(
+                "{}\n{}\n{}\n\n",
+                grid,
+                progress_tracker
+                    .cache
+                    .game_backend()
+                    .print_game_to_str(game),
+                temp
+            );
+            stdout.lock().write_all(to_write.as_bytes()).unwrap();
+            progress_tracker.new_saved();
+
+            {
+                let mut highest_temp = progress_tracker.highest_temp.lock().unwrap();
+                if temp > *highest_temp {
+                    *highest_temp = temp;
+                }
+            }
+        });
+    progress_pid.join().unwrap();
+
+    if let Some(ref file_path) = progress_tracker.args.cache_write_path {
+        eprintln!(
+            "Saving {no_games} canonical forms to {file_path}.",
+            no_games = progress_tracker.cache.game_backend().known_games_len()
+        );
+        progress_tracker
+            .cache
+            .save_to_file(file_path)
+            .with_context(|| format!("Could not save cache to {file_path}"))?;
+    }
+
+    Ok(())
+}
+
+fn progress_report(progress_tracker: Arc<ProgressTracker>) {
+    let grid_tiles = progress_tracker.args.width * progress_tracker.args.height;
+    let max_last_id: u64 = 1 << grid_tiles;
+    let last_id: u64 = match progress_tracker.args.last_id {
+        None => max_last_id,
+        Some(last_id) => last_id,
+    };
+    let total_iterations = last_id - progress_tracker.args.start_id;
+    let total_len: u32 = last_id.ilog10() + 1;
     let stderr = io::stderr();
 
-    let progress = AtomicU64::new(0);
+    // NOTE: We want do..while behavior so the final 100% progress is shown
+    loop {
+        let completed_iterations = progress_tracker
+            .iteration
+            .load(std::sync::atomic::Ordering::SeqCst);
+        let saved = progress_tracker
+            .saved
+            .load(std::sync::atomic::Ordering::SeqCst);
+        let completed_iterations_str = format!("{}", completed_iterations);
+        let pad_len = total_len - (completed_iterations_str.len() as u32);
+        let zeros_padding = "0".repeat(pad_len as usize);
+        let percent_progress: f32 = completed_iterations as f32 / total_iterations as f32;
+        let now = chrono::offset::Utc::now();
+        let is_finished = completed_iterations == total_iterations;
+        let known_games = progress_tracker.cache.game_backend().known_games_len();
+        let highest_temp = if saved == 0 {
+            "N/A".to_string()
+        } else {
+            format!("{}", progress_tracker.highest_temp.lock().unwrap().clone())
+        };
 
-    let print_progress = |p: u64| {
-        let progress = format!("{}", p);
-        let pad_len = total_len - (progress.len() as u32);
-        let pad = "0".repeat(pad_len as usize);
+        let estimated_finish = if completed_iterations == 0 {
+            "N/A".to_string()
+        } else {
+            let estimated_total_seconds = SystemTime::elapsed(&progress_tracker.start_time)
+                .unwrap()
+                .as_secs_f32()
+                / percent_progress;
+            let estimated_total_seconds = estimated_total_seconds as u64;
+            let esitmated_duration = chrono::Duration::seconds(estimated_total_seconds as i64);
+            let estimated_end: DateTime<Utc> =
+                DateTime::from(progress_tracker.start_time) + esitmated_duration;
+            format!("{}", estimated_end)
+        };
 
         // NOTE: We may move known_games_len() to atomic counter instead so we won't take read
         // lock on games vec
 
         let to_write = format!(
-            "{}{}/{}\tKnown games: {}\n",
-            pad,
-            progress,
-            last_id,
-            cache.game_backend().known_games_len()
+            "[{now}]\n\
+	     \tProgress: {percent_progress:.6}\n\
+	     \tIterations: {zeros_padding}{completed_iterations_str}/{last_id}\n\
+	     \tHighest temperature: {highest_temp}\n\
+	     \tSaved games: {saved}\n\
+	     \tKnown games: {known_games}\n\
+	     \tEstimated end: {estimated_finish}\n",
         );
         stderr.lock().write_all(to_write.as_bytes()).unwrap();
-    };
 
-    (args.start_id..last_id).into_par_iter().for_each(|i| {
-        let i = last_id - i - 1;
-
-        let progress = progress.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        if progress % args.progress_step == 0 {
-            print_progress(progress);
+        if is_finished {
+            break;
         }
 
-        let grid = Position::from_number(args.width, args.height, i)
-            .unwrap()
-            .move_top_left();
-        let decompositions = grid.decompositons();
-
-        // We may want to skip decompositions since we have:
-        // (G + H)_t <= max(G_t, H_t)
-        // where G_t is the temperature of game G
-        if decompositions.len() != 1 && !args.include_decompositions {
-            return;
-        }
-
-        let game = Position::canonical_from_from_decompositions(decompositions, &cache);
-        let temp = cache.game_backend().temperature(game);
-
-        if let Some(temperature_threshold) = &args.temperature_threshold {
-            if &temp <= temperature_threshold {
-                return;
-            }
-        }
-
-        let to_write = format!(
-            "{}\n{}\n{}\n\n",
-            grid,
-            cache.game_backend().print_game_to_str(game),
-            temp
-        );
-        stdout.lock().write_all(to_write.as_bytes()).unwrap();
-    });
-    print_progress(progress.load(std::sync::atomic::Ordering::SeqCst));
-
-    if let Some(file_path) = args.cache_write_path {
-        eprintln!(
-            "Saving {no_games} canonical forms to {file_path}.",
-            no_games = cache.game_backend().known_games_len()
-        );
-        cache
-            .save_to_file(&file_path)
-            .with_context(|| format!("Could not save cache to {file_path}"))?;
+        thread::sleep(time::Duration::from_secs(
+            progress_tracker.args.progress_interval,
+        ));
     }
-
-    Ok(())
 }
