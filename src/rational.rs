@@ -1,9 +1,12 @@
 use std::{
     fmt::Display,
     ops::{Add, Div, Mul, Sub, SubAssign},
+    str::FromStr,
 };
 
 use num_rational::Rational64;
+
+use crate::nom_utils;
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -164,4 +167,49 @@ impl Display for Rational {
             Rational::PositiveInfinity => write!(f, "∞"),
         }
     }
+}
+
+impl Rational {
+    // NOTE: Doesn't handle infinities
+    fn parser(input: &str) -> nom::IResult<&str, Rational> {
+        let (input, numerator) = nom_utils::lexeme(nom::character::complete::i64)(input)?;
+        match nom_utils::lexeme(nom::bytes::complete::tag::<&str, &str, ()>("/"))(input) {
+            Ok((input, _)) => {
+                let (input, denominator) = nom_utils::lexeme(nom::character::complete::u32)(input)?;
+                let (input, _eof) = nom_utils::lexeme(nom::combinator::eof)(input)?;
+                // NOTE: zero denominator not handled
+                Ok((input, Rational::new(numerator, denominator)))
+            }
+            Err(_) => Ok((input, Rational::from(numerator))),
+        }
+    }
+}
+
+impl FromStr for Rational {
+    type Err = &'static str;
+
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        Rational::parser(input)
+            .map_err(|_| "Invalid rational")
+            .map(|(_, d)| d)
+    }
+}
+
+#[cfg(test)]
+fn test_parsing_works(inp: &str) {
+    let number = Rational::from_str(inp).unwrap();
+    assert_eq!(inp, &format!("{number}"));
+}
+
+#[test]
+fn parsing_works_positive() {
+    test_parsing_works("3/16");
+    test_parsing_works("42");
+    test_parsing_works("-1/2");
+}
+
+#[test]
+#[should_panic]
+fn parsing_works_negative() {
+    test_parsing_works("2/3");
 }

@@ -1,7 +1,10 @@
 use std::{
     fmt::Display,
     ops::{Add, AddAssign, Neg, Sub},
+    str::FromStr,
 };
+
+use crate::nom_utils;
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Hash, Clone, Copy, PartialEq, Eq)]
@@ -17,6 +20,31 @@ impl DyadicRationalNumber {
             denominator_exponent,
         }
         .normalized()
+    }
+
+    pub fn new_fraction(numerator: i64, mut denominator: u32) -> Option<DyadicRationalNumber> {
+        let mut denominator_exponent = 0;
+
+        if denominator == 0 {
+            return None;
+        }
+
+        while denominator % 2 == 0 {
+            denominator /= 2;
+            denominator_exponent += 1;
+        }
+
+        if denominator == 1 {
+            Some(
+                DyadicRationalNumber {
+                    numerator,
+                    denominator_exponent,
+                }
+                .normalized(),
+            )
+        } else {
+            None
+        }
     }
 
     pub fn numerator(&self) -> i64 {
@@ -243,4 +271,53 @@ fn dyadic_rationals_pretty() {
         format!("{}", DyadicRationalNumber::new(21, 200)),
         "21/2^200"
     );
+}
+
+impl DyadicRationalNumber {
+    fn parser(input: &str) -> nom::IResult<&str, DyadicRationalNumber> {
+        let (input, numerator) = nom_utils::lexeme(nom::character::complete::i64)(input)?;
+        match nom_utils::lexeme(nom::bytes::complete::tag::<&str, &str, ()>("/"))(input) {
+            Ok((input, _)) => {
+                let (input, denominator) = nom_utils::lexeme(nom::character::complete::u32)(input)?;
+                let (input, _eof) = nom_utils::lexeme(nom::combinator::eof)(input)?;
+                match DyadicRationalNumber::new_fraction(numerator, denominator) {
+                    Some(d) => Ok((input, d)),
+                    None => Err(nom::Err::Error(nom::error::Error::new(
+                        "Not a dyadic fraction",
+                        nom::error::ErrorKind::Verify,
+                    ))),
+                }
+            }
+            Err(_) => Ok((input, DyadicRationalNumber::from(numerator))),
+        }
+    }
+}
+
+impl FromStr for DyadicRationalNumber {
+    type Err = &'static str;
+
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        DyadicRationalNumber::parser(input)
+            .map_err(|_| "Invalid dyadic number")
+            .map(|(_, d)| d)
+    }
+}
+
+#[cfg(test)]
+fn test_parsing_works(inp: &str) {
+    let number = DyadicRationalNumber::from_str(inp).unwrap();
+    assert_eq!(inp, &format!("{number}"));
+}
+
+#[test]
+fn parsing_works_positive() {
+    test_parsing_works("3/16");
+    test_parsing_works("42");
+    test_parsing_works("-1/2");
+}
+
+#[test]
+#[should_panic]
+fn parsing_works_negative() {
+    test_parsing_works("2/3");
 }

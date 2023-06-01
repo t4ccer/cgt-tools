@@ -9,3 +9,5 @@ pub mod trajectory;
 
 #[cfg(feature = "serde")]
 pub mod to_from_file;
+
+mod nom_utils;
