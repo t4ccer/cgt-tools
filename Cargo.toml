@@ -14,11 +14,11 @@ itertools = "0.10.5"
 num-rational = { version = "0.4.1", default-features = false, features = ["std"]}
 serde = { version = "1.0.163", features = ["std", "derive"], optional = true}
 bincode = { version = "1.3.3", optional = true}
-elsa = "1.8.1"
+elsa = { git = "https://github.com/t4ccer/elsa", branch = "t4/sync-serde" }
 
 [features]
 default = ["serde"]
-serde = ["dep:serde", "dep:bincode", "num-rational/serde"]
+serde = ["dep:serde", "dep:bincode", "num-rational/serde", "elsa/serde"]
 
 [workspace]
 members = ["cgt-cli"]

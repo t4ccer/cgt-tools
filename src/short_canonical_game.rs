@@ -163,9 +163,7 @@ impl Moves {
     }
 }
 
-// FIXME: Trait impls for elsa
-// #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-// #[derive(Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct GameBackend {
     /// Lock that **MUST** be taken when adding new game
     add_game_lock: Mutex<()>,
