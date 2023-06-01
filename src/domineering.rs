@@ -536,12 +536,12 @@ impl Position {
     /// ```
     pub fn canonical_form(&self, cache: &TranspositionTable) -> GameId {
         let grid = self.move_top_left();
-        if let Some(id) = cache.grids.get(&grid) {
-            return id;
-        }
+        // if let Some(id) = cache.grids.get(&grid) {
+        //     return id;
+        // }
 
         let result = Position::canonical_from_from_decompositions(grid.decompositons(), cache);
-        cache.grids.insert(grid, result);
+        // cache.grids.insert(grid, result);
         result
     }
 
@@ -553,10 +553,10 @@ impl Position {
     ) -> GameId {
         let mut result = cache.game_backend.zero_id;
         for grid in decompositions {
-            if let Some(id) = cache.grids.get(&grid) {
-                result = cache.game_backend.construct_sum(id, result);
-                continue;
-            }
+            // if let Some(id) = cache.grids.get(&grid) {
+            //     result = cache.game_backend.construct_sum(id, result);
+            //     continue;
+            // }
 
             let moves = Moves {
                 left: grid
@@ -572,7 +572,7 @@ impl Position {
             };
 
             let canonical_form = cache.game_backend.construct_from_moves(moves);
-            cache.grids.insert(grid, canonical_form);
+            // cache.grids.insert(grid, canonical_form);
             result = cache.game_backend.construct_sum(canonical_form, result);
         }
 
