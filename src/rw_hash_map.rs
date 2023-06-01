@@ -1,5 +1,13 @@
 use std::{collections::HashMap, hash::Hash, ops::Deref, sync::RwLock};
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    serde(
+        bound = "K: serde::Serialize + serde::de::DeserializeOwned + Eq + Hash,\
+		 V: serde::Serialize + serde::de::DeserializeOwned"
+    )
+)]
 #[derive(Debug)]
 pub(crate) struct RwHashMap<K, V>(RwLock<HashMap<K, V>>);
 
@@ -19,36 +27,5 @@ where
     pub(crate) fn insert(&self, key: K, value: V) {
         let mut cache = self.0.write().unwrap();
         cache.insert(key, value);
-    }
-}
-
-// serde cannot derive it and breaks on constraints
-
-#[cfg(feature = "serde")]
-impl<K, V> serde::Serialize for RwHashMap<K, V>
-where
-    K: Eq + Hash + serde::Serialize,
-    V: serde::Serialize,
-{
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serde::Serialize::serialize(self.0.read().unwrap().deref(), serializer)
-    }
-}
-
-#[cfg(feature = "serde")]
-impl<'de, K, V> serde::Deserialize<'de> for RwHashMap<K, V>
-where
-    K: Eq + Hash + serde::Deserialize<'de>,
-    V: serde::Deserialize<'de>,
-{
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let hash_map = serde::Deserialize::deserialize(deserializer)?;
-        Ok(RwHashMap(RwLock::new(hash_map)))
     }
 }
