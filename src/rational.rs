@@ -206,10 +206,5 @@ fn parsing_works_positive() {
     test_parsing_works("3/16");
     test_parsing_works("42");
     test_parsing_works("-1/2");
-}
-
-#[test]
-#[should_panic]
-fn parsing_works_negative() {
     test_parsing_works("2/3");
 }
