@@ -16,4 +16,3 @@ rayon = "1.7.0"
 
 [[bin]]
 name = "cgt-cli"
-path = "main.rs"

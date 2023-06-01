@@ -1,4 +1,5 @@
 use std::{
+    fmt::Display,
     fs::File,
     io::{BufReader, Read},
 };
@@ -7,6 +8,24 @@ use std::{
 pub enum ToFromFileError {
     DecodeError(Box<bincode::ErrorKind>),
     FileError(std::io::Error),
+}
+
+impl Display for ToFromFileError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ToFromFileError::DecodeError(_) => write!(f, "Could not decode the file"),
+            ToFromFileError::FileError(_) => write!(f, "Could not access the file"),
+        }
+    }
+}
+
+impl std::error::Error for ToFromFileError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            ToFromFileError::DecodeError(e) => Some(e),
+            ToFromFileError::FileError(e) => Some(e),
+        }
+    }
 }
 
 impl From<Box<bincode::ErrorKind>> for ToFromFileError {

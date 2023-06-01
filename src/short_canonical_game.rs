@@ -1129,6 +1129,10 @@ impl GameBackend {
         thermograph
     }
 
+    pub fn known_games_len(&self) -> usize {
+        self.known_games.len()
+    }
+
     fn thermograph_from_moves(&self, moves: &Moves) -> Thermograph {
         let mut left_scaffold = Trajectory::new_constant(Rational::NegativeInfinity);
         let mut right_scaffold = Trajectory::new_constant(Rational::PositiveInfinity);

@@ -489,6 +489,7 @@ impl Position {
 }
 
 /// Transaction table (cache) of domineering positions and canonical forms.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TranspositionTable {
     grids: RwHashMap<Position, GameId>,
     game_backend: GameBackend,

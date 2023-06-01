@@ -1,11 +1,12 @@
-use anyhow::{anyhow, Result};
+use anyhow::{bail, Context, Result};
 use cgt::domineering::{Position, TranspositionTable};
-use cgt::short_canonical_game::GameBackend;
 use cgt::to_from_file::ToFromFile;
 use clap::Parser;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use std::io::{self, Write};
 use std::sync::atomic::AtomicU64;
+
+mod anyhow_utils;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about)]
@@ -51,19 +52,32 @@ fn main() -> Result<()> {
     };
 
     if last_id > max_last_id {
-        Err(anyhow!(
-            "last-id is {}, but for this grid it cannot exceed {}",
+        bail!(
+            "last-id is {}, but for this grid it cannot exceed {}.",
             last_id,
             max_last_id - 1
-        ))?;
+        );
     }
 
     let total_len: u32 = last_id.ilog10() + 1;
 
     let cache = match args.cache_read_path {
-        Some(file_path) => {
-            TranspositionTable::with_game_backend(GameBackend::load_from_file(&file_path).unwrap())
-        }
+        Some(file_path) => match TranspositionTable::load_from_file(&file_path) {
+            Err(err) => {
+                anyhow_utils::warn(
+                    err,
+                    "Could not load cache from {file_path}. Creating new cache.",
+                );
+                TranspositionTable::new()
+            }
+            Ok(cache) => {
+                eprintln!(
+                    "Loaded {no_games} canonical forms from {file_path}.",
+                    no_games = cache.game_backend().known_games_len()
+                );
+                cache
+            }
+        },
         None => TranspositionTable::new(),
     };
 
@@ -109,7 +123,13 @@ fn main() -> Result<()> {
     print_progress(progress.load(std::sync::atomic::Ordering::SeqCst));
 
     if let Some(file_path) = args.cache_write_path {
-        cache.game_backend().save_to_file(&file_path).unwrap();
+        eprintln!(
+            "Saving {no_games} canonical forms to {file_path}.",
+            no_games = cache.game_backend().known_games_len()
+        );
+        cache
+            .save_to_file(&file_path)
+            .with_context(|| format!("Could not save cache to {file_path}"))?;
     }
 
     Ok(())
