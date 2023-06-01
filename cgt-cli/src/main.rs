@@ -5,7 +5,8 @@ use cgt::to_from_file::ToFromFile;
 use chrono::{DateTime, Utc};
 use clap::Parser;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
-use std::io::{self, Write};
+use std::fs::File;
+use std::io::{self, BufWriter, Write};
 use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
@@ -57,6 +58,10 @@ struct Args {
     /// Compute positions with decompositions
     #[arg(long, default_value_t = false)]
     include_decompositions: bool,
+
+    /// Path to write the cache
+    #[arg(long)]
+    output_path: String,
 }
 
 struct ProgressTracker {
@@ -130,7 +135,9 @@ fn main() -> Result<()> {
         None => TranspositionTable::new(),
     };
 
-    let stdout = io::stdout();
+    let output_file =
+        File::create(&args.output_path).with_context(|| "Could not open output file")?;
+    let output_buf = Mutex::new(BufWriter::new(output_file));
 
     let progress_tracker = Arc::new(ProgressTracker::new(cache, args));
 
@@ -177,7 +184,11 @@ fn main() -> Result<()> {
                     .print_game_to_str(game),
                 temp
             );
-            stdout.lock().write_all(to_write.as_bytes()).unwrap();
+
+            {
+                let mut buf = output_buf.lock().unwrap();
+                buf.write_all(to_write.as_bytes()).unwrap();
+            }
             progress_tracker.new_saved();
 
             {
@@ -187,6 +198,12 @@ fn main() -> Result<()> {
                 }
             }
         });
+
+    {
+        let mut buf = output_buf.lock().unwrap();
+        buf.flush().unwrap();
+    }
+
     progress_pid.join().unwrap();
 
     if let Some(ref file_path) = progress_tracker.args.cache_write_path {
