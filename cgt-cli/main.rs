@@ -1,5 +1,7 @@
 use anyhow::{anyhow, Result};
 use cgt::domineering::{Position, TranspositionTable};
+use cgt::short_canonical_game::GameBackend;
+use cgt::to_from_file::ToFromFile;
 use clap::Parser;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use std::io::{self, Write};
@@ -27,6 +29,14 @@ struct Args {
     /// How often to log progress
     #[arg(long, default_value_t = 1000)]
     progress_step: u64,
+
+    // Path to read the cache
+    #[arg(long, default_value = None)]
+    cache_read_path: Option<String>,
+
+    // Path to write the cache
+    #[arg(long, default_value = None)]
+    cache_write_path: Option<String>,
 }
 
 fn main() -> Result<()> {
@@ -50,7 +60,13 @@ fn main() -> Result<()> {
 
     let total_len: u32 = last_id.ilog10() + 1;
 
-    let cache = TranspositionTable::new();
+    let cache = match args.cache_read_path {
+        Some(file_path) => {
+            TranspositionTable::with_game_backend(GameBackend::load_from_file(&file_path).unwrap())
+        }
+        None => TranspositionTable::new(),
+    };
+
     let stdout = io::stdout();
     let stderr = io::stderr();
 
@@ -91,6 +107,10 @@ fn main() -> Result<()> {
         }
     });
     print_progress(progress.load(std::sync::atomic::Ordering::SeqCst));
+
+    if let Some(file_path) = args.cache_write_path {
+        cache.game_backend().save_to_file(&file_path).unwrap();
+    }
 
     Ok(())
 }
