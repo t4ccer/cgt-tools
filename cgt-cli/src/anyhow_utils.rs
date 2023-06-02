@@ -1,5 +1,6 @@
 use anyhow::Context;
 
+/// Report a warning in a style of error
 pub fn warn<E>(err: E, msg: &str)
 where
     Result<(), E>: Context<(), E>,

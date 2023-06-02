@@ -2,14 +2,12 @@ use anyhow::{bail, Context, Result};
 use cgt::domineering::{Position, TranspositionTable};
 use cgt::rational::Rational;
 use cgt::to_from_file::ToFromFile;
-use chrono::{DateTime, Utc};
 use clap::Parser;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use std::fs::File;
 use std::io::{self, BufWriter, Write};
 use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, Mutex};
-use std::time::SystemTime;
 use std::{thread, time};
 
 mod anyhow_utils;
@@ -70,18 +68,18 @@ struct ProgressTracker {
     iteration: AtomicU64,
     saved: AtomicU64,
     highest_temp: Mutex<Rational>,
-    start_time: SystemTime,
+    output_buffer: Mutex<BufWriter<File>>,
 }
 
 impl ProgressTracker {
-    fn new(cache: TranspositionTable, args: Args) -> ProgressTracker {
+    fn new(cache: TranspositionTable, args: Args, output_file: File) -> ProgressTracker {
         ProgressTracker {
             cache,
             args,
             iteration: AtomicU64::new(0),
             saved: AtomicU64::new(0),
             highest_temp: Mutex::new(Rational::NegativeInfinity),
-            start_time: SystemTime::now(),
+            output_buffer: Mutex::new(BufWriter::new(output_file)),
         }
     }
 
@@ -90,9 +88,13 @@ impl ProgressTracker {
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     }
 
-    fn new_saved(&self) {
+    fn write_game(&self, game: &str) {
         self.saved
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        {
+            let mut buf = self.output_buffer.lock().unwrap();
+            buf.write_all(game.as_bytes()).unwrap();
+        }
     }
 }
 
@@ -137,9 +139,7 @@ fn main() -> Result<()> {
 
     let output_file =
         File::create(&args.output_path).with_context(|| "Could not open output file")?;
-    let output_buf = Mutex::new(BufWriter::new(output_file));
-
-    let progress_tracker = Arc::new(ProgressTracker::new(cache, args));
+    let progress_tracker = Arc::new(ProgressTracker::new(cache, args, output_file));
 
     let progress_tracker_cpy = progress_tracker.clone();
     let progress_pid = thread::spawn(move || progress_report(progress_tracker_cpy));
@@ -148,7 +148,6 @@ fn main() -> Result<()> {
         .into_par_iter()
         .for_each(|i| {
             progress_tracker.next_iteration();
-            let i = last_id - i - 1;
 
             let grid =
                 Position::from_number(progress_tracker.args.width, progress_tracker.args.height, i)
@@ -184,12 +183,7 @@ fn main() -> Result<()> {
                     .print_game_to_str(game),
                 temp
             );
-
-            {
-                let mut buf = output_buf.lock().unwrap();
-                buf.write_all(to_write.as_bytes()).unwrap();
-            }
-            progress_tracker.new_saved();
+            progress_tracker.write_game(&to_write);
 
             {
                 let mut highest_temp = progress_tracker.highest_temp.lock().unwrap();
@@ -198,12 +192,6 @@ fn main() -> Result<()> {
                 }
             }
         });
-
-    {
-        let mut buf = output_buf.lock().unwrap();
-        buf.flush().unwrap();
-    }
-
     progress_pid.join().unwrap();
 
     if let Some(ref file_path) = progress_tracker.args.cache_write_path {
@@ -252,20 +240,6 @@ fn progress_report(progress_tracker: Arc<ProgressTracker>) {
             format!("{}", progress_tracker.highest_temp.lock().unwrap().clone())
         };
 
-        let estimated_finish = if completed_iterations == 0 {
-            "N/A".to_string()
-        } else {
-            let estimated_total_seconds = SystemTime::elapsed(&progress_tracker.start_time)
-                .unwrap()
-                .as_secs_f32()
-                / percent_progress;
-            let estimated_total_seconds = estimated_total_seconds as u64;
-            let esitmated_duration = chrono::Duration::seconds(estimated_total_seconds as i64);
-            let estimated_end: DateTime<Utc> =
-                DateTime::from(progress_tracker.start_time) + esitmated_duration;
-            format!("{}", estimated_end)
-        };
-
         // NOTE: We may move known_games_len() to atomic counter instead so we won't take read
         // lock on games vec
 
@@ -275,10 +249,14 @@ fn progress_report(progress_tracker: Arc<ProgressTracker>) {
 	     \tIterations: {zeros_padding}{completed_iterations_str}/{last_id}\n\
 	     \tHighest temperature: {highest_temp}\n\
 	     \tSaved games: {saved}\n\
-	     \tKnown games: {known_games}\n\
-	     \tEstimated end: {estimated_finish}\n",
+	     \tKnown games: {known_games}\n",
         );
         stderr.lock().write_all(to_write.as_bytes()).unwrap();
+
+        {
+            let mut buf = progress_tracker.output_buffer.lock().unwrap();
+            buf.flush().unwrap();
+        }
 
         if is_finished {
             break;
