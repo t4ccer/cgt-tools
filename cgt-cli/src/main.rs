@@ -188,7 +188,6 @@ fn main() -> Result<()> {
             {
                 let mut buf = output_buf.lock().unwrap();
                 buf.write_all(to_write.as_bytes()).unwrap();
-                buf.flush().unwrap(); // FIXME
             }
             progress_tracker.new_saved();
 
