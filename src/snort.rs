@@ -1,9 +1,9 @@
 //! Game of Snort
 
 use num_derive::FromPrimitive;
-use std::fmt::Display;
 
 use crate::{
+    graph::undirected::Graph,
     short_canonical_game::{GameId, Moves, PartizanShortGame},
     transposition_table::TranspositionTable,
 };
@@ -19,130 +19,47 @@ pub enum VertexColor {
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub struct AdjacencyMatrix {
-    size: usize,
-    adjacency_matrix: Vec<bool>,
-}
-
-impl Display for AdjacencyMatrix {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for (idx, elem) in self.adjacency_matrix.iter().enumerate() {
-            write!(f, "{}", *elem as u8)?;
-            if (idx + 1) % self.size == 0 {
-                write!(f, "\n")?;
-            }
-        }
-
-        Ok(())
-    }
-}
-
-impl AdjacencyMatrix {
-    #[inline]
-    pub fn empty(size: usize) -> Self {
-        Self {
-            size,
-            adjacency_matrix: vec![false; size * size],
-        }
-    }
-
-    #[inline]
-    pub fn from_vec(size: usize, vec: Vec<bool>) -> Self {
-        assert!(vec.len() == size * size, "Invalid vector size");
-        Self {
-            size,
-            adjacency_matrix: vec,
-        }
-    }
-
-    #[inline]
-    pub fn from_matrix(size: usize, matrix: Vec<Vec<bool>>) -> Self {
-        let vec: Vec<bool> = matrix.iter().flatten().copied().collect();
-        Self::from_vec(size, vec)
-    }
-
-    #[inline]
-    pub fn at(&self, x: usize, y: usize) -> bool {
-        self.adjacency_matrix[self.size * y + x]
-    }
-
-    #[inline]
-    pub fn set(&mut self, x: usize, y: usize, value: bool) {
-        self.adjacency_matrix[self.size * y + x] = value;
-        self.adjacency_matrix[self.size * x + y] = value;
-    }
-
-    pub fn adjacent_to(&self, vertex: usize) -> Vec<usize> {
-        let mut res = Vec::with_capacity(self.size);
-        for idx in 0..self.size {
-            if self.at(vertex, idx) {
-                res.push(idx);
-            }
-        }
-        res
-    }
-}
-
-/// ```text
-/// 1 - 3 - 2
-///  \  |
-///   \ |
-///     0
-/// ```
-#[cfg(test)]
-fn test_matrix() -> AdjacencyMatrix {
-    let mut m = AdjacencyMatrix::empty(4);
-    m.set(3, 0, true);
-    m.set(3, 2, true);
-    m.set(1, 3, true);
-    m.set(1, 0, true);
-    m
-}
-
-#[test]
-fn set_adjacency_matrix() {
-    let m = test_matrix();
-    assert_eq!(
-        m,
-        AdjacencyMatrix::from_vec(
-            4,
-            vec![
-                false, true, false, true, true, false, false, true, false, false, false, true,
-                true, true, true, false
-            ]
-        )
-    );
-}
-
-#[test]
-fn test_adjacency() {
-    let m = test_matrix();
-    assert_eq!(m.adjacent_to(0), vec![1, 3]);
-    assert_eq!(m.adjacent_to(1), vec![0, 3]);
-    assert_eq!(m.adjacent_to(2), vec![3]);
-    assert_eq!(m.adjacent_to(3), vec![0, 1, 2]);
-}
-
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Position {
     vertices: Vec<VertexColor>,
-    adjacency_matrix: AdjacencyMatrix,
+    graph: Graph,
 }
 
 impl Position {
-    pub fn new(vertices: Vec<VertexColor>, adjacency_matrix: AdjacencyMatrix) -> Self {
-        assert_eq!(vertices.len(), adjacency_matrix.size);
+    /// Create new Snort position with all vertices empty.
+    pub fn new(graph: Graph) -> Self {
         Self {
-            vertices,
-            adjacency_matrix,
+            vertices: vec![VertexColor::Empty; graph.size()],
+            graph,
         }
     }
 
+    // TODO: Perform that check
+    /// Create a Snort position with initial colors. It's up to the user to ensure that no conflicting
+    /// colors are connected in the graph.
+    /// Returns `None` if `vertices` and `graph` have conflicting sizes.
+    pub fn with_colors(vertices: Vec<VertexColor>, graph: Graph) -> Option<Self> {
+        if vertices.len() != graph.size() {
+            return None;
+        }
+
+        Some(Self { vertices, graph })
+    }
+
+    pub fn vertices(&self) -> &Vec<VertexColor> {
+        &self.vertices
+    }
+
+    pub fn graph(&self) -> &Graph {
+        &self.graph
+    }
+
+    /// Get moves for a given player. Works only for `TintLeft` and `TintRight`.
+    /// Any other input is undefined.
     fn moves_for<const COLOR: u8>(&self) -> Vec<Self> {
         // const ADT generics are unsable, so here we go
         let own_tint_color: VertexColor = num::FromPrimitive::from_u8(COLOR).unwrap();
 
-        let mut moves = Vec::with_capacity(self.adjacency_matrix.size);
+        let mut moves = Vec::with_capacity(self.graph.size());
 
         // Vertices where player can move
         let move_vertices = self
@@ -167,11 +84,9 @@ impl Position {
             };
 
             // Disconnect `move_vertex` from adjecent vertices and tint them
-            for adjacent_vertex in self.adjacency_matrix.adjacent_to(move_vertex) {
+            for adjacent_vertex in self.graph.adjacent_to(move_vertex) {
                 // Disconnect move vertex from adjecent
-                position
-                    .adjacency_matrix
-                    .set(move_vertex, adjacent_vertex, false);
+                position.graph.connect(move_vertex, adjacent_vertex, false);
 
                 // No loops
                 if adjacent_vertex != move_vertex {
@@ -205,20 +120,21 @@ impl Position {
     /// # Examples
     ///
     /// ```
+    /// use cgt::graph::undirected::Graph;
     /// use cgt::short_canonical_game::PartizanShortGame;
-    /// use cgt::snort::{AdjacencyMatrix, Position, VertexColor};
+    /// use cgt::snort::{Position, VertexColor};
     /// use cgt::transposition_table::TranspositionTable;
     ///
-    /// let mut m = AdjacencyMatrix::empty(3);
-    /// m.set(1, 2, true);
+    /// let mut graph = Graph::empty(3);
+    /// graph.connect(1, 2, true);
     ///
-    /// let vs = vec![
+    /// let colors = vec![
     ///     VertexColor::TintLeft,
     ///     VertexColor::TintRight,
     ///     VertexColor::TintLeft,
     /// ];
     ///
-    /// let position = Position::new(vs, m);
+    /// let position = Position::with_colors(colors, graph).unwrap();
     /// assert_eq!(position.left_moves().len(), 2);
     /// assert_eq!(position.right_moves().len(), 1);
     ///
@@ -256,31 +172,7 @@ impl Position {
 
 #[test]
 fn no_moves() {
-    let m = AdjacencyMatrix::empty(0);
-    let vs = vec![];
-    let position = Position::new(vs, m);
+    let position = Position::new(Graph::empty(0));
     assert_eq!(position.left_moves(), vec![]);
     assert_eq!(position.right_moves(), vec![]);
-}
-
-#[test]
-fn canonical_form_works() {
-    // 0     1 --- 2
-    // left  right left
-    let mut m = AdjacencyMatrix::empty(3);
-    m.set(1, 2, true);
-
-    let vs = vec![
-        VertexColor::TintLeft,
-        VertexColor::TintRight,
-        VertexColor::TintLeft,
-    ];
-
-    let position = Position::new(vs, m);
-    assert_eq!(position.left_moves().len(), 2);
-    assert_eq!(position.right_moves().len(), 1);
-
-    let cache = TranspositionTable::new();
-    let game = position.canonical_form(&cache);
-    assert_eq!(&cache.game_backend.print_game_to_str(game), "{2|0}");
 }

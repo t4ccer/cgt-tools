@@ -1,5 +1,6 @@
 pub mod domineering;
 pub mod dyadic_rational_number;
+pub mod graph;
 pub mod nimber;
 pub mod rational;
 pub mod short_canonical_game;

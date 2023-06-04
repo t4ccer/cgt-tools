@@ -1344,6 +1344,9 @@ fn temp_of_one_minus_one_is_one() {
 }
 
 pub trait PartizanShortGame: Sized {
+    /// Get moves available for Left player.
     fn left_moves(&self) -> Vec<Self>;
+
+    /// Get moves available for Right player.
     fn right_moves(&self) -> Vec<Self>;
 }
