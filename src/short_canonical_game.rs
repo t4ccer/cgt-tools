@@ -1342,3 +1342,8 @@ fn temp_of_one_minus_one_is_one() {
     let g = b.construct_from_moves(moves);
     assert_eq!(b.temperature(g), Rational::from(1));
 }
+
+pub trait PartizanShortGame: Sized {
+    fn left_moves(&self) -> Vec<Self>;
+    fn right_moves(&self) -> Vec<Self>;
+}

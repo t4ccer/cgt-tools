@@ -5,8 +5,8 @@ use alloc::collections::vec_deque::VecDeque;
 use std::fmt::Display;
 
 use crate::{
-    rw_hash_map::RwHashMap,
-    short_canonical_game::{GameBackend, GameId, Moves},
+    short_canonical_game::{GameId, Moves, PartizanShortGame},
+    transposition_table::TranspositionTable,
 };
 
 pub type GridBits = u64;
@@ -266,13 +266,16 @@ impl Position {
         }
         moves
     }
-
+}
+impl PartizanShortGame for Position {
     /// Get moves for the Left player as positions she can move to.
     ///
     /// # Examples
     ///
     /// ```
     /// use cgt::domineering::Position;
+    /// use crate::cgt::short_canonical_game::PartizanShortGame;
+    ///
     /// let width = 3;
     /// let height = 3;
     /// let position = Position::parse(width, height, "..#|.#.|##.").unwrap();
@@ -284,7 +287,7 @@ impl Position {
     ///     ]
     /// );
     /// ```
-    pub fn left_moves(&self) -> Vec<Position> {
+    fn left_moves(&self) -> Vec<Position> {
         self.moves_for::<0, 1>()
     }
 
@@ -294,6 +297,8 @@ impl Position {
     ///
     /// ```
     /// use cgt::domineering::Position;
+    /// use crate::cgt::short_canonical_game::PartizanShortGame;
+    ///
     /// let width = 3;
     /// let height = 3;
     /// let position = Position::parse(width, height, "..#|.#.|##.").unwrap();
@@ -302,7 +307,7 @@ impl Position {
     ///     vec![Position::parse(width, height, "###|.#.|##.").unwrap(),]
     /// );
     /// ```
-    pub fn right_moves(&self) -> Vec<Position> {
+    fn right_moves(&self) -> Vec<Position> {
         self.moves_for::<1, 0>()
     }
 }
@@ -488,36 +493,6 @@ impl Position {
     }
 }
 
-/// Transaction table (cache) of domineering positions and canonical forms.
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct TranspositionTable {
-    grids: RwHashMap<Position, GameId>,
-    game_backend: GameBackend,
-}
-
-impl TranspositionTable {
-    /// Create new empty transposition table.
-    #[inline]
-    pub fn new() -> TranspositionTable {
-        TranspositionTable::with_game_backend(GameBackend::new())
-    }
-
-    /// Create new transposition table with pre-existing game backend.
-    /// Useful if you load game backend from file, or re-use it from earlier computations.
-    #[inline]
-    pub fn with_game_backend(game_backend: GameBackend) -> TranspositionTable {
-        TranspositionTable {
-            grids: RwHashMap::new(),
-            game_backend,
-        }
-    }
-
-    /// Get the underlying game storage backend.
-    pub fn game_backend(&self) -> &GameBackend {
-        &self.game_backend
-    }
-}
-
 impl Position {
     /// Get the canonical form of the position.
     ///
@@ -528,13 +503,15 @@ impl Position {
     /// # Examples
     ///
     /// ```
-    /// use cgt::domineering::{TranspositionTable, Position};
+    /// use cgt::domineering::Position;
+    /// use cgt::transposition_table::TranspositionTable;
+    ///
     /// let cache = TranspositionTable::new();
     /// let position = Position::parse(2, 2, ".#|..").unwrap();
     /// let game = position.canonical_form(&cache);
     /// assert_eq!(&cache.game_backend().print_game_to_str(game), "*");
     /// ```
-    pub fn canonical_form(&self, cache: &TranspositionTable) -> GameId {
+    pub fn canonical_form(&self, cache: &TranspositionTable<Self>) -> GameId {
         let grid = self.move_top_left();
         if let Some(id) = cache.grids.get(&grid) {
             return id;
@@ -549,7 +526,7 @@ impl Position {
     /// Useful if you obtain decompositions before deciding whether to calculate the canonical form.
     pub fn canonical_from_from_decompositions(
         decompositions: Vec<Position>,
-        cache: &TranspositionTable,
+        cache: &TranspositionTable<Self>,
     ) -> GameId {
         let mut result = cache.game_backend.zero_id;
         for grid in decompositions {

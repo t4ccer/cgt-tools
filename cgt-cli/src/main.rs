@@ -1,7 +1,8 @@
 use anyhow::{bail, Context, Result};
-use cgt::domineering::{Position, TranspositionTable};
+use cgt::domineering;
 use cgt::rational::Rational;
 use cgt::to_from_file::ToFromFile;
+use cgt::transposition_table::TranspositionTable;
 use clap::Parser;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use std::fs::File;
@@ -63,7 +64,7 @@ struct Args {
 }
 
 struct ProgressTracker {
-    cache: TranspositionTable,
+    cache: TranspositionTable<domineering::Position>,
     args: Args,
     iteration: AtomicU64,
     saved: AtomicU64,
@@ -72,7 +73,11 @@ struct ProgressTracker {
 }
 
 impl ProgressTracker {
-    fn new(cache: TranspositionTable, args: Args, output_file: File) -> ProgressTracker {
+    fn new(
+        cache: TranspositionTable<domineering::Position>,
+        args: Args,
+        output_file: File,
+    ) -> ProgressTracker {
         ProgressTracker {
             cache,
             args,
@@ -149,10 +154,13 @@ fn main() -> Result<()> {
         .for_each(|i| {
             progress_tracker.next_iteration();
 
-            let grid =
-                Position::from_number(progress_tracker.args.width, progress_tracker.args.height, i)
-                    .unwrap()
-                    .move_top_left();
+            let grid = domineering::Position::from_number(
+                progress_tracker.args.width,
+                progress_tracker.args.height,
+                i,
+            )
+            .unwrap()
+            .move_top_left();
             let decompositions = grid.decompositons();
 
             // We may want to skip decompositions since we have:
@@ -162,7 +170,7 @@ fn main() -> Result<()> {
                 return;
             }
 
-            let game = Position::canonical_from_from_decompositions(
+            let game = domineering::Position::canonical_from_from_decompositions(
                 decompositions,
                 &progress_tracker.cache,
             );
