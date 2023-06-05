@@ -1,0 +1,16 @@
+[package]
+name = "cgt-website"
+version = "0.1.0"
+edition = "2021"
+authors = ["Tomasz Maciosowski <t4ccer@gmail.com>"]
+license = "AGPL-3.0"
+readme = "README.md"
+repository = "https://github.com/t4ccer/cgt-rs"
+description = "Library to work with Combinatorial Games"
+
+[dependencies]
+cgt = { path = "../." }
+console_error_panic_hook = "0.1.7"
+console_log = "1.0.0"
+leptos = { version = "0.3", features = ["stable"] }
+log = "0.4.18"

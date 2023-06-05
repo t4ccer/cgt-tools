@@ -92,6 +92,21 @@
     },
     "nixpkgs": {
       "locked": {
+        "lastModified": 1685914916,
+        "narHash": "sha256-AuZqSPiLQ26yxiUm54/UC3O8mta7/vgulSEowM9Iw64=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "3da62d63435c71dfeb4a89cf95d1a35091d7ae3c",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "nixpkgs_2": {
+      "locked": {
         "lastModified": 1681358109,
         "narHash": "sha256-eKyxW4OohHQx9Urxi7TQlFBTDWII+F+x2hklDOQPB50=",
         "owner": "NixOS",
@@ -135,10 +150,7 @@
     "root": {
       "inputs": {
         "flake-parts": "flake-parts",
-        "nixpkgs": [
-          "rust-overlay",
-          "nixpkgs"
-        ],
+        "nixpkgs": "nixpkgs",
         "pre-commit-hooks-nix": "pre-commit-hooks-nix",
         "rust-overlay": "rust-overlay"
       }
@@ -146,7 +158,7 @@
     "rust-overlay": {
       "inputs": {
         "flake-utils": "flake-utils_2",
-        "nixpkgs": "nixpkgs"
+        "nixpkgs": "nixpkgs_2"
       },
       "locked": {
         "lastModified": 1681611682,

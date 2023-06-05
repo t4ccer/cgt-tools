@@ -199,6 +199,16 @@ impl Position {
     pub fn from_arr(width: u8, height: u8, grid: &[bool]) -> Result<Position, PositionError> {
         Position::from_number(width, height, arr_to_bits(grid))
     }
+
+    /// Get number of columns in the grid
+    pub fn width(&self) -> u8 {
+        self.width
+    }
+
+    /// Get number of rows in the grid
+    pub fn height(&self) -> u8 {
+        self.height
+    }
 }
 
 #[test]
@@ -233,13 +243,13 @@ fn set_works() {
 
 impl Position {
     #[inline]
-    fn at(&self, x: u8, y: u8) -> bool {
+    pub fn at(&self, x: u8, y: u8) -> bool {
         let n = self.width as GridBits * y as GridBits + x as GridBits;
         (self.grid >> n) & 1 == 1
     }
 
     #[inline]
-    fn set(&mut self, x: u8, y: u8, val: bool) -> () {
+    pub fn set(&mut self, x: u8, y: u8, val: bool) -> () {
         let val = val as GridBits;
         let n = self.width as GridBits * y as GridBits + x as GridBits;
         self.grid = (self.grid & !(1 << n)) | (val << n);
