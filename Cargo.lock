@@ -254,6 +254,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "cgt-py-adapter"
+version = "0.1.0"
+dependencies = [
+ "cgt",
+ "clap",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "cgt-website"
 version = "0.1.0"
 dependencies = [

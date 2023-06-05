@@ -60,6 +60,7 @@
             pkgs.cargo-leptos
             pkgs.trunk
             pkgs.nodePackages.tailwindcss
+            pkgs.sage
 
             (pkgs.rust-bin.fromRustupToolchain {
               channel = "stable";

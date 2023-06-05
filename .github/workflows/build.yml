@@ -46,10 +46,12 @@ jobs:
 
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
             cp target/release/cgt-cli.exe "$staging/"
+            cp target/release/cgt-py-adapter.exe "$staging/"
             7z a "$staging.zip" "$staging"
             echo "ASSET=$staging.zip" >> $GITHUB_ENV
           else
             cp target/release/cgt-cli "$staging/"
+            cp target/release/cgt-py-adapter "$staging/"
             tar czf "$staging.tar.gz" "$staging"
             echo "ASSET=$staging.tar.gz" >> $GITHUB_ENV
           fi

@@ -25,4 +25,4 @@ default = ["serde"]
 serde = ["dep:serde", "dep:bincode", "num-rational/serde", "elsa/serde"]
 
 [workspace]
-members = ["cgt-cli", "cgt-website"]
+members = ["cgt-cli", "cgt-website", "cgt-py-adapter"]
