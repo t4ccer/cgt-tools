@@ -34,7 +34,7 @@ pub fn Domineering(cx: Scope, position: domineering::Position) -> impl IntoView 
     #[rustfmt::skip]
     view! {cx,
 	   <div class="flex flex-row gap-x-4">
-             <div class="flex flex-col gap-y-2 border-4 w-fit p-2">
+             <div class="flex flex-col gap-y-2 border-4 border-light-gray w-fit p-2">
 	     <For each = move || 0..height
 	          key = |y| *y
                   view = move |cx, y| {
@@ -44,9 +44,9 @@ pub fn Domineering(cx: Scope, position: domineering::Position) -> impl IntoView 
 	                            key = |x| *x
       	                            view = move |cx, x| {
 					let class = move || if position.get().at(x, y) {
-					    "bg-neutral-800 aspect-square h-16"
+					    "bg-dark-gray aspect-square h-16"
 					} else {
-					    "bg-neutral-200 aspect-square h-16"
+					    "bg-light-gray aspect-square h-16"
 					};
 					view! {cx,
       					       <div class=class
