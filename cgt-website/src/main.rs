@@ -1,21 +1,33 @@
 use cgt::{domineering, transposition_table::TranspositionTable};
 use leptos::{ev::MouseEvent, *};
+use leptos_router::*;
 
 fn main() {
     _ = console_log::init_with_level(log::Level::Debug);
     console_error_panic_hook::set_once();
 
-    mount_to_body(|cx| {
-        #[rustfmt::skip]
-        view! {cx,
-               <div class="flex flex-col w-screen justify-center items-center gap-y-4">
-	         <div class="flex w-full bg-gray h-12 sticky top-0"></div>
-                 <div class="flex w-full max-w-6xl">
-                   <Domineering state=DomineeringState::new(cx, domineering::Position::empty(4, 4).unwrap())/>
-                 </div>
-               </div>
-        }
-    })
+    mount_to_body(|cx| view! {cx, <App/>})
+}
+
+#[component()]
+fn App(cx: Scope) -> impl IntoView {
+    let domineerign_state = DomineeringState::new(cx, domineering::Position::empty(4, 4).unwrap());
+
+    #[rustfmt::skip]
+    view! {cx,
+	   <div class="flex flex-col w-screen justify-center items-center gap-y-4">
+	     <Router>
+	       <nav class="flex w-full bg-gray h-12 sticky top-0">
+	       </nav>
+	       <main class="flex w-full max-w-6xl">
+	         <Routes>
+	           <Route path="playground/domineering" view = move |cx| {
+		       view! { cx, <Domineering state=domineerign_state/>}}/>
+	         </Routes>
+	       </main>
+	     </Router>
+	   </div>
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -103,14 +115,14 @@ fn ResizeWidth(cx: Scope, state: DomineeringState) -> impl IntoView {
     view! {cx,
       <div class="flex flex-col">
         <div class="flex flex-col justify-center items-center w-12 h-10 grow border-2 border-dashed border-cyan rounded-lg gap-4 mb-14">
-       <AddRemoveButton enabled_color = "bg-green".to_string()
-                        icon = "add".to_string()
-                        on_click = move |_| resize(&state, 1, 0)
-                        disabled = block_expand_width />
-       <AddRemoveButton enabled_color = "bg-pink".to_string()
-                        icon = "remove".to_string()
-                        on_click = move |_| resize(&state, -1, 0)
-                        disabled = move || state.position.get().width() <= 1 />
+          <AddRemoveButton enabled_color = "bg-green".to_string()
+                           icon = "add".to_string()
+                           on_click = move |_| resize(&state, 1, 0)
+                           disabled = block_expand_width />
+          <AddRemoveButton enabled_color = "bg-pink".to_string()
+                           icon = "remove".to_string()
+                           on_click = move |_| resize(&state, -1, 0)
+                           disabled = move || state.position.get().width() <= 1 />
         </div>
       </div>
     }
