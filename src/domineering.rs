@@ -5,7 +5,7 @@ use alloc::collections::vec_deque::VecDeque;
 use std::fmt::Display;
 
 use crate::{
-    short_canonical_game::{GameId, Moves, PartizanShortGame},
+    short_canonical_game::{Game, Moves, PartizanShortGame},
     transposition_table::TranspositionTable,
 };
 
@@ -521,7 +521,7 @@ impl Position {
     /// let game = position.canonical_form(&cache);
     /// assert_eq!(&cache.game_backend().print_game_to_str(game), "*");
     /// ```
-    pub fn canonical_form(&self, cache: &TranspositionTable<Self>) -> GameId {
+    pub fn canonical_form(&self, cache: &TranspositionTable<Self>) -> Game {
         let grid = self.move_top_left();
         if let Some(id) = cache.grids.get(&grid) {
             return id;
@@ -537,8 +537,8 @@ impl Position {
     pub fn canonical_from_from_decompositions(
         decompositions: Vec<Position>,
         cache: &TranspositionTable<Self>,
-    ) -> GameId {
-        let mut result = cache.game_backend.zero_id;
+    ) -> Game {
+        let mut result = cache.game_backend.construct_integer(0);
         for grid in decompositions {
             if let Some(id) = cache.grids.get(&grid) {
                 result = cache.game_backend.construct_sum(id, result);

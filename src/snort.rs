@@ -4,7 +4,7 @@ use num_derive::FromPrimitive;
 
 use crate::{
     graph::undirected::Graph,
-    short_canonical_game::{GameId, Moves, PartizanShortGame},
+    short_canonical_game::{Game, Moves, PartizanShortGame},
     transposition_table::TranspositionTable,
 };
 
@@ -142,7 +142,7 @@ impl Position {
     /// let game = position.canonical_form(&cache);
     /// assert_eq!(&cache.game_backend().print_game_to_str(game), "{2|0}");
     /// ```
-    pub fn canonical_form(&self, cache: &TranspositionTable<Self>) -> GameId {
+    pub fn canonical_form(&self, cache: &TranspositionTable<Self>) -> Game {
         if let Some(id) = cache.grids.get(&self) {
             return id;
         }
@@ -153,7 +153,7 @@ impl Position {
         // NOTE: That's redundant, but may increase performance
         // `construct_from_moves` on empty moves results in 0 as well
         if left_moves.is_empty() && right_moves.is_empty() {
-            return cache.game_backend.zero_id;
+            return cache.game_backend.construct_integer(0);
         }
 
         let moves = Moves {

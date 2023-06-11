@@ -1,6 +1,6 @@
 use crate::{
     rw_hash_map::RwHashMap,
-    short_canonical_game::{GameBackend, GameId},
+    short_canonical_game::{Game, GameBackend},
 };
 use std::hash::Hash;
 
@@ -11,7 +11,7 @@ use std::hash::Hash;
     serde(bound = "G: serde::Serialize + serde::de::DeserializeOwned + Eq + Hash")
 )]
 pub struct TranspositionTable<G> {
-    pub(crate) grids: RwHashMap<G, GameId>,
+    pub(crate) grids: RwHashMap<G, Game>,
     pub(crate) game_backend: GameBackend,
 }
 

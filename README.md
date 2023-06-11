@@ -9,8 +9,7 @@ Combinatorial Game Theory (very in progress) library in Rust.
 
 ## TODO List
 
-- [ ] Python interface
-- [ ] Using direct references instead of `GameId` indices
+- [ ] Statistics feature flag
 
 ## License
 

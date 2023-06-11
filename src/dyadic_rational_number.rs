@@ -274,7 +274,7 @@ fn dyadic_rationals_pretty() {
 }
 
 impl DyadicRationalNumber {
-    fn parser(input: &str) -> nom::IResult<&str, DyadicRationalNumber> {
+    pub(crate) fn parser(input: &str) -> nom::IResult<&str, DyadicRationalNumber> {
         let (input, numerator) = nom_utils::lexeme(nom::character::complete::i64)(input)?;
         match nom_utils::lexeme(nom::bytes::complete::tag::<&str, &str, ()>("/"))(input) {
             Ok((input, _)) => {
