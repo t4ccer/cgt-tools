@@ -11,7 +11,7 @@ description = "Library to work with Combinatorial Games"
 [dependencies]
 anyhow = "1.0.71"
 clap = { version = "4.3.0", features = ["derive"] }
-cgt = { path = "../." }
+cgt = { path = "../.", features = ["statistics"] }
 rayon = "1.7.0"
 chrono = { version = "0.4.26", default-features = false, features = ["clock"] }
 

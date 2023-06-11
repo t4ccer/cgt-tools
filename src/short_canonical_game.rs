@@ -429,6 +429,75 @@ impl Moves {
     }
 }
 
+#[cfg(feature = "statistics")]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug)]
+pub struct BoundsTracker<T> {
+    min_value: T,
+    max_value: T,
+}
+
+#[cfg(feature = "statistics")]
+impl<T> BoundsTracker<T>
+where
+    T: Ord + Copy,
+{
+    fn new(init: T) -> Self {
+        BoundsTracker {
+            min_value: init,
+            max_value: init,
+        }
+    }
+
+    fn update(&mut self, new_value: T) {
+        self.min_value = std::cmp::min(self.min_value, new_value);
+        self.max_value = std::cmp::max(self.max_value, new_value);
+    }
+}
+
+#[cfg(feature = "statistics")]
+impl<T> Display for BoundsTracker<T>
+where
+    T: Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{}, {}]", self.min_value, self.max_value)
+    }
+}
+
+#[cfg(feature = "statistics")]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug)]
+pub struct Statistics {
+    max_rational_num: BoundsTracker<i64>,
+    max_rational_den_exp: BoundsTracker<u32>,
+    max_up: BoundsTracker<i32>,
+    max_nimber: BoundsTracker<Nimber>,
+}
+
+#[cfg(feature = "statistics")]
+impl Statistics {
+    pub fn new() -> Self {
+        Statistics {
+            max_rational_num: BoundsTracker::new(0),
+            max_rational_den_exp: BoundsTracker::new(0),
+            max_up: BoundsTracker::new(0),
+            max_nimber: BoundsTracker::new(Nimber::from(0)),
+        }
+    }
+}
+
+#[cfg(feature = "statistics")]
+impl Display for Statistics {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "max_rational_num: {}, max_rational_den_exp: {}, max_up: {}, max_nimber: {}, ",
+            self.max_rational_num, self.max_rational_den_exp, self.max_up, self.max_nimber
+        )
+    }
+}
+
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct GameBackend {
     /// Lock that **MUST** be taken when adding new game
@@ -443,6 +512,8 @@ pub struct GameBackend {
     leq_index: RwHashMap<(Game, Game), bool>,
     /// Lookup table for already constructed thermographs of non-trivial games
     thermograph_index: RwHashMap<Game, Thermograph>,
+    #[cfg(feature = "statistics")]
+    pub statistics: Mutex<Statistics>,
 }
 
 impl GameBackend {
@@ -454,12 +525,31 @@ impl GameBackend {
             add_index: RwHashMap::new(),
             leq_index: RwHashMap::new(),
             thermograph_index: RwHashMap::new(),
+            #[cfg(feature = "statistics")]
+            statistics: Mutex::new(Statistics::new()),
+        }
+    }
+
+    #[cfg(feature = "statistics")]
+    fn update_statistics(&self, moves: &Moves) {
+        let mut lock = self.statistics.lock().unwrap();
+        for game in moves.left.iter().chain(moves.right.iter()) {
+            if let Game::Nus(nus) = game {
+                lock.max_rational_num.update(nus.number.numerator());
+                lock.max_rational_den_exp
+                    .update(nus.number.denominator_exponent());
+                lock.max_up.update(nus.up_multiple);
+                lock.max_nimber.update(nus.nimber);
+            }
         }
     }
 
     fn add_new_game(&self, moves: Moves) -> Game {
         // Locking here guarantees that no two threads will try to insert the same game
         let lock = self.add_game_lock.lock().unwrap();
+
+        #[cfg(feature = "statistics")]
+        self.update_statistics(&moves);
 
         if let Some(id) = self.moves_index.get(&moves) {
             return id;

@@ -257,7 +257,14 @@ fn progress_report(progress_tracker: Arc<ProgressTracker>) {
 	     \tIterations: {zeros_padding}{completed_iterations_str}/{last_id}\n\
 	     \tHighest temperature: {highest_temp}\n\
 	     \tSaved games: {saved}\n\
-	     \tKnown games: {known_games}\n",
+	     \tKnown games: {known_games}\n\
+	     \tStatistics: {stats}\n",
+            stats = progress_tracker
+                .cache
+                .game_backend()
+                .statistics
+                .lock()
+                .unwrap()
         );
         stderr.lock().write_all(to_write.as_bytes()).unwrap();
 
