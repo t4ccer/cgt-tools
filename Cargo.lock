@@ -231,6 +231,7 @@ name = "cgt"
 version = "0.1.0"
 dependencies = [
  "bincode",
+ "concurrent_lru",
  "elsa",
  "gcd",
  "itertools",
@@ -239,7 +240,6 @@ dependencies = [
  "num-derive",
  "num-rational",
  "num-traits",
- "serde",
 ]
 
 [[package]]
@@ -373,6 +373,15 @@ name = "common_macros"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f3f6d59c71e7dc3af60f0af9db32364d96a16e9310f3f5db2b55ed642162dd35"
+
+[[package]]
+name = "concurrent_lru"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7feb5cb312f774e8a24540e27206db4e890f7d488563671d24a16389cf4c2e4e"
+dependencies = [
+ "once_cell",
+]
 
 [[package]]
 name = "config"
@@ -566,7 +575,6 @@ name = "elsa"
 version = "1.8.1"
 source = "git+https://github.com/t4ccer/elsa?branch=t4/sync-serde#deda2855366e9f1c948eb03e57c67221a5c19ea2"
 dependencies = [
- "serde",
  "stable_deref_trait",
 ]
 
@@ -1348,7 +1356,6 @@ dependencies = [
  "num-bigint",
  "num-integer",
  "num-traits",
- "serde",
 ]
 
 [[package]]

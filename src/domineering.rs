@@ -12,7 +12,6 @@ use crate::{
 pub type GridBits = u64;
 
 /// A Domineering position on a rectengular grid.
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub struct Position {
     width: u8,
@@ -63,7 +62,6 @@ fn bits_to_arr_to_bits_roundtrip() {
     assert_eq!(inp, arr_to_bits(&bits_to_arr(inp)),);
 }
 
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum PositionError {
     TooLarge,

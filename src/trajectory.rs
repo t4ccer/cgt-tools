@@ -2,7 +2,6 @@ use crate::rational::Rational;
 use itertools::Itertools;
 use std::cmp::Ordering;
 
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub struct Trajectory {
     pub(crate) critical_points: Vec<Rational>,

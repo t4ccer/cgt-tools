@@ -6,7 +6,6 @@ use std::{
 
 use crate::nom_utils;
 
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Hash, Clone, Copy, PartialEq, Eq)]
 pub struct DyadicRationalNumber {
     numerator: i64,

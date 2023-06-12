@@ -1,7 +1,6 @@
 use anyhow::{bail, Context, Result};
 use cgt::domineering;
 use cgt::rational::Rational;
-use cgt::to_from_file::ToFromFile;
 use cgt::transposition_table::TranspositionTable;
 use clap::Parser;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
@@ -122,25 +121,7 @@ fn main() -> Result<()> {
         );
     }
 
-    let cache = match args.cache_read_path {
-        Some(ref file_path) => match TranspositionTable::load_from_file(&file_path) {
-            Err(err) => {
-                anyhow_utils::warn(
-                    err,
-                    "Could not load cache from {file_path}. Creating new cache.",
-                );
-                TranspositionTable::new()
-            }
-            Ok(cache) => {
-                eprintln!(
-                    "Loaded {no_games} canonical forms from {file_path}.",
-                    no_games = cache.game_backend().known_games_len()
-                );
-                cache
-            }
-        },
-        None => TranspositionTable::new(),
-    };
+    let cache = TranspositionTable::new();
 
     let output_file =
         File::create(&args.output_path).with_context(|| "Could not open output file")?;
@@ -201,17 +182,6 @@ fn main() -> Result<()> {
             }
         });
     progress_pid.join().unwrap();
-
-    if let Some(ref file_path) = progress_tracker.args.cache_write_path {
-        eprintln!(
-            "Saving {no_games} canonical forms to {file_path}.",
-            no_games = progress_tracker.cache.game_backend().known_games_len()
-        );
-        progress_tracker
-            .cache
-            .save_to_file(file_path)
-            .with_context(|| format!("Could not save cache to {file_path}"))?;
-    }
 
     Ok(())
 }

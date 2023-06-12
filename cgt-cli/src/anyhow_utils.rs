@@ -1,6 +1,7 @@
 use anyhow::Context;
 
 /// Report a warning in a style of error
+#[allow(dead_code)]
 pub fn warn<E>(err: E, msg: &str)
 where
     Result<(), E>: Context<(), E>,

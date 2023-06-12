@@ -3,7 +3,6 @@ use std::{
     ops::{Add, AddAssign, Neg, Sub, SubAssign},
 };
 
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Nimber(u32);
 

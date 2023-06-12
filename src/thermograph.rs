@@ -3,7 +3,6 @@ use std::cmp::Ordering;
 use crate::rational::Rational;
 use crate::trajectory::Trajectory;
 
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub struct Thermograph {
     pub(crate) left_wall: Trajectory,

@@ -8,7 +8,6 @@ use num_rational::Rational64;
 
 use crate::nom_utils;
 
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Rational {
     NegativeInfinity,

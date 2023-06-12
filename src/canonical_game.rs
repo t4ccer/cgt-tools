@@ -10,11 +10,9 @@ use std::{
     sync::Mutex,
 };
 
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct GamePtr(usize);
 
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Game {
     Nus(Nus),
@@ -52,7 +50,6 @@ impl Game {
 }
 
 /// A number-up-star game position that is a sum of a number, up and, nimber.
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Nus {
     number: DyadicRationalNumber,
@@ -172,7 +169,6 @@ impl Display for Nus {
 }
 
 /// Left and Right moves from a given position
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub struct Moves {
     left: Vec<Game>,
@@ -350,7 +346,6 @@ impl Moves {
     }
 }
 
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct GameBackend {
     /// Lock that **MUST** be taken when adding new game
     add_game_lock: Mutex<()>,

@@ -1,23 +1,16 @@
-use crate::{
-    rw_hash_map::RwHashMap,
-    short_canonical_game::{Game, GameBackend},
-};
+use crate::short_canonical_game::{Game, GameBackend};
+use concurrent_lru::sharded::LruCache;
 use std::hash::Hash;
 
 /// Transaction table (cache) of game positions and canonical forms.
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(
-    feature = "serde",
-    serde(bound = "G: serde::Serialize + serde::de::DeserializeOwned + Eq + Hash")
-)]
 pub struct TranspositionTable<G> {
-    grids: RwHashMap<G, Game>,
+    grids: LruCache<G, Game>,
     game_backend: GameBackend,
 }
 
 impl<G> TranspositionTable<G>
 where
-    G: Eq + Hash,
+    G: Eq + Hash + Clone + Sync + Send,
 {
     /// Create new empty transposition table.
     #[inline]
@@ -30,7 +23,7 @@ where
     #[inline]
     pub fn with_game_backend(game_backend: GameBackend) -> Self {
         TranspositionTable {
-            grids: RwHashMap::new(),
+            grids: LruCache::new(16777216), // 2^24
             game_backend,
         }
     }
@@ -43,16 +36,16 @@ where
 
     #[inline]
     pub fn grids_get(&self, grid: &G) -> Option<Game> {
-        self.grids.get(grid)
+        self.grids.get(grid.clone()).map(|h| h.value().clone())
     }
 
     #[inline]
     pub fn grids_insert(&self, grid: G, game: Game) {
-        self.grids.insert(grid, game)
+        self.grids.get_or_init(grid, 1, |_| game);
     }
 
     #[inline]
     pub fn grids_saved(&self) -> usize {
-        self.grids.len()
+        self.grids.total_charge() as usize
     }
 }

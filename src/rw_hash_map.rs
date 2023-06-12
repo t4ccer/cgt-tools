@@ -1,13 +1,5 @@
 use std::{collections::HashMap, hash::Hash, ops::Deref, sync::RwLock};
 
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(
-    feature = "serde",
-    serde(
-        bound = "K: serde::Serialize + serde::de::DeserializeOwned + Eq + Hash,\
-		 V: serde::Serialize + serde::de::DeserializeOwned"
-    )
-)]
 #[derive(Debug)]
 pub(crate) struct RwHashMap<K, V>(RwLock<HashMap<K, V>>);
 
@@ -29,6 +21,7 @@ where
         cache.insert(key, value);
     }
 
+    #[allow(dead_code)]
     pub(crate) fn len(&self) -> usize {
         self.0.read().unwrap().len()
     }
