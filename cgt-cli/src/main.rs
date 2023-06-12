@@ -243,10 +243,18 @@ fn progress_report(progress_tracker: Arc<ProgressTracker>) {
         let is_finished = completed_iterations == total_iterations;
         let known_games = progress_tracker.cache.game_backend().known_games_len();
         let highest_temp = if saved == 0 {
-            "N/A".to_string()
+            format!(
+                "<= {}",
+                progress_tracker
+                    .args
+                    .temperature_threshold
+                    .clone()
+                    .unwrap_or(Rational::from(-1))
+            )
         } else {
             format!("{}", progress_tracker.highest_temp.lock().unwrap().clone())
         };
+        let known_grids = progress_tracker.cache.grids_saved();
 
         // NOTE: We may move known_games_len() to atomic counter instead so we won't take read
         // lock on games vec
@@ -258,6 +266,7 @@ fn progress_report(progress_tracker: Arc<ProgressTracker>) {
 	     \tHighest temperature: {highest_temp}\n\
 	     \tSaved games: {saved}\n\
 	     \tKnown games: {known_games}\n\
+	     \tKnown grids: {known_grids}\n\
 	     \tStatistics: {stats}\n",
             stats = progress_tracker
                 .cache

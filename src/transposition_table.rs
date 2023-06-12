@@ -11,8 +11,8 @@ use std::hash::Hash;
     serde(bound = "G: serde::Serialize + serde::de::DeserializeOwned + Eq + Hash")
 )]
 pub struct TranspositionTable<G> {
-    pub(crate) grids: RwHashMap<G, Game>,
-    pub(crate) game_backend: GameBackend,
+    grids: RwHashMap<G, Game>,
+    game_backend: GameBackend,
 }
 
 impl<G> TranspositionTable<G>
@@ -39,5 +39,20 @@ where
     #[inline]
     pub fn game_backend(&self) -> &GameBackend {
         &self.game_backend
+    }
+
+    #[inline]
+    pub fn grids_get(&self, grid: &G) -> Option<Game> {
+        self.grids.get(grid)
+    }
+
+    #[inline]
+    pub fn grids_insert(&self, grid: G, game: Game) {
+        self.grids.insert(grid, game)
+    }
+
+    #[inline]
+    pub fn grids_saved(&self) -> usize {
+        self.grids.len()
     }
 }

@@ -143,7 +143,7 @@ impl Position {
     /// assert_eq!(&cache.game_backend().print_game_to_str(game), "{2|0}");
     /// ```
     pub fn canonical_form(&self, cache: &TranspositionTable<Self>) -> Game {
-        if let Some(id) = cache.grids.get(&self) {
+        if let Some(id) = cache.grids_get(self) {
             return id;
         }
 
@@ -153,7 +153,7 @@ impl Position {
         // NOTE: That's redundant, but may increase performance
         // `construct_from_moves` on empty moves results in 0 as well
         if left_moves.is_empty() && right_moves.is_empty() {
-            return cache.game_backend.construct_integer(0);
+            return cache.game_backend().construct_integer(0);
         }
 
         let moves = Moves {
@@ -164,8 +164,8 @@ impl Position {
                 .collect(),
         };
 
-        let canonical_form = cache.game_backend.construct_from_moves(moves);
-        cache.grids.insert(self.clone(), canonical_form);
+        let canonical_form = cache.game_backend().construct_from_moves(moves);
+        cache.grids_insert(self.clone(), canonical_form);
         canonical_form
     }
 }

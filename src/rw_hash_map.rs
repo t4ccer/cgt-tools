@@ -28,4 +28,8 @@ where
         let mut cache = self.0.write().unwrap();
         cache.insert(key, value);
     }
+
+    pub(crate) fn len(&self) -> usize {
+        self.0.read().unwrap().len()
+    }
 }

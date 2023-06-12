@@ -492,7 +492,7 @@ impl Display for Statistics {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "max_rational_num: {}, max_rational_den_exp: {}, max_up: {}, max_nimber: {}, ",
+            "max_rational_num: {}, max_rational_den_exp: {}, max_up: {}, max_nimber: {}",
             self.max_rational_num, self.max_rational_den_exp, self.max_up, self.max_nimber
         )
     }
@@ -545,15 +545,22 @@ impl GameBackend {
     }
 
     fn add_new_game(&self, moves: Moves) -> Game {
+        // What's going on here: we try to lookup game in cache without taking a lock (inserts are rare)
+        // to allow for concurrent lookups. After taking write lock we need to lookup again to be
+        // 100% sure we're not inserting two same games.
+        if let Some(id) = self.moves_index.get(&moves) {
+            return id;
+        }
+
         // Locking here guarantees that no two threads will try to insert the same game
         let lock = self.add_game_lock.lock().unwrap();
-
-        #[cfg(feature = "statistics")]
-        self.update_statistics(&moves);
 
         if let Some(id) = self.moves_index.get(&moves) {
             return id;
         }
+
+        #[cfg(feature = "statistics")]
+        self.update_statistics(&moves);
 
         let ptr = GamePtr(self.known_games.push_get_index(Box::new(moves.clone())));
         let game = Game::MovesPtr(ptr);

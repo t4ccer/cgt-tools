@@ -61,6 +61,7 @@
             pkgs.trunk
             pkgs.nodePackages.tailwindcss
             pkgs.sage
+            pkgs.heaptrack
 
             (pkgs.rust-bin.fromRustupToolchain {
               channel = "stable";

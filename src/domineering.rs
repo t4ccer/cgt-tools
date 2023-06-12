@@ -13,7 +13,7 @@ pub type GridBits = u64;
 
 /// A Domineering position on a rectengular grid.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub struct Position {
     width: u8,
     height: u8,
@@ -523,12 +523,12 @@ impl Position {
     /// ```
     pub fn canonical_form(&self, cache: &TranspositionTable<Self>) -> Game {
         let grid = self.move_top_left();
-        if let Some(id) = cache.grids.get(&grid) {
+        if let Some(id) = cache.grids_get(&grid) {
             return id;
         }
 
         let result = Position::canonical_from_from_decompositions(grid.decompositons(), cache);
-        cache.grids.insert(grid, result);
+        cache.grids_insert(grid, result);
         result
     }
 
@@ -538,10 +538,10 @@ impl Position {
         decompositions: Vec<Position>,
         cache: &TranspositionTable<Self>,
     ) -> Game {
-        let mut result = cache.game_backend.construct_integer(0);
+        let mut result = cache.game_backend().construct_integer(0);
         for grid in decompositions {
-            if let Some(id) = cache.grids.get(&grid) {
-                result = cache.game_backend.construct_sum(id, result);
+            if let Some(id) = cache.grids_get(&grid) {
+                result = cache.game_backend().construct_sum(id, result);
                 continue;
             }
 
@@ -558,9 +558,9 @@ impl Position {
                     .collect(),
             };
 
-            let canonical_form = cache.game_backend.construct_from_moves(moves);
-            cache.grids.insert(grid, canonical_form);
-            result = cache.game_backend.construct_sum(canonical_form, result);
+            let canonical_form = cache.game_backend().construct_from_moves(moves);
+            cache.grids_insert(grid, canonical_form);
+            result = cache.game_backend().construct_sum(canonical_form, result);
         }
 
         result
@@ -574,7 +574,7 @@ fn test_grid_canonical_form(grid: Position, canonical_form: &str) {
     let cache = TranspositionTable::new();
     let game_id = grid.canonical_form(&cache);
     assert_eq!(
-        &cache.game_backend.print_game_to_str(game_id),
+        &cache.game_backend().print_game_to_str(game_id),
         canonical_form
     );
 }
@@ -636,7 +636,7 @@ fn finds_temperature_of_four_by_four_grid() {
     let cache = TranspositionTable::new();
     let grid = Position::parse(4, 4, "#...|....|....|....").unwrap();
     let game_id = grid.canonical_form(&cache);
-    let temp = cache.game_backend.temperature(game_id);
-    assert_eq!(&cache.game_backend.print_game_to_str(game_id), "{1*|-1*}");
+    let temp = cache.game_backend().temperature(game_id);
+    assert_eq!(&cache.game_backend().print_game_to_str(game_id), "{1*|-1*}");
     assert_eq!(temp, Rational::from(1));
 }
