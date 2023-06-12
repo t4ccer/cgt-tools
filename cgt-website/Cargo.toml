@@ -12,6 +12,6 @@ description = "Library to work with Combinatorial Games"
 cgt = { path = "../." }
 console_error_panic_hook = "0.1.7"
 console_log = "1.0.0"
-leptos = { version = "0.3", features = ["stable"] }
-leptos_router = { version = "0.3.0", features = ["stable", "csr"] }
 log = "0.4.18"
+sycamore = "0.8.2"
+sycamore-router = "0.8.0"
