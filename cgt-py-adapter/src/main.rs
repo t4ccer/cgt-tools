@@ -11,7 +11,7 @@ struct DomineeringRequest {
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 struct SnortRequest {
-    size: usize,
+    vertices: Vec<snort::VertexColor>,
     adjacency_matrix: Vec<bool>,
 }
 
@@ -67,9 +67,11 @@ fn process_line(line: &str) -> Result<Response, ProcessingError> {
             })
         }
         Request::Snort(request) => {
-            let graph = undirected::Graph::from_vec(request.size, request.adjacency_matrix)
+            let size = request.vertices.len();
+            let graph = undirected::Graph::from_vec(size, request.adjacency_matrix)
                 .ok_or(ProcessingError::Parsing)?;
-            let position = snort::Position::new(graph);
+            let position = snort::Position::with_colors(request.vertices, graph)
+                .ok_or(ProcessingError::Decoding)?;
             let cache = TranspositionTable::new();
             let game = position.canonical_form(&cache);
             let canonical_form = cache.game_backend().print_game_to_str(game);

@@ -1,5 +1,13 @@
 from subprocess import Popen, PIPE, STDOUT
 import json
+import math
+
+class SnortColor():
+    Empty = 0
+    TintBlue = 1
+    TintRed = 2
+    Blue = 3
+    Red = 4
 
 class Game:
     def __init__(self, canonical_form, temperature):
@@ -33,10 +41,12 @@ class Cgt:
         }
         return self.request(d)
 
-    def snort(self, size, adjacency_matrix):
+    def snort(self, adjacency_matrix, vertices = None):
+        size = math.isqrt(len(adjacency_matrix))
+        vs = [SnortColor.Empty]*size if vertices is None else vertices
         d = {
             "Snort": {
-                "size": size,
+                "vertices": vs,
                 "adjacency_matrix": adjacency_matrix,
             },
         }
