@@ -31,6 +31,7 @@ jobs:
         run: |
           trunk build --release
           cp dist/index.html dist/404.html
+          echo "cgt.t4ccer.com" > dist/CNAME
 
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
