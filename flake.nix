@@ -62,6 +62,7 @@
             pkgs.nodePackages.tailwindcss
             pkgs.sage
             pkgs.heaptrack
+            pkgs.texlive.combined.scheme-full
 
             (pkgs.rust-bin.fromRustupToolchain {
               channel = "stable";

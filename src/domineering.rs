@@ -12,7 +12,7 @@ use crate::{
 pub type GridBits = u64;
 
 /// A Domineering position on a rectengular grid.
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Position {
     width: u8,
     height: u8,
@@ -268,10 +268,12 @@ impl Position {
                     let mut new_grid = self.clone();
                     new_grid.set(x, y, true);
                     new_grid.set(next_x, next_y, true);
-                    moves.push(new_grid);
+                    moves.push(new_grid.move_top_left());
                 }
             }
         }
+        moves.sort_unstable();
+        moves.dedup();
         moves
     }
 }
@@ -281,17 +283,19 @@ impl PartizanShortGame for Position {
     /// # Examples
     ///
     /// ```
+    /// // ..#       ..   .# |
+    /// // .#.  = {  .# , #. | <...> }
+    /// // ##.            #. |
+    ///
     /// use cgt::domineering::Position;
     /// use crate::cgt::short_canonical_game::PartizanShortGame;
     ///
-    /// let width = 3;
-    /// let height = 3;
-    /// let position = Position::parse(width, height, "..#|.#.|##.").unwrap();
+    /// let position = Position::parse(3, 3, "..#|.#.|##.").unwrap();
     /// assert_eq!(
     ///     position.left_moves(),
     ///     vec![
-    ///         Position::parse(width, height, "#.#|##.|##.").unwrap(),
-    ///         Position::parse(width, height, "..#|.##|###").unwrap(),
+    ///         Position::parse(2, 2, "..|.#").unwrap(),
+    ///         Position::parse(2, 3, ".#|#.|#.").unwrap(),
     ///     ]
     /// );
     /// ```
@@ -304,15 +308,17 @@ impl PartizanShortGame for Position {
     /// # Examples
     ///
     /// ```
+    /// // ..#             |
+    /// // .#.  = {  <...> | .#. ,
+    /// // ##.             | ##.
+    ///
     /// use cgt::domineering::Position;
     /// use crate::cgt::short_canonical_game::PartizanShortGame;
     ///
-    /// let width = 3;
-    /// let height = 3;
-    /// let position = Position::parse(width, height, "..#|.#.|##.").unwrap();
+    /// let position = Position::parse(3, 3, "..#|.#.|##.").unwrap();
     /// assert_eq!(
     ///     position.right_moves(),
-    ///     vec![Position::parse(width, height, "###|.#.|##.").unwrap(),]
+    ///     vec![Position::parse(3, 2, ".#.|##.").unwrap(),]
     /// );
     /// ```
     fn right_moves(&self) -> Vec<Position> {
@@ -689,4 +695,35 @@ fn finds_temperature_of_four_by_four_grid() {
     let temp = cache.game_backend().temperature(game_id);
     assert_eq!(&cache.game_backend().print_game_to_str(game_id), "{1*|-1*}");
     assert_eq!(temp, Rational::from(1));
+}
+
+impl Position {
+    /// Output positions as LaTeX TikZ picture where empty tiles are 1x1 tiles
+    pub fn to_latex(&self) -> String {
+        use std::fmt::Write;
+        let mut buf = String::new();
+        write!(buf, "\\begin{{tikzpicture}} ").unwrap();
+        for y in 0..self.height() {
+            for x in 0..self.width() {
+                if !self.at(x, y) {
+                    let next_x = x + 1;
+                    let y = (self.height() as i32) - (y as i32) - 1;
+                    let next_y = y - 1;
+                    write!(buf, "\\draw ({x}, {y}) -- ({next_x}, {y}) -- ({next_x}, {next_y}) -- ({x}, {next_y}) -- ({x}, {y}); ").unwrap();
+                }
+            }
+        }
+        write!(buf, "\\end{{tikzpicture}}").unwrap();
+        buf
+    }
+}
+
+#[test]
+fn latex_works() {
+    let position = Position::parse(4, 4, "##..|....|#...|..##").unwrap();
+    let latex = position.to_latex();
+    assert_eq!(
+        &latex,
+        r#"\begin{tikzpicture} \draw (2, 3) -- (3, 3) -- (3, 2) -- (2, 2) -- (2, 3); \draw (3, 3) -- (4, 3) -- (4, 2) -- (3, 2) -- (3, 3); \draw (0, 2) -- (1, 2) -- (1, 1) -- (0, 1) -- (0, 2); \draw (1, 2) -- (2, 2) -- (2, 1) -- (1, 1) -- (1, 2); \draw (2, 2) -- (3, 2) -- (3, 1) -- (2, 1) -- (2, 2); \draw (3, 2) -- (4, 2) -- (4, 1) -- (3, 1) -- (3, 2); \draw (1, 1) -- (2, 1) -- (2, 0) -- (1, 0) -- (1, 1); \draw (2, 1) -- (3, 1) -- (3, 0) -- (2, 0) -- (2, 1); \draw (3, 1) -- (4, 1) -- (4, 0) -- (3, 0) -- (3, 1); \draw (0, 0) -- (1, 0) -- (1, -1) -- (0, -1) -- (0, 0); \draw (1, 0) -- (2, 0) -- (2, -1) -- (1, -1) -- (1, 0); \end{tikzpicture}"#
+    );
 }

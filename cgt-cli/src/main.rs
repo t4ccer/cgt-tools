@@ -175,13 +175,14 @@ fn main() -> Result<()> {
                 }
 
                 let to_write = format!(
-                    "{}\n{}\n{}\n\n",
+                    "{}\n{} & {} \\\\ \n{}\n\n",
                     grid,
+                    grid.to_latex(),
+                    temp,
                     progress_tracker
                         .cache
                         .game_backend()
-                        .print_game_to_str(game),
-                    temp
+                        .print_game_to_str(game)
                 );
                 progress_tracker.write_game(&to_write);
 
@@ -206,6 +207,15 @@ fn main() -> Result<()> {
     Ok(())
 }
 
+/// Zero pad `to_pad` to the length of `max_size`
+fn zero_padded(to_pad: u128, max_size: u128) -> String {
+    let total_len: u32 = max_size.ilog10() + 1;
+    let to_pad_str = format!("{}", to_pad);
+    let pad_len = total_len - (to_pad_str.len() as u32);
+    let zeros_padding = "0".repeat(pad_len as usize);
+    format!("{zeros_padding}{to_pad}")
+}
+
 fn progress_report(progress_tracker: Arc<ProgressTracker>) {
     let grid_tiles = progress_tracker.args.width * progress_tracker.args.height;
     let max_last_id: u64 = 1 << grid_tiles;
@@ -214,7 +224,6 @@ fn progress_report(progress_tracker: Arc<ProgressTracker>) {
         Some(last_id) => last_id,
     };
     let total_iterations = last_id - progress_tracker.args.start_id;
-    let total_len: u32 = last_id.ilog10() + 1;
     let stderr = io::stderr();
 
     // NOTE: We want do..while behavior so the final 100% progress is shown
@@ -228,9 +237,8 @@ fn progress_report(progress_tracker: Arc<ProgressTracker>) {
         let current_class = progress_tracker
             .current_class
             .load(std::sync::atomic::Ordering::SeqCst);
-        let completed_iterations_str = format!("{}", completed_iterations);
-        let pad_len = total_len - (completed_iterations_str.len() as u32);
-        let zeros_padding = "0".repeat(pad_len as usize);
+        let completed_iterations_str =
+            zero_padded(completed_iterations as u128, total_iterations as u128);
         let percent_progress: f32 = completed_iterations as f32 / total_iterations as f32;
         let now = chrono::offset::Utc::now();
         let is_finished = completed_iterations == total_iterations;
@@ -249,14 +257,22 @@ fn progress_report(progress_tracker: Arc<ProgressTracker>) {
         };
         let known_grids = progress_tracker.cache.grids_saved();
 
+        let curr_total_iterations = (completed_iterations as u128)
+            + (total_iterations as u128) * (current_class as u128 + 1);
+        let total_iterations = (total_iterations as u128) * (grid_tiles as u128 + 1);
+        let curr_total_iterations_str = zero_padded(curr_total_iterations, total_iterations);
+        let total_progress = curr_total_iterations as f32 / total_iterations as f32;
+
         // NOTE: We may move known_games_len() to atomic counter instead so we won't take read
         // lock on games vec
 
         let to_write = format!(
             "[{now}]\n\
 	     \tProgress: {percent_progress:.6}\n\
-	     \tIterations: {zeros_padding}{completed_iterations_str}/{last_id}\n\
+	     \tClass Iterations: {completed_iterations_str}/{last_id}\n\
 	     \tClass: {current_class}/{grid_tiles}\n\
+	     \tTotal progress: {total_progress:.6}\n\
+	     \tTotal Iterations: {curr_total_iterations_str}/{total_iterations}\n\
 	     \tHighest temperature: {highest_temp}\n\
 	     \tSaved games: {saved}\n\
 	     \tKnown games: {known_games}\n\
