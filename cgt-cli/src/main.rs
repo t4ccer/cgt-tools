@@ -133,6 +133,7 @@ fn main() -> Result<()> {
     (progress_tracker.args.start_id..last_id)
         .into_par_iter()
         .for_each(|i| {
+            let i = last_id - i - 1;
             progress_tracker.next_iteration();
 
             let grid = domineering::Position::from_number(
@@ -236,16 +237,23 @@ fn progress_report(progress_tracker: Arc<ProgressTracker>) {
 	     \tHighest temperature: {highest_temp}\n\
 	     \tSaved games: {saved}\n\
 	     \tKnown games: {known_games}\n\
-	     \tKnown grids: {known_grids}\n\
-	     \tStatistics: {stats}\n",
-            stats = progress_tracker
-                .cache
-                .game_backend()
-                .statistics
-                .lock()
-                .unwrap()
+	     \tKnown grids: {known_grids}\n"
         );
         stderr.lock().write_all(to_write.as_bytes()).unwrap();
+
+        #[cfg(feature = "statistics")]
+        {
+            let to_write = format!(
+                "\tStatistics: {stats}\n",
+                stats = progress_tracker
+                    .cache
+                    .game_backend()
+                    .statistics
+                    .lock()
+                    .unwrap()
+            );
+            stderr.lock().write_all(to_write.as_bytes()).unwrap();
+        }
 
         {
             let mut buf = progress_tracker.output_buffer.lock().unwrap();

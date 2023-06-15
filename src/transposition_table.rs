@@ -23,7 +23,7 @@ where
     #[inline]
     pub fn with_game_backend(game_backend: GameBackend) -> Self {
         TranspositionTable {
-            grids: LruCache::new(16777216), // 2^24
+            grids: LruCache::new(1 << 23),
             game_backend,
         }
     }

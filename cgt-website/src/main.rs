@@ -211,10 +211,10 @@ fn Domineering<'a, G: Html>(cx: Scope<'a>, state: DomineeringState<'a>) -> View<
 	div(class="flex flex-row gap-x-4") {
 	    div(class="flex flex-col w-fit gap-y-4") {
 		Grid(state=state)
-		    ResizeHeight(state=state)
+		ResizeHeight(state=state)
 	    }
-	    ResizeWidth(state=state)
-	    div(class="flex flex-col") {
+            ResizeWidth(state=state)
+            div(class="flex flex-col") {
 		span(class="text-white font-mono"){"Canonical form: " (canonical_form.get())}
 		span(class="text-white font-mono"){"Temperature: " (temperature.get())}
 		span(class="text-white font-mono"){"Canonical form: TODO"}
