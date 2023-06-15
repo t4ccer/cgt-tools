@@ -5,7 +5,7 @@ use alloc::collections::vec_deque::VecDeque;
 use std::fmt::Display;
 
 use crate::{
-    short_canonical_game::{Game, Moves, PartizanShortGame},
+    short_canonical_game::{Game, Moves, PartizanShortGame, PlacementGame},
     transposition_table::TranspositionTable,
 };
 
@@ -320,6 +320,20 @@ impl PartizanShortGame for Position {
     }
 }
 
+impl PlacementGame for Position {
+    fn free_places(&self) -> usize {
+        let mut res = 0;
+        for y in 0..self.height() {
+            for x in 0..self.width() {
+                if !self.at(x, y) {
+                    res += 1;
+                }
+            }
+        }
+        res
+    }
+}
+
 impl Display for Position {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for y in 0..self.height {
@@ -478,14 +492,14 @@ impl Position {
     /// use cgt::domineering::Position;
     /// let position = Position::parse(3, 3, "..#|.#.|##.").unwrap();
     /// assert_eq!(
-    ///    position.decompositons(),
+    ///    position.decompositions(),
     ///    vec![
     ///        Position::parse(2, 2, "..|.#").unwrap(),
     ///        Position::parse(1, 2, ".|.").unwrap(),
     ///    ]
     /// );
     /// ```
-    pub fn decompositons(&self) -> Vec<Position> {
+    pub fn decompositions(&self) -> Vec<Position> {
         let mut visited = Position::empty(self.width, self.height).unwrap();
         let mut ds = Vec::new();
 
@@ -514,7 +528,7 @@ impl Position {
     /// use cgt::domineering::Position;
     /// use cgt::transposition_table::TranspositionTable;
     ///
-    /// let cache = TranspositionTable::new();
+    /// let cache = TranspositionTable::new(4);
     /// let position = Position::parse(2, 2, ".#|..").unwrap();
     /// let game = position.canonical_form(&cache);
     /// assert_eq!(&cache.game_backend().print_game_to_str(game), "*");
@@ -525,8 +539,46 @@ impl Position {
             return id;
         }
 
-        let result = Position::canonical_from_from_decompositions(grid.decompositons(), cache);
+        let result = Position::canonical_from_from_decompositions(grid.decompositions(), cache);
         cache.grids_insert(grid, result);
+        result
+    }
+
+    pub fn canonical_form_with_lookup(
+        &self,
+        cache: &TranspositionTable<Self>,
+        current_class: i32,
+    ) -> Game {
+        if current_class < 0 {
+            #[cfg(debug_assertions)]
+            {
+                let grid = self.move_top_left();
+                assert!(grid.width == 0 && grid.height == 0);
+            }
+            return cache.game_backend().construct_integer(0);
+        }
+
+        let grid = self.move_top_left();
+        let mut result = cache.game_backend().construct_integer(0);
+        for grid in grid.decompositions() {
+            let moves = Moves {
+                left: grid
+                    .left_moves()
+                    .iter()
+                    .map(|o| o.canonical_form_with_lookup(cache, current_class - 2))
+                    .collect(),
+                right: grid
+                    .right_moves()
+                    .iter()
+                    .map(|o| o.canonical_form_with_lookup(cache, current_class - 2))
+                    .collect(),
+            };
+
+            let canonical_form = cache.game_backend().construct_from_moves(moves);
+            cache.grids_insert(grid, canonical_form);
+            result = cache.game_backend().construct_sum(canonical_form, result);
+        }
+
         result
     }
 
@@ -569,7 +621,7 @@ impl Position {
 
 #[cfg(test)]
 fn test_grid_canonical_form(grid: Position, canonical_form: &str) {
-    let cache = TranspositionTable::new();
+    let cache = TranspositionTable::new(u8::MAX);
     let game_id = grid.canonical_form(&cache);
     assert_eq!(
         &cache.game_backend().print_game_to_str(game_id),
@@ -631,7 +683,7 @@ fn finds_canonical_form_of_num_nim_sum() {
 fn finds_temperature_of_four_by_four_grid() {
     use crate::rational::Rational;
 
-    let cache = TranspositionTable::new();
+    let cache = TranspositionTable::new(u8::MAX);
     let grid = Position::parse(4, 4, "#...|....|....|....").unwrap();
     let game_id = grid.canonical_form(&cache);
     let temp = cache.game_backend().temperature(game_id);

@@ -21,8 +21,12 @@ where
         cache.insert(key, value);
     }
 
-    #[allow(dead_code)]
     pub(crate) fn len(&self) -> usize {
         self.0.read().unwrap().len()
+    }
+
+    pub(crate) fn clear(&self) {
+        let mut cache = self.0.write().unwrap();
+        cache.clear();
     }
 }

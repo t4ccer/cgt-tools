@@ -1459,3 +1459,8 @@ pub trait PartizanShortGame: Sized {
     /// Get moves available for Right player.
     fn right_moves(&self) -> Vec<Self>;
 }
+
+// TODO: Read a book and name that stuff correctly
+pub trait PlacementGame: Sized {
+    fn free_places(&self) -> usize;
+}

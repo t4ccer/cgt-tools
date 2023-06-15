@@ -1,6 +1,7 @@
 use anyhow::{bail, Context, Result};
 use cgt::domineering;
 use cgt::rational::Rational;
+use cgt::short_canonical_game::PlacementGame;
 use cgt::transposition_table::TranspositionTable;
 use clap::Parser;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
@@ -66,6 +67,7 @@ struct ProgressTracker {
     cache: TranspositionTable<domineering::Position>,
     args: Args,
     iteration: AtomicU64,
+    current_class: AtomicU64,
     saved: AtomicU64,
     highest_temp: Mutex<Rational>,
     output_buffer: Mutex<BufWriter<File>>,
@@ -81,6 +83,7 @@ impl ProgressTracker {
             cache,
             args,
             iteration: AtomicU64::new(0),
+            current_class: AtomicU64::new(0),
             saved: AtomicU64::new(0),
             highest_temp: Mutex::new(Rational::NegativeInfinity),
             output_buffer: Mutex::new(BufWriter::new(output_file)),
@@ -121,68 +124,84 @@ fn main() -> Result<()> {
         );
     }
 
-    let cache = TranspositionTable::new();
+    let cache = TranspositionTable::new(grid_tiles);
 
     let output_file =
         File::create(&args.output_path).with_context(|| "Could not open output file")?;
     let progress_tracker = Arc::new(ProgressTracker::new(cache, args, output_file));
 
-    let progress_tracker_cpy = progress_tracker.clone();
-    let progress_pid = thread::spawn(move || progress_report(progress_tracker_cpy));
+    for expected_empty_tiles in 0..=(grid_tiles as i32) {
+        let progress_tracker_cpy = progress_tracker.clone();
+        progress_tracker.current_class.store(
+            expected_empty_tiles as u64,
+            std::sync::atomic::Ordering::SeqCst,
+        );
+        let progress_pid = thread::spawn(move || progress_report(progress_tracker_cpy));
 
-    (progress_tracker.args.start_id..last_id)
-        .into_par_iter()
-        .for_each(|i| {
-            let i = last_id - i - 1;
-            progress_tracker.next_iteration();
+        (progress_tracker.args.start_id..last_id)
+            .into_par_iter()
+            .for_each(|i| {
+                progress_tracker.next_iteration();
 
-            let grid = domineering::Position::from_number(
-                progress_tracker.args.width,
-                progress_tracker.args.height,
-                i,
-            )
-            .unwrap()
-            .move_top_left();
-            let decompositions = grid.decompositons();
+                let grid = domineering::Position::from_number(
+                    progress_tracker.args.width,
+                    progress_tracker.args.height,
+                    i,
+                )
+                .unwrap()
+                .move_top_left();
 
-            // We may want to skip decompositions since we have:
-            // (G + H)_t <= max(G_t, H_t)
-            // where G_t is the temperature of game G
-            if decompositions.len() != 1 && !progress_tracker.args.include_decompositions {
-                return;
-            }
-
-            let game = domineering::Position::canonical_from_from_decompositions(
-                decompositions,
-                &progress_tracker.cache,
-            );
-            let temp = progress_tracker.cache.game_backend().temperature(game);
-
-            if let Some(temperature_threshold) = &progress_tracker.args.temperature_threshold {
-                if &temp <= temperature_threshold {
+                if grid.free_places() != expected_empty_tiles as usize {
                     return;
                 }
-            }
 
-            let to_write = format!(
-                "{}\n{}\n{}\n\n",
-                grid,
-                progress_tracker
-                    .cache
-                    .game_backend()
-                    .print_game_to_str(game),
-                temp
-            );
-            progress_tracker.write_game(&to_write);
+                let decompositions = grid.decompositions();
 
-            {
-                let mut highest_temp = progress_tracker.highest_temp.lock().unwrap();
-                if temp > *highest_temp {
-                    *highest_temp = temp;
+                // We may want to skip decompositions since we have:
+                // (G + H)_t <= max(G_t, H_t)
+                // where G_t is the temperature of game G
+                if decompositions.len() != 1 && !progress_tracker.args.include_decompositions {
+                    return;
                 }
-            }
-        });
-    progress_pid.join().unwrap();
+
+                let game =
+                    grid.canonical_form_with_lookup(&progress_tracker.cache, expected_empty_tiles);
+                let temp = progress_tracker.cache.game_backend().temperature(game);
+
+                if let Some(temperature_threshold) = &progress_tracker.args.temperature_threshold {
+                    if &temp <= temperature_threshold {
+                        return;
+                    }
+                }
+
+                let to_write = format!(
+                    "{}\n{}\n{}\n\n",
+                    grid,
+                    progress_tracker
+                        .cache
+                        .game_backend()
+                        .print_game_to_str(game),
+                    temp
+                );
+                progress_tracker.write_game(&to_write);
+
+                {
+                    let mut highest_temp = progress_tracker.highest_temp.lock().unwrap();
+                    if temp > *highest_temp {
+                        *highest_temp = temp;
+                    }
+                }
+            });
+        progress_pid.join().unwrap();
+        let class_to_prune = (expected_empty_tiles as isize) - 2;
+        if class_to_prune >= 0 {
+            progress_tracker.cache.clear_class(class_to_prune as usize);
+        }
+        eprintln!(" --- Finished class {expected_empty_tiles} --- ");
+        progress_tracker
+            .iteration
+            .store(0, std::sync::atomic::Ordering::SeqCst);
+    }
 
     Ok(())
 }
@@ -205,6 +224,9 @@ fn progress_report(progress_tracker: Arc<ProgressTracker>) {
             .load(std::sync::atomic::Ordering::SeqCst);
         let saved = progress_tracker
             .saved
+            .load(std::sync::atomic::Ordering::SeqCst);
+        let current_class = progress_tracker
+            .current_class
             .load(std::sync::atomic::Ordering::SeqCst);
         let completed_iterations_str = format!("{}", completed_iterations);
         let pad_len = total_len - (completed_iterations_str.len() as u32);
@@ -234,6 +256,7 @@ fn progress_report(progress_tracker: Arc<ProgressTracker>) {
             "[{now}]\n\
 	     \tProgress: {percent_progress:.6}\n\
 	     \tIterations: {zeros_padding}{completed_iterations_str}/{last_id}\n\
+	     \tClass: {current_class}/{grid_tiles}\n\
 	     \tHighest temperature: {highest_temp}\n\
 	     \tSaved games: {saved}\n\
 	     \tKnown games: {known_games}\n\

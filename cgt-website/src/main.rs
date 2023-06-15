@@ -50,7 +50,7 @@ struct DomineeringState<'a> {
 impl<'a> DomineeringState<'a> {
     fn new(cx: Scope<'a>, position: domineering::Position) -> Self {
         let position = create_signal(cx, position);
-        let cache = create_signal(cx, TranspositionTable::new());
+        let cache = create_signal(cx, TranspositionTable::new(GRID_MAX_SIZE));
         DomineeringState { position, cache }
     }
 }

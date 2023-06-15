@@ -4,7 +4,7 @@ use num_derive::FromPrimitive;
 
 use crate::{
     graph::undirected::Graph,
-    short_canonical_game::{Game, Moves, PartizanShortGame},
+    short_canonical_game::{Game, Moves, PartizanShortGame, PlacementGame},
     transposition_table::TranspositionTable,
 };
 
@@ -114,6 +114,22 @@ impl PartizanShortGame for Position {
     }
 }
 
+impl PlacementGame for Position {
+    fn free_places(&self) -> usize {
+        self.vertices
+            .iter()
+            .filter(|v| {
+                [
+                    VertexColor::Empty,
+                    VertexColor::TintLeft,
+                    VertexColor::TintRight,
+                ]
+                .contains(v)
+            })
+            .count()
+    }
+}
+
 impl Position {
     /// Get the canonical form of the position.
     ///
@@ -142,7 +158,7 @@ impl Position {
     /// assert_eq!(position.left_moves().len(), 2);
     /// assert_eq!(position.right_moves().len(), 1);
     ///
-    /// let cache = TranspositionTable::new();
+    /// let cache = TranspositionTable::new(3);
     /// let game = position.canonical_form(&cache);
     /// assert_eq!(&cache.game_backend().print_game_to_str(game), "{2|0}");
     /// ```
