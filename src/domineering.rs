@@ -551,39 +551,43 @@ impl Position {
     }
 
     pub fn canonical_form_with_lookup(&self, cache: &TranspositionTable<Self>) -> Game {
-        let grid = self.move_top_left();
-        let mut result = cache.game_backend().construct_integer(0);
-        for grid in grid.decompositions() {
-            let moves = Moves {
-                // Why cache.grids_get(o).unwrap_or(cache.game_backend().construct_integer(0)) part?
-                // Move from n empty tiles moves to n-2 empty tiles - then the game is in cache
-                // If the game is not in cache that means that the grid is full, thus it's a 0 game
-                left: grid
-                    .left_moves()
-                    .iter()
-                    .map(|o| {
-                        cache
-                            .grids_get(o)
-                            .unwrap_or(cache.game_backend().construct_integer(0))
-                    })
-                    .collect(),
-                right: grid
-                    .right_moves()
-                    .iter()
-                    .map(|o| {
-                        cache
-                            .grids_get(o)
-                            .unwrap_or(cache.game_backend().construct_integer(0))
-                    })
-                    .collect(),
-            };
-
-            let canonical_form = cache.game_backend().construct_from_moves(moves);
-            cache.grids_insert(grid, canonical_form);
-            result = cache.game_backend().construct_sum(canonical_form, result);
+        let grid = self;
+        if let Some(game) = cache.grids_get(&grid) {
+            return game;
         }
 
-        result
+        let moves = Moves {
+	    left: grid
+                .left_moves()
+                .iter()
+                .map(|left_move| match cache.grids_get(left_move) {
+                    None => {
+			let grid_idx = grid.free_places();
+			let move_idx = left_move.free_places();
+			eprintln!("{grid:?} ({grid}) ({grid_idx}) => {left_move:?} ({left_move}) ({move_idx})");
+			panic!("Unexpected cache miss");
+		    },
+                    Some(g) => g,
+                })
+                .collect(),
+            right: grid
+                .right_moves()
+                .iter()
+                .map(|right_move| match cache.grids_get(right_move) {
+                    None => {
+			let grid_idx = grid.free_places();
+			let move_idx = right_move.free_places();
+			eprintln!("{grid:?} ({grid}) ({grid_idx}) => {right_move:?} ({right_move}) ({move_idx})");
+			panic!("Unexpected cache miss");
+		    },
+                    Some(g) => g,
+                })
+                .collect(),
+        };
+
+        let canonical_form = cache.game_backend().construct_from_moves(moves);
+        cache.grids_insert(grid.clone(), canonical_form);
+        canonical_form
     }
 
     /// Get the canonical from from the decompositon of the position rather than from the position itself.

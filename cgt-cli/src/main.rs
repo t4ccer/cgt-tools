@@ -54,10 +54,6 @@ struct Args {
     #[arg(long, default_value = None)]
     temperature_threshold: Option<Rational>,
 
-    /// Compute positions with decompositions
-    #[arg(long, default_value_t = false)]
-    include_decompositions: bool,
-
     /// Path to write the cache
     #[arg(long)]
     output_path: String,
@@ -155,15 +151,6 @@ fn main() -> Result<()> {
                     return;
                 }
 
-                let decompositions = grid.decompositions();
-
-                // We may want to skip decompositions since we have:
-                // (G + H)_t <= max(G_t, H_t)
-                // where G_t is the temperature of game G
-                if decompositions.len() != 1 && !progress_tracker.args.include_decompositions {
-                    return;
-                }
-
                 let game = grid.canonical_form_with_lookup(&progress_tracker.cache);
                 let temp = progress_tracker.cache.game_backend().temperature(game);
 
@@ -197,7 +184,7 @@ fn main() -> Result<()> {
         if class_to_prune >= 0 {
             progress_tracker.cache.clear_class(class_to_prune as usize);
         }
-        eprintln!(" --- Finished class {expected_empty_tiles} --- ");
+        eprintln!(" --- Finished class {expected_empty_tiles}, pruning {class_to_prune} --- ");
         progress_tracker
             .iteration
             .store(0, std::sync::atomic::Ordering::SeqCst);
