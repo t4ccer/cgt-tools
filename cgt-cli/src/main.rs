@@ -164,8 +164,7 @@ fn main() -> Result<()> {
                     return;
                 }
 
-                let game =
-                    grid.canonical_form_with_lookup(&progress_tracker.cache, expected_empty_tiles);
+                let game = grid.canonical_form_with_lookup(&progress_tracker.cache);
                 let temp = progress_tracker.cache.game_backend().temperature(game);
 
                 if let Some(temperature_threshold) = &progress_tracker.args.temperature_threshold {

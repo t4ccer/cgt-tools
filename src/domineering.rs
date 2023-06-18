@@ -550,33 +550,31 @@ impl Position {
         result
     }
 
-    pub fn canonical_form_with_lookup(
-        &self,
-        cache: &TranspositionTable<Self>,
-        current_class: i32,
-    ) -> Game {
-        if current_class < 0 {
-            #[cfg(debug_assertions)]
-            {
-                let grid = self.move_top_left();
-                assert!(grid.width == 0 && grid.height == 0);
-            }
-            return cache.game_backend().construct_integer(0);
-        }
-
+    pub fn canonical_form_with_lookup(&self, cache: &TranspositionTable<Self>) -> Game {
         let grid = self.move_top_left();
         let mut result = cache.game_backend().construct_integer(0);
         for grid in grid.decompositions() {
             let moves = Moves {
+                // Why cache.grids_get(o).unwrap_or(cache.game_backend().construct_integer(0)) part?
+                // Move from n empty tiles moves to n-2 empty tiles - then the game is in cache
+                // If the game is not in cache that means that the grid is full, thus it's a 0 game
                 left: grid
                     .left_moves()
                     .iter()
-                    .map(|o| o.canonical_form_with_lookup(cache, current_class - 2))
+                    .map(|o| {
+                        cache
+                            .grids_get(o)
+                            .unwrap_or(cache.game_backend().construct_integer(0))
+                    })
                     .collect(),
                 right: grid
                     .right_moves()
                     .iter()
-                    .map(|o| o.canonical_form_with_lookup(cache, current_class - 2))
+                    .map(|o| {
+                        cache
+                            .grids_get(o)
+                            .unwrap_or(cache.game_backend().construct_integer(0))
+                    })
                     .collect(),
             };
 
