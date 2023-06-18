@@ -541,68 +541,12 @@ impl Position {
     /// ```
     pub fn canonical_form(&self, cache: &TranspositionTable<Self>) -> Game {
         let grid = self.move_top_left();
-        if let Some(id) = cache.grids_get(&grid) {
-            return id;
+        if let Some(g) = cache.grids_get(&grid) {
+            return g;
         }
 
-        let result = Position::canonical_from_from_decompositions(grid.decompositions(), cache);
-        cache.grids_insert(grid, result);
-        result
-    }
-
-    pub fn canonical_form_with_lookup(&self, cache: &TranspositionTable<Self>) -> Game {
-        let grid = self;
-        if let Some(game) = cache.grids_get(&grid) {
-            return game;
-        }
-
-        let moves = Moves {
-	    left: grid
-                .left_moves()
-                .iter()
-                .map(|left_move| match cache.grids_get(left_move) {
-                    None => {
-			let grid_idx = grid.free_places();
-			let move_idx = left_move.free_places();
-			eprintln!("{grid:?} ({grid}) ({grid_idx}) => {left_move:?} ({left_move}) ({move_idx})");
-			panic!("Unexpected cache miss");
-		    },
-                    Some(g) => g,
-                })
-                .collect(),
-            right: grid
-                .right_moves()
-                .iter()
-                .map(|right_move| match cache.grids_get(right_move) {
-                    None => {
-			let grid_idx = grid.free_places();
-			let move_idx = right_move.free_places();
-			eprintln!("{grid:?} ({grid}) ({grid_idx}) => {right_move:?} ({right_move}) ({move_idx})");
-			panic!("Unexpected cache miss");
-		    },
-                    Some(g) => g,
-                })
-                .collect(),
-        };
-
-        let canonical_form = cache.game_backend().construct_from_moves(moves);
-        cache.grids_insert(grid.clone(), canonical_form);
-        canonical_form
-    }
-
-    /// Get the canonical from from the decompositon of the position rather than from the position itself.
-    /// Useful if you obtain decompositions before deciding whether to calculate the canonical form.
-    pub fn canonical_from_from_decompositions(
-        decompositions: Vec<Position>,
-        cache: &TranspositionTable<Self>,
-    ) -> Game {
         let mut result = cache.game_backend().construct_integer(0);
-        for grid in decompositions {
-            if let Some(id) = cache.grids_get(&grid) {
-                result = cache.game_backend().construct_sum(id, result);
-                continue;
-            }
-
+        for grid in grid.decompositions() {
             let moves = Moves {
                 left: grid
                     .left_moves()
@@ -621,6 +565,7 @@ impl Position {
             result = cache.game_backend().construct_sum(canonical_form, result);
         }
 
+        cache.grids_insert(grid, result);
         result
     }
 }
