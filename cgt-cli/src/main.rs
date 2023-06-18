@@ -256,8 +256,8 @@ fn progress_report(progress_tracker: Arc<ProgressTracker>) {
         };
         let known_grids = progress_tracker.cache.grids_saved();
 
-        let curr_total_iterations = (completed_iterations as u128)
-            + (total_iterations as u128) * (current_class as u128 + 1);
+        let curr_total_iterations =
+            (completed_iterations as u128) + (total_iterations as u128) * (current_class as u128);
         let total_iterations = (total_iterations as u128) * (grid_tiles as u128 + 1);
         let curr_total_iterations_str = zero_padded(curr_total_iterations, total_iterations);
         let total_progress = curr_total_iterations as f32 / total_iterations as f32;
