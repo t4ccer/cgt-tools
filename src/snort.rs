@@ -158,7 +158,7 @@ impl Position {
     /// assert_eq!(position.left_moves().len(), 2);
     /// assert_eq!(position.right_moves().len(), 1);
     ///
-    /// let cache = TranspositionTable::new(3);
+    /// let cache = TranspositionTable::new();
     /// let game = position.canonical_form(&cache);
     /// assert_eq!(&cache.game_backend().print_game_to_str(game), "{2|0}");
     /// ```

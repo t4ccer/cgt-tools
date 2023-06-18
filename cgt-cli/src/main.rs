@@ -124,7 +124,7 @@ fn main() -> Result<()> {
         );
     }
 
-    let cache = TranspositionTable::new(grid_tiles);
+    let cache = TranspositionTable::new();
 
     let output_file =
         File::create(&args.output_path).with_context(|| "Could not open output file")?;
@@ -193,13 +193,7 @@ fn main() -> Result<()> {
                 }
             });
         progress_pid.join().unwrap();
-        let class_to_prune = (expected_empty_tiles as isize) - 2;
-        if class_to_prune >= 0 {
-            for i in 0..=(class_to_prune as usize) {
-                progress_tracker.cache.clear_class(i);
-            }
-        }
-        eprintln!(" --- Finished class {expected_empty_tiles}, pruning {class_to_prune} --- ");
+        eprintln!(" --- Finished class {expected_empty_tiles} --- ");
         progress_tracker
             .iteration
             .store(0, std::sync::atomic::Ordering::SeqCst);
