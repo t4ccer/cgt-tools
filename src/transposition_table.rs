@@ -15,16 +15,16 @@ where
 {
     /// Create new empty transposition table.
     #[inline]
-    pub fn new() -> Self {
-        TranspositionTable::with_game_backend(GameBackend::new())
+    pub fn new(capacity: u64) -> Self {
+        TranspositionTable::with_game_backend(GameBackend::new(), capacity)
     }
 
     /// Create new transposition table with pre-existing game backend.
     /// Useful if you load game backend from file, or re-use it from earlier computations.
     #[inline]
-    pub fn with_game_backend(game_backend: GameBackend) -> Self {
+    pub fn with_game_backend(game_backend: GameBackend, capacity: u64) -> Self {
         TranspositionTable {
-            grids: LruCache::new(1 << 23),
+            grids: LruCache::new(capacity),
             game_backend,
         }
     }

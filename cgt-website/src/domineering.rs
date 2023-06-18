@@ -11,7 +11,7 @@ pub struct DomineeringState<'a> {
 impl<'a> DomineeringState<'a> {
     pub fn new(cx: Scope<'a>, position: domineering::Position) -> Self {
         let position = create_signal(cx, position);
-        let cache = create_signal(cx, TranspositionTable::new());
+        let cache = create_signal(cx, TranspositionTable::new(1 << 22));
         DomineeringState { position, cache }
     }
 }
