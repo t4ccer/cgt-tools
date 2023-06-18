@@ -7,10 +7,6 @@ Combinatorial Game Theory (very in progress) library in Rust.
 - Library is heavily inspired by https://github.com/aaron-siegel/cgsuite
 - Library in Haskell that provides basic functions to work with combinatorial games https://github.com/kamekura/haskell-cgt
 
-## TODO List
-
-- [ ] Statistics feature flag
-
 ## License
 
 Copyright (C) 2023 Tomasz Maciosowski (t4ccer)
