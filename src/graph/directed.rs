@@ -1,3 +1,4 @@
+use num::{iter::Range, range};
 use std::fmt::Display;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -75,6 +76,76 @@ impl Graph {
         }
         res
     }
+
+    /// Get iterator over vertices
+    pub(crate) fn vertices(&self) -> Range<usize> {
+        range(0, self.size())
+    }
+
+    /// Add a new disconnected vertex at the end of the graph
+    pub fn add_vertex(&mut self) {
+        let mut new_graph = Self::empty(self.size() + 1);
+        for in_v in self.vertices() {
+            for out_v in self.vertices() {
+                new_graph.connect(out_v, in_v, self.are_adjacent(out_v, in_v));
+            }
+        }
+        *self = new_graph;
+    }
+
+    /// Remove a given vertex from the graph, remove all its edges
+    pub fn remove_vertex(&mut self, vertex_to_remove: usize) {
+        debug_assert!(self.size() > 0, "Graph has no vertices");
+        let mut new_graph = Self::empty(self.size() - 1);
+
+        for in_v in new_graph.vertices() {
+            for out_v in new_graph.vertices() {
+                new_graph.connect(
+                    out_v,
+                    in_v,
+                    self.are_adjacent(
+                        // Skip over vertex we're removing
+                        out_v + (out_v >= vertex_to_remove) as usize * 1,
+                        in_v + (in_v >= vertex_to_remove) as usize * 1,
+                    ),
+                );
+            }
+        }
+
+        *self = new_graph;
+    }
+}
+
+#[test]
+fn adds_new_vertex() {
+    let mut g = test_matrix();
+    assert_eq!(
+        &format!("{g}"),
+        "0101\n\
+	 0000\n\
+	 0001\n\
+	 0100\n"
+    );
+
+    // adds one empty row and column to previous matrix
+    g.add_vertex();
+    assert_eq!(
+        &format!("{g}"),
+        "01010\n\
+	 00000\n\
+	 00010\n\
+	 01000\n\
+         00000\n"
+    );
+
+    g.remove_vertex(1);
+    assert_eq!(
+        &format!("{g}"),
+        "0010\n\
+	 0010\n\
+	 0000\n\
+         0000\n"
+    );
 }
 
 /// ```text

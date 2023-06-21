@@ -51,6 +51,16 @@ impl Graph {
     pub fn adjacent_to(&self, vertex: usize) -> Vec<usize> {
         self.0.adjacent_to(vertex)
     }
+
+    /// Add a new disconnected vertex at the end of the graph
+    pub fn add_vertex(&mut self) {
+        self.0.add_vertex();
+    }
+
+    /// Remove a given vertex from the graph, remove all its edges
+    pub fn remove_vertex(&mut self, vertex_to_remove: usize) {
+        self.0.remove_vertex(vertex_to_remove);
+    }
 }
 
 /// ```text
