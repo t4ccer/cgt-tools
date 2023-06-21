@@ -1,7 +1,7 @@
 use std::{collections::HashMap, hash::Hash, ops::Deref, sync::RwLock};
 
 #[derive(Debug)]
-pub(crate) struct RwHashMap<K, V>(RwLock<HashMap<K, V>>);
+pub(crate) struct RwHashMap<K, V>(pub(crate) RwLock<HashMap<K, V>>);
 
 impl<K, V> RwHashMap<K, V>
 where

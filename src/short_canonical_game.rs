@@ -557,6 +557,19 @@ impl GameBackend {
         game
     }
 
+    pub fn clean_up(&self) {
+        let mut moves_index = self.moves_index.0.write().unwrap();
+        let foo = moves_index
+            .iter()
+            .filter(|(_, v)| v.strong_count() == 0)
+            .map(|(k, _)| k)
+            .cloned()
+            .collect::<Vec<_>>();
+        for k in foo {
+            moves_index.remove(&k);
+        }
+    }
+
     #[inline]
     fn get_moves(&self, ptr: GamePtr) -> Arc<Moves> {
         ptr.0

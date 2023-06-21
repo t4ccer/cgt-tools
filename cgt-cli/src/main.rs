@@ -238,6 +238,8 @@ fn progress_report(progress_tracker: Arc<ProgressTracker>) {
         };
         let known_grids = progress_tracker.cache.grids_saved();
 
+        progress_tracker.cache.game_backend().clean_up();
+
         // NOTE: We may move known_games_len() to atomic counter instead so we won't take read
         // lock on games vec
 
