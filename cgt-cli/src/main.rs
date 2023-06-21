@@ -159,7 +159,7 @@ fn main() -> Result<()> {
             }
 
             let game = grid.canonical_form(&progress_tracker.cache);
-            let temp = progress_tracker.cache.game_backend().temperature(game);
+            let temp = progress_tracker.cache.game_backend().temperature(&game);
 
             if let Some(temperature_threshold) = &progress_tracker.args.temperature_threshold {
                 if &temp <= temperature_threshold {
@@ -175,7 +175,7 @@ fn main() -> Result<()> {
                 progress_tracker
                     .cache
                     .game_backend()
-                    .print_game_to_str(game)
+                    .print_game_to_str(&game)
             );
             progress_tracker.write_game(&to_write);
 

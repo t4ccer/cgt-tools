@@ -131,8 +131,8 @@ pub fn Domineering<'a, G: Html>(cx: Scope<'a>, state: DomineeringState<'a>) -> V
     let game_info = state.position.map(cx, |pos| {
         let cache = state.cache.get();
         let game = pos.canonical_form(&cache);
-        let canonical_form = cache.game_backend().print_game_to_str(game);
-        let temp = cache.game_backend().temperature(game);
+        let canonical_form = cache.game_backend().print_game_to_str(&game);
+        let temp = cache.game_backend().temperature(&game);
         (canonical_form, temp)
     });
     let canonical_form = game_info.map(cx, |(cf, _)| cf.clone());
@@ -150,7 +150,7 @@ pub fn Domineering<'a, G: Html>(cx: Scope<'a>, state: DomineeringState<'a>) -> V
 	    div(class="flex flex-col") {
 		span(class="text-white font-mono"){"Canonical form: " (canonical_form.get())}
 		span(class="text-white font-mono"){"Temperature: " (temperature.get())}
-		span(class="text-white font-mono"){"Canonical form: TODO"}
+		span(class="text-white font-mono"){"Thermograph: TODO"}
 	    }
 	}
     }

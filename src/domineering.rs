@@ -537,7 +537,7 @@ impl Position {
     /// let cache = TranspositionTable::new(1 << 22);
     /// let position = Position::parse(2, 2, ".#|..").unwrap();
     /// let game = position.canonical_form(&cache);
-    /// assert_eq!(&cache.game_backend().print_game_to_str(game), "*");
+    /// assert_eq!(&cache.game_backend().print_game_to_str(&game), "*");
     /// ```
     pub fn canonical_form(&self, cache: &TranspositionTable<Self>) -> Game {
         let grid = self.move_top_left();
@@ -561,11 +561,11 @@ impl Position {
             };
 
             let canonical_form = cache.game_backend().construct_from_moves(moves);
-            cache.grids_insert(grid, canonical_form);
-            result = cache.game_backend().construct_sum(canonical_form, result);
+            cache.grids_insert(grid, canonical_form.clone());
+            result = cache.game_backend().construct_sum(&canonical_form, &result);
         }
 
-        cache.grids_insert(grid, result);
+        cache.grids_insert(grid, result.clone());
         result
     }
 }
@@ -577,7 +577,7 @@ fn test_grid_canonical_form(grid: Position, canonical_form: &str) {
     let cache = TranspositionTable::new(1 << 22);
     let game_id = grid.canonical_form(&cache);
     assert_eq!(
-        &cache.game_backend().print_game_to_str(game_id),
+        &cache.game_backend().print_game_to_str(&game_id),
         canonical_form
     );
 }
@@ -639,8 +639,11 @@ fn finds_temperature_of_four_by_four_grid() {
     let cache = TranspositionTable::new(1 << 22);
     let grid = Position::parse(4, 4, "#...|....|....|....").unwrap();
     let game_id = grid.canonical_form(&cache);
-    let temp = cache.game_backend().temperature(game_id);
-    assert_eq!(&cache.game_backend().print_game_to_str(game_id), "{1*|-1*}");
+    let temp = cache.game_backend().temperature(&game_id);
+    assert_eq!(
+        &cache.game_backend().print_game_to_str(&game_id),
+        "{1*|-1*}"
+    );
     assert_eq!(temp, Rational::from(1));
 }
 
