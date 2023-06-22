@@ -667,9 +667,17 @@ fn finds_temperature_of_four_by_four_grid() {
 impl Position {
     /// Output positions as LaTeX TikZ picture where empty tiles are 1x1 tiles
     pub fn to_latex(&self) -> String {
+        self.to_latex_with_scale(1.)
+    }
+
+    pub fn to_latex_with_scale(&self, scale: f32) -> String {
+        assert!(scale >= 0., "Scale must be positive");
+
+        let scale = scale.to_string();
+
         use std::fmt::Write;
         let mut buf = String::new();
-        write!(buf, "\\begin{{tikzpicture}}[scale=0.4] ").unwrap();
+        write!(buf, "\\begin{{tikzpicture}}[scale={}] ", scale).unwrap();
         for y in 0..self.height() {
             for x in 0..self.width() {
                 if self.at(x, y) {
@@ -702,6 +710,6 @@ fn latex_works() {
     let latex = position.to_latex();
     assert_eq!(
         &latex,
-        r#"\begin{tikzpicture}[scale=0.4] \fill[fill=gray] (0,0) rectangle (1,1); \fill[fill=gray] (1,0) rectangle (2,1); \fill[fill=gray] (0,2) rectangle (1,3); \fill[fill=gray] (2,3) rectangle (3,4); \fill[fill=gray] (3,3) rectangle (4,4); \draw[step=1cm,black] (0,0) grid (4, 4); \end{tikzpicture}"#
+        r#"\begin{tikzpicture}[scale=1] \fill[fill=gray] (0,0) rectangle (1,1); \fill[fill=gray] (1,0) rectangle (2,1); \fill[fill=gray] (0,2) rectangle (1,3); \fill[fill=gray] (2,3) rectangle (3,4); \fill[fill=gray] (3,3) rectangle (4,4); \draw[step=1cm,black] (0,0) grid (4, 4); \end{tikzpicture}"#
     );
 }

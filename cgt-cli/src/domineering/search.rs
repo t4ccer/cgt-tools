@@ -2,7 +2,6 @@ use anyhow::{bail, Context, Result};
 use cgt::{domineering, rational::Rational, transposition_table::TranspositionTable};
 use clap::Parser;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
-use serde::{Deserialize, Serialize};
 use std::{
     fs::File,
     io::{self, BufWriter, Write},
@@ -10,12 +9,7 @@ use std::{
     thread, time,
 };
 
-#[derive(Serialize, Deserialize)]
-pub struct DomineeringResult {
-    pub grid: String,
-    pub canonical: String,
-    pub temperature: String,
-}
+use super::common::DomineeringResult;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about)]
