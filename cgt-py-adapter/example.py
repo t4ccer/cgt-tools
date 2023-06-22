@@ -3,8 +3,8 @@ from cgt import Cgt, SnortColor
 # Path to the `cgt-py-adapter` executable. See README.md how to get it.
 cgt = Cgt('./../target/debug/cgt-py-adapter')
 
-# cgt.domineering(WIDTH, HEIGHT, GRID)
-print(cgt.domineering(2, 3, "..|.#|#.")) # (1)
+# cgt.domineering(GRID)
+print(cgt.domineering("..|.#|#.")) # (1)
 
 # cgt.snort(ADJACENCY_MATRIX)
 # If you don't provide second argument, all graph vertices will be empty,

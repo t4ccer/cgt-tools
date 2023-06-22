@@ -31,11 +31,9 @@ class Cgt:
         return Game(resp['canonical_form'], resp['temperature'])
 
     
-    def domineering(self, width, height, grid):
+    def domineering(self, grid):
         d = {
             "Domineering": {
-                "width": width,
-                "height": height,
                 "grid": grid,
             },
         }

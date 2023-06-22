@@ -4,8 +4,6 @@ use cgt::{domineering, graph::undirected, snort, transposition_table::Transposit
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 struct DomineeringRequest {
-    width: u8,
-    height: u8,
     grid: String,
 }
 
@@ -54,9 +52,8 @@ fn process_line(line: &str) -> Result<Response, ProcessingError> {
         serde_json::de::from_str(&line).map_err(|_| ProcessingError::Decoding)?;
     match request {
         Request::Domineering(request) => {
-            let position =
-                domineering::Position::parse(request.width, request.height, &request.grid)
-                    .map_err(|_| ProcessingError::Parsing)?;
+            let position = domineering::Position::parse(&request.grid)
+                .map_err(|_| ProcessingError::Parsing)?;
             let cache = TranspositionTable::new(1 << 22);
             let game = position.canonical_form(&cache);
             let canonical_form = cache.game_backend().print_game_to_str(&game);

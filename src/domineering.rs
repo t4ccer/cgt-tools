@@ -123,9 +123,18 @@ impl Position {
     ///
     /// ```
     /// use cgt::domineering::Position;
-    /// Position::parse(3, 3, "..#|.#.|##.").unwrap();
+    /// Position::parse("..#|.#.|##.").unwrap();
     /// ```
-    pub fn parse(width: u8, height: u8, input: &str) -> Result<Position, PositionError> {
+    pub fn parse(input: &str) -> Result<Position, PositionError> {
+        // number of chars till first '|' or eof is the width
+        // number of '|' + 1 is the height
+        let width = input
+            .split('|')
+            .next()
+            .ok_or(PositionError::CouldNotParse)?
+            .len() as u8;
+        let height = input.chars().filter(|c| *c == '|').count() as u8 + 1;
+
         let mut grid = Position::empty(width, height)?;
         let mut x = 0;
         let mut y = 0;
@@ -220,7 +229,7 @@ fn parse_grid() {
     let width = 3;
     let height = 3;
     assert_eq!(
-        Position::parse(width, height, "..#|.#.|##.").unwrap(),
+        Position::parse("..#|.#.|##.").unwrap(),
         Position::from_arr(
             width,
             height,
@@ -232,7 +241,7 @@ fn parse_grid() {
 
 #[test]
 fn set_works() {
-    let mut grid = Position::parse(3, 2, ".#.|##.").unwrap();
+    let mut grid = Position::parse(".#.|##.").unwrap();
     grid.set(2, 1, true);
     grid.set(0, 0, true);
     grid.set(1, 0, false);
@@ -290,12 +299,12 @@ impl PartizanShortGame for Position {
     /// use cgt::domineering::Position;
     /// use crate::cgt::short_canonical_game::PartizanShortGame;
     ///
-    /// let position = Position::parse(3, 3, "..#|.#.|##.").unwrap();
+    /// let position = Position::parse("..#|.#.|##.").unwrap();
     /// assert_eq!(
     ///     position.left_moves(),
     ///     vec![
-    ///         Position::parse(2, 2, "..|.#").unwrap(),
-    ///         Position::parse(2, 3, ".#|#.|#.").unwrap(),
+    ///         Position::parse("..|.#").unwrap(),
+    ///         Position::parse(".#|#.|#.").unwrap(),
     ///     ]
     /// );
     /// ```
@@ -315,10 +324,10 @@ impl PartizanShortGame for Position {
     /// use cgt::domineering::Position;
     /// use crate::cgt::short_canonical_game::PartizanShortGame;
     ///
-    /// let position = Position::parse(3, 3, "..#|.#.|##.").unwrap();
+    /// let position = Position::parse("..#|.#.|##.").unwrap();
     /// assert_eq!(
     ///     position.right_moves(),
-    ///     vec![Position::parse(3, 2, ".#.|##.").unwrap(),]
+    ///     vec![Position::parse(".#.|##.").unwrap(),]
     /// );
     /// ```
     fn right_moves(&self) -> Vec<Position> {
@@ -358,7 +367,7 @@ impl Display for Position {
 #[test]
 fn parse_display_roundtrip() {
     let inp = "...|#.#|##.|###";
-    assert_eq!(&format!("{}", Position::parse(3, 4, inp).unwrap()), inp,);
+    assert_eq!(&format!("{}", Position::parse(inp).unwrap()), inp,);
 }
 
 impl Position {
@@ -367,7 +376,7 @@ impl Position {
     /// # Examples
     /// ```
     /// use cgt::domineering::Position;
-    /// let position = Position::parse(3, 3, "###|.#.|##.").unwrap();
+    /// let position = Position::parse("###|.#.|##.").unwrap();
     /// assert_eq!(&format!("{}", position.move_top_left()), ".#.|##.");
     /// ```
     pub fn move_top_left(&self) -> Position {
@@ -496,12 +505,12 @@ impl Position {
     /// // ##.   ###   ##.
     ///
     /// use cgt::domineering::Position;
-    /// let position = Position::parse(3, 3, "..#|.#.|##.").unwrap();
+    /// let position = Position::parse("..#|.#.|##.").unwrap();
     /// assert_eq!(
     ///    position.decompositions(),
     ///    vec![
-    ///        Position::parse(2, 2, "..|.#").unwrap(),
-    ///        Position::parse(1, 2, ".|.").unwrap(),
+    ///        Position::parse("..|.#").unwrap(),
+    ///        Position::parse(".|.").unwrap(),
     ///    ]
     /// );
     /// ```
@@ -535,7 +544,7 @@ impl Position {
     /// use cgt::transposition_table::TranspositionTable;
     ///
     /// let cache = TranspositionTable::new(1 << 22);
-    /// let position = Position::parse(2, 2, ".#|..").unwrap();
+    /// let position = Position::parse(".#|..").unwrap();
     /// let game = position.canonical_form(&cache);
     /// assert_eq!(&cache.game_backend().print_game_to_str(&game), "*");
     /// ```
@@ -599,7 +608,7 @@ fn finds_canonical_form_of_two_by_two() {
 
 #[test]
 fn finds_canonical_form_of_two_by_two_with_noise() {
-    test_grid_canonical_form(Position::parse(3, 3, "..#|..#|##.").unwrap(), "{1|-1}");
+    test_grid_canonical_form(Position::parse("..#|..#|##.").unwrap(), "{1|-1}");
 }
 
 #[test]
@@ -609,17 +618,17 @@ fn finds_canonical_form_of_minus_two() {
 
 #[test]
 fn finds_canonical_form_of_l_shape() {
-    test_grid_canonical_form(Position::parse(2, 2, ".#|..").unwrap(), "*");
+    test_grid_canonical_form(Position::parse(".#|..").unwrap(), "*");
 }
 
 #[test]
 fn finds_canonical_form_of_long_l_shape() {
-    test_grid_canonical_form(Position::parse(3, 3, ".##|.##|...").unwrap(), "0");
+    test_grid_canonical_form(Position::parse(".##|.##|...").unwrap(), "0");
 }
 
 #[test]
 fn finds_canonical_form_of_weird_l_shape() {
-    test_grid_canonical_form(Position::parse(3, 3, "..#|..#|...").unwrap(), "{1/2|-2}");
+    test_grid_canonical_form(Position::parse("..#|..#|...").unwrap(), "{1/2|-2}");
 }
 
 #[test]
@@ -629,7 +638,7 @@ fn finds_canonical_form_of_three_by_three() {
 
 #[test]
 fn finds_canonical_form_of_num_nim_sum() {
-    test_grid_canonical_form(Position::parse(4, 2, ".#.#|.#..").unwrap(), "1*");
+    test_grid_canonical_form(Position::parse(".#.#|.#..").unwrap(), "1*");
 }
 
 #[test]
@@ -637,7 +646,7 @@ fn finds_temperature_of_four_by_four_grid() {
     use crate::rational::Rational;
 
     let cache = TranspositionTable::new(1 << 22);
-    let grid = Position::parse(4, 4, "#...|....|....|....").unwrap();
+    let grid = Position::parse("#...|....|....|....").unwrap();
     let game_id = grid.canonical_form(&cache);
     let temp = cache.game_backend().temperature(&game_id);
     assert_eq!(
@@ -670,7 +679,7 @@ impl Position {
 
 #[test]
 fn latex_works() {
-    let position = Position::parse(4, 4, "##..|....|#...|..##").unwrap();
+    let position = Position::parse("##..|....|#...|..##").unwrap();
     let latex = position.to_latex();
     assert_eq!(
         &latex,
