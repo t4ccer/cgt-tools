@@ -2,7 +2,7 @@
 
 extern crate alloc;
 use alloc::collections::vec_deque::VecDeque;
-use std::fmt::Display;
+use std::{fmt::Display, str::FromStr};
 
 use crate::{
     short_canonical_game::{Game, Moves, PartizanShortGame, PlacementGame},
@@ -215,6 +215,14 @@ impl Position {
     /// Get number of rows in the grid
     pub fn height(&self) -> u8 {
         self.height
+    }
+}
+
+impl FromStr for Position {
+    type Err = PositionError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Position::parse(s)
     }
 }
 
