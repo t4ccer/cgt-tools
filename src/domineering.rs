@@ -661,18 +661,29 @@ impl Position {
     pub fn to_latex(&self) -> String {
         use std::fmt::Write;
         let mut buf = String::new();
-        write!(buf, "\\begin{{tikzpicture}} ").unwrap();
+        write!(buf, "\\begin{{tikzpicture}}[scale=0.4] ").unwrap();
         for y in 0..self.height() {
             for x in 0..self.width() {
-                if !self.at(x, y) {
-                    let next_x = x + 1;
-                    let y = (self.height() as i32) - (y as i32) - 1;
-                    let next_y = y - 1;
-                    write!(buf, "\\draw ({x}, {y}) -- ({next_x}, {y}) -- ({next_x}, {next_y}) -- ({x}, {next_y}) -- ({x}, {y}); ").unwrap();
+                if self.at(x, y) {
+                    write!(
+                        buf,
+                        "\\fill[fill=gray] ({},{}) rectangle ({},{}); ",
+                        x,
+                        y,
+                        x + 1,
+                        y + 1,
+                    )
+                    .unwrap();
                 }
             }
         }
-        write!(buf, "\\end{{tikzpicture}}").unwrap();
+        write!(
+            buf,
+            "\\draw[step=1cm,black] (0,0) grid ({}, {}); \\end{{tikzpicture}}",
+            self.width(),
+            self.height()
+        )
+        .unwrap();
         buf
     }
 }
@@ -683,6 +694,6 @@ fn latex_works() {
     let latex = position.to_latex();
     assert_eq!(
         &latex,
-        r#"\begin{tikzpicture} \draw (2, 3) -- (3, 3) -- (3, 2) -- (2, 2) -- (2, 3); \draw (3, 3) -- (4, 3) -- (4, 2) -- (3, 2) -- (3, 3); \draw (0, 2) -- (1, 2) -- (1, 1) -- (0, 1) -- (0, 2); \draw (1, 2) -- (2, 2) -- (2, 1) -- (1, 1) -- (1, 2); \draw (2, 2) -- (3, 2) -- (3, 1) -- (2, 1) -- (2, 2); \draw (3, 2) -- (4, 2) -- (4, 1) -- (3, 1) -- (3, 2); \draw (1, 1) -- (2, 1) -- (2, 0) -- (1, 0) -- (1, 1); \draw (2, 1) -- (3, 1) -- (3, 0) -- (2, 0) -- (2, 1); \draw (3, 1) -- (4, 1) -- (4, 0) -- (3, 0) -- (3, 1); \draw (0, 0) -- (1, 0) -- (1, -1) -- (0, -1) -- (0, 0); \draw (1, 0) -- (2, 0) -- (2, -1) -- (1, -1) -- (1, 0); \end{tikzpicture}"#
+        r#"\begin{tikzpicture}[scale=0.4] \fill[fill=gray] (0,0) rectangle (1,1); \fill[fill=gray] (1,0) rectangle (2,1); \fill[fill=gray] (0,2) rectangle (1,3); \fill[fill=gray] (2,3) rectangle (3,4); \fill[fill=gray] (3,3) rectangle (4,4); \draw[step=1cm,black] (0,0) grid (4, 4); \end{tikzpicture}"#
     );
 }
