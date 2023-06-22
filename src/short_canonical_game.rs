@@ -559,15 +559,7 @@ impl GameBackend {
 
     pub fn clean_up(&self) {
         let mut moves_index = self.moves_index.0.write().unwrap();
-        let foo = moves_index
-            .iter()
-            .filter(|(_, v)| v.strong_count() == 0)
-            .map(|(k, _)| k)
-            .cloned()
-            .collect::<Vec<_>>();
-        for k in foo {
-            moves_index.remove(&k);
-        }
+        moves_index.retain(|_, v| v.strong_count() > 0);
     }
 
     #[inline]
