@@ -713,3 +713,42 @@ fn latex_works() {
         r#"\begin{tikzpicture}[scale=1] \fill[fill=gray] (0,0) rectangle (1,1); \fill[fill=gray] (1,0) rectangle (2,1); \fill[fill=gray] (0,2) rectangle (1,3); \fill[fill=gray] (2,3) rectangle (3,4); \fill[fill=gray] (3,3) rectangle (4,4); \draw[step=1cm,black] (0,0) grid (4, 4); \end{tikzpicture}"#
     );
 }
+
+impl Position {
+    pub fn rotate(&self) -> Self {
+        let mut result = Position::empty(self.height(), self.width()).unwrap();
+        for y in 0..self.height() {
+            for x in 0..self.width() {
+                result.set(result.width() - y - 1, x, self.at(x, y));
+            }
+        }
+        result
+    }
+}
+
+#[test]
+fn rotation_works() {
+    let position = Position::parse(
+        "##..|\
+	 ....|\
+	 #..#",
+    )
+    .unwrap()
+    .rotate();
+
+    assert_eq!(
+        &format!("{position}"),
+        "#.#|\
+	 ..#|\
+	 ...|\
+	 #.."
+    );
+
+    let position = position.rotate();
+    assert_eq!(
+        &format!("{position}"),
+        "#..#|\
+	 ....|\
+	 ..##"
+    );
+}

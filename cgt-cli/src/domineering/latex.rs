@@ -8,6 +8,7 @@ use std::{
     str::FromStr,
 };
 
+#[derive(Debug, Clone)]
 struct DomineeringEntry {
     temperature: Rational,
     grid: domineering::Position,
@@ -43,6 +44,10 @@ pub struct Args {
     /// Position scale, ie. scaling factor of tile size. 1 => 1cm.
     #[arg(long, default_value_t = 0.4)]
     position_scale: f32,
+
+    /// Include positions that are rotations of already included positions
+    #[arg(long, default_value_t = false)]
+    include_rotations: bool,
 }
 
 pub fn run(args: Args) -> Result<()> {
@@ -50,32 +55,54 @@ pub fn run(args: Args) -> Result<()> {
         BufReader::new(Box::new(stdin()))
     } else {
         BufReader::new(Box::new(
-            File::open(&args.in_file).context("Could not open input file")?,
+            File::open(&args.in_file)
+                .context(format!("Could not open input file '{}'", args.in_file))?,
         ))
     };
 
     let mut output: BufWriter<Box<dyn Write>> = if args.out_file == "-" {
         BufWriter::new(Box::new(stdout()))
     } else {
-        BufWriter::new(Box::new(
-            File::create(&args.out_file).context("Could not create/open output file")?,
-        ))
+        BufWriter::new(Box::new(File::create(&args.out_file).context(format!(
+            "Could not create/open output file '{}'",
+            args.out_file
+        ))?))
     };
 
-    let mut input = serde_json::de::Deserializer::from_reader(input)
+    let input = serde_json::de::Deserializer::from_reader(input)
         .into_iter::<DomineeringResult>()
         .map(|line| {
-            line.context("Could not parse JSON '{line}'").and_then(|r| {
-                DomineeringEntry::new(&r)
-                // Rational::from_str(&r.temperature)
-                //     .ok()
-                //     .context(format!("Invalid line '{}'", r.temperature))
-                //     .map(|t| (t, r))
-            })
+            line.context("Could not parse JSON '{line}'")
+                .and_then(|r| DomineeringEntry::new(&r))
         })
-        .collect::<Vec<_>>()
         .into_iter()
         .collect::<Result<Vec<_>, _>>()?;
+
+    // remove rotations
+    let mut input = if args.include_rotations {
+        input
+    } else {
+        let mut input_without_rotations =
+            input.iter().cloned().map(|e| Some(e)).collect::<Vec<_>>();
+        for (idx, entry) in input.iter().enumerate() {
+            let rot1 = entry.grid.rotate();
+            let rot2 = rot1.rotate();
+            let rot3 = rot2.rotate();
+            let rots = [rot1, rot2, rot3];
+            for idx in (idx + 1)..input_without_rotations.len() {
+                if let Some(next_entry) = &input_without_rotations[idx] {
+                    if rots.contains(&next_entry.grid) {
+                        input_without_rotations[idx] = None;
+                    }
+                }
+            }
+        }
+        input_without_rotations
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>()
+    };
+
     input.sort_by(|lhs, rhs| rhs.temperature.cmp(&lhs.temperature)); // descending sort
 
     let max_grid_width = input
@@ -120,7 +147,7 @@ pub fn run(args: Args) -> Result<()> {
                     }
                     write!(
                         output,
-                        "{} & {} ",
+                        "{} & ${}$ ",
                         entry.grid.to_latex_with_scale(args.position_scale),
                         entry.temperature
                     )?;
@@ -128,7 +155,7 @@ pub fn run(args: Args) -> Result<()> {
                 None => {}
             }
         }
-        writeln!(output, "{}", r"\\ \hline")?;
+        writeln!(output, "{}", r"\\")?;
     }
 
     writeln!(output, "{}", r"\end{longtabu}")?;
