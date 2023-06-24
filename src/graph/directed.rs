@@ -2,6 +2,7 @@ use num::{iter::Range, range};
 use std::fmt::Display;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Graph {
     size: usize,
     adjacency_matrix: Vec<bool>,
@@ -78,7 +79,7 @@ impl Graph {
     }
 
     /// Get iterator over vertices
-    pub(crate) fn vertices(&self) -> Range<usize> {
+    pub fn vertices(&self) -> Range<usize> {
         range(0, self.size())
     }
 

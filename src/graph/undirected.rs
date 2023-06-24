@@ -1,8 +1,10 @@
-use std::fmt::Display;
+use num::iter::Range;
+use std::{collections::VecDeque, fmt::Display};
 
 use super::directed;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Graph(directed::Graph);
 
 impl Display for Graph {
@@ -52,6 +54,11 @@ impl Graph {
         self.0.adjacent_to(vertex)
     }
 
+    /// Get iterator over vertices
+    pub fn vertices(&self) -> Range<usize> {
+        self.0.vertices()
+    }
+
     /// Add a new disconnected vertex at the end of the graph
     pub fn add_vertex(&mut self) {
         self.0.add_vertex();
@@ -60,6 +67,49 @@ impl Graph {
     /// Remove a given vertex from the graph, remove all its edges
     pub fn remove_vertex(&mut self, vertex_to_remove: usize) {
         self.0.remove_vertex(vertex_to_remove);
+    }
+
+    pub fn degrees(&self) -> Vec<usize> {
+        let mut degrees = vec![0; self.size()];
+        for v in self.vertices() {
+            for u in self.vertices() {
+                if u != v && self.are_adjacent(v, u) {
+                    degrees[v] += 1;
+                }
+            }
+        }
+        degrees
+    }
+
+    pub fn degree(&self) -> usize {
+        *self
+            .degrees()
+            .iter()
+            .max()
+            .expect("graph to have at least 1 vertex")
+    }
+
+    pub fn is_connected(&self) -> bool {
+        if self.size() == 0 {
+            return true;
+        }
+
+        let mut seen = vec![false; self.size()];
+        let mut queue: VecDeque<usize> = VecDeque::with_capacity(self.size());
+
+        seen[0] = true;
+        queue.push_back(0);
+
+        while let Some(v) = queue.pop_front() {
+            for u in self.vertices() {
+                if self.are_adjacent(v, u) && v != u && !seen[u] {
+                    seen[u] = true;
+                    queue.push_back(u);
+                }
+            }
+        }
+
+        seen.iter().all(|b| *b)
     }
 }
 

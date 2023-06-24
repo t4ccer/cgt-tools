@@ -1,6 +1,6 @@
 //! Game of Snort
-
 use num_derive::FromPrimitive;
+use std::fmt::Write;
 
 use crate::{
     graph::undirected::Graph,
@@ -18,14 +18,14 @@ pub enum VertexColor {
     Empty = 0,
     TintLeft = 1,
     TintRight = 2,
-    Left = 3,
-    Right = 4,
+    Taken = 3,
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Position {
-    vertices: Vec<VertexColor>,
-    graph: Graph,
+    pub vertices: Vec<VertexColor>,
+    pub graph: Graph,
 }
 
 impl Position {
@@ -80,12 +80,7 @@ impl Position {
             let mut position: Position = self.clone();
 
             // Take vertex
-            position.vertices[move_vertex] = if own_tint_color == VertexColor::TintLeft {
-                VertexColor::Left
-            } else {
-                debug_assert_eq!(own_tint_color, VertexColor::TintRight);
-                VertexColor::Right
-            };
+            position.vertices[move_vertex] = VertexColor::Taken;
 
             // Disconnect `move_vertex` from adjecent vertices and tint them
             for adjacent_vertex in self.graph.adjacent_to(move_vertex) {
@@ -95,7 +90,13 @@ impl Position {
                 // No loops
                 if adjacent_vertex != move_vertex {
                     // Tint adjacent vertex
-                    position.vertices[adjacent_vertex] = own_tint_color;
+                    if position.vertices[adjacent_vertex] == own_tint_color
+                        && position.vertices[adjacent_vertex] == VertexColor::Empty
+                    {
+                        position.vertices[adjacent_vertex] = own_tint_color;
+                    } else {
+                        position.vertices[adjacent_vertex] = VertexColor::Taken;
+                    }
                 }
             }
             moves.push(position);
@@ -195,4 +196,33 @@ fn no_moves() {
     let position = Position::new(Graph::empty(0));
     assert_eq!(position.left_moves(), vec![]);
     assert_eq!(position.right_moves(), vec![]);
+}
+
+impl Position {
+    pub fn to_graphviz(&self) -> String {
+        let mut buf = String::new();
+
+        write!(buf, "graph G {{").unwrap();
+
+        for (v, color) in self.vertices.iter().enumerate() {
+            let col = match color {
+                VertexColor::Empty => "white",
+                VertexColor::TintLeft => "blue",
+                VertexColor::TintRight => "red",
+                VertexColor::Taken => continue,
+            };
+            write!(buf, "{v} [fillcolor={col}, style=filled];").unwrap();
+        }
+
+        for v in self.graph.vertices() {
+            for u in self.graph.vertices() {
+                if v < u && self.graph.are_adjacent(v, u) {
+                    write!(buf, "{v} -- {u};").unwrap();
+                }
+            }
+        }
+
+        write!(buf, "}}").unwrap();
+        buf
+    }
 }
