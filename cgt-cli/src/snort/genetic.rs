@@ -173,7 +173,7 @@ impl Alg {
         Alg {
             args,
             specimen,
-            cache: TranspositionTable::new(1 << 20),
+            cache: TranspositionTable::new(),
         }
     }
 
@@ -188,7 +188,7 @@ impl Alg {
                     score: Rational::NegativeInfinity,
                 })
                 .collect(),
-            cache: TranspositionTable::new(1 << 20),
+            cache: TranspositionTable::new(),
         }
     }
 

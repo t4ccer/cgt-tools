@@ -2,18 +2,19 @@ use crate::{
     dyadic_rational_number::DyadicRationalNumber, nimber::Nimber, rational::Rational,
     rw_hash_map::RwHashMap, thermograph::Thermograph, trajectory::Trajectory,
 };
+use elsa::sync::FrozenVec;
 use std::{
     cmp::Ordering,
     fmt::{self, Display, Write},
     ops::{Add, Neg},
     str::FromStr,
-    sync::{Arc, Mutex, Weak},
+    sync::Mutex,
 };
 
-#[derive(Debug, Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct GamePtr(Arc<Moves>);
+#[derive(Debug, Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct GamePtr(usize);
 
-#[derive(Debug, Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Game {
     Nus(Nus),
     MovesPtr(GamePtr),
@@ -21,9 +22,9 @@ pub enum Game {
 
 impl Game {
     #[inline]
-    fn get_nus_unchecked(&self) -> Nus {
+    fn get_nus_unchecked(self) -> Nus {
         match self {
-            Game::Nus(nus) => *nus,
+            Game::Nus(nus) => nus,
             Game::MovesPtr(_) => panic!("Not a nus"),
         }
     }
@@ -247,7 +248,7 @@ impl Display for Nus {
 }
 
 /// Left and Right moves from a given position
-#[derive(Debug, Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub struct Moves {
     pub left: Vec<Game>,
     pub right: Vec<Game>,
@@ -263,7 +264,6 @@ impl Moves {
     }
 
     fn eliminate_duplicates(&mut self) {
-        // FIXME
         self.left.sort();
         self.left.dedup();
 
@@ -295,7 +295,7 @@ impl Moves {
         } else if num_ro == 0 {
             // Case: n+1 = {n|}
             // No right options so there must be a left move that is a number
-            debug_assert_eq!(num_lo, 1, "Entry not normalized: {:?}", self);
+            debug_assert!(num_lo == 1, "Entry not normalized");
             result.number = self.left[0].get_nus_unchecked().number + DyadicRationalNumber::from(1);
             result.up_multiple = 0;
             result.nimber = Nimber::from(0);
@@ -391,11 +391,11 @@ impl Moves {
             // Case: n + *k
             // If doesn't hold then it's not a NUS
             for i in 0..num_lo {
-                let l_id = self.left[i].clone();
-                let l = self.left[i].clone();
+                let l_id = self.left[i];
+                let l = self.left[i];
 
-                let r_id = self.right[i].clone();
-                let r = self.right[i].clone();
+                let r_id = self.right[i];
+                let r = self.right[i];
 
                 if l_id != r_id
                     || !l.is_number_up_star()
@@ -495,8 +495,10 @@ impl Display for Statistics {
 pub struct GameBackend {
     /// Lock that **MUST** be taken when adding new game
     add_game_lock: Mutex<()>,
+    /// Games that were already constructed
+    known_games: FrozenVec<Box<Moves>>,
     /// Lookup table for list of moves
-    moves_index: RwHashMap<Moves, Weak<Moves>>,
+    moves_index: RwHashMap<Moves, Game>,
     /// Lookup table for game addition
     add_index: RwHashMap<(Game, Game), Game>,
     /// Lookup table for comparison
@@ -511,6 +513,7 @@ impl GameBackend {
     pub fn new() -> Self {
         Self {
             add_game_lock: Mutex::new(()),
+            known_games: FrozenVec::new(),
             moves_index: RwHashMap::new(),
             add_index: RwHashMap::new(),
             leq_index: RwHashMap::new(),
@@ -534,75 +537,63 @@ impl GameBackend {
         }
     }
 
-    fn add_new_game(&self, moves: Moves) -> Arc<Moves> {
+    fn add_new_game(&self, moves: Moves) -> Game {
         // What's going on here: we try to lookup game in cache without taking a lock (inserts are rare)
         // to allow for concurrent lookups. After taking write lock we need to lookup again to be
         // 100% sure we're not inserting two same games.
+        if let Some(id) = self.moves_index.get(&moves) {
+            return id;
+        }
 
         // Locking here guarantees that no two threads will try to insert the same game
         let lock = self.add_game_lock.lock().unwrap();
 
-        if let Some(weak) = self.moves_index.get(&moves) {
-            if let Some(strong) = weak.upgrade() {
-                return strong;
-            }
+        if let Some(id) = self.moves_index.get(&moves) {
+            return id;
         }
 
         #[cfg(feature = "statistics")]
         self.update_statistics(&moves);
 
-        let game = Arc::new(moves.clone());
-        self.moves_index.insert(moves, Arc::downgrade(&game));
+        let ptr = GamePtr(self.known_games.push_get_index(Box::new(moves.clone())));
+        let game = Game::MovesPtr(ptr);
+        self.moves_index.insert(moves, game);
         drop(lock);
         game
     }
 
-    pub fn clean_up(&self) {
-        let mut moves_index = self.moves_index.0.write().unwrap();
-        moves_index.retain(|_, v| v.strong_count() > 0);
-    }
-
     #[inline]
-    fn get_moves(&self, ptr: GamePtr) -> Arc<Moves> {
-        ptr.0
-        // self.known_games.get(ptr.0).unwrap()
+    fn get_moves(&self, ptr: &GamePtr) -> &Moves {
+        self.known_games.get(ptr.0).unwrap()
     }
 
-    fn get_game_moves(&self, game: &Game) -> Arc<Moves> {
+    fn get_game_moves(&self, game: &Game) -> Moves {
         match game {
             Game::Nus(nus) => {
                 // Case: Just a number
                 if nus.is_number() {
                     if nus.number == DyadicRationalNumber::from(0) {
-                        return Arc::new(Moves {
+                        return Moves {
                             left: vec![],
                             right: vec![],
-                        });
+                        };
                     }
 
                     if let Some(integer) = nus.number.to_integer() {
                         let sign = if integer >= 0 { 1 } else { -1 };
-                        let prev = Nus::integer(integer - sign);
-                        return Arc::new(Moves {
-                            left: (if sign > 0 {
-                                vec![Game::Nus(prev)]
-                            } else {
-                                vec![]
-                            }),
-                            right: (if sign > 0 {
-                                vec![]
-                            } else {
-                                vec![Game::Nus(prev)]
-                            }),
-                        });
+                        let prev = Game::Nus(Nus::integer(integer - sign));
+                        return Moves {
+                            left: (if sign > 0 { vec![prev] } else { vec![] }),
+                            right: (if sign > 0 { vec![] } else { vec![prev] }),
+                        };
                     } else {
                         let rational = nus.number;
                         let left_move = Game::Nus(Nus::rational(rational.step(-1)));
                         let right_move = Game::Nus(Nus::rational(rational.step(1)));
-                        return Arc::new(Moves {
+                        return Moves {
                             left: vec![left_move],
                             right: vec![right_move],
-                        });
+                        };
                     }
                 }
 
@@ -621,12 +612,11 @@ impl GameBackend {
                         moves.left.push(Game::Nus(new_nus));
                         moves.right.push(Game::Nus(new_nus));
                     }
-                    return Arc::new(moves);
+                    return moves;
                 }
 
                 // Case: number-up-star
-                let number_move = Nus::rational(nus.number);
-                // let number_move = Game::Nus(Nus::rational(nus.number));
+                let number_move = Game::Nus(Nus::rational(nus.number));
 
                 let sign = if nus.up_multiple >= 0 { 1 } else { -1 };
                 let prev_up = nus.up_multiple - sign;
@@ -642,8 +632,8 @@ impl GameBackend {
                         nimber: Nimber::from(1),
                     });
                     moves = Moves {
-                        left: vec![Game::Nus(number_move), star_move],
-                        right: vec![Game::Nus(number_move)],
+                        left: vec![number_move, star_move],
+                        right: vec![number_move],
                     };
                 } else if nus.up_multiple == -1 && nus.nimber == Nimber::from(1) {
                     // Special case: nv*
@@ -653,8 +643,8 @@ impl GameBackend {
                         nimber: Nimber::from(1),
                     });
                     moves = Moves {
-                        left: vec![Game::Nus(number_move)],
-                        right: vec![Game::Nus(number_move), star_move],
+                        left: vec![number_move],
+                        right: vec![number_move, star_move],
                     };
                 } else if nus.up_multiple > 0 {
                     let prev_nus = Game::Nus(Nus {
@@ -663,7 +653,7 @@ impl GameBackend {
                         nimber: Nimber::from(prev_nimber),
                     });
                     moves = Moves {
-                        left: vec![Game::Nus(number_move)],
+                        left: vec![number_move],
                         right: vec![prev_nus],
                     };
                 } else {
@@ -674,22 +664,19 @@ impl GameBackend {
                     });
                     moves = Moves {
                         left: vec![prev_nus],
-                        right: vec![Game::Nus(number_move)],
+                        right: vec![number_move],
                     };
                 }
 
-                Arc::new(moves)
+                moves
             }
-            Game::MovesPtr(ptr) => ptr.0.clone(),
+            Game::MovesPtr(ptr) => self.get_moves(ptr).clone(),
         }
     }
 
     #[inline]
     fn get_game_by_moves(&self, moves: &Moves) -> Option<Game> {
-        self.moves_index
-            .get(moves)
-            .and_then(|m| Weak::upgrade(&m))
-            .map(|m| Game::MovesPtr(GamePtr(m)))
+        self.moves_index.get(moves)
     }
 
     #[inline]
@@ -722,7 +709,7 @@ impl GameBackend {
             Game::MovesPtr(ptr) => {
                 // TODO: cache lookup
 
-                let moves = self.get_moves(ptr.clone());
+                let moves = self.get_moves(ptr);
 
                 let new_left_moves = moves
                     .left
@@ -744,15 +731,14 @@ impl GameBackend {
     }
 
     /// Construct a sum of two games
-    pub fn construct_sum(&self, g: &Game, h: &Game) -> Game {
+    pub fn construct_sum(&self, g: Game, h: Game) -> Game {
         if let (Game::Nus(g_nus), Game::Nus(h_nus)) = (g, h) {
             return self.construct_nus(g_nus + h_nus);
         }
 
-        // FIXME
-        // if let Some(result) = self.add_index.get(&(g, h)) {
-        //     return result;
-        // }
+        if let Some(result) = self.add_index.get(&(g, h)) {
+            return result;
+        }
 
         // We want to return { GL+H, G+HL | GR+H, G+HR }
 
@@ -763,25 +749,25 @@ impl GameBackend {
         if !g.is_number() {
             let g_moves = self.get_game_moves(&g);
             for g_l in &g_moves.left {
-                moves.left.push(self.construct_sum(g_l, h));
+                moves.left.push(self.construct_sum(*g_l, h));
             }
             for g_r in &g_moves.right {
-                moves.right.push(self.construct_sum(g_r, h));
+                moves.right.push(self.construct_sum(*g_r, h));
             }
         }
         if !h.is_number() {
             let h_moves = self.get_game_moves(&h);
             for h_l in &h_moves.left {
-                moves.left.push(self.construct_sum(g, h_l));
+                moves.left.push(self.construct_sum(g, *h_l));
             }
             for h_r in &h_moves.right {
-                moves.right.push(self.construct_sum(g, h_r));
+                moves.right.push(self.construct_sum(g, *h_r));
             }
         }
 
         let result = self.construct_from_moves(moves);
-        // self.add_index.insert((g, h), result);
-        // self.add_index.insert((h, g), result);
+        self.add_index.insert((g, h), result);
+        self.add_index.insert((h, g), result);
         result
     }
 
@@ -798,7 +784,7 @@ impl GameBackend {
         }
 
         // Game is not a nus
-        Game::MovesPtr(GamePtr(self.add_new_game(moves)))
+        self.add_new_game(moves)
     }
 
     /// Safe function to construct a game from possible moves
@@ -841,14 +827,14 @@ impl GameBackend {
         let mut moves: Vec<Option<Game>> = moves.iter().cloned().map(Some).collect();
 
         for i in 0..moves.len() {
-            let move_i = match &moves[i] {
+            let move_i = match moves[i] {
                 None => continue,
-                Some(id) => id.clone(),
+                Some(id) => id,
             };
             for j in 0..i {
-                let move_j = match &moves[j] {
+                let move_j = match moves[j] {
                     None => continue,
-                    Some(id) => id.clone(),
+                    Some(id) => id,
                 };
 
                 if (eliminate_smaller_moves && self.leq(&move_i, &move_j))
@@ -864,7 +850,7 @@ impl GameBackend {
             }
         }
 
-        moves.iter().flatten().cloned().collect()
+        moves.iter().flatten().copied().collect()
     }
 
     /// Return false if `H <= GL` for some left option `GL` of `G` or `HR <= G` for some right
@@ -938,10 +924,9 @@ impl GameBackend {
             }
         }
 
-        // FIXME
-        // if let Some(leq) = self.leq_index.get(&(*lhs_game, *rhs_game)) {
-        //     return leq;
-        // }
+        if let Some(leq) = self.leq_index.get(&(*lhs_game, *rhs_game)) {
+            return leq;
+        }
 
         let mut leq = true;
 
@@ -965,7 +950,7 @@ impl GameBackend {
             }
         }
 
-        // self.leq_index.insert((*lhs_game, *rhs_game), leq);
+        self.leq_index.insert((*lhs_game, *rhs_game), leq);
 
         leq
     }
@@ -980,29 +965,29 @@ impl GameBackend {
             if (i as usize) >= left_moves.len() {
                 break;
             }
-            let g_l = match &left_moves[i as usize] {
+            let g_l = match left_moves[i as usize] {
                 None => {
                     i += 1;
                     continue;
                 }
-                Some(g) => g.clone(),
+                Some(g) => g,
             };
-            for g_lr in &self.get_game_moves(&g_l).right {
+            for g_lr in self.get_game_moves(&g_l).right {
                 if self.leq_arrays(&g_lr, &left_moves, &right_moves) {
                     let g_lr_moves = self.get_game_moves(&g_lr);
                     let mut new_left_moves: Vec<Option<Game>> =
                         vec![None; left_moves.len() + g_lr_moves.left.len() as usize - 1];
                     for k in 0..(i as usize) {
-                        new_left_moves[k] = left_moves[k].clone();
+                        new_left_moves[k] = left_moves[k];
                     }
                     for k in (i as usize + 1)..left_moves.len() {
-                        new_left_moves[k - 1] = left_moves[k].clone();
+                        new_left_moves[k - 1] = left_moves[k];
                     }
                     for (k, g_lrl) in g_lr_moves.left.iter().enumerate() {
-                        if left_moves.contains(&Some(g_lrl.clone())) {
+                        if left_moves.contains(&Some(*g_lrl)) {
                             new_left_moves[left_moves.len() + k - 1] = None;
                         } else {
-                            new_left_moves[left_moves.len() + k - 1] = Some(g_lrl.clone());
+                            new_left_moves[left_moves.len() + k - 1] = Some(*g_lrl);
                         }
                     }
                     left_moves = new_left_moves;
@@ -1014,7 +999,7 @@ impl GameBackend {
             i += 1;
         }
         Moves {
-            left: left_moves.iter().flatten().cloned().collect(),
+            left: left_moves.iter().flatten().copied().collect(),
             right: moves.right,
         }
     }
@@ -1029,29 +1014,29 @@ impl GameBackend {
             if (i as usize) >= right_moves.len() {
                 break;
             }
-            let g_r = match &right_moves[i as usize] {
+            let g_r = match right_moves[i as usize] {
                 None => {
                     i += 1;
                     continue;
                 }
-                Some(game) => game.clone(),
+                Some(game) => game,
             };
-            for g_rl in &self.get_game_moves(&g_r).left {
+            for g_rl in self.get_game_moves(&g_r).left {
                 if self.geq_arrays(&g_rl, &left_moves, &right_moves) {
                     let g_rl_moves = self.get_game_moves(&g_rl);
                     let mut new_right_moves: Vec<Option<Game>> =
                         vec![None; right_moves.len() + g_rl_moves.right.len() as usize - 1];
                     for k in 0..(i as usize) {
-                        new_right_moves[k] = right_moves[k].clone();
+                        new_right_moves[k] = right_moves[k];
                     }
                     for k in (i as usize + 1)..right_moves.len() {
-                        new_right_moves[k - 1] = right_moves[k].clone();
+                        new_right_moves[k - 1] = right_moves[k];
                     }
                     for (k, g_rlr) in g_rl_moves.right.iter().enumerate() {
-                        if right_moves.contains(&Some(g_rlr.clone())) {
+                        if right_moves.contains(&Some(*g_rlr)) {
                             new_right_moves[right_moves.len() + k - 1] = None;
                         } else {
-                            new_right_moves[right_moves.len() + k - 1] = Some(g_rlr.clone());
+                            new_right_moves[right_moves.len() + k - 1] = Some(*g_rlr);
                         }
                     }
                     right_moves = new_right_moves;
@@ -1064,7 +1049,7 @@ impl GameBackend {
         }
         Moves {
             left: moves.left,
-            right: right_moves.iter().flatten().cloned().collect(),
+            right: right_moves.iter().flatten().copied().collect(),
         }
     }
 
@@ -1126,7 +1111,7 @@ impl GameBackend {
                 if let Some(thermograph) = self.thermograph_index.get(&game) {
                     return thermograph.clone();
                 }
-                let moves = self.get_moves(ptr.clone());
+                let moves = self.get_moves(ptr);
                 self.thermograph_from_moves(&moves)
             }
             Game::Nus(nus) => {
@@ -1156,8 +1141,7 @@ impl GameBackend {
                 }
             }
         };
-        self.thermograph_index
-            .insert(game.clone(), thermograph.clone());
+        self.thermograph_index.insert(*game, thermograph.clone());
 
         thermograph
     }
@@ -1180,7 +1164,7 @@ impl GameBackend {
     }
 
     pub fn known_games_len(&self) -> usize {
-        self.moves_index.len()
+        self.known_games.len()
     }
 }
 
@@ -1190,7 +1174,7 @@ impl GameBackend {
         match game {
             Game::Nus(nus) => write!(f, "{}", nus),
             Game::MovesPtr(ptr) => {
-                let moves = self.get_moves(ptr.clone());
+                let moves = self.get_moves(ptr);
                 self.print_moves(&moves, f)
             }
         }
@@ -1442,14 +1426,14 @@ fn sum_works() {
     let one = b.construct_integer(1);
 
     let one_zero = b.construct_from_moves(Moves {
-        left: vec![one.clone()],
-        right: vec![zero.clone()],
+        left: vec![one],
+        right: vec![zero],
     });
     let zero_one = b.construct_from_moves(Moves {
-        left: vec![zero.clone()],
-        right: vec![one.clone()],
+        left: vec![zero],
+        right: vec![one],
     });
-    let sum = b.construct_sum(&one_zero, &zero_one);
+    let sum = b.construct_sum(one_zero, zero_one);
     assert_eq!(&b.print_game_to_str(&sum), "{3/2|1/2}");
 }
 

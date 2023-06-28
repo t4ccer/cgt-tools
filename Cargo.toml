@@ -17,7 +17,6 @@ nom = "7.1.3"
 num = "0.4.0"
 num-derive = "0.3.3"
 num-traits = "0.2.15"
-concurrent_lru = "0.2.0"
 serde_repr = { version = "0.1.12", optional = true}
 serde = { version = "1.0.164", optional = true}
 

@@ -39,10 +39,6 @@ pub struct Args {
     #[arg(long, default_value_t = 5)]
     progress_interval: u64,
 
-    /// Transposition table capacity
-    #[arg(long, default_value_t = 8388608)]
-    transposition_capacity: u64,
-
     /// Path to read the cache
     #[arg(long, default_value = None)]
     cache_read_path: Option<String>,
@@ -121,7 +117,7 @@ pub fn run(args: Args) -> Result<()> {
         );
     }
 
-    let cache = TranspositionTable::new(args.transposition_capacity);
+    let cache = TranspositionTable::new();
 
     let output_file =
         File::create(&args.output_path).with_context(|| "Could not open output file")?;
@@ -245,8 +241,6 @@ fn progress_report(progress_tracker: Arc<ProgressTracker>) {
             format!("{}", progress_tracker.highest_temp.lock().unwrap().clone())
         };
         let known_grids = progress_tracker.cache.grids_saved();
-
-        progress_tracker.cache.game_backend().clean_up();
 
         // NOTE: We may move known_games_len() to atomic counter instead so we won't take read
         // lock on games vec

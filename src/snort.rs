@@ -159,9 +159,9 @@ impl Position {
     /// assert_eq!(position.left_moves().len(), 2);
     /// assert_eq!(position.right_moves().len(), 1);
     ///
-    /// let cache = TranspositionTable::new(1 << 22);
+    /// let cache = TranspositionTable::new();
     /// let game = position.canonical_form(&cache);
-    /// assert_eq!(&cache.game_backend().print_game_to_str(&game), "{2|0}");
+    /// assert_eq!(&cache.game_backend().print_game_to_str(&game), "1*");
     /// ```
     pub fn canonical_form(&self, cache: &TranspositionTable<Self>) -> Game {
         if let Some(id) = cache.grids_get(self) {
@@ -186,7 +186,7 @@ impl Position {
         };
 
         let canonical_form = cache.game_backend().construct_from_moves(moves);
-        cache.grids_insert(self.clone(), canonical_form.clone());
+        cache.grids_insert(self.clone(), canonical_form);
         canonical_form
     }
 }
