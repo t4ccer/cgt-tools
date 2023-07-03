@@ -54,10 +54,10 @@ fn process_line(line: &str) -> Result<Response, ProcessingError> {
         Request::Domineering(request) => {
             let position = domineering::Position::parse(&request.grid)
                 .map_err(|_| ProcessingError::Parsing)?;
-            let cache = TranspositionTable::new(1 << 22);
+            let cache = TranspositionTable::new();
             let game = position.canonical_form(&cache);
-            let canonical_form = cache.game_backend().print_game_to_str(game);
-            let temperature = cache.game_backend().temperature(game).to_string();
+            let canonical_form = cache.game_backend().print_game_to_str(&game);
+            let temperature = cache.game_backend().temperature(&game).to_string();
             Ok(Response {
                 canonical_form,
                 temperature,
@@ -69,10 +69,10 @@ fn process_line(line: &str) -> Result<Response, ProcessingError> {
                 .ok_or(ProcessingError::Parsing)?;
             let position = snort::Position::with_colors(request.vertices, graph)
                 .ok_or(ProcessingError::Decoding)?;
-            let cache = TranspositionTable::new(1 << 22);
+            let cache = TranspositionTable::new();
             let game = position.canonical_form(&cache);
-            let canonical_form = cache.game_backend().print_game_to_str(game);
-            let temperature = cache.game_backend().temperature(game).to_string();
+            let canonical_form = cache.game_backend().print_game_to_str(&game);
+            let temperature = cache.game_backend().temperature(&game).to_string();
             Ok(Response {
                 canonical_form,
                 temperature,
