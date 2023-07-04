@@ -27,3 +27,7 @@ pedantic = []
 
 [workspace]
 members = ["cgt-cli", "cgt-website", "cgt-py-adapter"]
+
+[profile.release]
+lto = true
+panic = "abort"
