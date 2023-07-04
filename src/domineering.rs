@@ -715,11 +715,34 @@ fn latex_works() {
 }
 
 impl Position {
+    /// Rotate grid 90° clockwise
     pub fn rotate(&self) -> Self {
         let mut result = Position::empty(self.height(), self.width()).unwrap();
         for y in 0..self.height() {
             for x in 0..self.width() {
                 result.set(result.width() - y - 1, x, self.at(x, y));
+            }
+        }
+        result
+    }
+
+    /// Flip grid vertically
+    pub fn vertical_flip(&self) -> Self {
+        let mut result = Position::empty(self.width(), self.height()).unwrap();
+        for y in 0..self.height() {
+            for x in 0..self.width() {
+                result.set(result.width() - x - 1, y, self.at(x, y));
+            }
+        }
+        result
+    }
+
+    /// Flip grid horizontally
+    pub fn horizontal_flip(&self) -> Self {
+        let mut result = Position::empty(self.width(), self.height()).unwrap();
+        for y in 0..self.height() {
+            for x in 0..self.width() {
+                result.set(x, result.height() - y - 1, self.at(x, y));
             }
         }
         result
@@ -750,5 +773,29 @@ fn rotation_works() {
         "#..#|\
 	 ....|\
 	 ..##"
+    );
+}
+
+#[test]
+fn flip_works() {
+    let position = Position::parse(
+        "##..|\
+	 ....|\
+	 #..#",
+    )
+    .unwrap();
+
+    assert_eq!(
+        &format!("{}", position.vertical_flip()),
+        "..##|\
+	 ....|\
+	 #..#",
+    );
+
+    assert_eq!(
+        &format!("{}", position.horizontal_flip()),
+        "#..#|\
+	 ....|\
+	 ##..",
     );
 }

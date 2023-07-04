@@ -85,13 +85,21 @@ pub fn run(args: Args) -> Result<()> {
         let mut input_without_rotations =
             input.iter().cloned().map(|e| Some(e)).collect::<Vec<_>>();
         for (idx, entry) in input.iter().enumerate() {
-            let rot1 = entry.grid.rotate();
-            let rot2 = rot1.rotate();
-            let rot3 = rot2.rotate();
-            let rots = [rot1, rot2, rot3];
+            let rot_90deg = entry.grid.rotate();
+            let rot_180deg = rot_90deg.rotate();
+            let rot_270deg = rot_180deg.rotate();
+            let vertical_flip = entry.grid.vertical_flip();
+            let horizontal_flip = entry.grid.horizontal_flip();
+            let equivalent_grids = [
+                rot_90deg,
+                rot_180deg,
+                rot_270deg,
+                vertical_flip,
+                horizontal_flip,
+            ];
             for idx in (idx + 1)..input_without_rotations.len() {
                 if let Some(next_entry) = &input_without_rotations[idx] {
-                    if rots.contains(&next_entry.grid) {
+                    if equivalent_grids.contains(&next_entry.grid) {
                         input_without_rotations[idx] = None;
                     }
                 }
