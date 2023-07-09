@@ -12,20 +12,20 @@ where
         RwHashMap(RwLock::new(HashMap::new()))
     }
 
-    pub(crate) fn get(&self, key: &K) -> Option<V> {
+    pub fn get(&self, key: &K) -> Option<V> {
         self.0.read().unwrap().deref().get(key).cloned()
     }
 
-    pub(crate) fn insert(&self, key: K, value: V) {
+    pub fn insert(&self, key: K, value: V) {
         let mut cache = self.0.write().unwrap();
         cache.insert(key, value);
     }
 
-    pub(crate) fn len(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.0.read().unwrap().len()
     }
 
-    pub(crate) fn clear(&self) {
+    pub fn clear(&self) {
         let mut cache = self.0.write().unwrap();
         cache.clear();
     }

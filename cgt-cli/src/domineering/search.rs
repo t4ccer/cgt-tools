@@ -1,5 +1,8 @@
 use anyhow::{bail, Context, Result};
-use cgt::{domineering, rational::Rational, transposition_table::TranspositionTable};
+use cgt::{
+    domineering, rational::Rational, rw_hash_map::RwHashMap,
+    short_canonical_game::PartizanShortGame, thermograph::Thermograph,
+};
 use clap::Parser;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use std::{
@@ -61,7 +64,7 @@ pub struct Args {
 }
 
 struct ProgressTracker {
-    cache: TranspositionTable<domineering::Position>,
+    cache: RwHashMap<domineering::Position, Thermograph>,
     args: Args,
     iteration: AtomicU64,
     saved: AtomicU64,
@@ -71,7 +74,7 @@ struct ProgressTracker {
 
 impl ProgressTracker {
     fn new(
-        cache: TranspositionTable<domineering::Position>,
+        cache: RwHashMap<domineering::Position, Thermograph>,
         args: Args,
         output_file: File,
     ) -> ProgressTracker {
@@ -117,7 +120,7 @@ pub fn run(args: Args) -> Result<()> {
         );
     }
 
-    let cache = TranspositionTable::new();
+    let cache = RwHashMap::new();
 
     let output_file =
         File::create(&args.output_path).with_context(|| "Could not open output file")?;
@@ -158,12 +161,12 @@ pub fn run(args: Args) -> Result<()> {
                 return;
             }
 
-            let game = grid.canonical_form(&progress_tracker.cache);
-            let temp = progress_tracker.cache.game_backend().temperature(&game);
+            let thermograph = grid.thermograph(&progress_tracker.cache);
+            let temperature = thermograph.get_temperature();
 
             // Don't save temperatures below or equal to treashold
             if let Some(temperature_threshold) = &progress_tracker.args.temperature_threshold {
-                if &temp <= temperature_threshold {
+                if &temperature <= temperature_threshold {
                     return;
                 }
             }
@@ -171,22 +174,15 @@ pub fn run(args: Args) -> Result<()> {
             // Save results as newline separated JSON objects
             let result = DomineeringResult {
                 grid: format!("{grid}"),
-                canonical: format!(
-                    "{}",
-                    progress_tracker
-                        .cache
-                        .game_backend()
-                        .print_game_to_str(&game)
-                ),
-                temperature: format!("{temp}"),
+                temperature: format!("{temperature}"),
             };
             let to_write = format!("{}\n", serde_json::ser::to_string(&result).unwrap());
             progress_tracker.write_game(&to_write);
 
             {
                 let mut highest_temp = progress_tracker.highest_temp.lock().unwrap();
-                if temp > *highest_temp {
-                    *highest_temp = temp;
+                if temperature > *highest_temp {
+                    *highest_temp = temperature;
                 }
             }
         });
@@ -227,7 +223,6 @@ fn progress_report(progress_tracker: Arc<ProgressTracker>) {
         let percent_progress: f32 = completed_iterations as f32 / total_iterations as f32;
         let now = chrono::offset::Utc::now();
         let is_finished = completed_iterations == total_iterations;
-        let known_games = progress_tracker.cache.game_backend().known_games_len();
         let highest_temp = if saved == 0 {
             format!(
                 "<= {}",
@@ -240,7 +235,7 @@ fn progress_report(progress_tracker: Arc<ProgressTracker>) {
         } else {
             format!("{}", progress_tracker.highest_temp.lock().unwrap().clone())
         };
-        let known_grids = progress_tracker.cache.grids_saved();
+        let known_grids = progress_tracker.cache.len();
 
         // NOTE: We may move known_games_len() to atomic counter instead so we won't take read
         // lock on games vec
@@ -251,7 +246,6 @@ fn progress_report(progress_tracker: Arc<ProgressTracker>) {
 	     \tIterations: {completed_iterations_str}/{last_id}\n\
 	     \tHighest temperature: {highest_temp}\n\
 	     \tSaved games: {saved}\n\
-	     \tKnown games: {known_games}\n\
 	     \tKnown grids: {known_grids}\n"
         );
         stderr.lock().write_all(to_write.as_bytes()).unwrap();
