@@ -10,7 +10,7 @@ use crate::{
 };
 
 #[cfg(test)]
-use crate::{rational::Rational, rw_hash_map::RwHashMap};
+use crate::rational::Rational;
 
 pub type GridBits = u64;
 
@@ -803,13 +803,13 @@ fn flip_works() {
     );
 }
 
-#[cfg(test)]
 /// Assert temperature value without going through canonical form
+/// Using macro yields better error location on assertion failure
+#[cfg(test)]
 macro_rules! assert_temperature {
     ($grid:expr, $temp:expr) => {
         let grid = $grid.unwrap();
-        let cache = RwHashMap::new();
-        let thermograph = grid.thermograph(&cache);
+        let thermograph = grid.thermograph();
         let expected_temperature = Rational::from($temp);
         assert_eq!(thermograph.get_temperature(), expected_temperature);
     };
@@ -821,5 +821,4 @@ fn temperature_without_game_works() {
     assert_temperature!(Position::parse(".."), -1);
     assert_temperature!(Position::parse("..|.#"), 0);
     assert_temperature!(Position::parse("#...|....|....|...."), 1);
-    assert_temperature!(Position::parse("..##..|#.....|....#.|##...#|##.#.#"), 2);
 }

@@ -30,6 +30,14 @@ impl Graph {
         Some(Self(directed::Graph::from_matrix(size, matrix)?))
     }
 
+    pub fn from_edges(size: usize, edges: &[(usize, usize)]) -> Self {
+        let mut graph = Graph::empty(size);
+        for (v, u) in edges {
+            graph.connect(*v, *u, true);
+        }
+        graph
+    }
+
     /// Get number of vertices in the graph.
     #[inline]
     pub fn size(&self) -> usize {

@@ -66,6 +66,7 @@
             pkgs.sage
             pkgs.heaptrack
             pkgs.texlive.combined.scheme-full
+            pkgs.graphviz
 
             (pkgs.rust-bin.fromRustupToolchain {
               channel = "stable";

@@ -1,11 +1,14 @@
+use crate::snort::common::{Log, Scored};
 use anyhow::Result;
 use cgt::{graph::undirected, rational::Rational, snort, transposition_table::TranspositionTable};
 use clap::{self, Parser};
 use rand::{seq::SliceRandom, Rng};
 use std::{
     cmp::min,
+    collections::HashSet,
     fs::File,
-    io::{BufReader, BufWriter, Write},
+    io::{stderr, BufReader, BufWriter, Write},
+    path::Path,
 };
 
 #[derive(Parser, Debug, Clone)]
@@ -24,10 +27,19 @@ pub struct Args {
 
     /// Path to saved snapshot
     #[arg(long, default_value = None)]
-    load_snapshot: Option<String>,
+    snapshot_load_file: Option<String>,
 
     #[arg(long)]
-    output_file: String,
+    snapshot_save_file: String,
+
+    #[arg(long)]
+    out_file: String,
+
+    #[arg(long, default_value_t = 50)]
+    cleanup_interval: usize,
+
+    #[arg(long, default_value_t = Rational::from(0))]
+    save_eq_or_above: Rational,
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -35,16 +47,12 @@ struct Snapshot {
     specimen: Vec<snort::Position>,
 }
 
-#[derive(Clone)]
-struct Scored {
-    position: snort::Position,
-    score: Rational,
-}
-
 struct Alg {
     args: Args,
     specimen: Vec<Scored>,
     cache: TranspositionTable<snort::Position>,
+    all_time_best: HashSet<Scored>,
+    log_writer: BufWriter<Box<dyn Write>>,
 }
 
 fn random_position(max_graph_vertices: usize) -> snort::Position {
@@ -112,14 +120,11 @@ fn mutate(position: &mut snort::Position, mutation_rate: f32) {
 
 fn score(position: &snort::Position, cache: &TranspositionTable<snort::Position>) -> Rational {
     let degree_sum = position.graph.degrees().iter().sum::<usize>();
-    if degree_sum == 0 || !position.graph.is_connected() {
+    if position.vertices().is_empty() || degree_sum == 0 || !position.graph.is_connected() {
         return Rational::NegativeInfinity;
     }
 
-    min(
-        temp_dif(position, cache) * Rational::from(1000),
-        Rational::from(0),
-    ) + Rational::from((position.graph.size() + degree_sum) as i64)
+    temp_dif(position, cache)
 }
 
 fn temp_dif(position: &snort::Position, cache: &TranspositionTable<snort::Position>) -> Rational {
@@ -159,43 +164,132 @@ fn cross(lhs: &snort::Position, rhs: &snort::Position) -> snort::Position {
     snort::Position::with_colors(colors, new_graph).unwrap()
 }
 
+fn seed_positions() -> Vec<snort::Position> {
+    // 0   5   6     11
+    //  \   \ /     /
+    // 1--3--4--10-12
+    //  /   /|\     \
+    // 2   7 8 9     13
+    let g1 = undirected::Graph::from_edges(
+        14,
+        &[
+            (0, 3),
+            (1, 3),
+            (2, 3),
+            (3, 4),
+            (4, 5),
+            (4, 6),
+            (4, 7),
+            (4, 8),
+            (4, 9),
+            (4, 10),
+            (10, 11),
+            (10, 12),
+            (10, 13),
+        ],
+    );
+    let pos1 = snort::Position::new(g1);
+
+    //         9
+    //         |
+    // 0  5   7-10
+    //  \  \ / \11
+    // 1-3--4
+    //  /  / \ /12
+    // 2  6   8 -13
+    //        |
+    //        14
+    let g2 = undirected::Graph::from_edges(
+        15,
+        &[
+            (0, 3),
+            (1, 3),
+            (2, 3),
+            (3, 4),
+            (4, 5),
+            (4, 6),
+            (4, 7),
+            (4, 8),
+            (7, 9),
+            (7, 10),
+            (7, 11),
+            (8, 12),
+            (8, 13),
+            (8, 14),
+        ],
+    );
+    let pos2 = snort::Position::new(g2);
+    vec![pos1, pos2]
+}
+
 impl Alg {
     fn new_random(args: Args) -> Alg {
         let mut specimen = Vec::with_capacity(args.generation_size);
-        for _ in 0..args.generation_size {
+
+        // TODO: Add --no-seed flag to omit this
+        specimen.extend(seed_positions().into_iter().map(Scored::without_score));
+
+        for _ in specimen.len()..args.generation_size {
             let scored = Scored {
                 position: random_position(args.max_graph_vertices),
                 score: Rational::NegativeInfinity,
             };
             specimen.push(scored);
         }
+        Alg::with_specimen(args, specimen)
+    }
+
+    fn from_snapshot(args: Args, snapshot: Snapshot) -> Alg {
+        let specimen = snapshot
+            .specimen
+            .into_iter()
+            .map(|position| Scored {
+                position,
+                score: Rational::NegativeInfinity,
+            })
+            .collect();
+        Alg::with_specimen(args, specimen)
+    }
+
+    fn with_specimen(args: Args, specimen: Vec<Scored>) -> Alg {
+        let file = if Path::new(&args.out_file).exists() {
+            File::open(&args.out_file)
+        } else {
+            File::create(&args.out_file)
+        }
+        .unwrap();
+        let log_writer: BufWriter<Box<dyn Write>> = BufWriter::new(Box::new(file));
 
         Alg {
             args,
             specimen,
             cache: TranspositionTable::new(),
-        }
-    }
-
-    fn from_snapshot(args: Args, snapshot: Snapshot) -> Alg {
-        Alg {
-            args,
-            specimen: snapshot
-                .specimen
-                .into_iter()
-                .map(|position| Scored {
-                    position,
-                    score: Rational::NegativeInfinity,
-                })
-                .collect(),
-            cache: TranspositionTable::new(),
+            all_time_best: HashSet::new(),
+            log_writer,
         }
     }
 
     // TODO: parallel with rayon
     fn score(&mut self) {
-        for mut spec in &mut self.specimen {
+        let specimen = &mut self.specimen;
+        for mut spec in specimen {
             spec.score = score(&spec.position, &self.cache);
+            if spec.score >= self.args.save_eq_or_above {
+                if self.all_time_best.insert(spec.clone()) {
+                    let canonical_form = spec.position.canonical_form(&self.cache);
+                    let log = Log::HighFitness {
+                        position: spec.clone(),
+                        canonical_form: self
+                            .cache
+                            .game_backend()
+                            .print_game_to_str(&canonical_form),
+                        temperature: self.cache.game_backend().temperature(&canonical_form),
+                        degree: spec.position.graph.degree(),
+                    };
+                    drop(spec);
+                    Alg::emit_log(&mut self.log_writer, &log);
+                }
+            }
         }
         self.specimen.sort_by_key(|spec| spec.score.clone());
     }
@@ -246,13 +340,18 @@ impl Alg {
         }
         self.specimen = new_specimen;
     }
+
+    fn emit_log(writer: &mut BufWriter<Box<dyn Write>>, log: &Log) {
+        writeln!(writer, "{}", serde_json::ser::to_string(log).unwrap()).unwrap();
+        writer.flush().unwrap();
+    }
 }
 
 pub fn run(args: Args) -> Result<()> {
     let generation_limit = args.generation_limit;
-    let output_file_path = args.output_file.clone();
+    let output_file_path = args.snapshot_save_file.clone();
 
-    let mut alg = if let Some(snapshot_file) = args.load_snapshot.clone() {
+    let mut alg = if let Some(snapshot_file) = args.snapshot_load_file.clone() {
         let f = BufReader::new(File::open(snapshot_file).unwrap());
         let snapshot: Snapshot = serde_json::de::from_reader(f).unwrap();
         Alg::from_snapshot(args, snapshot)
@@ -263,10 +362,8 @@ pub fn run(args: Args) -> Result<()> {
     let mut generation = 0;
 
     loop {
-        if let Some(generation_limit) = generation_limit {
-            if generation >= generation_limit {
-                break;
-            }
+        if generation_limit.map_or(false, |limit| generation >= limit) {
+            break;
         }
 
         alg.score();
@@ -275,19 +372,25 @@ pub fn run(args: Args) -> Result<()> {
         alg.save_progress(&mut output);
 
         let top = &alg.specimen.last().unwrap().position;
-        eprintln!(
-            "Generation {generation}: Top score: {}, Temp: {}, Temp diff: {}",
-            alg.highest_score(),
-            alg.cache
-                .game_backend()
-                .temperature(&top.canonical_form(&alg.cache)),
-            temp_dif(&top, &alg.cache)
+        let top_score = alg.highest_score();
+        Alg::emit_log(
+            &mut BufWriter::new(Box::new(stderr())),
+            &Log::Generation {
+                generation,
+                top_score,
+                temperature: alg
+                    .cache
+                    .game_backend()
+                    .temperature(&top.canonical_form(&alg.cache)),
+            },
         );
-        eprintln!("{}", top.to_graphviz());
-
         alg.cross();
 
         generation += 1;
+
+        if generation % alg.args.cleanup_interval == 0 {
+            alg.cache = TranspositionTable::new();
+        }
     }
 
     Ok(())

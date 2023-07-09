@@ -21,7 +21,7 @@ serde_repr = { version = "0.1.12", optional = true}
 serde = { version = "1.0.164", optional = true}
 
 [features]
-serde = ["dep:serde", "dep:serde_repr"]
+serde = ["dep:serde", "dep:serde_repr", "num-rational/serde"]
 statistics = []
 pedantic = []
 

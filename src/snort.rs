@@ -87,15 +87,23 @@ impl Position {
                 // Disconnect move vertex from adjecent
                 position.graph.connect(move_vertex, adjacent_vertex, false);
 
-                // No loops
+                // No loops in snort graphs
                 if adjacent_vertex != move_vertex {
+                    let adjacent_vertex_color = &mut position.vertices[adjacent_vertex];
                     // Tint adjacent vertex
-                    if position.vertices[adjacent_vertex] == own_tint_color
-                        && position.vertices[adjacent_vertex] == VertexColor::Empty
+
+                    if *adjacent_vertex_color == own_tint_color
+                        || *adjacent_vertex_color == VertexColor::Empty
                     {
-                        position.vertices[adjacent_vertex] = own_tint_color;
+                        // If adjacent vertex is empty or tinted in own color, tint it in own
+                        *adjacent_vertex_color = own_tint_color;
                     } else {
-                        position.vertices[adjacent_vertex] = VertexColor::Taken;
+                        // Otherwise the vertex is tinted in opponents color, so no one can longer
+                        // move there, thus we mark is as taken and disconnect from the graph
+                        *adjacent_vertex_color = VertexColor::Taken;
+                        for v in position.graph.vertices() {
+                            position.graph.connect(v, adjacent_vertex, false);
+                        }
                     }
                 }
             }
@@ -211,7 +219,7 @@ impl Position {
                 VertexColor::TintRight => "red",
                 VertexColor::Taken => continue,
             };
-            write!(buf, "{v} [fillcolor={col}, style=filled];").unwrap();
+            write!(buf, "{} [fillcolor={}, style=filled, shape=circle, fixedsize=true, width=1, height=1, fontsize=24];", v, col).unwrap();
         }
 
         for v in self.graph.vertices() {

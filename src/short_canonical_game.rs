@@ -392,18 +392,12 @@ impl Moves {
             // Case: n + *k
             // If doesn't hold then it's not a NUS
             for i in 0..num_lo {
-                let l_id = self.left[i];
                 let l = self.left[i];
-
-                let r_id = self.right[i];
                 let r = self.right[i];
 
-                if l_id != r_id
+                if l != r
                     || !l.is_number_up_star()
-                    || l.get_nus_unchecked()
-                        .number
-                        .cmp(&r.get_nus_unchecked().number)
-                        .is_ne()
+                    || l.get_nus_unchecked().number != r.get_nus_unchecked().number
                 {
                     return None;
                 }
@@ -1465,37 +1459,27 @@ pub trait PartizanShortGame: Sized {
     /// This is copy-pasted from short_canonical_form module, but specialized to domineering
     /// position rather than arbitrary game
     /// See: zubzero-thermography
-    fn thermograph(&self, cache: &RwHashMap<Self, Thermograph>) -> Thermograph
-    where
-        Self: Clone + Eq + Hash,
-    {
+    fn thermograph(&self) -> Thermograph {
         let left_moves = self.left_moves();
         let right_moves = self.right_moves();
         if left_moves.is_empty() && right_moves.is_empty() {
             return Thermograph::with_mast(Rational::from(0));
         }
 
-        if let Some(thermograph) = cache.get(self) {
-            return thermograph.clone();
-        }
-
         let mut left_scaffold = Trajectory::new_constant(Rational::NegativeInfinity);
         let mut right_scaffold = Trajectory::new_constant(Rational::PositiveInfinity);
 
         for left_move in &left_moves {
-            left_scaffold = left_scaffold.max(&left_move.thermograph(cache).right_wall);
+            left_scaffold = left_scaffold.max(&left_move.thermograph().right_wall);
         }
         for right_move in &right_moves {
-            right_scaffold = right_scaffold.min(&right_move.thermograph(cache).left_wall);
+            right_scaffold = right_scaffold.min(&right_move.thermograph().left_wall);
         }
 
         left_scaffold.tilt(Rational::from(-1));
         right_scaffold.tilt(Rational::from(1));
 
-        let thermograph = Thermograph::thermographic_intersection(left_scaffold, right_scaffold);
-        cache.insert(self.clone(), thermograph.clone());
-
-        thermograph
+        Thermograph::thermographic_intersection(left_scaffold, right_scaffold)
     }
 }
 
