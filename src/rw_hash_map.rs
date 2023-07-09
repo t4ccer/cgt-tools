@@ -1,14 +1,14 @@
 use std::{collections::HashMap, hash::Hash, ops::Deref, sync::RwLock};
 
 #[derive(Debug)]
-pub(crate) struct RwHashMap<K, V>(pub(crate) RwLock<HashMap<K, V>>);
+pub struct RwHashMap<K, V>(pub(crate) RwLock<HashMap<K, V>>);
 
 impl<K, V> RwHashMap<K, V>
 where
     K: Eq + Hash,
     V: Clone,
 {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         RwHashMap(RwLock::new(HashMap::new()))
     }
 

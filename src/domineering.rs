@@ -9,6 +9,9 @@ use crate::{
     transposition_table::TranspositionTable,
 };
 
+#[cfg(test)]
+use crate::{rational::Rational, rw_hash_map::RwHashMap};
+
 pub type GridBits = u64;
 
 /// A Domineering position on a rectengular grid.
@@ -797,5 +800,21 @@ fn flip_works() {
         "#..#|\
 	 ....|\
 	 ##..",
+    );
+}
+
+#[cfg(test)]
+fn assert_temperature(grid: Position, expected_temperature: Rational) {
+    let cache = RwHashMap::new();
+    let thermograph = grid.thermograph(&cache);
+    assert_eq!(thermograph.get_temperature(), expected_temperature);
+}
+
+#[test]
+fn temperature_without_game_works() {
+    assert_temperature(Position::empty(0, 0).unwrap(), Rational::from(-1));
+    assert_temperature(
+        Position::parse("#...|....|....|....").unwrap(),
+        Rational::from(1),
     );
 }

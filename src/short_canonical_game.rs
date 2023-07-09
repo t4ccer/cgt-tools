@@ -6,6 +6,7 @@ use elsa::sync::FrozenVec;
 use std::{
     cmp::Ordering,
     fmt::{self, Display, Write},
+    hash::Hash,
     ops::{Add, Neg},
     str::FromStr,
     sync::Mutex,
@@ -1458,6 +1459,44 @@ pub trait PartizanShortGame: Sized {
 
     /// Get moves available for Right player.
     fn right_moves(&self) -> Vec<Self>;
+
+    /// Compute the thermograph without going through canonical form
+    /// Taken from Elwyn Berlekamp - The Economist’s View of Combinatorial Games
+    /// This is copy-pasted from short_canonical_form module, but specialized to domineering
+    /// position rather than arbitrary game
+    /// See: zubzero-thermography
+    fn thermograph(&self, cache: &RwHashMap<Self, Thermograph>) -> Thermograph
+    where
+        Self: Clone + Eq + Hash,
+    {
+        let left_moves = self.left_moves();
+        let right_moves = self.right_moves();
+        if left_moves.is_empty() && right_moves.is_empty() {
+            return Thermograph::with_mast(Rational::from(0));
+        }
+
+        if let Some(thermograph) = cache.get(self) {
+            return thermograph.clone();
+        }
+
+        let mut left_scaffold = Trajectory::new_constant(Rational::NegativeInfinity);
+        let mut right_scaffold = Trajectory::new_constant(Rational::PositiveInfinity);
+
+        for left_move in &left_moves {
+            left_scaffold = left_scaffold.max(&left_move.thermograph(cache).right_wall);
+        }
+        for right_move in &right_moves {
+            right_scaffold = right_scaffold.min(&right_move.thermograph(cache).left_wall);
+        }
+
+        left_scaffold = left_scaffold.tilt(Rational::from(-1));
+        right_scaffold = right_scaffold.tilt(Rational::from(1));
+
+        let thermograph = Thermograph::thermographic_intersection(left_scaffold, right_scaffold);
+        cache.insert(self.clone(), thermograph.clone());
+
+        thermograph
+    }
 }
 
 // TODO: Read a book and name that stuff correctly
