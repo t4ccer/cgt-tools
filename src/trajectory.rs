@@ -21,17 +21,14 @@ impl Trajectory {
 
     /// Tilts this trajectory by `r`.
     /// If this trajectory has value `a(x)` at `x`, then the tilted trajectory has value `a(x) + rx`
-    pub fn tilt(&self, r: Rational) -> Self {
+    pub fn tilt(&mut self, r: Rational) {
         if self.is_infinite() {
-            return self.clone();
+            return;
         }
 
-        let result = Trajectory {
-            critical_points: self.critical_points.clone(),
-            slopes: self.slopes.iter().map(|s| s + &r).collect(),
-            x_intercepts: self.x_intercepts.clone(),
-        };
-        result
+        for slope in &mut self.slopes {
+            *slope += r;
+        }
     }
 
     pub fn new(
@@ -98,7 +95,7 @@ impl Trajectory {
             .take_while(|critical_point| r < critical_point)
             .count();
         if r.is_infinite() && self.slopes[i] == Rational::from(0) {
-            self.x_intercepts[i].clone()
+            self.x_intercepts[i]
         } else {
             &(r * &self.slopes[i]) + &self.x_intercepts[i]
         }
@@ -120,6 +117,7 @@ impl Trajectory {
         }
     }
 
+    #[inline]
     pub(crate) fn intersection_point(
         slope1: &Rational,
         x_intercept1: &Rational,
@@ -147,15 +145,16 @@ impl Trajectory {
             if upwards {
                 // You cannot inline it becasue borrow checker...
                 let last_idx = cps.len() - 1;
-                cps[last_idx] = new_cp.clone();
+                cps[last_idx] = *new_cp;
             }
         } else {
-            cps.push(new_cp.clone());
-            slopes.push(new_slope.clone());
-            x_intercepts.push(new_x_intercept.clone());
+            cps.push(*new_cp);
+            slopes.push(*new_slope);
+            x_intercepts.push(*new_x_intercept);
         }
     }
 
+    #[inline]
     fn is_infinite(&self) -> bool {
         self.x_intercepts[0].is_infinite()
     }
@@ -217,9 +216,9 @@ impl Trajectory {
                         as i32;
                 }
                 current_critical_point = if current_critical_point_owner <= 0 {
-                    self.critical_points[next_critical_point_self].clone()
+                    self.critical_points[next_critical_point_self]
                 } else {
-                    other.critical_points[next_critical_point_other].clone()
+                    other.critical_points[next_critical_point_other]
                 }
             }
 
@@ -242,14 +241,14 @@ impl Trajectory {
                         - &other.slopes[next_critical_point_other]);
                 new_critical_points.push(crossover_point);
                 new_slopes.push(if dominant_at_previous_critical_point < 0 {
-                    self.slopes[next_critical_point_self].clone()
+                    self.slopes[next_critical_point_self]
                 } else {
-                    other.slopes[next_critical_point_other].clone()
+                    other.slopes[next_critical_point_other]
                 });
                 new_x_intercepts.push(if dominant_at_previous_critical_point < 0 {
-                    self.x_intercepts[next_critical_point_self].clone()
+                    self.x_intercepts[next_critical_point_self]
                 } else {
-                    other.x_intercepts[next_critical_point_other].clone()
+                    other.x_intercepts[next_critical_point_other]
                 });
             }
 
@@ -263,13 +262,13 @@ impl Trajectory {
             if dominant_at_current_critical_point < 0 && current_critical_point_owner <= 0 {
                 // This trajectory is dominant at `current_critical_point` and its slope changes there.
                 new_critical_points.push(current_critical_point);
-                new_slopes.push(self.slopes[next_critical_point_self].clone());
-                new_x_intercepts.push(self.x_intercepts[next_critical_point_self].clone());
+                new_slopes.push(self.slopes[next_critical_point_self]);
+                new_x_intercepts.push(self.x_intercepts[next_critical_point_self]);
             } else if dominant_at_current_critical_point > 0 && current_critical_point_owner >= 0 {
                 // `other` is dominant at `current_critical_point` and its slope changes there.
                 new_critical_points.push(current_critical_point);
-                new_slopes.push(other.slopes[next_critical_point_other].clone());
-                new_x_intercepts.push(other.x_intercepts[next_critical_point_other].clone());
+                new_slopes.push(other.slopes[next_critical_point_other]);
+                new_x_intercepts.push(other.x_intercepts[next_critical_point_other]);
             } else if dominant_at_current_critical_point == 0 {
                 // The trajectories meet at `current_critical_point`. In this case we check which
                 // *slope* dominates above and below `current_critical_point`, and add
@@ -281,20 +280,20 @@ impl Trajectory {
                         as i32);
                 let slope_above_current_critical_point =
                     if dominant_slope_above_current_critical_point < 0 {
-                        self.slopes[next_critical_point_self].clone()
+                        self.slopes[next_critical_point_self]
                     } else {
-                        other.slopes[next_critical_point_other].clone()
+                        other.slopes[next_critical_point_other]
                     };
                 let self_slope_below_current_critical_point = if current_critical_point_owner <= 0 {
-                    self.slopes[next_critical_point_self + 1].clone()
+                    self.slopes[next_critical_point_self + 1]
                 } else {
-                    self.slopes[next_critical_point_self].clone()
+                    self.slopes[next_critical_point_self]
                 };
                 let other_slope_below_current_critical_point = if current_critical_point_owner >= 0
                 {
-                    other.slopes[next_critical_point_other + 1].clone()
+                    other.slopes[next_critical_point_other + 1]
                 } else {
-                    other.slopes[next_critical_point_other].clone()
+                    other.slopes[next_critical_point_other]
                 };
                 // TODO: use minmax with !max
                 let slope_below_current_critical_point = if max {
@@ -308,9 +307,9 @@ impl Trajectory {
                     new_critical_points.push(current_critical_point);
                     new_slopes.push(slope_above_current_critical_point);
                     new_x_intercepts.push(if dominant_slope_above_current_critical_point < 0 {
-                        self.x_intercepts[next_critical_point_self].clone()
+                        self.x_intercepts[next_critical_point_self]
                     } else {
-                        other.x_intercepts[next_critical_point_other].clone()
+                        other.x_intercepts[next_critical_point_other]
                     });
                 }
             }
@@ -343,15 +342,15 @@ impl Trajectory {
         }
 
         new_slopes.push(if dominant_at_tail < 0 {
-            self.slopes.last().unwrap().clone()
+            *self.slopes.last().unwrap()
         } else {
-            other.slopes.last().unwrap().clone()
+            *other.slopes.last().unwrap()
         });
 
         new_x_intercepts.push(if dominant_at_tail < 0 {
-            self.x_intercepts.last().unwrap().clone()
+            *self.x_intercepts.last().unwrap()
         } else {
-            other.x_intercepts.last().unwrap().clone()
+            *other.x_intercepts.last().unwrap()
         });
 
         let result = Trajectory {

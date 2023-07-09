@@ -1,6 +1,6 @@
 use std::{
     fmt::Display,
-    ops::{Add, Div, Mul, Sub, SubAssign},
+    ops::{Add, AddAssign, Div, Mul, Sub, SubAssign},
     str::FromStr,
 };
 
@@ -8,7 +8,7 @@ use num_rational::Rational64;
 
 use crate::nom_utils;
 
-#[derive(Debug, Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Rational {
     NegativeInfinity,
     Value(Rational64),
@@ -16,16 +16,14 @@ pub enum Rational {
 }
 
 impl Rational {
+    #[inline]
     pub fn new(numerator: i64, denominator: u32) -> Self {
         Rational::Value(Rational64::new(numerator, denominator as i64))
     }
 
+    #[inline]
     pub fn is_infinite(&self) -> bool {
-        match self {
-            Rational::NegativeInfinity => true,
-            Rational::Value(_) => false,
-            Rational::PositiveInfinity => true,
-        }
+        !matches!(self, Rational::Value(_))
     }
 }
 
@@ -70,6 +68,12 @@ impl Add for &Rational {
                 unimplemented!()
             }
         }
+    }
+}
+
+impl AddAssign for Rational {
+    fn add_assign(&mut self, rhs: Self) {
+        *self = self.add(rhs);
     }
 }
 

@@ -285,7 +285,7 @@ impl Position {
                 let next_x = x + DIR_X;
                 let next_y = y + DIR_Y;
                 if !self.at(x, y) && !self.at(next_x, next_y) {
-                    let mut new_grid = self.clone();
+                    let mut new_grid = *self;
                     new_grid.set(x, y, true);
                     new_grid.set(next_x, next_y, true);
                     moves.push(new_grid.move_top_left());

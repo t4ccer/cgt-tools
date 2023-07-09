@@ -1158,8 +1158,8 @@ impl GameBackend {
             right_scaffold = right_scaffold.min(&self.thermograph(right_move).left_wall);
         }
 
-        left_scaffold = left_scaffold.tilt(Rational::from(-1));
-        right_scaffold = right_scaffold.tilt(Rational::from(1));
+        left_scaffold.tilt(Rational::from(-1));
+        right_scaffold.tilt(Rational::from(1));
 
         Thermograph::thermographic_intersection(left_scaffold, right_scaffold)
     }
@@ -1489,8 +1489,8 @@ pub trait PartizanShortGame: Sized {
             right_scaffold = right_scaffold.min(&right_move.thermograph(cache).left_wall);
         }
 
-        left_scaffold = left_scaffold.tilt(Rational::from(-1));
-        right_scaffold = right_scaffold.tilt(Rational::from(1));
+        left_scaffold.tilt(Rational::from(-1));
+        right_scaffold.tilt(Rational::from(1));
 
         let thermograph = Thermograph::thermographic_intersection(left_scaffold, right_scaffold);
         cache.insert(self.clone(), thermograph.clone());
