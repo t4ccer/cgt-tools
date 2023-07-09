@@ -1,5 +1,8 @@
 use anyhow::{bail, Context, Result};
-use cgt::{domineering, rational::Rational, transposition_table::TranspositionTable};
+use cgt::{
+    domineering, rational::Rational, short_canonical_game::PlacementGame,
+    transposition_table::TranspositionTable,
+};
 use clap::Parser;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use std::{
@@ -58,6 +61,10 @@ pub struct Args {
     /// Path to write the cache
     #[arg(long)]
     output_path: String,
+
+    /// Maximum empty tiles to compute
+    #[arg(long, default_value = None)]
+    max_empty_tiles: Option<usize>,
 }
 
 struct ProgressTracker {
@@ -156,6 +163,12 @@ pub fn run(args: Args) -> Result<()> {
                 || grid.height() != progress_tracker.args.height
             {
                 return;
+            }
+
+            if let Some(max_empty_tiles) = progress_tracker.args.max_empty_tiles {
+                if grid.free_places() > max_empty_tiles {
+                    return;
+                }
             }
 
             let game = grid.canonical_form(&progress_tracker.cache);
