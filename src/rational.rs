@@ -1,6 +1,6 @@
 use std::{
     fmt::Display,
-    ops::{Add, AddAssign, Div, Mul, Sub, SubAssign},
+    ops::{Add, AddAssign, Div, Mul, Neg, Sub, SubAssign},
     str::FromStr,
 };
 
@@ -158,6 +158,18 @@ impl Div for &Rational {
             Rational::from(lhs / rhs)
         } else {
             unimplemented!()
+        }
+    }
+}
+
+impl Neg for Rational {
+    type Output = Rational;
+
+    fn neg(self) -> Self::Output {
+        match self {
+            Rational::NegativeInfinity => Rational::PositiveInfinity,
+            Rational::Value(val) => Rational::Value(-val),
+            Rational::PositiveInfinity => Rational::NegativeInfinity,
         }
     }
 }

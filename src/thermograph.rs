@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use std::fmt::Display;
 
 use crate::rational::Rational;
 use crate::trajectory::Trajectory;
@@ -448,5 +449,37 @@ impl Thermograph {
             left_wall,
             right_wall,
         }
+    }
+}
+
+impl Display for Thermograph {
+    /// Follows cgsuite format
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        fn fmt_trajectory(f: &mut std::fmt::Formatter<'_>, t: &Trajectory) -> std::fmt::Result {
+            write!(f, "{},[", t.mast_x_intercept())?;
+            for (idx, critical_point) in t.critical_points.iter().enumerate() {
+                if idx != 0 {
+                    write!(f, ",")?;
+                }
+                write!(f, "{}", critical_point)?;
+            }
+            write!(f, "],[")?;
+            for (idx, slope) in t.slopes.iter().enumerate() {
+                if idx != 0 {
+                    write!(f, ",")?;
+                }
+                write!(f, "{}", slope)?;
+            }
+            write!(f, "]")?;
+            Ok(())
+        }
+
+        write!(f, "Thermograph(")?;
+        fmt_trajectory(f, &self.left_wall)?;
+        write!(f, ",")?;
+        fmt_trajectory(f, &self.right_wall)?;
+        write!(f, ")")?;
+
+        Ok(())
     }
 }

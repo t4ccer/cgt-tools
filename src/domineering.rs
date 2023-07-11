@@ -804,17 +804,22 @@ fn flip_works() {
 }
 
 #[cfg(test)]
-fn assert_temperature(grid: Position, expected_temperature: Rational) {
-    let cache = RwHashMap::new();
-    let thermograph = grid.thermograph(&cache);
-    assert_eq!(thermograph.get_temperature(), expected_temperature);
+/// Assert temperature value without going through canonical form
+macro_rules! assert_temperature {
+    ($grid:expr, $temp:expr) => {
+        let grid = $grid.unwrap();
+        let cache = RwHashMap::new();
+        let thermograph = grid.thermograph(&cache);
+        let expected_temperature = Rational::from($temp);
+        assert_eq!(thermograph.get_temperature(), expected_temperature);
+    };
 }
 
 #[test]
 fn temperature_without_game_works() {
-    assert_temperature(Position::empty(0, 0).unwrap(), Rational::from(-1));
-    assert_temperature(
-        Position::parse("#...|....|....|....").unwrap(),
-        Rational::from(1),
-    );
+    assert_temperature!(Position::empty(0, 0), -1);
+    assert_temperature!(Position::parse(".."), -1);
+    assert_temperature!(Position::parse("..|.#"), 0);
+    assert_temperature!(Position::parse("#...|....|....|...."), 1);
+    assert_temperature!(Position::parse("..##..|#.....|....#.|##...#|##.#.#"), 2);
 }

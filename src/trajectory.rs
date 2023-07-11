@@ -2,8 +2,12 @@ use crate::rational::Rational;
 use itertools::Itertools;
 use std::cmp::Ordering;
 
+/// A continuous piecewise linear trajectory with rational slopes and critical points.
+/// Each trajectory is defined for all rational numbers on the interval `-1 ≤ x < ∞`.
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub struct Trajectory {
+    /// A `critical point` is a point at which the trajectory changes slope, and must be strictly
+    /// between `-1` and `∞`.
     pub(crate) critical_points: Vec<Rational>,
     pub(crate) slopes: Vec<Rational>,
     pub(crate) x_intercepts: Vec<Rational>,
@@ -86,7 +90,6 @@ impl Trajectory {
         self.x_intercepts.get(0).unwrap()
     }
 
-    // NOTE: This may be wrong
     /// Gets the value of this trajectory at the specified point.
     pub fn value_at(&self, r: &Rational) -> Rational {
         let i = self
@@ -161,16 +164,16 @@ impl Trajectory {
 
     #[inline]
     pub(crate) fn max(&self, other: &Trajectory) -> Trajectory {
-        self.minmax(true, other)
+        self.minmax::<true>(other)
     }
 
     #[inline]
     pub(crate) fn min(&self, other: &Trajectory) -> Trajectory {
-        self.minmax(false, other)
+        self.minmax::<false>(other)
     }
 
-    fn minmax(&self, max: bool, other: &Trajectory) -> Trajectory {
-        let max_multiplier = if max { -1 } else { 1 };
+    fn minmax<const MAX: bool>(&self, other: &Trajectory) -> Trajectory {
+        let max_multiplier = if MAX { -1 } else { 1 };
         // We scan down through the critical points.  We keep track of which
         // trajectory was dominant at the previous critical point:
         // <0 = this, 0 = both (equal), >0 = t.
@@ -296,7 +299,7 @@ impl Trajectory {
                     other.slopes[next_critical_point_other]
                 };
                 // TODO: use minmax with !max
-                let slope_below_current_critical_point = if max {
+                let slope_below_current_critical_point = if MAX {
                     self_slope_below_current_critical_point
                         .min(other_slope_below_current_critical_point)
                 } else {
