@@ -1157,10 +1157,6 @@ impl GameBackend {
 
         Thermograph::thermographic_intersection(left_scaffold, right_scaffold)
     }
-
-    pub fn known_games_len(&self) -> usize {
-        self.known_games.len()
-    }
 }
 
 // printing
