@@ -7,6 +7,9 @@ license = "AGPL-3.0"
 readme = "README.md"
 repository = "https://github.com/t4ccer/cgt-rs"
 description = "Library to work with Combinatorial Games"
+homepage = "https://cgt.t4ccer.com/"
+documentation = "https://docs.rs/cgt"
+exclude = ["papers"]
 
 [dependencies]
 gcd = "2.3.0"
