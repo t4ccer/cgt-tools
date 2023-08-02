@@ -137,6 +137,7 @@ dependencies = [
  "cgt",
  "chrono",
  "clap",
+ "itertools",
  "rand",
  "rayon",
  "serde",

@@ -4,6 +4,7 @@ pub mod domineering;
 pub mod dyadic_rational_number;
 pub mod graph;
 pub mod nimber;
+pub mod quicksort;
 pub mod rational;
 pub mod rw_hash_map;
 pub mod short_canonical_game;

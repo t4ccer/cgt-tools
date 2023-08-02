@@ -3,12 +3,14 @@ use clap::{self, Parser, Subcommand};
 
 mod anyhow_utils;
 mod domineering;
+mod quicksort;
 mod snort;
 
 #[derive(Subcommand, Debug)]
 enum Command {
     Domineering(domineering::Args),
     Snort(snort::Args),
+    Quicksort(quicksort::Args),
 }
 
 #[derive(Parser)]
@@ -22,5 +24,6 @@ fn main() -> Result<()> {
     match args.command {
         Command::Domineering(args) => domineering::run(args),
         Command::Snort(args) => snort::run(args),
+        Command::Quicksort(args) => quicksort::run(args),
     }
 }

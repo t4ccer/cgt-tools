@@ -23,7 +23,7 @@ impl Thermograph {
         let left = self.get_left_temperature();
         let right = self.get_right_temperature();
 
-        if self.left_wall.value_at(&left) > self.right_wall.value_at(&right) {
+        if self.left_wall.value_at(left) > self.right_wall.value_at(right) {
             Rational::PositiveInfinity
         } else {
             left.max(right)
@@ -34,7 +34,7 @@ impl Thermograph {
         if self.left_wall.critical_points.is_empty() {
             Rational::from(-1)
         } else {
-            self.left_wall.critical_points[0].clone()
+            self.left_wall.critical_points[0]
         }
     }
 
@@ -42,7 +42,7 @@ impl Thermograph {
         if self.right_wall.critical_points.is_empty() {
             Rational::from(-1)
         } else {
-            self.right_wall.critical_points[0].clone()
+            self.right_wall.critical_points[0]
         }
     }
 
@@ -69,8 +69,8 @@ impl Thermograph {
         let minus_one = Rational::from(-1);
         let zero = Rational::from(0);
 
-        let ls_at_base: Rational = left_scaffold.value_at(&minus_one);
-        let rs_at_base: Rational = right_scaffold.value_at(&minus_one);
+        let ls_at_base: Rational = left_scaffold.value_at(minus_one);
+        let rs_at_base: Rational = right_scaffold.value_at(minus_one);
 
         let mut previous_cave_value: Option<Rational>;
 
@@ -130,7 +130,7 @@ impl Thermograph {
             }
 
             let now_in_hill_region: bool = matches!(
-                left_scaffold.compare_to_at(&right_scaffold, &current_cp),
+                left_scaffold.compare_to_at(&right_scaffold, current_cp),
                 Ordering::Greater | Ordering::Equal
             );
             if previous_cave_value.is_none() && !now_in_hill_region {
@@ -171,27 +171,27 @@ impl Thermograph {
                 // Now add the cave mast.
                 let cave_mast_slope: Rational;
                 let cave_mast_intercept: Rational;
-                if left_scaffold.value_at(&current_cp) > left_scaffold.value_at(&crossover_point) {
+                if left_scaffold.value_at(current_cp) > left_scaffold.value_at(crossover_point) {
                     // The left scaffold moves to the left above the crossover point.
                     // The cave mast follows the left scaffold.
                     cave_mast_slope = left_scaffold.slopes[(next_cp_left + 1) as usize].clone();
                     cave_mast_intercept =
                         left_scaffold.x_intercepts[(next_cp_left + 1) as usize].clone();
-                    previous_cave_value = Some(left_scaffold.value_at(&current_cp));
-                } else if right_scaffold.value_at(&current_cp)
-                    < right_scaffold.value_at(&crossover_point)
+                    previous_cave_value = Some(left_scaffold.value_at(current_cp));
+                } else if right_scaffold.value_at(current_cp)
+                    < right_scaffold.value_at(crossover_point)
                 {
                     // The right scaffold moves to the right above the crossover point.
                     // The cave mast follows the right scaffold.
                     cave_mast_slope = right_scaffold.slopes[(next_cp_right + 1) as usize].clone();
                     cave_mast_intercept =
                         right_scaffold.x_intercepts[(next_cp_right + 1) as usize].clone();
-                    previous_cave_value = Some(right_scaffold.value_at(&current_cp));
+                    previous_cave_value = Some(right_scaffold.value_at(current_cp));
                 } else {
                     // Neither of the above.
                     // The cave mast extends vertically above the crossover point.
                     cave_mast_slope = Rational::from(0);
-                    cave_mast_intercept = left_scaffold.value_at(&crossover_point);
+                    cave_mast_intercept = left_scaffold.value_at(crossover_point);
                     previous_cave_value = Some(cave_mast_intercept.clone());
                 }
 
@@ -225,7 +225,7 @@ impl Thermograph {
 
                 // First determine which crossing points exist and find their values.
                 let left_scaffold_crossing_point =
-                    if &left_scaffold.value_at(&current_cp) > previous_cave_value_r {
+                    if &left_scaffold.value_at(current_cp) > previous_cave_value_r {
                         Some(
                             &(previous_cave_value_r
                                 - &left_scaffold.x_intercepts[(next_cp_left + 1) as usize])
@@ -235,7 +235,7 @@ impl Thermograph {
                         None
                     };
                 let right_scaffold_crossing_point =
-                    if &right_scaffold.value_at(&current_cp) < previous_cave_value_r {
+                    if &right_scaffold.value_at(current_cp) < previous_cave_value_r {
                         Some(
                             &(previous_cave_value_r
                                 - &right_scaffold.x_intercepts[(next_cp_right + 1) as usize])
@@ -293,7 +293,7 @@ impl Thermograph {
                             &right_scaffold.x_intercepts[(next_cp_right + 1) as usize],
                         );
                     } else {
-                        previous_cave_value = Some(left_scaffold.value_at(&current_cp));
+                        previous_cave_value = Some(left_scaffold.value_at(current_cp));
                         new_right_cp = current_cp.clone();
                     }
 
@@ -354,7 +354,7 @@ impl Thermograph {
                             &right_scaffold.x_intercepts[(next_cp_right + 1) as usize],
                         );
                     } else {
-                        previous_cave_value = Some(right_scaffold.value_at(&current_cp));
+                        previous_cave_value = Some(right_scaffold.value_at(current_cp));
                         new_left_cp = current_cp.clone();
                     }
                     Trajectory::extend_trajectory(

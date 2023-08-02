@@ -1,6 +1,6 @@
 use crate::rational::Rational;
 use itertools::Itertools;
-use std::cmp::Ordering;
+use std::{cmp::Ordering, fmt::Write};
 
 /// A continuous piecewise linear trajectory with rational slopes and critical points.
 /// Each trajectory is defined for all rational numbers on the interval `-1 ≤ x < ∞`.
@@ -86,30 +86,30 @@ impl Trajectory {
     }
 
     /// Get intercept of mast and the x-axis
-    pub fn mast_x_intercept(&self) -> &Rational {
-        self.x_intercepts.get(0).unwrap()
+    pub fn mast_x_intercept(&self) -> Rational {
+        self.x_intercepts[0]
     }
 
     /// Gets the value of this trajectory at the specified point.
-    pub fn value_at(&self, r: &Rational) -> Rational {
+    pub fn value_at(&self, r: Rational) -> Rational {
         let i = self
             .critical_points
             .iter()
-            .take_while(|critical_point| r < critical_point)
+            .take_while(|critical_point| r < **critical_point)
             .count();
         if r.is_infinite() && self.slopes[i] == Rational::from(0) {
             self.x_intercepts[i]
         } else {
-            &(r * &self.slopes[i]) + &self.x_intercepts[i]
+            &(r * self.slopes[i]) + &self.x_intercepts[i]
         }
     }
 
-    pub fn compare_to_at(&self, other: &Trajectory, t: &Rational) -> Ordering {
-        if t < &Rational::from(-1) {
+    pub fn compare_to_at(&self, other: &Trajectory, t: Rational) -> Ordering {
+        if t < Rational::from(-1) {
             panic!("t < -1");
         }
 
-        if t == &Rational::PositiveInfinity {
+        if t == Rational::PositiveInfinity {
             if self.slopes[0] == other.slopes[0] {
                 self.x_intercepts[0].cmp(&other.x_intercepts[0])
             } else {
@@ -227,8 +227,8 @@ impl Trajectory {
 
             let dominant_at_current_critical_point = max_multiplier
                 * (self
-                    .value_at(&current_critical_point)
-                    .cmp(&other.value_at(&current_critical_point)) as i32);
+                    .value_at(current_critical_point)
+                    .cmp(&other.value_at(current_critical_point)) as i32);
 
             if (dominant_at_current_critical_point < 0 && dominant_at_previous_critical_point > 0)
                 || (dominant_at_current_critical_point > 0
@@ -298,7 +298,7 @@ impl Trajectory {
                 } else {
                     other.slopes[next_critical_point_other]
                 };
-                // TODO: use minmax with !max
+
                 let slope_below_current_critical_point = if MAX {
                     self_slope_below_current_critical_point
                         .min(other_slope_below_current_critical_point)
@@ -333,8 +333,8 @@ impl Trajectory {
         let negative_one = Rational::from(-1);
         let mut dominant_at_tail = max_multiplier
             * (self
-                .value_at(&negative_one)
-                .cmp(&other.value_at(&negative_one)) as i32);
+                .value_at(negative_one)
+                .cmp(&other.value_at(negative_one)) as i32);
         if dominant_at_tail == 0 {
             dominant_at_tail = max_multiplier
                 * (self
@@ -363,5 +363,38 @@ impl Trajectory {
         };
 
         result
+    }
+
+    fn to_latex_impl(&self, f: &mut impl Write) -> std::fmt::Result {
+        let top_factor = Rational::new(4, 3);
+        let mut view_top = self.critical_points[0] * top_factor;
+        for cp in &self.critical_points {
+            view_top = view_top.max(*cp * top_factor);
+        }
+
+        for i in (-1)..(self.critical_points.len() as i32 - 1) {
+            let cp1 = if i == -1 {
+                view_top
+            } else {
+                self.critical_points[i as usize]
+            };
+            let cp2 = self.critical_points[(i + 1) as usize];
+            write!(
+                f,
+                "({}, {}) -- ({}, {})",
+                self.value_at(cp1),
+                cp1,
+                self.value_at(cp2),
+                cp2
+            )?;
+        }
+
+        Ok(())
+    }
+
+    pub fn to_latex(&self) -> String {
+        let mut buf = String::new();
+        self.to_latex_impl(&mut buf).unwrap();
+        buf
     }
 }

@@ -4,7 +4,7 @@ use std::{
 };
 
 #[derive(Debug, Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Nimber(u32);
+pub struct Nimber(pub u32);
 
 impl Nimber {
     pub fn get(&self) -> u32 {
