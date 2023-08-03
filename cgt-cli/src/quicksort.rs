@@ -1,7 +1,7 @@
 use anyhow::Result;
 use cgt::{
     numeric::{dyadic_rational_number::DyadicRationalNumber, nimber::Nimber},
-    short::impartial::games::quicksort::Quicksort,
+    short::impartial::games::quicksort_halfs::Quicksort,
     short::partizan::short_canonical_game::{Game, GameBackend},
 };
 use clap::{self, Parser};
