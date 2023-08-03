@@ -1,4 +1,4 @@
-use crate::short_canonical_game::{Game, GameBackend, Moves};
+use crate::short::partizan::short_canonical_game::{Game, GameBackend, Moves};
 use std::fmt::Display;
 
 #[derive(Debug, PartialEq, Eq)]

@@ -1,8 +1,6 @@
+use crate::{numeric::rational::Rational, short::partizan::trajectory::Trajectory};
 use std::cmp::Ordering;
 use std::fmt::Display;
-
-use crate::rational::Rational;
-use crate::trajectory::Trajectory;
 
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub struct Thermograph {

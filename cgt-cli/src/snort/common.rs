@@ -1,4 +1,4 @@
-use cgt::{rational::Rational, snort};
+use cgt::{numeric::rational::Rational, short::partizan::games::snort};
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub enum Log {

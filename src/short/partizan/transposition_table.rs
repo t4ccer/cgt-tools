@@ -1,7 +1,7 @@
 // TODO: Move to short positional game module
 use crate::{
     rw_hash_map::RwHashMap,
-    short_canonical_game::{Game, GameBackend, PlacementGame},
+    short::partizan::short_canonical_game::{Game, GameBackend, PlacementGame},
 };
 use std::hash::Hash;
 

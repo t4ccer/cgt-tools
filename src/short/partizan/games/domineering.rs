@@ -1,16 +1,15 @@
 //! Domineering game
 
 extern crate alloc;
+use crate::{
+    short::partizan::short_canonical_game::{Game, Moves, PartizanShortGame, PlacementGame},
+    short::partizan::transposition_table::TranspositionTable,
+};
 use alloc::collections::vec_deque::VecDeque;
 use std::{fmt::Display, str::FromStr};
 
-use crate::{
-    short_canonical_game::{Game, Moves, PartizanShortGame, PlacementGame},
-    transposition_table::TranspositionTable,
-};
-
 #[cfg(test)]
-use crate::rational::Rational;
+use crate::numeric::rational::Rational;
 
 pub type GridBits = u64;
 
@@ -85,7 +84,7 @@ impl Position {
     /// # Examples
     ///
     /// ```
-    /// use cgt::domineering::Position;
+    /// use cgt::short::partizan::games::domineering::Position;
     /// assert_eq!(&format!("{}", Position::empty(2, 3).unwrap()), "..|..|..");
     /// ```
     pub fn empty(width: u8, height: u8) -> Result<Position, PositionError> {
@@ -103,7 +102,7 @@ impl Position {
     /// # Examples
     ///
     /// ```
-    /// use cgt::domineering::Position;
+    /// use cgt::short::partizan::games::domineering::Position;
     /// assert_eq!(&format!("{}", Position::filled(3, 2).unwrap()), "###|###");
     /// ```
     pub fn filled(width: u8, height: u8) -> Result<Position, PositionError> {
@@ -125,7 +124,7 @@ impl Position {
     /// # Examples
     ///
     /// ```
-    /// use cgt::domineering::Position;
+    /// use cgt::short::partizan::games::domineering::Position;
     /// Position::parse("..#|.#.|##.").unwrap();
     /// ```
     pub fn parse(input: &str) -> Result<Position, PositionError> {
@@ -178,7 +177,7 @@ impl Position {
     /// # Examples
     ///
     /// ```
-    /// use cgt::domineering::Position;
+    /// use cgt::short::partizan::games::domineering::Position;
     /// assert_eq!(&format!("{}", Position::from_number(3, 2, 0b101110).unwrap()), ".##|#.#");
     /// ```
     pub fn from_number(
@@ -203,7 +202,7 @@ impl Position {
     /// # Examples
     ///
     /// ```
-    /// use cgt::domineering::Position;
+    /// use cgt::short::partizan::games::domineering::Position;
     /// Position::from_arr(2, 3, &[true, true, false, false, false, true]).unwrap();
     /// ```
     pub fn from_arr(width: u8, height: u8, grid: &[bool]) -> Result<Position, PositionError> {
@@ -307,8 +306,8 @@ impl PartizanShortGame for Position {
     /// // .#.  = {  .# , #. | <...> }
     /// // ##.            #. |
     ///
-    /// use cgt::domineering::Position;
-    /// use crate::cgt::short_canonical_game::PartizanShortGame;
+    /// use cgt::short::partizan::games::domineering::Position;
+    /// use cgt::short::partizan::short_canonical_game::PartizanShortGame;
     ///
     /// let position = Position::parse("..#|.#.|##.").unwrap();
     /// assert_eq!(
@@ -332,8 +331,8 @@ impl PartizanShortGame for Position {
     /// // .#.  = {  <...> | .#. ,
     /// // ##.             | ##.
     ///
-    /// use cgt::domineering::Position;
-    /// use crate::cgt::short_canonical_game::PartizanShortGame;
+    /// use cgt::short::partizan::games::domineering::Position;
+    /// use cgt::short::partizan::short_canonical_game::PartizanShortGame;
     ///
     /// let position = Position::parse("..#|.#.|##.").unwrap();
     /// assert_eq!(
@@ -386,7 +385,7 @@ impl Position {
     ///
     /// # Examples
     /// ```
-    /// use cgt::domineering::Position;
+    /// use cgt::short::partizan::games::domineering::Position;
     /// let position = Position::parse("###|.#.|##.").unwrap();
     /// assert_eq!(&format!("{}", position.move_top_left()), ".#.|##.");
     /// ```
@@ -515,7 +514,7 @@ impl Position {
     /// // .#. = .## + ##.
     /// // ##.   ###   ##.
     ///
-    /// use cgt::domineering::Position;
+    /// use cgt::short::partizan::games::domineering::Position;
     /// let position = Position::parse("..#|.#.|##.").unwrap();
     /// assert_eq!(
     ///    position.decompositions(),
@@ -551,8 +550,7 @@ impl Position {
     /// # Examples
     ///
     /// ```
-    /// use cgt::domineering::Position;
-    /// use cgt::transposition_table::TranspositionTable;
+    /// use cgt::short::partizan::{games::domineering::Position, transposition_table::TranspositionTable};
     ///
     /// let cache = TranspositionTable::new();
     /// let position = Position::parse(".#|..").unwrap();
@@ -654,7 +652,7 @@ fn finds_canonical_form_of_num_nim_sum() {
 
 #[test]
 fn finds_temperature_of_four_by_four_grid() {
-    use crate::rational::Rational;
+    use crate::numeric::rational::Rational;
 
     let cache = TranspositionTable::new();
     let grid = Position::parse("#...|....|....|....").unwrap();

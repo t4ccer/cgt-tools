@@ -1,6 +1,6 @@
 use super::common::DomineeringResult;
 use anyhow::{anyhow, Context, Result};
-use cgt::{domineering, rational::Rational};
+use cgt::{numeric::rational::Rational, short::partizan::games::domineering};
 use clap::Parser;
 use std::{
     fs::File,

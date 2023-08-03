@@ -1,9 +1,8 @@
 use anyhow::Result;
 use cgt::{
-    dyadic_rational_number::DyadicRationalNumber,
-    nimber::Nimber,
-    quicksort::Quicksort,
-    short_canonical_game::{Game, GameBackend},
+    numeric::{dyadic_rational_number::DyadicRationalNumber, nimber::Nimber},
+    short::impartial::games::quicksort::Quicksort,
+    short::partizan::short_canonical_game::{Game, GameBackend},
 };
 use clap::{self, Parser};
 use itertools::Itertools;

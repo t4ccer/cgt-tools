@@ -1,10 +1,12 @@
 use anyhow::{bail, Context, Result};
 use cgt::{
-    domineering,
-    rational::Rational,
+    numeric::rational::Rational,
     rw_hash_map::RwHashMap,
-    short_canonical_game::{PartizanShortGame, PlacementGame},
-    thermograph::Thermograph,
+    short::partizan::{
+        games::domineering,
+        short_canonical_game::{PartizanShortGame, PlacementGame},
+        thermograph::Thermograph,
+    },
 };
 use clap::Parser;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};

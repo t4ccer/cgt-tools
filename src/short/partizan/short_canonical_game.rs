@@ -1,6 +1,7 @@
 use crate::{
-    dyadic_rational_number::DyadicRationalNumber, nimber::Nimber, rational::Rational,
-    rw_hash_map::RwHashMap, thermograph::Thermograph, trajectory::Trajectory,
+    numeric::dyadic_rational_number::DyadicRationalNumber, numeric::nimber::Nimber,
+    numeric::rational::Rational, rw_hash_map::RwHashMap, short::partizan::thermograph::Thermograph,
+    short::partizan::trajectory::Trajectory,
 };
 use elsa::sync::FrozenVec;
 use std::{

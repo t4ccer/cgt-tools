@@ -1,5 +1,5 @@
 use crate::utils::AddRemoveButton;
-use cgt::{domineering, transposition_table::TranspositionTable};
+use cgt::short::partizan::{games::domineering, transposition_table::TranspositionTable};
 use sycamore::prelude::*;
 
 #[derive(Clone, Copy)]

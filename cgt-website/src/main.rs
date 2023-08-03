@@ -1,4 +1,5 @@
 use crate::domineering::{Domineering, DomineeringState};
+use cgt::short::partizan::games::domineering::Position;
 use sycamore::prelude::*;
 use sycamore_router::{HistoryIntegration, Route, Router};
 
@@ -33,7 +34,7 @@ fn App<'a, G: Html>(cx: Scope<'a>) -> View<G> {
 		Router(integration=HistoryIntegration::new(), view=|cx, route: &ReadSignal<Routes>| { view! {
 		    cx,
 		    ({
-			let domineering_position = cgt::domineering::Position::empty(4, 4).unwrap();
+			let domineering_position = Position::empty(4, 4).unwrap();
 			let domineering_state = DomineeringState::new(cx, domineering_position);
 			match route.get().as_ref() {
 			    Routes::Domineering => view! {cx, Domineering(state=domineering_state)},

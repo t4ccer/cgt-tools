@@ -1,6 +1,10 @@
 use crate::snort::common::{Log, Scored};
 use anyhow::Result;
-use cgt::{graph::undirected, rational::Rational, snort, transposition_table::TranspositionTable};
+use cgt::{
+    graph::undirected,
+    numeric::rational::Rational,
+    short::partizan::{games::snort, transposition_table::TranspositionTable},
+};
 use clap::{self, Parser};
 use rand::{seq::SliceRandom, Rng};
 use std::{

@@ -1,4 +1,4 @@
-use crate::rational::Rational;
+use crate::numeric::rational::Rational;
 use itertools::Itertools;
 use std::{cmp::Ordering, fmt::Write};
 

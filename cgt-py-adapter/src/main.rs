@@ -1,6 +1,12 @@
 use std::io::stdin;
 
-use cgt::{domineering, graph::undirected, snort, transposition_table::TranspositionTable};
+use cgt::{
+    graph::undirected,
+    short::partizan::{
+        games::{domineering, snort},
+        transposition_table::TranspositionTable,
+    },
+};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 struct DomineeringRequest {

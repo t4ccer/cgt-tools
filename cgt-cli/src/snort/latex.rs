@@ -1,5 +1,5 @@
 use anyhow::{bail, Context, Result};
-use cgt::rational::Rational;
+use cgt::numeric::rational::Rational;
 use clap::Parser;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use std::{

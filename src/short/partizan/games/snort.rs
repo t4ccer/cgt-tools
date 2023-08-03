@@ -1,12 +1,11 @@
 //! Game of Snort
-use num_derive::FromPrimitive;
-use std::fmt::Write;
-
 use crate::{
     graph::undirected::Graph,
-    short_canonical_game::{Game, Moves, PartizanShortGame, PlacementGame},
-    transposition_table::TranspositionTable,
+    short::partizan::short_canonical_game::{Game, Moves, PartizanShortGame, PlacementGame},
+    short::partizan::transposition_table::TranspositionTable,
 };
+use num_derive::FromPrimitive;
+use std::fmt::Write;
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, FromPrimitive)]
 #[cfg_attr(
@@ -150,9 +149,9 @@ impl Position {
     ///
     /// ```
     /// use cgt::graph::undirected::Graph;
-    /// use cgt::short_canonical_game::PartizanShortGame;
-    /// use cgt::snort::{Position, VertexColor};
-    /// use cgt::transposition_table::TranspositionTable;
+    /// use cgt::short::partizan::short_canonical_game::PartizanShortGame;
+    /// use cgt::short::partizan::games::snort::{Position, VertexColor};
+    /// use cgt::short::partizan::transposition_table::TranspositionTable;
     ///
     /// let mut graph = Graph::empty(3);
     /// graph.connect(1, 2, true);
