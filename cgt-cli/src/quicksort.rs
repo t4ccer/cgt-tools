@@ -44,6 +44,7 @@ pub struct Args {
 
     #[arg(long, default_value = "none")]
     filter: GameValueFilter,
+    // TODO: Add variant: normal/halfs
 }
 
 pub fn run(args: Args) -> Result<()> {

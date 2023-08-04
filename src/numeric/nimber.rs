@@ -1,5 +1,5 @@
 use std::{
-    fmt::Display,
+    fmt::{Display, Write},
     ops::{Add, AddAssign, Neg, Sub, SubAssign},
 };
 
@@ -100,4 +100,18 @@ fn mex_works() {
         Nimber(2),
         Nimber::mex(vec![Nimber(0), Nimber(1), Nimber(1)])
     );
+}
+
+impl Nimber {
+    pub fn write_vec(w: &mut impl Write, nimbers: &[Nimber]) -> std::fmt::Result {
+        write!(w, "[")?;
+        for (idx, nimber) in nimbers.iter().enumerate() {
+            if idx != 0 {
+                write!(w, ",")?;
+            }
+            write!(w, "{}", nimber)?;
+        }
+        write!(w, "]")?;
+        Ok(())
+    }
 }

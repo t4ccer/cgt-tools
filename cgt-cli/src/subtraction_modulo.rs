@@ -1,26 +1,34 @@
-use anyhow::Result;
+use anyhow::{bail, Result};
 use cgt::loopy::impartial::games::subtraction_modulo::Sub;
 use clap::{self, Parser};
 
 #[derive(Parser, Debug)]
 pub struct Args {
-    #[arg(short)]
-    a: u32,
+    /// Comma separated list of values in the subtraction set
+    #[arg(long, num_args=1.., value_delimiter=',')]
+    moves: Vec<u32>,
 
-    #[arg(short)]
-    b: u32,
-
-    #[arg(long)]
+    /// Starting graph size
+    #[arg(long, default_value_t = 1)]
     start_n: u32,
 
-    #[arg(long)]
+    /// Final graph size
+    #[arg(long, default_value_t = 20)]
     end_n: u32,
 }
 
 pub fn run(args: Args) -> Result<()> {
+    if args.moves.is_empty() {
+        bail!("Subtraction set cannot be empty. Use --moves a,b,... to specify it.");
+    }
+
     for n in args.start_n..=args.end_n {
-        let sub = Sub::solve_using_graph(n, args.a, args.b);
-        println!("{}", sub);
+        println!("Sequence:");
+        let _sub = Sub::solve_using_sequence(&[1], n, args.moves.clone());
+        // println!("{}", sub);
+
+        let sub = Sub::solve_using_graph(n, args.moves.clone());
+        println!("Graph:\n{}\n", sub);
     }
 
     Ok(())

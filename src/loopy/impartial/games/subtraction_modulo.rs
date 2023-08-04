@@ -4,6 +4,7 @@ use std::{collections::HashSet, fmt::Display};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Vertex {
     Value(Nimber),
+    Loop(Vec<Nimber>),
     Unknown,
 }
 
@@ -11,6 +12,13 @@ impl Display for Vertex {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Vertex::Value(n) => write!(f, "{}", n),
+            Vertex::Loop(infs) => {
+                write!(f, "∞")?;
+                if !infs.is_empty() {
+                    Nimber::write_vec(f, infs)?;
+                }
+                Ok(())
+            }
             Vertex::Unknown => write!(f, "?"),
         }
     }
@@ -28,19 +36,12 @@ impl Vertex {
 #[derive(Debug, PartialEq, Eq)]
 pub struct Sub {
     graph: Vec<Vertex>,
-    a: u32,
-    b: u32,
+    moves: Vec<u32>,
 }
 
 impl Display for Sub {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "Sub(n = {}, a = {}, b = {}) = [",
-            self.graph.len(),
-            self.a,
-            self.b
-        )?;
+        write!(f, "Sub(n = {}, {:?}) = [", self.graph.len(), self.moves,)?;
         for (idx, v) in self.graph.iter().enumerate() {
             if idx != 0 {
                 write!(f, ", ")?;
@@ -58,16 +59,6 @@ impl Sub {
         self.graph.len() as u32
     }
 
-    /// Get the `a` component of `Sub(n, a, b)`
-    pub fn a(&self) -> u32 {
-        self.a
-    }
-
-    /// Get the `b` component of `Sub(n, a, b)`
-    pub fn b(&self) -> u32 {
-        self.b
-    }
-
     /// Solve using graph orbiting method.
     ///
     /// # Arguments
@@ -77,11 +68,10 @@ impl Sub {
     /// `a` - First element in subtraction set
     ///
     /// `a` - Second element in subtraction set
-    pub fn solve_using_graph(n: u32, a: u32, b: u32) -> Self {
+    pub fn solve_using_graph(n: u32, moves: Vec<u32>) -> Self {
         let mut res = Sub {
             graph: vec![Vertex::Unknown; n as usize],
-            a,
-            b,
+            moves,
         };
 
         // First zero is trivial - the first element is zero by the game definition
@@ -90,37 +80,34 @@ impl Sub {
         let n = n as i32;
 
         // First pass - find other zeros
-        // element is a zero if for every move to non-zero position there is a move to zero
+        // element is a zero if for every move to non-zero position there is a response move to zero
         for _ in 0..res.graph.len() {
-            for idx in 1..(res.graph.len() as i32) {
+            'inner: for idx in 1..(res.graph.len() as i32) {
                 // Alredy visited and marked as zero
                 if !matches!(res.graph[idx as usize], Vertex::Unknown) {
                     continue;
                 }
 
-                // We check for, then idx==0
-                // idx -> v1 != 0 -> 0
-                // AND
-                // idx -> v2 != 0 -> 0
+                for first_move in &res.moves {
+                    // Make a move
+                    let move_vertex = &res.graph[(idx - *first_move as i32).rem_euclid(n) as usize];
 
-                let v1 = &res.graph[(idx - res.a as i32).rem_euclid(n) as usize];
-                let v11 = &res.graph[(idx - res.a as i32 - res.a as i32).rem_euclid(n) as usize];
-                let v12 = &res.graph[(idx - res.a as i32 - res.b as i32).rem_euclid(n) as usize];
+                    // If we can move to zero, we cannot be zero.
+                    if !matches!(move_vertex, Vertex::Unknown) {
+                        continue 'inner;
+                    }
 
-                let v2 = &res.graph[(idx - res.b as i32).rem_euclid(n) as usize];
-                let v21 = &res.graph[(idx - res.b as i32 - res.a as i32).rem_euclid(n) as usize];
-                let v22 = &res.graph[(idx - res.b as i32 - res.b as i32).rem_euclid(n) as usize];
+                    // Check if there's a response move to zero
+                    let can_respond_to_zero = res.moves.iter().any(|response_move| {
+                        let response_vertex =
+                            &res.graph[(idx - *first_move as i32 - *response_move as i32)
+                                .rem_euclid(n) as usize];
+                        response_vertex.is_zero()
+                    });
 
-                if !matches!((v1, v2), (Vertex::Unknown, Vertex::Unknown)) {
-                    continue;
-                }
-
-                if !v11.is_zero() && !v12.is_zero() {
-                    continue;
-                }
-
-                if !v21.is_zero() && !v22.is_zero() {
-                    continue;
+                    if !can_respond_to_zero {
+                        continue 'inner;
+                    }
                 }
 
                 res.graph[idx as usize] = Vertex::Value(Nimber(0));
@@ -129,30 +116,47 @@ impl Sub {
 
         // Second pass - compute mex for each finite element
         for _ in 0..res.graph.len() {
-            for idx in 1..(res.graph.len() as i32) {
+            'inner: for idx in 1..(res.graph.len() as i32) {
                 if !matches!(res.graph[idx as usize], Vertex::Unknown) {
                     continue;
                 }
 
-                let v1 = &res.graph[(idx - res.a as i32).rem_euclid(n) as usize];
-                let v2 = &res.graph[(idx - res.b as i32).rem_euclid(n) as usize];
+                let mut for_mex = Vec::with_capacity(res.n() as usize);
+                for m in &res.moves {
+                    let v1 = &res.graph[(idx - *m as i32).rem_euclid(n) as usize];
+                    match v1 {
+                        Vertex::Value(g) => for_mex.push(*g),
+                        Vertex::Unknown | Vertex::Loop(_) => continue 'inner,
+                    };
+                }
 
-                let g1 = match v1 {
-                    Vertex::Unknown => continue,
-                    Vertex::Value(g) => *g,
-                };
-                let g2 = match v2 {
-                    Vertex::Unknown => continue,
-                    Vertex::Value(g) => *g,
-                };
-
-                let moves = vec![g1, g2];
-                let g = Nimber::mex(moves);
+                let g = Nimber::mex(for_mex);
                 res.graph[idx as usize] = Vertex::Value(g);
             }
         }
 
-        // TODO: Handle infinities and assert that threre's no more unknowns
+        // Third pass - compute infinites
+        for _ in 0..res.graph.len() {
+            for idx in 0..(res.n() as i32) {
+                // If we're a nimber we cannot be an infinity
+                if matches!(res.graph[idx as usize], Vertex::Value(_)) {
+                    continue;
+                }
+
+                let mut infinities = vec![];
+
+                for m in &res.moves {
+                    let v1 = &res.graph[(idx - *m as i32).rem_euclid(n) as usize];
+                    if let Vertex::Value(g) = v1 {
+                        if !infinities.contains(g) {
+                            infinities.push(*g);
+                        }
+                    }
+                }
+
+                res.graph[idx as usize] = Vertex::Loop(infinities);
+            }
+        }
 
         res
     }
@@ -168,9 +172,8 @@ impl Sub {
     /// `a` - First element in subtraction set
     ///
     /// `a` - Second element in subtraction set
-    pub fn solve_using_sequence(period: &[u32], n: u32, a: u32, b: u32) -> Self {
-        // List of allowed moves. I'm not sure if it works for more than two elements
-        let moves = vec![a, b];
+    pub fn solve_using_sequence(period: &[u32], n: u32, moves: Vec<u32>) -> Self {
+        assert!(period.len() > 0, "Period must not be empty");
 
         let n = n as usize;
 
@@ -209,7 +212,21 @@ impl Sub {
                 new_seq.push(new);
             }
 
+            if new_seq == extended_seq {
+                break;
+            }
+
             extended_seq = new_seq;
+            {
+                let r = Sub {
+                    graph: extended_seq
+                        .iter()
+                        .map(|n| Vertex::Value(Nimber(*n)))
+                        .collect(),
+                    moves: moves.clone(),
+                };
+                eprintln!("{}", r);
+            }
 
             // Cycle/fixpoint! We can break
             if seen.contains(&extended_seq) {
@@ -225,29 +242,22 @@ impl Sub {
                 .iter()
                 .map(|n| Vertex::Value(Nimber(*n)))
                 .collect(),
-            a,
-            b,
+            moves: moves.clone(),
         }
     }
 }
 
 #[test]
 fn sequence_reduction_graph_equivalence() {
+    // Graph and sequence are requivalent on finite games
     let using_sequence =
-        Sub::solve_using_sequence(&[0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 2], 40, 6, 7);
-    let using_graph = Sub::solve_using_graph(40, 6, 7);
+        Sub::solve_using_sequence(&[0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 2], 40, vec![6, 7]);
+    let using_graph = Sub::solve_using_graph(40, vec![6, 7]);
     assert_eq!(using_graph, using_sequence);
 
-    // let a = 2;
-    // let b = 3;
-
-    // for n in 1..100 {
-    // 	let using_sequence = Sub::solve_using_sequence(&[0,0,1,1,2,0], n, a, b);
-    // 	eprintln!("[n = {n}] [convergence = {}] {}", using_sequence.0, using_sequence.1);
-    // // let mut using_graph = Sub::new_unknown(n, a, b);
-    // 	// using_graph.solve_using_graph();
-    // }
-    // panic!();
-
-    // assert_eq!(using_graph, using_sequence);
+    // Initial starting sequence doesn't matter for the final result
+    let using_sequence1 =
+        Sub::solve_using_sequence(&[0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 2], 40, vec![6, 7]);
+    let using_sequence2 = Sub::solve_using_sequence(&[1], 40, vec![6, 7]);
+    assert_eq!(using_sequence1, using_sequence2);
 }
