@@ -1,4 +1,4 @@
-use crate::short::partizan::short_canonical_game::{Game, GameBackend, Moves};
+use crate::numeric::nimber::Nimber;
 use std::fmt::Display;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -15,7 +15,7 @@ impl Display for Quicksort {
 
 impl Quicksort {
     /// pivot on `pivot+0.5`
-    fn pivot(&self, pivot: u32) -> Self {
+    pub fn pivot(&self, pivot: u32) -> Self {
         let mut res = Quicksort(Vec::with_capacity(self.0.len()));
         for elem in &self.0 {
             if *elem <= pivot {
@@ -41,24 +41,12 @@ impl Quicksort {
         res
     }
 
-    pub fn game(&self, b: &GameBackend) -> Game {
+    pub fn game(&self) -> Nimber {
         let moves = self.moves();
         let mut game_moves = Vec::with_capacity(moves.len());
         for m in moves {
-            game_moves.push(m.game(b));
+            game_moves.push(m.game());
         }
-        b.construct_from_moves(Moves {
-            left: game_moves.clone(),
-            right: game_moves,
-        })
+        Nimber::mex(game_moves)
     }
-}
-
-#[test]
-fn qs() {
-    let game = Quicksort(vec![4, 2, 3, 1]);
-    for m in game.moves() {
-        eprintln!("{m}");
-    }
-    panic!();
 }

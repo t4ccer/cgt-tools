@@ -1,9 +1,5 @@
 use anyhow::Result;
-use cgt::{
-    numeric::{dyadic_rational_number::DyadicRationalNumber, nimber::Nimber},
-    short::impartial::games::quicksort_halfs::Quicksort,
-    short::partizan::short_canonical_game::{Game, GameBackend},
-};
+use cgt::{numeric::nimber::Nimber, short::impartial::games::quicksort_halfs::Quicksort};
 use clap::{self, Parser};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
@@ -51,22 +47,17 @@ pub struct Args {
 }
 
 pub fn run(args: Args) -> Result<()> {
-    let b = GameBackend::new();
-
     for max_value in args.start_range..=args.end_range {
         let sorted_range = (1..=max_value).into_iter().collect::<Vec<u32>>();
 
-        let filter: Box<dyn Fn(Game) -> bool> = match args.filter {
+        let filter: Box<dyn Fn(Nimber) -> bool> = match args.filter {
             GameValueFilter::None => Box::new(|_| true),
             GameValueFilter::NMinusOne => Box::new(|actual| {
-                let expected = b.construct_nimber(
-                    DyadicRationalNumber::from(0),
-                    Nimber((max_value - 1) as u32),
-                );
+                let expected = Nimber((max_value - 1) as u32);
                 expected == actual
             }),
             GameValueFilter::Zero => Box::new(|actual| {
-                let expected = b.construct_integer(0);
+                let expected = Nimber(0);
                 expected == actual
             }),
         };
@@ -74,11 +65,11 @@ pub fn run(args: Args) -> Result<()> {
         let range_len = sorted_range.len();
         for game in sorted_range.into_iter().permutations(range_len) {
             let game = Quicksort(game);
-            let game_value = game.game(&b);
+            let game_value = game.game();
             if filter(game_value) {
                 let report = Report {
                     position: game.to_string(),
-                    game_value: b.print_game_to_str(&game_value),
+                    game_value: game_value.to_string(),
                 };
                 println!("{}", serde_json::ser::to_string(&report).unwrap());
             }

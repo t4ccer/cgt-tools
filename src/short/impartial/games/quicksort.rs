@@ -1,5 +1,6 @@
-use crate::short::partizan::short_canonical_game::{Game, GameBackend, Moves};
 use std::fmt::Display;
+
+use crate::numeric::nimber::Nimber;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Quicksort(pub Vec<u32>);
@@ -41,15 +42,13 @@ impl Quicksort {
         res
     }
 
-    pub fn game(&self, b: &GameBackend) -> Game {
+    pub fn game(&self) -> Nimber {
         let moves = self.moves();
         let mut game_moves = Vec::with_capacity(moves.len());
         for m in moves {
-            game_moves.push(m.game(b));
+            game_moves.push(m.game());
         }
-        b.construct_from_moves(Moves {
-            left: game_moves.clone(),
-            right: game_moves,
-        })
+
+        Nimber::mex(game_moves)
     }
 }

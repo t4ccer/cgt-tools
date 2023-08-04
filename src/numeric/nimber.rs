@@ -56,6 +56,45 @@ impl SubAssign for Nimber {
 
 impl Display for Nimber {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
+        if self.0 == 0 {
+            write!(f, "0")
+        } else if self.0 == 1 {
+            write!(f, "*")
+        } else {
+            write!(f, "*{}", self.0)
+        }
     }
+}
+
+impl Nimber {
+    pub fn mex(mut nimbers: Vec<Self>) -> Self {
+        nimbers.sort();
+        let mut current = 0;
+        for n in nimbers {
+            if current < n.0 {
+                return Nimber(current);
+            } else if current == n.0 {
+                current += 1;
+            }
+        }
+        return Nimber(current);
+    }
+}
+
+#[test]
+fn mex_works() {
+    assert_eq!(
+        Nimber(3),
+        Nimber::mex(vec![Nimber(0), Nimber(0), Nimber(2), Nimber(5), Nimber(1)])
+    );
+
+    assert_eq!(
+        Nimber(3),
+        Nimber::mex(vec![Nimber(0), Nimber(1), Nimber(2)])
+    );
+
+    assert_eq!(
+        Nimber(2),
+        Nimber::mex(vec![Nimber(0), Nimber(1), Nimber(1)])
+    );
 }

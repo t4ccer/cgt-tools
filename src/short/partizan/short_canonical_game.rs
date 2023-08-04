@@ -57,7 +57,7 @@ impl Game {
 pub struct Nus {
     number: DyadicRationalNumber,
     up_multiple: i32,
-    nimber: Nimber,
+    pub nimber: Nimber,
 }
 
 impl Nus {
@@ -239,10 +239,8 @@ impl Display for Nus {
             write!(f, "v{}", self.up_multiple.abs())?;
         }
 
-        if self.nimber == Nimber::from(1) {
-            write!(f, "*")?;
-        } else if self.nimber != Nimber::from(0) {
-            write!(f, "*{}", self.nimber)?;
+        if self.nimber != Nimber::from(0) {
+            write!(f, "{}", self.nimber)?;
         }
 
         Ok(())
