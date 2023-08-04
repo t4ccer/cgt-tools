@@ -53,6 +53,21 @@ impl Display for Sub {
 }
 
 impl Sub {
+    /// Get the `n` component of `Sub(n, a, b)`
+    pub fn n(&self) -> u32 {
+        self.graph.len() as u32
+    }
+
+    /// Get the `a` component of `Sub(n, a, b)`
+    pub fn a(&self) -> u32 {
+        self.a
+    }
+
+    /// Get the `b` component of `Sub(n, a, b)`
+    pub fn b(&self) -> u32 {
+        self.b
+    }
+
     /// Solve using graph orbiting method.
     ///
     /// # Arguments
@@ -62,9 +77,9 @@ impl Sub {
     /// `a` - First element in subtraction set
     ///
     /// `a` - Second element in subtraction set
-    pub fn solve_using_graph(n: usize, a: u32, b: u32) -> Self {
+    pub fn solve_using_graph(n: u32, a: u32, b: u32) -> Self {
         let mut res = Sub {
-            graph: vec![Vertex::Unknown; n],
+            graph: vec![Vertex::Unknown; n as usize],
             a,
             b,
         };
@@ -153,9 +168,11 @@ impl Sub {
     /// `a` - First element in subtraction set
     ///
     /// `a` - Second element in subtraction set
-    pub fn solve_using_sequence(period: &[u32], n: usize, a: u32, b: u32) -> Self {
+    pub fn solve_using_sequence(period: &[u32], n: u32, a: u32, b: u32) -> Self {
         // List of allowed moves. I'm not sure if it works for more than two elements
         let moves = vec![a, b];
+
+        let n = n as usize;
 
         // Repeat classical subtraction period to match the length of the game graph
         let mut extended_seq = Vec::with_capacity(n);
@@ -200,6 +217,8 @@ impl Sub {
             }
             seen.insert(extended_seq.clone());
         }
+
+        // TODO: Add statistics: cycle len, sequence len
 
         Sub {
             graph: extended_seq

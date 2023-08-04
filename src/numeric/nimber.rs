@@ -3,6 +3,7 @@ use std::{
     ops::{Add, AddAssign, Neg, Sub, SubAssign},
 };
 
+#[repr(transparent)]
 #[derive(Debug, Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Nimber(pub u32);
 
@@ -67,7 +68,9 @@ impl Display for Nimber {
 }
 
 impl Nimber {
-    pub fn mex(mut nimbers: Vec<Self>) -> Self {
+    /// Compute the minimum excluded value from a vector of nimbers.
+    /// See https://en.wikipedia.org/wiki/Mex_(mathematics)
+    pub fn mex(mut nimbers: Vec<Nimber>) -> Nimber {
         nimbers.sort();
         let mut current = 0;
         for n in nimbers {
