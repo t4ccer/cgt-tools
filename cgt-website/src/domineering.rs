@@ -150,7 +150,7 @@ pub fn Domineering<'a, G: Html>(cx: Scope<'a>, state: DomineeringState<'a>) -> V
 	    div(class="flex flex-col") {
 		span(class="text-white font-mono"){"Canonical form: " (canonical_form.get())}
 		span(class="text-white font-mono"){"Temperature: " (temperature.get())}
-		span(class="text-white font-mono"){"Canonical form: TODO"}
+		span(class="text-white font-mono"){"Thermograph: TODO"}
 	    }
 	}
     }

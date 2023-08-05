@@ -27,9 +27,7 @@ impl Display for Vertex {
             Vertex::Loop(infs) => {
                 write!(f, "∞")?;
                 if !infs.is_empty() {
-                    write!(f, "(")?;
-                    display::sep(f, ",", infs)?;
-                    write!(f, "(")?;
+                    display::parens(f, |f| display::commas(f, infs))?;
                 }
                 Ok(())
             }
@@ -75,12 +73,13 @@ impl Sub {
 
 impl Display for Sub {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Sub(n = {}, {{", self.n())?;
-        display::sep(f, ",", &self.subtraction_set())?;
-        write!(f, "}}) = [")?;
-        display::sep(f, ", ", &self.graph())?;
-        write!(f, "]")?;
-        Ok(())
+        write!(f, "Sub")?;
+        display::parens(f, |f| {
+            write!(f, "n={}, ", self.n())?;
+            display::braces(f, |f| display::commas(f, &self.subtraction_set()))
+        })?;
+        write!(f, " = ")?;
+        display::brackets(f, |f| display::commas(f, &self.graph()))
     }
 }
 

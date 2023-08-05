@@ -1,12 +1,21 @@
 //! Subtraction game played on a finite subtraction set
 
-use crate::numeric::nimber::Nimber;
+use std::fmt::Display;
+
+use crate::{display, numeric::nimber::Nimber};
 
 /// Subtraction game
 #[derive(Clone, Debug)]
 pub struct Sub {
     // Invariant: sorted
     subtraction_set: Vec<u32>,
+}
+
+impl Display for Sub {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Sub")?;
+        display::parens(f, |f| display::commas(f, self.subtraction_set()))
+    }
 }
 
 impl Sub {
@@ -19,12 +28,14 @@ impl Sub {
 
 impl Sub {
     /// Define new subtraction game with a given subtraction set
+    #[inline]
     pub fn new(mut subtraction_set: Vec<u32>) -> Sub {
         subtraction_set.sort();
         Sub { subtraction_set }
     }
 
     /// Get the infinite Grundy sequence of the subtraction game
+    #[inline]
     pub fn grundy_sequence(self) -> GrundySequence {
         GrundySequence {
             game: self,
@@ -46,6 +57,8 @@ impl Iterator for GrundySequence {
     type Item = Nimber;
 
     fn next(&mut self) -> Option<Self::Item> {
+        // TODO: purge previous when went over game.subtraction_set().last()
+
         let mut for_mex = Vec::with_capacity(self.game.subtraction_set().len());
         for m in self.game.subtraction_set() {
             let j = self.current - *m as i32;
@@ -65,6 +78,7 @@ impl Iterator for GrundySequence {
 
 impl GrundySequence {
     /// Take first `n` elements of the Grundy sequence
+    #[inline]
     pub fn first_n(self, n: usize) -> Vec<Nimber> {
         self.into_iter().take(n).collect::<Vec<_>>()
     }
