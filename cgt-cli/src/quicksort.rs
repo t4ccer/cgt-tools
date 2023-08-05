@@ -1,40 +1,32 @@
 use anyhow::Result;
-use cgt::{numeric::nimber::Nimber, short::impartial::games::quicksort_halfs::Quicksort};
-use clap::{self, Parser};
+use cgt::{
+    numeric::nimber::Nimber,
+    short::impartial::games::{pseudo_quicksort::PseudoQuicksort, quicksort::Quicksort},
+};
+use clap::{self, Parser, ValueEnum};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use std::str::FromStr;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, ValueEnum)]
 enum GameValueFilter {
     None,
     NMinusOne,
     Zero,
 }
 
-impl FromStr for GameValueFilter {
-    type Err = String;
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s {
-            "none" => Ok(Self::None),
-            "n-1" => Ok(Self::NMinusOne),
-            "zero" => Ok(Self::Zero),
-            unexpected => Err(format!(
-                "Unexpected filter '{}'. Expected one of 'none', 'zero', 'n-1'",
-                unexpected
-            )),
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct Report {
     position: String,
     game_value: String,
 }
 
-#[derive(Parser, Debug)]
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum Variant {
+    Standard,
+    Halfs,
+}
+
+#[derive(Debug, Clone, Parser)]
 pub struct Args {
     #[arg(long, default_value_t = 1)]
     start_range: u32,
@@ -42,9 +34,26 @@ pub struct Args {
     #[arg(long, default_value_t = 6)]
     end_range: u32,
 
-    #[arg(long, default_value = "none")]
+    #[arg(long, value_enum, default_value_t = GameValueFilter::None)]
     filter: GameValueFilter,
-    // TODO: Add variant: normal/halfs
+
+    #[arg(long, value_enum, default_value_t = Variant::Standard)]
+    variant: Variant,
+}
+
+// There's no reasonable trait so here we go with a macro
+macro_rules! handle_variant {
+    ($variant:expr, $filter:expr) => {{
+        let game_value = $variant.nim_value();
+
+        if $filter(game_value) {
+            let report = Report {
+                position: $variant.to_string(),
+                game_value: game_value.to_string(),
+            };
+            println!("{}", serde_json::ser::to_string(&report).unwrap());
+        }
+    }};
 }
 
 pub fn run(args: Args) -> Result<()> {
@@ -65,14 +74,9 @@ pub fn run(args: Args) -> Result<()> {
 
         let range_len = sorted_range.len();
         for game in sorted_range.into_iter().permutations(range_len) {
-            let game = Quicksort(game);
-            let game_value = game.game();
-            if filter(game_value) {
-                let report = Report {
-                    position: game.to_string(),
-                    game_value: game_value.to_string(),
-                };
-                println!("{}", serde_json::ser::to_string(&report).unwrap());
+            match args.variant {
+                Variant::Standard => handle_variant!(Quicksort::new(game.clone()), filter),
+                Variant::Halfs => handle_variant!(PseudoQuicksort::new(game.clone()), filter),
             }
         }
     }

@@ -1,3 +1,3 @@
+pub mod pseudo_quicksort;
 pub mod quicksort;
-pub mod quicksort_halfs;
 pub mod subtraction;
