@@ -17,3 +17,6 @@ pub mod loopy;
 
 /// Nom parsing utilities
 mod nom_utils;
+
+/// Display utilities
+mod display;

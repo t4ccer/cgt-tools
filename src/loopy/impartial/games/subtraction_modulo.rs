@@ -1,10 +1,22 @@
-use crate::numeric::nimber::Nimber;
+//! Subtraction game played modulo some number `n`.
+//!
+//! This is loopy.
+//!
+//! This game has been proposed on Games-at-Dal 2023.
+
+use crate::{display, numeric::nimber::Nimber};
 use std::{collections::HashSet, fmt::Display};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Vertex {
+    /// Vertex that is equal to some finite nimber.
     Value(Nimber),
+
+    /// Vertex that can move in a finite loop, or escape to one of the nimbers.
     Loop(Vec<Nimber>),
+
+    // TODO: Remove
+    /// Vertex that couldn't be determined. Should never happen.
     Unknown,
 }
 
@@ -15,7 +27,9 @@ impl Display for Vertex {
             Vertex::Loop(infs) => {
                 write!(f, "∞")?;
                 if !infs.is_empty() {
-                    Nimber::write_vec(f, infs)?;
+                    write!(f, "(")?;
+                    display::sep(f, ",", infs)?;
+                    write!(f, "(")?;
                 }
                 Ok(())
             }
@@ -25,57 +39,67 @@ impl Display for Vertex {
 }
 
 impl Vertex {
+    /// Check if vertex is a finite zero
     fn is_zero(&self) -> bool {
         match self {
-            Vertex::Value(val) if val.0 == 0 => true,
+            Vertex::Value(val) if val.value() == 0 => true,
             _ => false,
         }
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Sub {
     graph: Vec<Vertex>,
-    moves: Vec<u32>,
+    subtraction_set: Vec<u32>,
+}
+
+impl Sub {
+    /// Get the underlying game graph
+    #[inline]
+    pub fn graph(&self) -> &Vec<Vertex> {
+        &self.graph
+    }
+
+    /// Get the subtraction set of the game
+    #[inline]
+    pub fn subtraction_set(&self) -> &Vec<u32> {
+        &self.subtraction_set
+    }
+
+    /// Get the `n` component of `Sub(n, a, b)`
+    pub fn n(&self) -> u32 {
+        self.graph.len() as u32
+    }
 }
 
 impl Display for Sub {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Sub(n = {}, {:?}) = [", self.graph.len(), self.moves,)?;
-        for (idx, v) in self.graph.iter().enumerate() {
-            if idx != 0 {
-                write!(f, ", ")?;
-            }
-            write!(f, "{}", v)?;
-        }
+        write!(f, "Sub(n = {}, {{", self.n())?;
+        display::sep(f, ",", &self.subtraction_set())?;
+        write!(f, "}}) = [")?;
+        display::sep(f, ", ", &self.graph())?;
         write!(f, "]")?;
         Ok(())
     }
 }
 
 impl Sub {
-    /// Get the `n` component of `Sub(n, a, b)`
-    pub fn n(&self) -> u32 {
-        self.graph.len() as u32
-    }
-
     /// Solve using graph orbiting method.
     ///
     /// # Arguments
     ///
     /// `n` - Size of the game graph. Will be used in `mod n`.
     ///
-    /// `a` - First element in subtraction set
-    ///
-    /// `a` - Second element in subtraction set
-    pub fn solve_using_graph(n: u32, moves: Vec<u32>) -> Self {
+    /// `subtraction_set` - Subtraction set for the game
+    pub fn solve_using_graph(n: u32, subtraction_set: Vec<u32>) -> Self {
         let mut res = Sub {
             graph: vec![Vertex::Unknown; n as usize],
-            moves,
+            subtraction_set,
         };
 
         // First zero is trivial - the first element is zero by the game definition
-        res.graph[0] = Vertex::Value(Nimber(0));
+        res.graph[0] = Vertex::Value(Nimber::new(0));
 
         let n = n as i32;
 
@@ -88,7 +112,7 @@ impl Sub {
                     continue;
                 }
 
-                for first_move in &res.moves {
+                for first_move in res.subtraction_set() {
                     // Make a move
                     let move_vertex = &res.graph[(idx - *first_move as i32).rem_euclid(n) as usize];
 
@@ -98,7 +122,7 @@ impl Sub {
                     }
 
                     // Check if there's a response move to zero
-                    let can_respond_to_zero = res.moves.iter().any(|response_move| {
+                    let can_respond_to_zero = res.subtraction_set().iter().any(|response_move| {
                         let response_vertex =
                             &res.graph[(idx - *first_move as i32 - *response_move as i32)
                                 .rem_euclid(n) as usize];
@@ -110,7 +134,7 @@ impl Sub {
                     }
                 }
 
-                res.graph[idx as usize] = Vertex::Value(Nimber(0));
+                res.graph[idx as usize] = Vertex::Value(Nimber::new(0));
             }
         }
 
@@ -122,7 +146,7 @@ impl Sub {
                 }
 
                 let mut for_mex = Vec::with_capacity(res.n() as usize);
-                for m in &res.moves {
+                for m in res.subtraction_set() {
                     let v1 = &res.graph[(idx - *m as i32).rem_euclid(n) as usize];
                     match v1 {
                         Vertex::Value(g) => for_mex.push(*g),
@@ -145,7 +169,7 @@ impl Sub {
 
                 let mut infinities = vec![];
 
-                for m in &res.moves {
+                for m in res.subtraction_set() {
                     let v1 = &res.graph[(idx - *m as i32).rem_euclid(n) as usize];
                     if let Vertex::Value(g) = v1 {
                         if !infinities.contains(g) {
@@ -165,14 +189,12 @@ impl Sub {
     ///
     /// # Arguments
     ///
-    /// `period` - Period of a regular subtraction game `Sub(a, b)`.
+    /// `period` - Period of the initial sequence
     ///
     /// `n` - Size of the game graph. Will be used in `mod n`.
     ///
-    /// `a` - First element in subtraction set
-    ///
-    /// `a` - Second element in subtraction set
-    pub fn solve_using_sequence(period: &[u32], n: u32, moves: Vec<u32>) -> Self {
+    /// `subtraction_set` - Subtraction set for the game
+    pub fn solve_using_sequence(period: &[u32], n: u32, subtraction_set: Vec<u32>) -> Self {
         assert!(period.len() > 0, "Period must not be empty");
 
         let n = n as usize;
@@ -204,11 +226,11 @@ impl Sub {
             for idx in 1..n {
                 let mut for_mex = Vec::new();
 
-                for m in &moves {
+                for m in &subtraction_set {
                     let i = (idx as i32 - (*m as i32)).rem_euclid(n as i32) as usize;
-                    for_mex.push(Nimber(extended_seq[i]));
+                    for_mex.push(Nimber::new(extended_seq[i]));
                 }
-                let new = Nimber::mex(for_mex).0;
+                let new = Nimber::mex(for_mex).value();
                 new_seq.push(new);
             }
 
@@ -221,9 +243,9 @@ impl Sub {
                 let r = Sub {
                     graph: extended_seq
                         .iter()
-                        .map(|n| Vertex::Value(Nimber(*n)))
+                        .map(|n| Vertex::Value(Nimber::new(*n)))
                         .collect(),
-                    moves: moves.clone(),
+                    subtraction_set: subtraction_set.clone(),
                 };
                 eprintln!("{}", r);
             }
@@ -240,9 +262,9 @@ impl Sub {
         Sub {
             graph: extended_seq
                 .iter()
-                .map(|n| Vertex::Value(Nimber(*n)))
+                .map(|n| Vertex::Value(Nimber::new(*n)))
                 .collect(),
-            moves: moves.clone(),
+            subtraction_set: subtraction_set.clone(),
         }
     }
 }
@@ -256,8 +278,23 @@ fn sequence_reduction_graph_equivalence() {
     assert_eq!(using_graph, using_sequence);
 
     // Initial starting sequence doesn't matter for the final result
+    // That is actually not always true, see below
     let using_sequence1 =
         Sub::solve_using_sequence(&[0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 2], 40, vec![6, 7]);
     let using_sequence2 = Sub::solve_using_sequence(&[1], 40, vec![6, 7]);
     assert_eq!(using_sequence1, using_sequence2);
 }
+
+#[test]
+fn weird_sequence() {
+    let a = 1;
+    let b = 2;
+    let n = 3;
+
+    let s1 = Sub::solve_using_sequence(&[0, 0, 0], n, vec![a, b]);
+    let s2 = Sub::solve_using_sequence(&[0, 1, 2], n, vec![a, b]);
+
+    assert_ne!(s1, s2);
+}
+
+// TODO: Test conjecture: P(Gr) = Gr iff Sub(n = a+b, {a,b})

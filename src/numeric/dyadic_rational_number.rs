@@ -1,3 +1,5 @@
+//! Number in form `n/2^m`
+
 use std::{
     fmt::Display,
     ops::{Add, AddAssign, Neg, Sub},

@@ -1,3 +1,5 @@
+//! Infinite rational number.
+
 use std::{
     fmt::Display,
     ops::{Add, AddAssign, Div, Mul, Neg, Sub, SubAssign},

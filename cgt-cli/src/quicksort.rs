@@ -54,11 +54,11 @@ pub fn run(args: Args) -> Result<()> {
         let filter: Box<dyn Fn(Nimber) -> bool> = match args.filter {
             GameValueFilter::None => Box::new(|_| true),
             GameValueFilter::NMinusOne => Box::new(|actual| {
-                let expected = Nimber((max_value - 1) as u32);
+                let expected = Nimber::new((max_value - 1) as u32);
                 expected == actual
             }),
             GameValueFilter::Zero => Box::new(|actual| {
-                let expected = Nimber(0);
+                let expected = Nimber::new(0);
                 expected == actual
             }),
         };

@@ -402,7 +402,7 @@ impl Moves {
                 }
 
                 if l.get_nus_unchecked().up_multiple != 0
-                    || l.get_nus_unchecked().nimber.get() != (i as u32)
+                    || l.get_nus_unchecked().nimber.value() != (i as u32)
                 {
                     return None;
                 }
@@ -597,7 +597,7 @@ impl GameBackend {
                     let nimber = nus.nimber;
 
                     let mut moves = Moves::empty();
-                    for i in 0..nimber.get() {
+                    for i in 0..nimber.value() {
                         let new_nus = Nus {
                             number: rational,
                             up_multiple: 0,
@@ -615,7 +615,7 @@ impl GameBackend {
                 let sign = if nus.up_multiple >= 0 { 1 } else { -1 };
                 let prev_up = nus.up_multiple - sign;
                 let up_parity: u32 = (nus.up_multiple & 1) as u32;
-                let prev_nimber = nus.nimber.get() ^ up_parity ^ (prev_up as u32 & 1);
+                let prev_nimber = nus.nimber.value() ^ up_parity ^ (prev_up as u32 & 1);
                 let moves;
 
                 if nus.up_multiple == 1 && nus.nimber == Nimber::from(1) {
@@ -1119,7 +1119,7 @@ impl GameBackend {
                         let new_game = self.construct_nus(Nus {
                             number: nus.number,
                             up_multiple: 0,
-                            nimber: Nimber::from(nus.nimber.get().cmp(&0) as u32), // signum(nus.nimber)
+                            nimber: Nimber::from(nus.nimber.value().cmp(&0) as u32), // signum(nus.nimber)
                         });
                         let new_game_moves = self.get_game_moves(&new_game);
                         self.thermograph_from_moves(&new_game_moves)

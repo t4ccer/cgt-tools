@@ -1,14 +1,25 @@
+//! Nimber is a number that represents a Nim heap of a given size.
+
 use std::{
-    fmt::{Display, Write},
+    fmt::Display,
     ops::{Add, AddAssign, Neg, Sub, SubAssign},
 };
 
+/// Number that represents a Nim heap of given size.
+///
+/// Addition is overloaded to Nim sum.
 #[repr(transparent)]
 #[derive(Debug, Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Nimber(pub u32);
+pub struct Nimber(u32);
 
 impl Nimber {
-    pub fn get(&self) -> u32 {
+    /// Construct new nimber
+    pub fn new(value: u32) -> Nimber {
+        Nimber(value)
+    }
+
+    /// Get the underlying nimber value
+    pub fn value(&self) -> u32 {
         self.0
     }
 }
@@ -69,7 +80,7 @@ impl Display for Nimber {
 
 impl Nimber {
     /// Compute the minimum excluded value from a vector of nimbers.
-    /// See https://en.wikipedia.org/wiki/Mex_(mathematics)
+    /// See <https://en.wikipedia.org/wiki/Mex_(mathematics)>
     pub fn mex(mut nimbers: Vec<Nimber>) -> Nimber {
         nimbers.sort();
         let mut current = 0;
@@ -100,18 +111,6 @@ fn mex_works() {
         Nimber(2),
         Nimber::mex(vec![Nimber(0), Nimber(1), Nimber(1)])
     );
-}
 
-impl Nimber {
-    pub fn write_vec(w: &mut impl Write, nimbers: &[Nimber]) -> std::fmt::Result {
-        write!(w, "[")?;
-        for (idx, nimber) in nimbers.iter().enumerate() {
-            if idx != 0 {
-                write!(w, ",")?;
-            }
-            write!(w, "{}", nimber)?;
-        }
-        write!(w, "]")?;
-        Ok(())
-    }
+    assert_eq!(Nimber(0), Nimber::mex(vec![]));
 }
