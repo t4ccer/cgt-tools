@@ -1,12 +1,17 @@
-//! Game of Snort
+//! Snort is played on undirected graph. In each turn Left colors a vertex blue and Right colors
+//! a vertex red. Players can only choose a vertex that is adjecent to only empty vertices or to
+//! vertices in their own color.
+
 use crate::{
     graph::undirected::Graph,
-    short::partizan::short_canonical_game::{Game, Moves, PartizanShortGame, PlacementGame},
+    short::partizan::short_canonical_game::{Game, Moves, PartizanShortGame},
     short::partizan::transposition_table::TranspositionTable,
 };
 use num_derive::FromPrimitive;
 use std::fmt::Write;
 
+/// Color of Snort vertex. Note that we are taking tinting apporach rather than direct tracking
+/// of adjacent colors.
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, FromPrimitive)]
 #[cfg_attr(
     feature = "serde",
@@ -14,16 +19,27 @@ use std::fmt::Write;
 )]
 #[repr(u8)]
 pub enum VertexColor {
+    /// Vertex without color, not connected to any taken vertices
     Empty = 0,
+
+    /// Vertex that is adjecent to left
     TintLeft = 1,
+
+    /// Vertex that is adjecent to right
     TintRight = 2,
+
+    /// Vertex that is either taken or connected to both colors
     Taken = 3,
 }
 
+/// Position of a [snort](self) game
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Position {
+    /// Vertices colors of the game graph
     pub vertices: Vec<VertexColor>,
+
+    /// Get graph of the game. This includes only edges
     pub graph: Graph,
 }
 
@@ -46,14 +62,6 @@ impl Position {
         }
 
         Some(Self { vertices, graph })
-    }
-
-    pub fn vertices(&self) -> &Vec<VertexColor> {
-        &self.vertices
-    }
-
-    pub fn graph(&self) -> &Graph {
-        &self.graph
     }
 
     /// Get moves for a given player. Works only for `TintLeft` and `TintRight`.
@@ -119,22 +127,6 @@ impl PartizanShortGame for Position {
 
     fn right_moves(&self) -> Vec<Self> {
         self.moves_for::<{ VertexColor::TintRight as u8 }>()
-    }
-}
-
-impl PlacementGame for Position {
-    fn free_places(&self) -> usize {
-        self.vertices
-            .iter()
-            .filter(|v| {
-                [
-                    VertexColor::Empty,
-                    VertexColor::TintLeft,
-                    VertexColor::TintRight,
-                ]
-                .contains(v)
-            })
-            .count()
     }
 }
 
@@ -206,6 +198,8 @@ fn no_moves() {
 }
 
 impl Position {
+    /// Render to a [graphviz](https://graphviz.org/) format, that can be later rendered to an
+    /// image with external engine.
     pub fn to_graphviz(&self) -> String {
         let mut buf = String::new();
 

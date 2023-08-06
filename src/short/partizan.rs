@@ -1,3 +1,5 @@
+//! Partizan games
+
 pub mod games;
 pub mod short_canonical_game;
 pub mod thermograph;

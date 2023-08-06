@@ -1,13 +1,13 @@
 //! Number in form `n/2^m`
 
+use crate::nom_utils;
 use std::{
     fmt::Display,
     ops::{Add, AddAssign, Neg, Sub},
     str::FromStr,
 };
 
-use crate::nom_utils;
-
+/// Number in form `n/2^m`
 #[derive(Debug, Hash, Clone, Copy, PartialEq, Eq)]
 pub struct DyadicRationalNumber {
     numerator: i64,
@@ -15,6 +15,7 @@ pub struct DyadicRationalNumber {
 }
 
 impl DyadicRationalNumber {
+    /// Create a new dyadic
     pub fn new(numerator: i64, denominator_exponent: u32) -> DyadicRationalNumber {
         DyadicRationalNumber {
             numerator,
@@ -23,6 +24,7 @@ impl DyadicRationalNumber {
         .normalized()
     }
 
+    /// Create a new fraction. Returns [None] if denominator is zero, or the number is not dyadic
     pub fn new_fraction(numerator: i64, mut denominator: u32) -> Option<DyadicRationalNumber> {
         let mut denominator_exponent = 0;
 
@@ -48,10 +50,12 @@ impl DyadicRationalNumber {
         }
     }
 
+    /// Get the numerator (`n` from `n/2^m`)
     pub fn numerator(&self) -> i64 {
         self.numerator
     }
 
+    /// Get the denominator (`2^m` from `n/2^m`) if it fits in [u128]
     pub fn denominator(&self) -> Option<u128> {
         if self.denominator_exponent as usize >= std::mem::size_of::<u128>() * 8 {
             None
@@ -61,6 +65,7 @@ impl DyadicRationalNumber {
         }
     }
 
+    /// Get denominator exponent (`m` from `n/2^m`)
     pub fn denominator_exponent(&self) -> u32 {
         self.denominator_exponent
     }

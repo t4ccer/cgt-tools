@@ -124,7 +124,7 @@ fn mutate(position: &mut snort::Position, mutation_rate: f32) {
 
 fn score(position: &snort::Position, cache: &TranspositionTable<snort::Position>) -> Rational {
     let degree_sum = position.graph.degrees().iter().sum::<usize>();
-    if position.vertices().is_empty() || degree_sum == 0 || !position.graph.is_connected() {
+    if position.vertices.is_empty() || degree_sum == 0 || !position.graph.is_connected() {
         return Rational::NegativeInfinity;
     }
 

@@ -1,8 +1,11 @@
+//! Undirected graph
+
 use num::iter::Range;
 use std::{collections::VecDeque, fmt::Display};
 
 use super::directed;
 
+/// Undirected graph
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Graph(directed::Graph);
@@ -20,16 +23,19 @@ impl Graph {
         Self(directed::Graph::empty(size))
     }
 
+    /// Create a graph from flattened adjecency matrix. Must be correct length
     #[inline]
     pub fn from_vec(size: usize, vec: Vec<bool>) -> Option<Self> {
         Some(Self(directed::Graph::from_vec(size, vec)?))
     }
 
+    /// Create a graph from adjecency matrix. Must be correct length
     #[inline]
     pub fn from_matrix(size: usize, matrix: Vec<Vec<bool>>) -> Option<Self> {
         Some(Self(directed::Graph::from_matrix(size, matrix)?))
     }
 
+    /// Create a graph from list of edges
     pub fn from_edges(size: usize, edges: &[(usize, usize)]) -> Self {
         let mut graph = Graph::empty(size);
         for (v, u) in edges {
@@ -77,6 +83,7 @@ impl Graph {
         self.0.remove_vertex(vertex_to_remove);
     }
 
+    /// Get degrees of all vertices in the graph
     pub fn degrees(&self) -> Vec<usize> {
         let mut degrees = vec![0; self.size()];
         for v in self.vertices() {
@@ -89,6 +96,7 @@ impl Graph {
         degrees
     }
 
+    /// Get graph degree (highest vertex degree)
     pub fn degree(&self) -> usize {
         *self
             .degrees()
@@ -97,6 +105,7 @@ impl Graph {
             .expect("graph to have at least 1 vertex")
     }
 
+    /// Check if graph is connected
     pub fn is_connected(&self) -> bool {
         if self.size() == 0 {
             return true;

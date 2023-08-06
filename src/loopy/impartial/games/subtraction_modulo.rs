@@ -1,12 +1,13 @@
 //! Subtraction game played modulo some number `n`.
 //!
-//! This is loopy.
-//!
-//! This game has been proposed on Games-at-Dal 2023.
+//! This game has been proposed at Games-at-Dal 2023 conference by Alfie Davies.
+
+// TODO: rename it when I remind myself the name
 
 use crate::{display, numeric::nimber::Nimber};
 use std::{collections::HashSet, fmt::Display};
 
+/// Value of graph vertex - finite or infinite
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Vertex {
     /// Vertex that is equal to some finite nimber.
@@ -46,6 +47,7 @@ impl Vertex {
     }
 }
 
+/// Modular subtraction game
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Sub {
     graph: Vec<Vertex>,

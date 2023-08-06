@@ -1,7 +1,10 @@
+//! Thermograph constructed from scaffolds with support for subzero thermography
+
 use crate::{numeric::rational::Rational, short::partizan::trajectory::Trajectory};
 use std::cmp::Ordering;
 use std::fmt::Display;
 
+/// See [thermograph](self) header
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub struct Thermograph {
     pub(crate) left_wall: Trajectory,
@@ -9,6 +12,7 @@ pub struct Thermograph {
 }
 
 impl Thermograph {
+    /// Construct a thermograph with only a mast at given value
     pub fn with_mast(mast: Rational) -> Self {
         let t = Trajectory::new_constant(mast);
         Thermograph {
@@ -17,6 +21,7 @@ impl Thermograph {
         }
     }
 
+    /// Get the temperature of the thermograph where both scaffolds merge into a mast
     pub fn get_temperature(&self) -> Rational {
         let left = self.get_left_temperature();
         let right = self.get_right_temperature();
@@ -28,7 +33,7 @@ impl Thermograph {
         }
     }
 
-    pub fn get_left_temperature(&self) -> Rational {
+    fn get_left_temperature(&self) -> Rational {
         if self.left_wall.critical_points.is_empty() {
             Rational::from(-1)
         } else {
@@ -36,7 +41,7 @@ impl Thermograph {
         }
     }
 
-    pub fn get_right_temperature(&self) -> Rational {
+    fn get_right_temperature(&self) -> Rational {
         if self.right_wall.critical_points.is_empty() {
             Rational::from(-1)
         } else {
@@ -44,6 +49,8 @@ impl Thermograph {
         }
     }
 
+    /// Calculate a thermograph given left and right scaffold. Note that scaffolds should be
+    /// [tilted](Trajectory::tilt) before.
     pub fn thermographic_intersection(
         left_scaffold: Trajectory,
         right_scaffold: Trajectory,

@@ -1,6 +1,9 @@
+//! Directed graph
+
 use num::{iter::Range, range};
 use std::fmt::Display;
 
+/// Directed graph
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Graph {
@@ -31,6 +34,7 @@ impl Graph {
         }
     }
 
+    /// Create a graph from flattened adjecency matrix. Must be correct length
     #[inline]
     pub fn from_vec(size: usize, vec: Vec<bool>) -> Option<Self> {
         if vec.len() != size * size {
@@ -43,6 +47,7 @@ impl Graph {
         })
     }
 
+    /// Create a graph from adjecency matrix. Must be correct length
     #[inline]
     pub fn from_matrix(size: usize, matrix: Vec<Vec<bool>>) -> Option<Self> {
         let vec: Vec<bool> = matrix.iter().flatten().copied().collect();

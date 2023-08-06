@@ -1,3 +1,5 @@
+//! Display utilities
+
 use std::fmt::{self, Display, Write};
 
 #[allow(dead_code)]

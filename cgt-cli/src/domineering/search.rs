@@ -3,9 +3,7 @@ use cgt::{
     numeric::rational::Rational,
     rw_hash_map::RwHashMap,
     short::partizan::{
-        games::domineering,
-        short_canonical_game::{PartizanShortGame, PlacementGame},
-        thermograph::Thermograph,
+        games::domineering, short_canonical_game::PartizanShortGame, thermograph::Thermograph,
     },
 };
 use clap::Parser;

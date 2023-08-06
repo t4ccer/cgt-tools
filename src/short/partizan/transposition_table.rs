@@ -1,7 +1,9 @@
+//! Thread safe transposition table for game values
+
 // TODO: Move to short positional game module
 use crate::{
     rw_hash_map::RwHashMap,
-    short::partizan::short_canonical_game::{Game, GameBackend, PlacementGame},
+    short::partizan::short_canonical_game::{Game, GameBackend},
 };
 use std::hash::Hash;
 
@@ -13,7 +15,7 @@ pub struct TranspositionTable<G> {
 
 impl<G> TranspositionTable<G>
 where
-    G: Eq + Hash + Clone + Sync + Send + PlacementGame,
+    G: Eq + Hash + Clone + Sync + Send,
 {
     /// Create new empty transposition table.
     #[inline]
@@ -37,16 +39,21 @@ where
         &self.game_backend
     }
 
+    // TODO: more generic names
+
+    /// Lookup a position
     #[inline]
     pub fn grids_get(&self, grid: &G) -> Option<Game> {
         self.grids.get(grid)
     }
 
+    /// Save position and its game value
     #[inline]
     pub fn grids_insert(&self, grid: G, game: Game) {
         self.grids.insert(grid, game);
     }
 
+    /// Get number of saved games
     #[inline]
     pub fn grids_saved(&self) -> usize {
         self.grids.len()

@@ -1,3 +1,7 @@
+//! Shared canonical form backend
+
+// TODO: Find better module name
+
 use crate::{
     numeric::dyadic_rational_number::DyadicRationalNumber, numeric::nimber::Nimber,
     numeric::rational::Rational, rw_hash_map::RwHashMap, short::partizan::thermograph::Thermograph,
@@ -13,12 +17,17 @@ use std::{
     sync::Mutex,
 };
 
+/// A pointer to a game form. Must be used with backend that created it
 #[derive(Debug, Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct GamePtr(usize);
 
+/// Canonical game form
 #[derive(Debug, Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Game {
+    /// Number Up Star sum
     Nus(Nus),
+
+    /// Not a NUS - pointer to list of left/right moves
     MovesPtr(GamePtr),
 }
 
@@ -31,6 +40,7 @@ impl Game {
         }
     }
 
+    /// Check if game is a Number Up Star sum
     pub fn is_number_up_star(&self) -> bool {
         matches!(self, Game::Nus(_))
     }
@@ -57,7 +67,7 @@ impl Game {
 pub struct Nus {
     number: DyadicRationalNumber,
     up_multiple: i32,
-    pub nimber: Nimber,
+    nimber: Nimber,
 }
 
 impl Nus {
@@ -250,7 +260,10 @@ impl Display for Nus {
 /// Left and Right moves from a given position
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub struct Moves {
+    /// Left player's moves
     pub left: Vec<Game>,
+
+    /// Right player's moves
     pub right: Vec<Game>,
 }
 
@@ -271,6 +284,7 @@ impl Moves {
         self.right.dedup();
     }
 
+    /// Try converting moves to NUS. Returns [None] if moves do not form a NUS
     pub fn to_nus(&self) -> Option<Nus> {
         let mut result = Nus::integer(0);
 
@@ -486,6 +500,7 @@ impl Display for Statistics {
     }
 }
 
+/// Shared game backend
 pub struct GameBackend {
     /// Lock that **MUST** be taken when adding new game
     add_game_lock: Mutex<()>,
@@ -499,11 +514,13 @@ pub struct GameBackend {
     leq_index: RwHashMap<(Game, Game), bool>,
     /// Lookup table for already constructed thermographs of non-trivial games
     thermograph_index: RwHashMap<Game, Thermograph>,
+
     #[cfg(feature = "statistics")]
     pub statistics: Mutex<Statistics>,
 }
 
 impl GameBackend {
+    /// Initialize new game backend
     pub fn new() -> Self {
         Self {
             add_game_lock: Mutex::new(()),
@@ -673,16 +690,19 @@ impl GameBackend {
         self.moves_index.get(moves)
     }
 
+    /// Construct NUD with only integer
     #[inline]
     pub fn construct_integer(&self, integer: i64) -> Game {
         Game::Nus(Nus::integer(integer))
     }
 
+    /// Construct NUD with only dyadic rational
     #[inline]
     pub fn construct_rational(&self, rational: DyadicRationalNumber) -> Game {
         Game::Nus(Nus::rational(rational))
     }
 
+    /// Construct NUD with only nimber
     #[inline]
     pub fn construct_nimber(&self, number: DyadicRationalNumber, nimber: Nimber) -> Game {
         Game::Nus(Nus {
@@ -692,11 +712,13 @@ impl GameBackend {
         })
     }
 
+    /// Construct NUS
     #[inline]
     pub fn construct_nus(&self, nus: Nus) -> Game {
         Game::Nus(nus)
     }
 
+    /// Construct negative of a game
     pub fn construct_negative(&self, game: &Game) -> Game {
         match game {
             Game::Nus(nus) => Game::Nus(-*nus),
@@ -1082,6 +1104,7 @@ impl GameBackend {
         Some(mex)
     }
 
+    /// Calculate temperature of the game. Avoids computing a thermograph is game is a NUS
     pub fn temperature(&self, game: &Game) -> Rational {
         match game {
             Game::Nus(nus) => {
@@ -1099,6 +1122,8 @@ impl GameBackend {
         }
     }
 
+    /// Construct a thermograph of a game, using thermographic intersection of
+    /// left and right scaffolds
     pub fn thermograph(&self, game: &Game) -> Thermograph {
         let thermograph = match game {
             Game::MovesPtr(ptr) => {
@@ -1160,6 +1185,7 @@ impl GameBackend {
 
 // printing
 impl GameBackend {
+    /// Print game using `{G^L | G^R}` notation
     pub fn print_game(&self, game: &Game, f: &mut impl Write) -> fmt::Result {
         match game {
             Game::Nus(nus) => write!(f, "{}", nus),
@@ -1170,12 +1196,14 @@ impl GameBackend {
         }
     }
 
+    /// Print game to string using `{G^L | G^R}` notation
     pub fn print_game_to_str(&self, id: &Game) -> String {
         let mut buf = String::new();
         self.print_game(id, &mut buf).unwrap();
         buf
     }
 
+    /// Print moves using `{G^L | G^R}` notation
     pub fn print_moves(&self, moves: &Moves, f: &mut impl Write) -> fmt::Result {
         write!(f, "{{")?;
         for (idx, l) in moves.left.iter().enumerate() {
@@ -1195,12 +1223,14 @@ impl GameBackend {
         Ok(())
     }
 
+    /// Print moves to string using `{G^L | G^R}` notation
     pub fn print_moves_to_str(&self, moves: &Moves) -> String {
         let mut buf = String::new();
         self.print_moves(moves, &mut buf).unwrap();
         buf
     }
 
+    /// Print moves with NUS unwrapped using `{G^L | G^R}` notation
     pub fn print_moves_deep(&self, moves: &Moves, f: &mut impl Write) -> fmt::Result {
         write!(f, "{{")?;
         for (idx, l) in moves.left.iter().enumerate() {
@@ -1220,6 +1250,7 @@ impl GameBackend {
         Ok(())
     }
 
+    /// Print moves to string with NUS unwrapped using `{G^L | G^R}` notation
     pub fn print_moves_deep_to_str(&self, moves: &Moves) -> String {
         let mut buf = String::new();
         self.print_moves_deep(moves, &mut buf).unwrap();
@@ -1442,6 +1473,7 @@ fn temp_of_one_minus_one_is_one() {
     assert_eq!(b.temperature(&g), Rational::from(1));
 }
 
+/// Game where Left and Right players have different moves
 pub trait PartizanShortGame: Sized {
     /// Get moves available for Left player.
     fn left_moves(&self) -> Vec<Self>;
@@ -1476,9 +1508,4 @@ pub trait PartizanShortGame: Sized {
 
         Thermograph::thermographic_intersection(left_scaffold, right_scaffold)
     }
-}
-
-// TODO: Read a book and name that stuff correctly
-pub trait PlacementGame: Sized {
-    fn free_places(&self) -> usize;
 }

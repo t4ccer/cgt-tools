@@ -1,29 +1,35 @@
 //! Infinite rational number.
 
+use crate::nom_utils;
+use num_rational::Rational64;
 use std::{
     fmt::Display,
     ops::{Add, AddAssign, Div, Mul, Neg, Sub, SubAssign},
     str::FromStr,
 };
 
-use num_rational::Rational64;
-
-use crate::nom_utils;
-
+/// Infinite rational number.
 #[derive(Debug, Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Rational {
+    /// Negative infnity, smaller than all other values
     NegativeInfinity,
+
+    /// A finite number
     Value(Rational64),
+
+    /// Positive infnity, greater than all other values
     PositiveInfinity,
 }
 
 impl Rational {
+    /// Create a new rational. Panics if denominator is zero.
     #[inline]
     pub fn new(numerator: i64, denominator: u32) -> Self {
         Rational::Value(Rational64::new(numerator, denominator as i64))
     }
 
+    /// Check if value is infinite
     #[inline]
     pub fn is_infinite(&self) -> bool {
         !matches!(self, Rational::Value(_))

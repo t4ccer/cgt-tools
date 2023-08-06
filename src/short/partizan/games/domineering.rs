@@ -1,8 +1,9 @@
-//! Domineering game
+//! The game is played on a rectengular grid. Left places vertical dominoes, Right places
+//! horizontal dominoes.
 
 extern crate alloc;
 use crate::{
-    short::partizan::short_canonical_game::{Game, Moves, PartizanShortGame, PlacementGame},
+    short::partizan::short_canonical_game::{Game, Moves, PartizanShortGame},
     short::partizan::transposition_table::TranspositionTable,
 };
 use alloc::collections::vec_deque::VecDeque;
@@ -11,6 +12,9 @@ use std::{fmt::Display, str::FromStr};
 #[cfg(test)]
 use crate::numeric::rational::Rational;
 
+// TODO: Move generic grid somewhere else
+
+/// Internal representation of a grid
 pub type GridBits = u64;
 
 /// A Domineering position on a rectengular grid.
@@ -45,6 +49,7 @@ fn bits_to_arr_works() {
     );
 }
 
+/// Reverse of [bits_to_arr]
 pub fn arr_to_bits(grid: &[bool]) -> GridBits {
     assert!(
         grid.len() <= 8 * std::mem::size_of::<GridBits>(),
@@ -64,9 +69,13 @@ fn bits_to_arr_to_bits_roundtrip() {
     assert_eq!(inp, arr_to_bits(&bits_to_arr(inp)),);
 }
 
+/// Grid construction error
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum PositionError {
+    /// Position larger than 64 tiles.
     TooLarge,
+
+    /// Invalid `.#` input
     CouldNotParse,
 }
 
@@ -260,12 +269,14 @@ fn set_works() {
 
 impl Position {
     #[inline]
+    /// Get value of given tile. Warning: UB if out of range
     pub fn at(&self, x: u8, y: u8) -> bool {
         let n = self.width as GridBits * y as GridBits + x as GridBits;
         (self.grid >> n) & 1 == 1
     }
 
     #[inline]
+    /// Set value of given tile. Warning: UB if out of range
     pub fn set(&mut self, x: u8, y: u8, val: bool) -> () {
         let val = val as GridBits;
         let n = self.width as GridBits * y as GridBits + x as GridBits;
@@ -345,8 +356,9 @@ impl PartizanShortGame for Position {
     }
 }
 
-impl PlacementGame for Position {
-    fn free_places(&self) -> usize {
+impl Position {
+    /// Get number of empty tiles on a grid
+    pub fn free_places(&self) -> usize {
         let mut res = 0;
         for y in 0..self.height() {
             for x in 0..self.width() {
@@ -671,6 +683,7 @@ impl Position {
         self.to_latex_with_scale(1.)
     }
 
+    /// Like [Self::to_latex] but allows to specify image scale. Scale must be positive
     pub fn to_latex_with_scale(&self, scale: f32) -> String {
         assert!(scale >= 0., "Scale must be positive");
 

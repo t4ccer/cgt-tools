@@ -1,3 +1,5 @@
+//! Nom parsing utilities
+
 use nom::{character::complete::multispace0, IResult, Parser};
 
 pub fn lexeme<'a, Output, Error, F>(
