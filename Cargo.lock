@@ -115,7 +115,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "cgt"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "elsa",
  "gcd",
@@ -131,7 +131,7 @@ dependencies = [
 
 [[package]]
 name = "cgt-cli"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "cgt",
@@ -146,7 +146,7 @@ dependencies = [
 
 [[package]]
 name = "cgt-py-adapter"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "cgt",
  "clap",
@@ -156,7 +156,7 @@ dependencies = [
 
 [[package]]
 name = "cgt-website"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "cgt",
  "console_error_panic_hook",
