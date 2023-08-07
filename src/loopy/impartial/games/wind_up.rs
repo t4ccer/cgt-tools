@@ -2,8 +2,6 @@
 //!
 //! This game has been proposed at Games-at-Dal 2023 conference by Alfie Davies.
 
-// TODO: rename it when I remind myself the name
-
 use crate::{display, numeric::nimber::Nimber};
 use std::{collections::HashSet, fmt::Display};
 
@@ -49,12 +47,12 @@ impl Vertex {
 
 /// Modular subtraction game
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Sub {
+pub struct WindUp {
     graph: Vec<Vertex>,
     subtraction_set: Vec<u32>,
 }
 
-impl Sub {
+impl WindUp {
     /// Get the underlying game graph
     #[inline]
     pub fn graph(&self) -> &Vec<Vertex> {
@@ -73,7 +71,7 @@ impl Sub {
     }
 }
 
-impl Display for Sub {
+impl Display for WindUp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Sub")?;
         display::parens(f, |f| {
@@ -85,7 +83,7 @@ impl Display for Sub {
     }
 }
 
-impl Sub {
+impl WindUp {
     /// Solve using graph orbiting method.
     ///
     /// # Arguments
@@ -94,7 +92,7 @@ impl Sub {
     ///
     /// `subtraction_set` - Subtraction set for the game
     pub fn solve_using_graph(n: u32, subtraction_set: Vec<u32>) -> Self {
-        let mut res = Sub {
+        let mut res = WindUp {
             graph: vec![Vertex::Unknown; n as usize],
             subtraction_set,
         };
@@ -241,7 +239,7 @@ impl Sub {
 
             extended_seq = new_seq;
             {
-                let r = Sub {
+                let r = WindUp {
                     graph: extended_seq
                         .iter()
                         .map(|n| Vertex::Value(Nimber::new(*n)))
@@ -260,7 +258,7 @@ impl Sub {
 
         // TODO: Add statistics: cycle len, sequence len
 
-        Sub {
+        WindUp {
             graph: extended_seq
                 .iter()
                 .map(|n| Vertex::Value(Nimber::new(*n)))
@@ -274,15 +272,15 @@ impl Sub {
 fn sequence_reduction_graph_equivalence() {
     // Graph and sequence are requivalent on finite games
     let using_sequence =
-        Sub::solve_using_sequence(&[0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 2], 40, vec![6, 7]);
-    let using_graph = Sub::solve_using_graph(40, vec![6, 7]);
+        WindUp::solve_using_sequence(&[0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 2], 40, vec![6, 7]);
+    let using_graph = WindUp::solve_using_graph(40, vec![6, 7]);
     assert_eq!(using_graph, using_sequence);
 
     // Initial starting sequence doesn't matter for the final result
     // That is actually not always true, see below
     let using_sequence1 =
-        Sub::solve_using_sequence(&[0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 2], 40, vec![6, 7]);
-    let using_sequence2 = Sub::solve_using_sequence(&[1], 40, vec![6, 7]);
+        WindUp::solve_using_sequence(&[0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 2], 40, vec![6, 7]);
+    let using_sequence2 = WindUp::solve_using_sequence(&[1], 40, vec![6, 7]);
     assert_eq!(using_sequence1, using_sequence2);
 }
 
@@ -292,8 +290,8 @@ fn weird_sequence() {
     let b = 2;
     let n = 3;
 
-    let s1 = Sub::solve_using_sequence(&[0, 0, 0], n, vec![a, b]);
-    let s2 = Sub::solve_using_sequence(&[0, 1, 2], n, vec![a, b]);
+    let s1 = WindUp::solve_using_sequence(&[0, 0, 0], n, vec![a, b]);
+    let s2 = WindUp::solve_using_sequence(&[0, 1, 2], n, vec![a, b]);
 
     assert_ne!(s1, s2);
 }

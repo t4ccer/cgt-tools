@@ -1,5 +1,5 @@
 use anyhow::{bail, Result};
-use cgt::loopy::impartial::games::subtraction_modulo::Sub;
+use cgt::loopy::impartial::games::wind_up::WindUp;
 use clap::{self, Parser};
 
 #[derive(Parser, Debug)]
@@ -30,7 +30,7 @@ pub fn run(args: Args) -> Result<()> {
         // let _sub = Sub::solve_using_sequence(&[1], n, args.moves.clone());
         // println!("{}", sub);
 
-        let sub = Sub::solve_using_graph(n, args.moves.clone());
+        let sub = WindUp::solve_using_graph(n, args.moves.clone());
         println!("{}", sub);
     }
 

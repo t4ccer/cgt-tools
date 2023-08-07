@@ -1,3 +1,3 @@
 //! Loopy games
 
-pub mod subtraction_modulo;
+pub mod wind_up;
