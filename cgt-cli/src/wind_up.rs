@@ -30,7 +30,7 @@ pub fn run(args: Args) -> Result<()> {
         // let _sub = Sub::solve_using_sequence(&[1], n, args.moves.clone());
         // println!("{}", sub);
 
-        let sub = WindUp::solve_using_graph(n, args.moves.clone());
+        let sub = WindUp::new_using_graph(n, args.moves.clone());
         println!("{}", sub);
     }
 
