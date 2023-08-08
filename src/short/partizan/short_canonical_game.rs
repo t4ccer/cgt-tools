@@ -690,19 +690,19 @@ impl GameBackend {
         self.moves_index.get(moves)
     }
 
-    /// Construct NUD with only integer
+    /// Construct NUS with only integer
     #[inline]
     pub fn construct_integer(&self, integer: i64) -> Game {
         Game::Nus(Nus::integer(integer))
     }
 
-    /// Construct NUD with only dyadic rational
+    /// Construct NUS with only dyadic rational
     #[inline]
     pub fn construct_rational(&self, rational: DyadicRationalNumber) -> Game {
         Game::Nus(Nus::rational(rational))
     }
 
-    /// Construct NUD with only nimber
+    /// Construct NUS with only nimber
     #[inline]
     pub fn construct_nimber(&self, number: DyadicRationalNumber, nimber: Nimber) -> Game {
         Game::Nus(Nus {

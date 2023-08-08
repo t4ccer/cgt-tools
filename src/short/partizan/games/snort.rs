@@ -8,10 +8,7 @@ use crate::{
     short::partizan::transposition_table::TranspositionTable,
 };
 use num_derive::FromPrimitive;
-use std::fmt::Write;
-
-#[cfg(feature = "rayon")]
-use rayon::prelude::{IntoParallelIterator, ParallelIterator};
+use std::{collections::VecDeque, fmt::Write};
 
 /// Color of Snort vertex. Note that we are taking tinting apporach rather than direct tracking
 /// of adjacent colors.
@@ -121,6 +118,85 @@ impl Position {
         }
         moves
     }
+
+    /// BFS search to get the decompisitons, should be used only as a helper for [Self::decompositions]
+    fn bfs(&self, visited: &mut Vec<bool>, v: usize) -> Self {
+        let mut vertices_to_take: Vec<usize> = Vec::new();
+
+        let mut q: VecDeque<usize> = VecDeque::new();
+        q.push_back(v);
+        visited[v] = true;
+
+        while let Some(v) = q.pop_front() {
+            vertices_to_take.push(v);
+
+            for u in self.graph.adjacent_to(v) {
+                if !visited[u] {
+                    visited[u] = true;
+                    q.push_back(u);
+                }
+            }
+        }
+
+        let mut new_graph = Graph::empty(vertices_to_take.len());
+        for (new_v, old_v) in vertices_to_take.iter().enumerate() {
+            for old_u in self.graph.adjacent_to(*old_v) {
+                if let Some(new_u) = vertices_to_take.iter().position(|x| *x == old_u) {
+                    new_graph.connect(new_v, new_u, true);
+                }
+            }
+        }
+
+        let mut new_vertices = Vec::with_capacity(vertices_to_take.len());
+        for v in &vertices_to_take {
+            new_vertices.push(self.vertices[*v]);
+        }
+
+        Self {
+            vertices: new_vertices,
+            graph: new_graph,
+        }
+    }
+
+    /// Decompose the game graph into disconnected components
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cgt::short::partizan::games::snort::Position;
+    /// use cgt::graph::undirected::Graph;
+    ///
+    /// assert_eq!(
+    ///     Position::new(Graph::from_edges(5, &[(0, 1), (0, 2), (1, 2), (3, 4)])).decompositions(),
+    ///     vec![
+    ///         Position::new(Graph::from_edges(3, &[(0, 1), (0, 2), (1, 2)])),
+    ///         Position::new(Graph::from_edges(2, &[(0, 1)]))
+    ///     ]
+    /// );
+    /// ```
+    pub fn decompositions(&self) -> Vec<Self> {
+        let mut visited = vec![false; self.vertices.len()];
+        let mut res = Vec::new();
+
+        for v in self.graph.vertices() {
+            if !matches!(self.vertices[v], VertexColor::Taken) && !visited[v] {
+                res.push(self.bfs(&mut visited, v));
+            }
+        }
+
+        res
+    }
+}
+
+#[test]
+fn decomposition_works() {
+    assert_eq!(
+        Position::new(Graph::from_edges(3, &[(0, 1), (0, 2), (1, 2)])).decompositions(),
+        vec![Position::new(Graph::from_edges(
+            3,
+            &[(0, 1), (0, 2), (1, 2)]
+        ))]
+    );
 }
 
 impl PartizanShortGame for Position {
@@ -166,43 +242,41 @@ impl Position {
     /// assert_eq!(&cache.game_backend().print_game_to_str(&game), "1*");
     /// ```
     pub fn canonical_form(&self, cache: &TranspositionTable<Self>) -> Game {
+        // TODO: move to trait
+
         if let Some(id) = cache.grids_get(self) {
             return id;
         }
 
-        let left_moves = self.left_moves();
-        let right_moves = self.right_moves();
+        let mut result = cache.game_backend().construct_integer(0);
+        for position in self.decompositions() {
+            let sub_result = match cache.grids_get(&position) {
+                Some(canonical_form) => canonical_form,
+                None => {
+                    let moves = Moves {
+                        left: position
+                            .left_moves()
+                            .iter()
+                            .map(|o| o.canonical_form(cache))
+                            .collect(),
+                        right: position
+                            .right_moves()
+                            .iter()
+                            .map(|o| o.canonical_form(cache))
+                            .collect(),
+                    };
 
-        // NOTE: That's redundant, but may increase performance
-        // `construct_from_moves` on empty moves results in 0 as well
-        if left_moves.is_empty() && right_moves.is_empty() {
-            return cache.game_backend().construct_integer(0);
+                    let canonical_form = cache.game_backend().construct_from_moves(moves);
+                    cache.grids_insert(position, canonical_form);
+                    canonical_form
+                }
+            };
+
+            result = cache.game_backend().construct_sum(sub_result, result);
         }
 
-        #[cfg(feature = "rayon")]
-        let moves = Moves {
-            left: left_moves
-                .into_par_iter()
-                .map(|o| o.canonical_form(cache))
-                .collect(),
-            right: right_moves
-                .into_par_iter()
-                .map(|o| o.canonical_form(cache))
-                .collect(),
-        };
-
-        #[cfg(not(feature = "rayon"))]
-        let moves = Moves {
-            left: left_moves.iter().map(|o| o.canonical_form(cache)).collect(),
-            right: right_moves
-                .iter()
-                .map(|o| o.canonical_form(cache))
-                .collect(),
-        };
-
-        let canonical_form = cache.game_backend().construct_from_moves(moves);
-        cache.grids_insert(self.clone(), canonical_form);
-        canonical_form
+        cache.grids_insert(self.clone(), result);
+        result
     }
 }
 
