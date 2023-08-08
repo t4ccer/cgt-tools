@@ -3,7 +3,9 @@ use anyhow::Result;
 use cgt::{
     graph::undirected,
     numeric::rational::Rational,
-    short::partizan::{games::snort, transposition_table::TranspositionTable},
+    short::partizan::{
+        games::snort, partizan_game::PartizanGame, transposition_table::TranspositionTable,
+    },
 };
 use clap::{self, Parser};
 use rand::{seq::SliceRandom, Rng};

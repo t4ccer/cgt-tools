@@ -2,11 +2,7 @@
 //! a vertex red. Players can only choose a vertex that is adjecent to only empty vertices or to
 //! vertices in their own color.
 
-use crate::{
-    graph::undirected::Graph,
-    short::partizan::short_canonical_game::{Game, Moves, PartizanShortGame},
-    short::partizan::transposition_table::TranspositionTable,
-};
+use crate::{graph::undirected::Graph, short::partizan::partizan_game::PartizanGame};
 use num_derive::FromPrimitive;
 use std::{collections::VecDeque, fmt::Write};
 
@@ -157,14 +153,25 @@ impl Position {
             graph: new_graph,
         }
     }
+}
+
+impl PartizanGame for Position {
+    fn left_moves(&self) -> Vec<Self> {
+        self.moves_for::<{ VertexColor::TintLeft as u8 }>()
+    }
+
+    fn right_moves(&self) -> Vec<Self> {
+        self.moves_for::<{ VertexColor::TintRight as u8 }>()
+    }
 
     /// Decompose the game graph into disconnected components
     ///
     /// # Examples
     ///
     /// ```
-    /// use cgt::short::partizan::games::snort::Position;
     /// use cgt::graph::undirected::Graph;
+    /// use cgt::short::partizan::games::snort::Position;
+    /// use cgt::short::partizan::partizan_game::PartizanGame;
     ///
     /// assert_eq!(
     ///     Position::new(Graph::from_edges(5, &[(0, 1), (0, 2), (1, 2), (3, 4)])).decompositions(),
@@ -174,7 +181,7 @@ impl Position {
     ///     ]
     /// );
     /// ```
-    pub fn decompositions(&self) -> Vec<Self> {
+    fn decompositions(&self) -> Vec<Self> {
         let mut visited = vec![false; self.vertices.len()];
         let mut res = Vec::new();
 
@@ -185,98 +192,6 @@ impl Position {
         }
 
         res
-    }
-}
-
-#[test]
-fn decomposition_works() {
-    assert_eq!(
-        Position::new(Graph::from_edges(3, &[(0, 1), (0, 2), (1, 2)])).decompositions(),
-        vec![Position::new(Graph::from_edges(
-            3,
-            &[(0, 1), (0, 2), (1, 2)]
-        ))]
-    );
-}
-
-impl PartizanShortGame for Position {
-    fn left_moves(&self) -> Vec<Self> {
-        self.moves_for::<{ VertexColor::TintLeft as u8 }>()
-    }
-
-    fn right_moves(&self) -> Vec<Self> {
-        self.moves_for::<{ VertexColor::TintRight as u8 }>()
-    }
-}
-
-impl Position {
-    /// Get the canonical form of the position.
-    ///
-    /// # Arguments
-    ///
-    /// `cache` - Shared cache of short combinatorial games.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use cgt::graph::undirected::Graph;
-    /// use cgt::short::partizan::short_canonical_game::PartizanShortGame;
-    /// use cgt::short::partizan::games::snort::{Position, VertexColor};
-    /// use cgt::short::partizan::transposition_table::TranspositionTable;
-    ///
-    /// let mut graph = Graph::empty(3);
-    /// graph.connect(1, 2, true);
-    ///
-    /// let colors = vec![
-    ///     VertexColor::TintLeft,
-    ///     VertexColor::TintRight,
-    ///     VertexColor::TintLeft,
-    /// ];
-    ///
-    /// let position = Position::with_colors(colors, graph).unwrap();
-    /// assert_eq!(position.left_moves().len(), 2);
-    /// assert_eq!(position.right_moves().len(), 1);
-    ///
-    /// let cache = TranspositionTable::new();
-    /// let game = position.canonical_form(&cache);
-    /// assert_eq!(&cache.game_backend().print_game_to_str(&game), "1*");
-    /// ```
-    pub fn canonical_form(&self, cache: &TranspositionTable<Self>) -> Game {
-        // TODO: move to trait
-
-        if let Some(id) = cache.grids_get(self) {
-            return id;
-        }
-
-        let mut result = cache.game_backend().construct_integer(0);
-        for position in self.decompositions() {
-            let sub_result = match cache.grids_get(&position) {
-                Some(canonical_form) => canonical_form,
-                None => {
-                    let moves = Moves {
-                        left: position
-                            .left_moves()
-                            .iter()
-                            .map(|o| o.canonical_form(cache))
-                            .collect(),
-                        right: position
-                            .right_moves()
-                            .iter()
-                            .map(|o| o.canonical_form(cache))
-                            .collect(),
-                    };
-
-                    let canonical_form = cache.game_backend().construct_from_moves(moves);
-                    cache.grids_insert(position, canonical_form);
-                    canonical_form
-                }
-            };
-
-            result = cache.game_backend().construct_sum(sub_result, result);
-        }
-
-        cache.grids_insert(self.clone(), result);
-        result
     }
 }
 

@@ -2,9 +2,7 @@ use anyhow::{bail, Context, Result};
 use cgt::{
     numeric::rational::Rational,
     rw_hash_map::RwHashMap,
-    short::partizan::{
-        games::domineering, short_canonical_game::PartizanShortGame, thermograph::Thermograph,
-    },
+    short::partizan::{games::domineering, partizan_game::PartizanGame, thermograph::Thermograph},
 };
 use clap::Parser;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
@@ -174,7 +172,7 @@ pub fn run(args: Args) -> Result<()> {
                 }
             }
 
-            let thermograph = grid.thermograph();
+            let thermograph = grid.thermograph_direct(); // NOTE: investigate why no canonical form
             let temperature = thermograph.get_temperature();
 
             // Don't save temperatures below or equal to treashold

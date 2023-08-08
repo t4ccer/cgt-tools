@@ -2,7 +2,10 @@ use anyhow::{bail, Context, Result};
 use cgt::{
     graph::undirected::Graph,
     numeric::rational::Rational,
-    short::partizan::{games::snort::Position, transposition_table::TranspositionTable},
+    short::partizan::{
+        games::snort::Position, partizan_game::PartizanGame,
+        transposition_table::TranspositionTable,
+    },
 };
 use clap::Parser;
 use std::{

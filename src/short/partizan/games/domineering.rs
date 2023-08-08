@@ -3,8 +3,8 @@
 
 extern crate alloc;
 use crate::{
-    short::partizan::short_canonical_game::{Game, Moves, PartizanShortGame},
-    short::partizan::transposition_table::TranspositionTable,
+    short::partizan::short_canonical_game::{Game, Moves},
+    short::partizan::{partizan_game::PartizanGame, transposition_table::TranspositionTable},
 };
 use alloc::collections::vec_deque::VecDeque;
 use std::{fmt::Display, str::FromStr};
@@ -307,7 +307,7 @@ impl Position {
         moves
     }
 }
-impl PartizanShortGame for Position {
+impl PartizanGame for Position {
     /// Get moves for the Left player as positions she can move to.
     ///
     /// # Examples
@@ -318,7 +318,7 @@ impl PartizanShortGame for Position {
     /// // ##.            #. |
     ///
     /// use cgt::short::partizan::games::domineering::Position;
-    /// use cgt::short::partizan::short_canonical_game::PartizanShortGame;
+    /// use crate::cgt::short::partizan::partizan_game::PartizanGame;
     ///
     /// let position = Position::parse("..#|.#.|##.").unwrap();
     /// assert_eq!(
@@ -343,7 +343,7 @@ impl PartizanShortGame for Position {
     /// // ##.             | ##.
     ///
     /// use cgt::short::partizan::games::domineering::Position;
-    /// use cgt::short::partizan::short_canonical_game::PartizanShortGame;
+    /// use crate::cgt::short::partizan::partizan_game::PartizanGame;
     ///
     /// let position = Position::parse("..#|.#.|##.").unwrap();
     /// assert_eq!(
@@ -353,6 +353,41 @@ impl PartizanShortGame for Position {
     /// ```
     fn right_moves(&self) -> Vec<Position> {
         self.moves_for::<1, 0>()
+    }
+
+    /// Get decompisitons of given position
+    ///
+    /// # Examples
+    /// ```
+    /// // ..#   ..#   ###
+    /// // .#. = .## + ##.
+    /// // ##.   ###   ##.
+    ///
+    /// use cgt::short::partizan::games::domineering::Position;
+    /// use crate::cgt::short::partizan::partizan_game::PartizanGame;
+    ///
+    /// let position = Position::parse("..#|.#.|##.").unwrap();
+    /// assert_eq!(
+    ///    position.decompositions(),
+    ///    vec![
+    ///        Position::parse("..|.#").unwrap(),
+    ///        Position::parse(".|.").unwrap(),
+    ///    ]
+    /// );
+    /// ```
+    fn decompositions(&self) -> Vec<Position> {
+        let mut visited = Position::empty(self.width, self.height).unwrap();
+        let mut ds = Vec::new();
+
+        for y in 0..self.height {
+            for x in 0..self.width {
+                if !self.at(x, y) && !visited.at(x, y) {
+                    ds.push(self.bfs(&mut visited, x, y));
+                }
+            }
+        }
+
+        ds
     }
 }
 
@@ -516,39 +551,6 @@ impl Position {
             }
         }
         grid.move_top_left()
-    }
-
-    /// Get decompisitons of given position
-    ///
-    /// # Examples
-    /// ```
-    /// // ..#   ..#   ###
-    /// // .#. = .## + ##.
-    /// // ##.   ###   ##.
-    ///
-    /// use cgt::short::partizan::games::domineering::Position;
-    /// let position = Position::parse("..#|.#.|##.").unwrap();
-    /// assert_eq!(
-    ///    position.decompositions(),
-    ///    vec![
-    ///        Position::parse("..|.#").unwrap(),
-    ///        Position::parse(".|.").unwrap(),
-    ///    ]
-    /// );
-    /// ```
-    pub fn decompositions(&self) -> Vec<Position> {
-        let mut visited = Position::empty(self.width, self.height).unwrap();
-        let mut ds = Vec::new();
-
-        for y in 0..self.height {
-            for x in 0..self.width {
-                if !self.at(x, y) && !visited.at(x, y) {
-                    ds.push(self.bfs(&mut visited, x, y));
-                }
-            }
-        }
-
-        ds
     }
 }
 
@@ -820,7 +822,7 @@ fn flip_works() {
 macro_rules! assert_temperature {
     ($grid:expr, $temp:expr) => {
         let grid = $grid.unwrap();
-        let thermograph = grid.thermograph();
+        let thermograph = grid.thermograph_direct();
         let expected_temperature = Rational::from($temp);
         assert_eq!(thermograph.get_temperature(), expected_temperature);
     };
