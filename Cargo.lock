@@ -125,6 +125,7 @@ dependencies = [
  "num-derive",
  "num-rational",
  "num-traits",
+ "rayon",
  "serde",
  "serde_repr",
 ]
@@ -138,6 +139,7 @@ dependencies = [
  "chrono",
  "clap",
  "itertools",
+ "nom",
  "rand",
  "rayon",
  "serde",

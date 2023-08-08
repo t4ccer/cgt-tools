@@ -10,6 +10,9 @@ use crate::{
 use num_derive::FromPrimitive;
 use std::fmt::Write;
 
+#[cfg(feature = "rayon")]
+use rayon::prelude::{IntoParallelIterator, ParallelIterator};
+
 /// Color of Snort vertex. Note that we are taking tinting apporach rather than direct tracking
 /// of adjacent colors.
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, FromPrimitive)]
@@ -176,6 +179,19 @@ impl Position {
             return cache.game_backend().construct_integer(0);
         }
 
+        #[cfg(feature = "rayon")]
+        let moves = Moves {
+            left: left_moves
+                .into_par_iter()
+                .map(|o| o.canonical_form(cache))
+                .collect(),
+            right: right_moves
+                .into_par_iter()
+                .map(|o| o.canonical_form(cache))
+                .collect(),
+        };
+
+        #[cfg(not(feature = "rayon"))]
         let moves = Moves {
             left: left_moves.iter().map(|o| o.canonical_form(cache)).collect(),
             right: right_moves
