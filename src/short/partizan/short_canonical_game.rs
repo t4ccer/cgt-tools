@@ -578,7 +578,8 @@ impl GameBackend {
         self.known_games.get(ptr.0).unwrap()
     }
 
-    fn get_game_moves(&self, game: &Game) -> Moves {
+    /// Get left and right moves from a canonical form
+    pub fn get_game_moves(&self, game: &Game) -> Moves {
         match game {
             Game::Nus(nus) => {
                 // Case: Just a number

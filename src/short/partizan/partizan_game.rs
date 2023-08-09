@@ -20,6 +20,9 @@ pub trait PartizanGame: Sized + Clone + Hash + Send + Sync + Eq {
     fn right_moves(&self) -> Vec<Self>;
 
     /// Split game into disjoint sum
+    ///
+    /// Note that default implementation doesn't find any decompisitons and may lead to performance
+    /// issues
     fn decompositions(&self) -> Vec<Self> {
         vec![self.clone()]
     }
@@ -91,5 +94,35 @@ pub trait PartizanGame: Sized + Clone + Hash + Send + Sync + Eq {
 
         cache.grids_insert(self.clone(), result);
         result
+    }
+
+    // TODO: Find a way to reduce duplication - maybe macro?
+
+    /// List of canonical moves for the Left player
+    fn sensible_left_moves(&self, cache: &TranspositionTable<Self>) -> Vec<Self> {
+        let canonical_form = self.canonical_form(cache);
+        let left_canonical = cache.game_backend().get_game_moves(&canonical_form).left;
+
+        self.left_moves()
+            .into_iter()
+            .filter(|m| {
+                let move_game_form = m.canonical_form(cache);
+                left_canonical.contains(&move_game_form)
+            })
+            .collect::<Vec<_>>()
+    }
+
+    /// List of canonical moves for the Right player
+    fn sensible_right_moves(&self, cache: &TranspositionTable<Self>) -> Vec<Self> {
+        let canonical_form = self.canonical_form(cache);
+        let right_canonical = cache.game_backend().get_game_moves(&canonical_form).right;
+
+        self.right_moves()
+            .into_iter()
+            .filter(|m| {
+                let move_game_form = m.canonical_form(cache);
+                right_canonical.contains(&move_game_form)
+            })
+            .collect::<Vec<_>>()
     }
 }
