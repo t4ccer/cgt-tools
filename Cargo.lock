@@ -125,7 +125,6 @@ dependencies = [
  "num-derive",
  "num-rational",
  "num-traits",
- "rayon",
  "serde",
  "serde_repr",
 ]
