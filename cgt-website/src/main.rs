@@ -1,9 +1,13 @@
-use crate::domineering::{Domineering, DomineeringState};
-use cgt::short::partizan::games::domineering::Position;
+use crate::{
+    domineering::{Domineering, DomineeringState},
+    snort::{Snort, SnortState},
+};
+use cgt::graph::undirected::Graph;
 use sycamore::prelude::*;
 use sycamore_router::{HistoryIntegration, Route, Router};
 
 mod domineering;
+mod snort;
 mod utils;
 
 fn main() {
@@ -34,11 +38,17 @@ fn App<'a, G: Html>(cx: Scope<'a>) -> View<G> {
 		Router(integration=HistoryIntegration::new(), view=|cx, route: &ReadSignal<Routes>| { view! {
 		    cx,
 		    ({
-			let domineering_position = Position::empty(4, 4).unwrap();
+			let domineering_position =
+			    cgt::short::partizan::games::domineering::Position::empty(4, 4).unwrap();
 			let domineering_state = DomineeringState::new(cx, domineering_position);
+			let snort_state = SnortState::new(
+			    cx,
+			    cgt::short::partizan::games::snort::Position::new(
+				Graph::from_edges(4, &[(0,1),(1,2),(0,2),(2,3)])));
+			
 			match route.get().as_ref() {
 			    Routes::Domineering => view! {cx, Domineering(state=domineering_state)},
-			    Routes::Snort => view! {cx, "TODO"},
+			    Routes::Snort => view! {cx, Snort(state=snort_state)},
 			    Routes::NotFound => view! {cx, ":("},
 			}
 		    })

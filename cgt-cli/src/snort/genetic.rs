@@ -278,7 +278,7 @@ impl Alg {
     // TODO: parallel with rayon
     fn score(&mut self) {
         let specimen = &mut self.specimen;
-        for mut spec in specimen {
+        for spec in specimen {
             spec.score = score(&spec.position, &self.cache);
             if spec.score >= self.args.save_eq_or_above {
                 if self.all_time_best.insert(spec.clone()) {
@@ -292,7 +292,6 @@ impl Alg {
                         temperature: self.cache.game_backend().temperature(&canonical_form),
                         degree: spec.position.graph.degree(),
                     };
-                    drop(spec);
                     Alg::emit_log(&mut self.log_writer, &log);
                 }
             }

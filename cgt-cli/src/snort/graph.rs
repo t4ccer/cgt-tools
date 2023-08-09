@@ -3,13 +3,14 @@ use cgt::{
     graph::undirected::Graph,
     numeric::rational::Rational,
     short::partizan::{
-        games::snort::Position, partizan_game::PartizanGame,
+        games::snort::{Position, VertexColor},
+        partizan_game::PartizanGame,
         transposition_table::TranspositionTable,
     },
 };
 use clap::Parser;
 use std::{
-    io::Write,
+    io::{self, stderr, Write},
     process::{Command, Stdio},
     str::FromStr,
     time,
@@ -43,10 +44,36 @@ impl FromStr for Edge {
     }
 }
 
+fn dump_edges(w: &mut impl Write, graph: &Graph) -> io::Result<()> {
+    let mut first = true;
+
+    for v in graph.vertices() {
+        for u in graph.vertices() {
+            if v < u && graph.are_adjacent(v, u) {
+                if !first {
+                    write!(w, ",")?;
+                }
+                write!(w, "{}-{}", v, u)?;
+                first = false;
+            }
+        }
+    }
+
+    write!(w, "\n")?;
+
+    Ok(())
+}
+
 #[derive(Parser, Debug, Clone)]
 pub struct Args {
     #[arg(long, value_delimiter = ',')]
     edges: Vec<Edge>,
+
+    #[arg(long, value_delimiter = ',')]
+    tinted_left: Vec<u32>,
+
+    #[arg(long, value_delimiter = ',')]
+    tinted_right: Vec<u32>,
 }
 
 pub fn run(args: Args) -> Result<()> {
@@ -63,7 +90,16 @@ pub fn run(args: Args) -> Result<()> {
         .collect::<Vec<_>>();
     let graph = Graph::from_edges((graph_size + 1) as usize, &edges);
     let degree = graph.degree();
-    let position = Position::new(graph);
+
+    let mut vertices = vec![VertexColor::Empty; graph.size()];
+    for v in args.tinted_left {
+        vertices[v as usize] = VertexColor::TintLeft;
+    }
+    for v in args.tinted_right {
+        vertices[v as usize] = VertexColor::TintRight;
+    }
+
+    let position = Position::with_colors(vertices, graph).unwrap();
 
     let tt = TranspositionTable::new();
     let canonical_form = position.canonical_form(&tt);
@@ -82,11 +118,13 @@ pub fn run(args: Args) -> Result<()> {
         let filename = format!("snort{}-left{}.png", timestamp, idx);
         render_snort(&m, &filename, "png", "fdp")?;
         eprintln!("Left Move {} Graph: {}", idx, filename);
+        dump_edges(&mut stderr(), &m.graph)?;
     }
     for (idx, m) in position.sensible_right_moves(&tt).iter().enumerate() {
         let filename = format!("snort{}-right{}.png", timestamp, idx);
         render_snort(&m, &filename, "png", "fdp")?;
         eprintln!("Right Move {} Graph: {}", idx, filename);
+        dump_edges(&mut stderr(), &m.graph)?;
     }
 
     let score = temperature - Rational::from(degree as i32);

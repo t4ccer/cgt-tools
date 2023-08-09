@@ -232,3 +232,23 @@ impl Position {
         buf
     }
 }
+
+#[test]
+fn correct_sensible() {
+    use crate::short::partizan::transposition_table::TranspositionTable;
+
+    let position = Position::with_colors(
+        vec![VertexColor::Empty, VertexColor::TintLeft],
+        Graph::empty(2),
+    )
+    .unwrap();
+    let tt = TranspositionTable::new();
+    assert_eq!(
+        position.sensible_left_moves(&tt),
+        vec![Position::with_colors(
+            vec![VertexColor::Taken, VertexColor::TintLeft],
+            Graph::empty(2),
+        )
+        .unwrap()]
+    );
+}

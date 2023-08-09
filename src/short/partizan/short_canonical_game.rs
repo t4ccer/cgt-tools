@@ -920,7 +920,8 @@ impl GameBackend {
         true
     }
 
-    fn leq(&self, lhs_game: &Game, rhs_game: &Game) -> bool {
+    /// Less than or equals comparison on two games
+    pub fn leq(&self, lhs_game: &Game, rhs_game: &Game) -> bool {
         if lhs_game == rhs_game {
             return true;
         }

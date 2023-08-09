@@ -101,13 +101,17 @@ pub trait PartizanGame: Sized + Clone + Hash + Send + Sync + Eq {
     /// List of canonical moves for the Left player
     fn sensible_left_moves(&self, cache: &TranspositionTable<Self>) -> Vec<Self> {
         let canonical_form = self.canonical_form(cache);
-        let left_canonical = cache.game_backend().get_game_moves(&canonical_form).left;
+        let moves = cache.game_backend().get_game_moves(&canonical_form);
+        let left_canonical = moves.left;
 
         self.left_moves()
             .into_iter()
             .filter(|m| {
                 let move_game_form = m.canonical_form(cache);
-                left_canonical.contains(&move_game_form)
+                let res = left_canonical
+                    .iter()
+                    .any(|k| cache.game_backend().leq(k, &move_game_form));
+                res
             })
             .collect::<Vec<_>>()
     }
@@ -115,13 +119,17 @@ pub trait PartizanGame: Sized + Clone + Hash + Send + Sync + Eq {
     /// List of canonical moves for the Right player
     fn sensible_right_moves(&self, cache: &TranspositionTable<Self>) -> Vec<Self> {
         let canonical_form = self.canonical_form(cache);
-        let right_canonical = cache.game_backend().get_game_moves(&canonical_form).right;
+        let moves = cache.game_backend().get_game_moves(&canonical_form);
+        let right_canonical = moves.right;
 
         self.right_moves()
             .into_iter()
             .filter(|m| {
                 let move_game_form = m.canonical_form(cache);
-                right_canonical.contains(&move_game_form)
+                let res = right_canonical
+                    .iter()
+                    .any(|k| cache.game_backend().leq(&move_game_form, k));
+                res
             })
             .collect::<Vec<_>>()
     }
