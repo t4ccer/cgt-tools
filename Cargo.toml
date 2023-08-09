@@ -31,7 +31,7 @@ rayon = ["dep:rayon"]
 pedantic = []
 
 [workspace]
-members = ["cgt-cli", "cgt-website", "cgt-py-adapter"]
+members = ["cgt-cli", "cgt-website"]
 
 [profile.release]
 lto = true
