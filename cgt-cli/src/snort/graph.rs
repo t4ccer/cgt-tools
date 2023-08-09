@@ -76,8 +76,18 @@ pub fn run(args: Args) -> Result<()> {
     let filename = format!("snort{}.png", timestamp);
     render_snort(&position, &filename, "png", "fdp")?;
     render_snort(&position, "snort.png", "png", "fdp")?;
-
     eprintln!("Graph: {}", filename);
+
+    for (idx, m) in position.sensible_left_moves(&tt).iter().enumerate() {
+        let filename = format!("snort{}-left{}.png", timestamp, idx);
+        render_snort(&m, &filename, "png", "fdp")?;
+        eprintln!("Left Move {} Graph: {}", idx, filename);
+    }
+    for (idx, m) in position.sensible_right_moves(&tt).iter().enumerate() {
+        let filename = format!("snort{}-right{}.png", timestamp, idx);
+        render_snort(&m, &filename, "png", "fdp")?;
+        eprintln!("Right Move {} Graph: {}", idx, filename);
+    }
 
     let score = temperature - Rational::from(degree as i32);
 
