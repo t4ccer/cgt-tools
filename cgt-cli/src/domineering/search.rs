@@ -1,10 +1,11 @@
 use anyhow::{bail, Context, Result};
 use cgt::{
     numeric::rational::Rational,
-    rw_hash_map::RwHashMap,
-    short::partizan::{games::domineering, partizan_game::PartizanGame, thermograph::Thermograph},
+    short::partizan::{
+        games::domineering, partizan_game::PartizanGame, transposition_table::TranspositionTable,
+    },
 };
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use std::{
     fs::File,
@@ -14,6 +15,12 @@ use std::{
 };
 
 use super::common::DomineeringResult;
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum ThermographMethod {
+    CanonicalForm,
+    Direct,
+}
 
 #[derive(Parser, Debug)]
 #[command(author, version, about)]
@@ -66,10 +73,14 @@ pub struct Args {
     /// Maximum empty tiles to compute
     #[arg(long, default_value = None)]
     max_empty_tiles: Option<usize>,
+
+    /// Method of computing the thermograph
+    #[arg(long, value_enum, default_value_t = ThermographMethod::CanonicalForm)]
+    thermograph_method: ThermographMethod,
 }
 
 struct ProgressTracker {
-    cache: RwHashMap<domineering::Position, Thermograph>,
+    cache: TranspositionTable<domineering::Position>,
     args: Args,
     iteration: AtomicU64,
     saved: AtomicU64,
@@ -79,7 +90,7 @@ struct ProgressTracker {
 
 impl ProgressTracker {
     fn new(
-        cache: RwHashMap<domineering::Position, Thermograph>,
+        cache: TranspositionTable<domineering::Position>,
         args: Args,
         output_file: File,
     ) -> ProgressTracker {
@@ -125,7 +136,7 @@ pub fn run(args: Args) -> Result<()> {
         );
     }
 
-    let cache = RwHashMap::new();
+    let cache = TranspositionTable::new();
 
     let output_file =
         File::create(&args.output_path).with_context(|| "Could not open output file")?;
@@ -172,7 +183,16 @@ pub fn run(args: Args) -> Result<()> {
                 }
             }
 
-            let thermograph = grid.thermograph_direct(); // NOTE: investigate why no canonical form
+            let thermograph = match progress_tracker.args.thermograph_method {
+                ThermographMethod::CanonicalForm => {
+                    let canonical_form = grid.canonical_form(&progress_tracker.cache);
+                    progress_tracker
+                        .cache
+                        .game_backend()
+                        .thermograph(&canonical_form)
+                }
+                ThermographMethod::Direct => grid.thermograph_direct(),
+            };
             let temperature = thermograph.get_temperature();
 
             // Don't save temperatures below or equal to treashold
@@ -246,8 +266,6 @@ fn progress_report(progress_tracker: Arc<ProgressTracker>) {
         } else {
             format!("{}", progress_tracker.highest_temp.lock().unwrap().clone())
         };
-        let known_grids = progress_tracker.cache.len();
-
         // NOTE: We may move known_games_len() to atomic counter instead so we won't take read
         // lock on games vec
 
@@ -256,11 +274,9 @@ fn progress_report(progress_tracker: Arc<ProgressTracker>) {
 	     \tProgress: {percent_progress:.6}\n\
 	     \tIterations: {completed_iterations_str}/{last_id}\n\
 	     \tHighest temperature: {highest_temp}\n\
-	     \tSaved games: {saved}\n\
-	     \tKnown grids: {known_grids}\n"
+	     \tSaved games: {saved}\n"
         );
         stderr.lock().write_all(to_write.as_bytes()).unwrap();
-
         #[cfg(feature = "statistics")]
         {
             let to_write = format!(
