@@ -2,15 +2,14 @@
 //! horizontal dominoes.
 
 extern crate alloc;
-use crate::{
-    short::partizan::short_canonical_game::{Game, Moves},
-    short::partizan::{partizan_game::PartizanGame, transposition_table::TranspositionTable},
-};
+use crate::short::partizan::partizan_game::PartizanGame;
 use alloc::collections::vec_deque::VecDeque;
 use std::{fmt::Display, str::FromStr};
 
 #[cfg(test)]
-use crate::numeric::rational::Rational;
+use crate::{
+    numeric::rational::Rational, short::partizan::transposition_table::TranspositionTable,
+};
 
 // TODO: Move generic grid somewhere else
 
@@ -551,54 +550,6 @@ impl Position {
             }
         }
         grid.move_top_left()
-    }
-}
-
-impl Position {
-    /// Get the canonical form of the position.
-    ///
-    /// # Arguments
-    ///
-    /// `cache` - Shared cache of short combinatorial games.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use cgt::short::partizan::{games::domineering::Position, transposition_table::TranspositionTable};
-    ///
-    /// let cache = TranspositionTable::new();
-    /// let position = Position::parse(".#|..").unwrap();
-    /// let game = position.canonical_form(&cache);
-    /// assert_eq!(&cache.game_backend().print_game_to_str(&game), "*");
-    /// ```
-    pub fn canonical_form(&self, cache: &TranspositionTable<Self>) -> Game {
-        let grid = self.move_top_left();
-        if let Some(g) = cache.grids_get(&grid) {
-            return g;
-        }
-
-        let mut result = cache.game_backend().construct_integer(0);
-        for grid in grid.decompositions() {
-            let moves = Moves {
-                left: grid
-                    .left_moves()
-                    .iter()
-                    .map(|o| o.canonical_form(cache))
-                    .collect(),
-                right: grid
-                    .right_moves()
-                    .iter()
-                    .map(|o| o.canonical_form(cache))
-                    .collect(),
-            };
-
-            let canonical_form = cache.game_backend().construct_from_moves(moves);
-            cache.grids_insert(grid, canonical_form);
-            result = cache.game_backend().construct_sum(canonical_form, result);
-        }
-
-        cache.grids_insert(grid, result);
-        result
     }
 }
 
