@@ -32,8 +32,8 @@ pub enum Vertex {
 impl Display for Vertex {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Vertex::Value(n) => write!(f, "{}", n),
-            Vertex::Loop(infs) => {
+            Self::Value(n) => write!(f, "{}", n),
+            Self::Loop(infs) => {
                 write!(f, "∞")?;
                 if !infs.is_empty() {
                     display::parens(f, |f| display::commas(f, infs))?;
@@ -46,11 +46,8 @@ impl Display for Vertex {
 
 impl UnresolvedVertex {
     /// Check if vertex is a finite zero
-    fn is_zero(&self) -> bool {
-        match self {
-            UnresolvedVertex::Value(val) if val.value() == 0 => true,
-            _ => false,
-        }
+    const fn is_zero(&self) -> bool {
+        matches!(self, Self::Value(val) if val.value() == 0)
     }
 }
 
@@ -66,10 +63,10 @@ impl Display for WindUp {
         write!(f, "WindUp")?;
         display::parens(f, |f| {
             write!(f, "n={}, ", self.n())?;
-            display::braces(f, |f| display::commas(f, &self.subtraction_set()))
+            display::braces(f, |f| display::commas(f, self.subtraction_set()))
         })?;
         write!(f, " = ")?;
-        display::brackets(f, |f| display::commas(f, &self.graph()))
+        display::brackets(f, |f| display::commas(f, self.graph()))
     }
 }
 
@@ -92,7 +89,7 @@ impl WindUp {
         // First pass - find other zeros
         // element is a zero if for every move to non-zero position there is a response move to zero
         for _ in 0..graph.len() {
-            'inner: for idx in 1..(graph.len() as i32) {
+            'inner: for idx in 1_i32..(graph.len() as i32) {
                 // Alredy visited and marked as zero
                 if !matches!(graph[idx as usize], UnresolvedVertex::Unresolved) {
                     continue;
@@ -126,12 +123,12 @@ impl WindUp {
 
         // Second pass - compute mex for each finite element
         for _ in 0..graph.len() {
-            'inner: for idx in 1..(graph.len() as i32) {
+            'inner: for idx in 1_i32..(graph.len() as i32) {
                 if !matches!(graph[idx as usize], UnresolvedVertex::Unresolved) {
                     continue;
                 }
 
-                let mut for_mex = Vec::with_capacity(graph.len() as usize);
+                let mut for_mex = Vec::with_capacity(graph.len());
                 for m in &subtraction_set {
                     let v1 = &graph[(idx - *m as i32).rem_euclid(n) as usize];
                     match v1 {
@@ -147,7 +144,7 @@ impl WindUp {
 
         // Third pass - compute infinites
         for _ in 0..graph.len() {
-            for idx in 0..(graph.len() as i32) {
+            for idx in 0_i32..(graph.len() as i32) {
                 // If we're a nimber we cannot be an infinity
                 if matches!(graph[idx as usize], UnresolvedVertex::Value(_)) {
                     continue;
@@ -176,7 +173,7 @@ impl WindUp {
                 UnresolvedVertex::Unresolved => unreachable!("All vertices should be resolved"),
             })
             .collect();
-        WindUp {
+        Self {
             graph,
             subtraction_set,
         }
@@ -191,8 +188,11 @@ impl WindUp {
     /// `n` - Size of the game graph. Will be used in `mod n`.
     ///
     /// `subtraction_set` - Subtraction set for the game
+    ///
+    /// # Panics
+    /// - `period` is empty
     pub fn new_using_sequence(period: &[u32], n: u32, subtraction_set: Vec<u32>) -> Self {
-        assert!(period.len() > 0, "Period must not be empty");
+        assert!(!period.is_empty(), "Period must not be empty");
 
         let n = n as usize;
 
@@ -246,24 +246,24 @@ impl WindUp {
 
         // TODO: Add statistics: cycle len, sequence len
 
-        WindUp {
+        Self {
             graph: extended_seq
                 .iter()
                 .map(|n| Vertex::Value(Nimber::new(*n)))
                 .collect(),
-            subtraction_set: subtraction_set.clone(),
+            subtraction_set,
         }
     }
 
     /// Get the underlying game graph
     #[inline]
-    pub fn graph(&self) -> &Vec<Vertex> {
+    pub const fn graph(&self) -> &Vec<Vertex> {
         &self.graph
     }
 
     /// Get the subtraction set of the game
     #[inline]
-    pub fn subtraction_set(&self) -> &Vec<u32> {
+    pub const fn subtraction_set(&self) -> &Vec<u32> {
         &self.subtraction_set
     }
 

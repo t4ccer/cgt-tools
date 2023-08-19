@@ -2,12 +2,12 @@
 
 use nom::{character::complete::multispace0, IResult, Parser};
 
-pub fn lexeme<'a, Output, Error, F>(
+pub fn lexeme<'input, Output, Error, F>(
     mut inner: F,
-) -> impl FnMut(&'a str) -> IResult<&str, Output, Error>
+) -> impl FnMut(&'input str) -> IResult<&str, Output, Error>
 where
-    F: Parser<&'a str, Output, Error>,
-    Error: nom::error::ParseError<&'a str>,
+    F: Parser<&'input str, Output, Error>,
+    Error: nom::error::ParseError<&'input str>,
 {
     move |input: &str| {
         let (input, _ws) = multispace0(input)?;
@@ -19,7 +19,7 @@ where
 
 // TODO: Fancy errors
 
-/// Implement [std::str::FromStr] using nom parser. Type must have `parse` method implemented.
+/// Implement [`std::str::FromStr`] using nom parser. Type must have `parse` method implemented.
 macro_rules! impl_from_str_via_nom {
     ($t: ident) => {
         impl std::str::FromStr for $t {

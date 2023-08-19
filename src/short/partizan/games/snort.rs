@@ -80,7 +80,7 @@ impl Position {
 
         // Go through list of vertices with legal move
         for move_vertex in move_vertices {
-            let mut position: Position = self.clone();
+            let mut position: Self = self.clone();
 
             // Take vertex
             position.vertices[move_vertex] = VertexColor::Taken;
@@ -115,8 +115,8 @@ impl Position {
         moves
     }
 
-    /// BFS search to get the decompisitons, should be used only as a helper for [Self::decompositions]
-    fn bfs(&self, visited: &mut Vec<bool>, v: usize) -> Self {
+    /// BFS search to get the decompisitons, should be used only as a helper for [`Self::decompositions`]
+    fn bfs(&self, visited: &mut [bool], v: usize) -> Self {
         let mut vertices_to_take: Vec<usize> = Vec::new();
 
         let mut q: VecDeque<usize> = VecDeque::new();
@@ -152,6 +152,35 @@ impl Position {
             vertices: new_vertices,
             graph: new_graph,
         }
+    }
+
+    /// Render to a [graphviz](https://graphviz.org/) format, that can be later rendered to an
+    /// image with external engine.
+    pub fn to_graphviz(&self) -> String {
+        let mut buf = String::new();
+
+        write!(buf, "graph G {{").unwrap();
+
+        for (v, color) in self.vertices.iter().enumerate() {
+            let col = match color {
+                VertexColor::Empty => "white",
+                VertexColor::TintLeft => "blue",
+                VertexColor::TintRight => "red",
+                VertexColor::Taken => continue,
+            };
+            write!(buf, "{} [fillcolor={}, style=filled, shape=circle, fixedsize=true, width=1, height=1, fontsize=24];", v, col).unwrap();
+        }
+
+        for v in self.graph.vertices() {
+            for u in self.graph.vertices() {
+                if v < u && self.graph.are_adjacent(v, u) {
+                    write!(buf, "{v} -- {u};").unwrap();
+                }
+            }
+        }
+
+        write!(buf, "}}").unwrap();
+        buf
     }
 }
 
@@ -200,37 +229,6 @@ fn no_moves() {
     let position = Position::new(Graph::empty(0));
     assert_eq!(position.left_moves(), vec![]);
     assert_eq!(position.right_moves(), vec![]);
-}
-
-impl Position {
-    /// Render to a [graphviz](https://graphviz.org/) format, that can be later rendered to an
-    /// image with external engine.
-    pub fn to_graphviz(&self) -> String {
-        let mut buf = String::new();
-
-        write!(buf, "graph G {{").unwrap();
-
-        for (v, color) in self.vertices.iter().enumerate() {
-            let col = match color {
-                VertexColor::Empty => "white",
-                VertexColor::TintLeft => "blue",
-                VertexColor::TintRight => "red",
-                VertexColor::Taken => continue,
-            };
-            write!(buf, "{} [fillcolor={}, style=filled, shape=circle, fixedsize=true, width=1, height=1, fontsize=24];", v, col).unwrap();
-        }
-
-        for v in self.graph.vertices() {
-            for u in self.graph.vertices() {
-                if v < u && self.graph.are_adjacent(v, u) {
-                    write!(buf, "{v} -- {u};").unwrap();
-                }
-            }
-        }
-
-        write!(buf, "}}").unwrap();
-        buf
-    }
 }
 
 #[test]

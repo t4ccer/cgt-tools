@@ -10,7 +10,7 @@
 use crate::numeric::nimber::Nimber;
 use std::fmt::Display;
 
-/// See [pseudo_quickcheck](self) header
+/// See [`pseudo_quickcheck`](self) header
 #[derive(Debug, PartialEq, Eq)]
 pub struct PseudoQuicksort {
     sequence: Vec<u32>,
@@ -28,19 +28,20 @@ impl Display for PseudoQuicksort {
 impl PseudoQuicksort {
     /// Create new quicksort position from a given sequence
     #[inline]
-    pub fn new(sequence: Vec<u32>) -> PseudoQuicksort {
-        PseudoQuicksort { sequence }
+    pub fn new(sequence: Vec<u32>) -> Self {
+        Self { sequence }
     }
 
     /// Get the sequence of the quicksort position
     #[inline]
-    pub fn sequence(&self) -> &Vec<u32> {
+    pub const fn sequence(&self) -> &Vec<u32> {
         &self.sequence
     }
 
     /// pivot on `pivot+0.5`
+    #[must_use]
     pub fn pivot_on(&self, pivot: u32) -> Self {
-        let mut res = PseudoQuicksort::new(Vec::with_capacity(self.sequence().len()));
+        let mut res = Self::new(Vec::with_capacity(self.sequence().len()));
         for elem in self.sequence() {
             if *elem <= pivot {
                 res.sequence.push(*elem);

@@ -9,6 +9,7 @@ pub struct TranspositionTable<G> {
     grids: RwHashMap<G, CanonicalForm>,
 }
 
+#[cfg_attr(feature = "cargo-clippy", allow(clippy::new_without_default))]
 impl<G> TranspositionTable<G>
 where
     G: Eq + Hash + Clone + Sync + Send,
@@ -16,7 +17,7 @@ where
     /// Create new empty transposition table.
     #[inline]
     pub fn new() -> Self {
-        TranspositionTable {
+        Self {
             grids: RwHashMap::new(),
         }
     }

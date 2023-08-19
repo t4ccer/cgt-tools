@@ -12,11 +12,15 @@ pub struct Graph {
 }
 
 impl Display for Graph {
+    #[cfg_attr(
+        feature = "cargo-clippy",
+        allow(clippy::missing_inline_in_public_items)
+    )]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for (idx, elem) in self.adjacency_matrix.iter().enumerate() {
-            write!(f, "{}", *elem as u8)?;
+            write!(f, "{}", u8::from(*elem))?;
             if (idx + 1) % self.size == 0 {
-                write!(f, "\n")?;
+                writeln!(f)?;
             }
         }
 
@@ -49,14 +53,14 @@ impl Graph {
 
     /// Create a graph from adjecency matrix. Must be correct length
     #[inline]
-    pub fn from_matrix(size: usize, matrix: Vec<Vec<bool>>) -> Option<Self> {
+    pub fn from_matrix(size: usize, matrix: &[Vec<bool>]) -> Option<Self> {
         let vec: Vec<bool> = matrix.iter().flatten().copied().collect();
         Self::from_vec(size, vec)
     }
 
     /// Get number of vertices in the graph.
     #[inline]
-    pub fn size(&self) -> usize {
+    pub const fn size(&self) -> usize {
         self.size
     }
 
@@ -73,6 +77,7 @@ impl Graph {
     }
 
     /// Get vertices adjacent to `out_vertex`.
+    #[inline]
     pub fn adjacent_to(&self, out_vertex: usize) -> Vec<usize> {
         let mut res = Vec::with_capacity(self.size);
         for idx in 0..self.size {
@@ -84,11 +89,13 @@ impl Graph {
     }
 
     /// Get iterator over vertices
+    #[inline]
     pub fn vertices(&self) -> Range<usize> {
         range(0, self.size())
     }
 
     /// Add a new disconnected vertex at the end of the graph
+    #[inline]
     pub fn add_vertex(&mut self) {
         let mut new_graph = Self::empty(self.size() + 1);
         for in_v in self.vertices() {
@@ -100,6 +107,7 @@ impl Graph {
     }
 
     /// Remove a given vertex from the graph, remove all its edges
+    #[inline]
     pub fn remove_vertex(&mut self, vertex_to_remove: usize) {
         debug_assert!(self.size() > 0, "Graph has no vertices");
         let mut new_graph = Self::empty(self.size() - 1);
@@ -111,8 +119,8 @@ impl Graph {
                     in_v,
                     self.are_adjacent(
                         // Skip over vertex we're removing
-                        out_v + (out_v >= vertex_to_remove) as usize * 1,
-                        in_v + (in_v >= vertex_to_remove) as usize * 1,
+                        out_v + (out_v >= vertex_to_remove) as usize,
+                        in_v + (in_v >= vertex_to_remove) as usize,
                     ),
                 );
             }

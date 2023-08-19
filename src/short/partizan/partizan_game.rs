@@ -29,7 +29,7 @@ pub trait PartizanGame: Sized + Clone + Hash + Send + Sync + Eq {
 
     /// Compute the thermograph without going through canonical form
     /// Taken from Elwyn Berlekamp - The Economist’s View of Combinatorial Games
-    /// This is copy-pasted from short_canonical_form module, but works on positions rather than
+    /// This is copy-pasted from [`super::canonical_form`] module, but works on positions rather than
     /// it's canonical forms, although the algorithm is the same
     ///
     /// Note that for some games, going through canonical form to compute the thermograph may
@@ -67,27 +67,24 @@ pub trait PartizanGame: Sized + Clone + Hash + Send + Sync + Eq {
 
         let mut result = CanonicalForm::new_integer(0);
         for position in self.decompositions() {
-            let sub_result = match cache.grids_get(&position) {
-                Some(canonical_form) => canonical_form,
-                None => {
-                    let moves = Moves {
-                        left: position
-                            .left_moves()
-                            .iter()
-                            .map(|o| o.canonical_form(cache))
-                            .collect(),
-                        right: position
-                            .right_moves()
-                            .iter()
-                            .map(|o| o.canonical_form(cache))
-                            .collect(),
-                    };
+            let sub_result = cache.grids_get(&position).unwrap_or_else(|| {
+                let moves = Moves {
+                    left: position
+                        .left_moves()
+                        .iter()
+                        .map(|o| o.canonical_form(cache))
+                        .collect(),
+                    right: position
+                        .right_moves()
+                        .iter()
+                        .map(|o| o.canonical_form(cache))
+                        .collect(),
+                };
 
-                    let canonical_form = CanonicalForm::new_from_moves(moves);
-                    cache.grids_insert(position, canonical_form.clone());
-                    canonical_form
-                }
-            };
+                let canonical_form = CanonicalForm::new_from_moves(moves);
+                cache.grids_insert(position, canonical_form.clone());
+                canonical_form
+            });
 
             result = sub_result + result;
         }

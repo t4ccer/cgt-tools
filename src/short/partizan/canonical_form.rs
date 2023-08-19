@@ -36,8 +36,8 @@ pub struct Nus {
 impl Nus {
     /// Create new number-up-start sum
     #[inline]
-    pub fn new(number: DyadicRationalNumber, up_multiple: i32, nimber: Nimber) -> Self {
-        Nus {
+    pub const fn new(number: DyadicRationalNumber, up_multiple: i32, nimber: Nimber) -> Self {
+        Self {
             number,
             up_multiple,
             nimber,
@@ -46,53 +46,57 @@ impl Nus {
 
     /// Create new number-up-star game equal to an integer.
     #[inline]
-    pub fn new_integer(integer: i64) -> Self {
-        Nus::new(DyadicRationalNumber::from(integer), 0, Nimber::from(0))
+    pub const fn new_integer(integer: i64) -> Self {
+        Self::new(
+            DyadicRationalNumber::new_integer(integer),
+            0,
+            Nimber::new(0),
+        )
     }
 
     /// Create new number-up-star game equal to an rational.
     #[inline]
-    pub fn new_number(number: DyadicRationalNumber) -> Self {
-        Nus::new(number, 0, Nimber::from(0))
+    pub const fn new_number(number: DyadicRationalNumber) -> Self {
+        Self::new(number, 0, Nimber::new(0))
     }
 
     /// Create new number-up-star game equal to an rational.
     #[inline]
-    pub fn new_nimber(nimber: Nimber) -> Self {
-        Nus::new(DyadicRationalNumber::from(0), 0, nimber)
+    pub const fn new_nimber(nimber: Nimber) -> Self {
+        Self::new(DyadicRationalNumber::new_integer(0), 0, nimber)
     }
 
     /// Get number part of the NUS sum
     #[inline]
-    pub fn number(&self) -> DyadicRationalNumber {
+    pub const fn number(self) -> DyadicRationalNumber {
         self.number
     }
 
     /// Get up/down part of the NUS sum. Positive for up, negative for down.
     #[inline]
-    pub fn up_multiple(&self) -> i32 {
+    pub const fn up_multiple(self) -> i32 {
         self.up_multiple
     }
 
     /// Get nimber part of the NUS sum
     #[inline]
-    pub fn nimber(&self) -> Nimber {
+    pub const fn nimber(self) -> Nimber {
         self.nimber
     }
 
     /// Check if the game has only number part (i.e. up multiple and nimber are zero).
     #[inline]
-    pub fn is_number(&self) -> bool {
+    pub fn is_number(self) -> bool {
         self.up_multiple() == 0 && self.nimber() == Nimber::from(0)
     }
 
     /// Check if the game is a nimber.
     #[inline]
-    pub fn is_nimber(&self) -> bool {
+    pub fn is_nimber(self) -> bool {
         self.number() == DyadicRationalNumber::from(0) && self.up_multiple() == 0
     }
 
-    fn to_moves(&self) -> Moves {
+    fn to_moves(self) -> Moves {
         // Case: Just a number
         if self.is_number() {
             if self.number() == DyadicRationalNumber::from(0) {
@@ -104,9 +108,9 @@ impl Nus {
 
             if let Some(integer) = self.number().to_integer() {
                 let sign = if integer >= 0 { 1 } else { -1 };
-                let prev = CanonicalForm::new_nus(Nus::new_integer(integer - sign));
+                let prev = CanonicalForm::new_nus(Self::new_integer(integer - sign));
 
-                if sign > 0 {
+                if integer >= 0 {
                     return Moves {
                         left: vec![prev],
                         right: vec![],
@@ -119,8 +123,8 @@ impl Nus {
                 }
             } else {
                 let rational = self.number();
-                let left_move = CanonicalForm::new_nus(Nus::new_number(rational.step(-1)));
-                let right_move = CanonicalForm::new_nus(Nus::new_number(rational.step(1)));
+                let left_move = CanonicalForm::new_nus(Self::new_number(rational.step(-1)));
+                let right_move = CanonicalForm::new_nus(Self::new_number(rational.step(1)));
                 return Moves {
                     left: vec![left_move],
                     right: vec![right_move],
@@ -135,7 +139,7 @@ impl Nus {
 
             let mut moves = Moves::empty();
             for i in 0..nimber.value() {
-                let new_nus = Nus {
+                let new_nus = Self {
                     number: rational,
                     up_multiple: 0,
                     nimber: Nimber::from(i),
@@ -147,7 +151,7 @@ impl Nus {
         }
 
         // Case: number-up-star
-        let number_move = Nus::new_number(self.number());
+        let number_move = Self::new_number(self.number());
 
         let sign = if self.up_multiple() >= 0 { 1 } else { -1 };
         let prev_up = self.up_multiple() - sign;
@@ -157,7 +161,7 @@ impl Nus {
 
         if self.up_multiple() == 1 && self.nimber() == Nimber::from(1) {
             // Special case: n^*
-            let star_move = CanonicalForm::new_nus(Nus {
+            let star_move = CanonicalForm::new_nus(Self {
                 number: self.number(),
                 up_multiple: 0,
                 nimber: Nimber::from(1),
@@ -168,7 +172,7 @@ impl Nus {
             };
         } else if self.up_multiple() == -1 && self.nimber() == Nimber::from(1) {
             // Special case: nv*
-            let star_move = CanonicalForm::new_nus(Nus {
+            let star_move = CanonicalForm::new_nus(Self {
                 number: self.number(),
                 up_multiple: 0,
                 nimber: Nimber::from(1),
@@ -178,7 +182,7 @@ impl Nus {
                 right: vec![CanonicalForm::new_nus(number_move), star_move],
             };
         } else if self.up_multiple() > 0 {
-            let prev_nus = CanonicalForm::new_nus(Nus {
+            let prev_nus = CanonicalForm::new_nus(Self {
                 number: self.number(),
                 up_multiple: prev_up,
                 nimber: Nimber::from(prev_nimber),
@@ -188,7 +192,7 @@ impl Nus {
                 right: vec![prev_nus],
             };
         } else {
-            let prev_nus = CanonicalForm::new_nus(Nus {
+            let prev_nus = CanonicalForm::new_nus(Self {
                 number: self.number(),
                 up_multiple: prev_up,
                 nimber: Nimber::from(prev_nimber),
@@ -205,6 +209,7 @@ impl Nus {
     /// Parse nus from string, using notation without pluses between number, up, and star components
     ///
     /// Pattern: `\d*([v^]\d*)?(\*\d*)`
+    #[cfg_attr(feature = "cargo-clippy", allow(clippy::missing_errors_doc))]
     pub fn parse(input: &str) -> nom::IResult<&str, Self> {
         let full_input = input;
         // This flag is set if we explicitly parse a number, rather than set it to zero if
@@ -212,16 +217,14 @@ impl Nus {
         // empty input parse to a zero game, which is undesired. We handle that case explicitly.
         let parsed_number: bool;
 
-        let (input, number) = match lexeme(DyadicRationalNumber::parse)(input) {
-            Ok((input, number)) => {
+        let (input, number) =
+            if let Ok((input, number)) = lexeme(DyadicRationalNumber::parse)(input) {
                 parsed_number = true;
                 (input, number)
-            }
-            Err(_) => {
+            } else {
                 parsed_number = false;
                 (input, DyadicRationalNumber::from(0))
-            }
-        };
+            };
 
         let (input, up_multiple) = match lexeme(one_of::<_, _, (&str, ErrorKind)>("^v"))(input) {
             Ok((input, chr)) => {
@@ -244,13 +247,13 @@ impl Nus {
             Err(_) => (input, 0),
         };
 
-        let nus = Nus {
+        let nus = Self {
             number,
             up_multiple,
             nimber: Nimber::from(star_multiple),
         };
 
-        if nus == Nus::new_integer(0) && !parsed_number {
+        if nus == Self::new_integer(0) && !parsed_number {
             return Err(nom::Err::Error(nom::error::Error::new(
                 full_input,
                 ErrorKind::Fail,
@@ -370,8 +373,8 @@ pub struct Moves {
 
 impl Moves {
     #[inline]
-    fn empty() -> Self {
-        Moves {
+    const fn empty() -> Self {
+        Self {
             left: vec![],
             right: vec![],
         }
@@ -387,7 +390,7 @@ impl Moves {
     }
 
     /// Construct a canoical form of arbitrary moves.
-    /// It is an alias of [CanonicalForm::new_from_moves]
+    /// It is an alias of [`CanonicalForm::new_from_moves`]
     pub fn canonical_form(self) -> CanonicalForm {
         CanonicalForm::new_from_moves(self)
     }
@@ -581,11 +584,9 @@ impl Moves {
         left_moves: &[Option<CanonicalForm>],
         right_moves: &[Option<CanonicalForm>],
     ) -> bool {
-        for r_move in right_moves {
-            if let Some(r_opt) = r_move {
-                if CanonicalForm::leq(r_opt, game) {
-                    return false;
-                }
+        for r_opt in right_moves.iter().flatten() {
+            if CanonicalForm::leq(r_opt, game) {
+                return false;
             }
         }
 
@@ -604,11 +605,9 @@ impl Moves {
         left_moves: &[Option<CanonicalForm>],
         right_moves: &[Option<CanonicalForm>],
     ) -> bool {
-        for l_move in left_moves {
-            if let Some(l_opt) = l_move {
-                if CanonicalForm::leq(game, l_opt) {
-                    return false;
-                }
+        for l_opt in left_moves.iter().flatten() {
+            if CanonicalForm::leq(game, l_opt) {
+                return false;
             }
         }
 
@@ -622,7 +621,7 @@ impl Moves {
         true
     }
 
-    fn bypass_reversible_moves_l(&self) -> Moves {
+    fn bypass_reversible_moves_l(&self) -> Self {
         let mut i: i64 = 0;
 
         let mut left_moves: Vec<Option<CanonicalForm>> =
@@ -645,13 +644,10 @@ impl Moves {
                 if Self::leq_arrays(&g_lr, &left_moves, &right_moves) {
                     let g_lr_moves = g_lr.to_moves();
                     let mut new_left_moves: Vec<Option<CanonicalForm>> =
-                        vec![None; left_moves.len() + g_lr_moves.left.len() as usize - 1];
-                    for k in 0..(i as usize) {
-                        new_left_moves[k] = left_moves[k].clone();
-                    }
-                    for k in (i as usize + 1)..left_moves.len() {
-                        new_left_moves[k - 1] = left_moves[k].clone();
-                    }
+                        vec![None; left_moves.len() + g_lr_moves.left.len() - 1];
+                    new_left_moves[..(i as usize)].clone_from_slice(&left_moves[..(i as usize)]);
+                    new_left_moves[(i as usize + 1 - 1)..(left_moves.len() - 1)]
+                        .clone_from_slice(&left_moves[(i as usize + 1)..]);
                     for (k, g_lrl) in g_lr_moves.left.iter().enumerate() {
                         if left_moves.contains(&Some(g_lrl.clone())) {
                             new_left_moves[left_moves.len() + k - 1] = None;
@@ -667,13 +663,13 @@ impl Moves {
 
             i += 1;
         }
-        Moves {
+        Self {
             left: left_moves.iter().flatten().cloned().collect(),
             right: self.right.clone(),
         }
     }
 
-    fn bypass_reversible_moves_r(&self) -> Moves {
+    fn bypass_reversible_moves_r(&self) -> Self {
         let mut i: i64 = 0;
 
         let left_moves: Vec<Option<CanonicalForm>> = self.left.iter().cloned().map(Some).collect();
@@ -695,13 +691,10 @@ impl Moves {
                 if Self::geq_arrays(&g_rl, &left_moves, &right_moves) {
                     let g_rl_moves = g_rl.to_moves();
                     let mut new_right_moves: Vec<Option<CanonicalForm>> =
-                        vec![None; right_moves.len() + g_rl_moves.right.len() as usize - 1];
-                    for k in 0..(i as usize) {
-                        new_right_moves[k] = right_moves[k].clone();
-                    }
-                    for k in (i as usize + 1)..right_moves.len() {
-                        new_right_moves[k - 1] = right_moves[k].clone();
-                    }
+                        vec![None; right_moves.len() + g_rl_moves.right.len() - 1];
+                    new_right_moves[..(i as usize)].clone_from_slice(&right_moves[..(i as usize)]);
+                    new_right_moves[(i as usize + 1 - 1)..(right_moves.len() - 1)]
+                        .clone_from_slice(&right_moves[(i as usize + 1)..]);
                     for (k, g_rlr) in g_rl_moves.right.iter().enumerate() {
                         if right_moves.contains(&Some(g_rlr.clone())) {
                             new_right_moves[right_moves.len() + k - 1] = None;
@@ -717,20 +710,20 @@ impl Moves {
 
             i += 1;
         }
-        Moves {
+        Self {
             left: self.left.clone(),
             right: right_moves.iter().flatten().cloned().collect(),
         }
     }
 
-    fn canonicalize(&self) -> Moves {
+    fn canonicalize(&self) -> Self {
         let moves = self.bypass_reversible_moves_l();
         let moves = moves.bypass_reversible_moves_r();
 
         let left = Self::eliminate_dominated_moves(&moves.left, true);
         let right = Self::eliminate_dominated_moves(&moves.right, false);
 
-        Moves { left, right }
+        Self { left, right }
     }
 
     fn thermograph(&self) -> Thermograph {
@@ -751,6 +744,7 @@ impl Moves {
     }
 
     /// Print moves with NUS unwrapped using `{G^L | G^R}` notation
+    #[cfg_attr(feature = "cargo-clippy", allow(clippy::missing_errors_doc))]
     pub fn print_deep(&self, f: &mut impl Write) -> fmt::Result {
         write!(f, "{{")?;
         for (idx, l) in self.left.iter().enumerate() {
@@ -771,25 +765,14 @@ impl Moves {
     }
 
     /// Print moves to string with NUS unwrapped using `{G^L | G^R}` notation
+    // Write to `String` never panics
+    #[cfg_attr(feature = "cargo-clippy", allow(clippy::missing_panics_doc))]
     pub fn print_deep_to_str(&self) -> String {
         let mut buf = String::new();
         Self::print_deep(self, &mut buf).unwrap();
         buf
     }
-}
 
-impl Display for Moves {
-    /// Print moves using `{G^L | G^R}` notation
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        display::braces(f, |f| {
-            display::commas(f, &self.left)?;
-            write!(f, "|")?;
-            display::commas(f, &self.right)
-        })
-    }
-}
-
-impl Moves {
     /// Parse comma-separated games
     fn parse_list(input: &str) -> nom::IResult<&str, Vec<CanonicalForm>> {
         separated_list0(lexeme(nom::bytes::complete::tag(",")), |input| {
@@ -804,8 +787,19 @@ impl Moves {
         let (input, _) = lexeme(char('|'))(input)?;
         let (input, right) = Self::parse_list(input)?;
         let (input, _) = lexeme(char('}'))(input)?;
-        let moves = Moves { left, right };
+        let moves = Self { left, right };
         Ok((input, moves))
+    }
+}
+
+impl Display for Moves {
+    /// Print moves using `{G^L | G^R}` notation
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        display::braces(f, |f| {
+            display::commas(f, &self.left)?;
+            write!(f, "|")?;
+            display::commas(f, &self.right)
+        })
     }
 }
 
@@ -831,19 +825,19 @@ pub struct CanonicalForm(CanonicalFormInner);
 impl CanonicalForm {
     /// Construct NUS with only integer
     #[inline]
-    pub fn new_integer(integer: i64) -> Self {
+    pub const fn new_integer(integer: i64) -> Self {
         Self::new_nus(Nus::new_integer(integer))
     }
 
     /// Construct NUS with only dyadic rational
     #[inline]
-    pub fn new_rational(rational: DyadicRationalNumber) -> Self {
+    pub const fn new_rational(rational: DyadicRationalNumber) -> Self {
         Self::new_nus(Nus::new_number(rational))
     }
 
     /// Construct NUS with only nimber
     #[inline]
-    pub fn new_nimber(number: DyadicRationalNumber, nimber: Nimber) -> Self {
+    pub const fn new_nimber(number: DyadicRationalNumber, nimber: Nimber) -> Self {
         Self::new_nus(Nus {
             number,
             up_multiple: 0,
@@ -853,24 +847,26 @@ impl CanonicalForm {
 
     /// Construct NUS
     #[inline]
-    pub fn new_nus(nus: Nus) -> Self {
-        CanonicalForm(CanonicalFormInner::Nus(nus))
+    #[must_use]
+    pub const fn new_nus(nus: Nus) -> Self {
+        Self(CanonicalFormInner::Nus(nus))
     }
 
-    /// Construct negative.0 of a game
-    fn construct_negative(&self) -> Self {
+    /// Construct negative.0 of a game. Alias for negation [`-`] operator
+    #[must_use]
+    pub fn construct_negative(&self) -> Self {
         match &self.0 {
-            CanonicalFormInner::Nus(nus) => CanonicalForm::new_nus(-nus),
+            CanonicalFormInner::Nus(nus) => Self::new_nus(-nus),
             CanonicalFormInner::Moves(moves) => {
                 let new_left_moves = moves
                     .left
                     .iter()
-                    .map(|left| left.construct_negative())
+                    .map(Self::construct_negative)
                     .collect::<Vec<_>>();
                 let new_right_moves = moves
                     .right
                     .iter()
-                    .map(|right| right.construct_negative())
+                    .map(Self::construct_negative)
                     .collect::<Vec<_>>();
                 let new_moves = Moves {
                     left: new_left_moves,
@@ -881,8 +877,8 @@ impl CanonicalForm {
         }
     }
 
-    /// Construct a sum of two games
-    fn construct_sum(g: &CanonicalForm, h: &CanonicalForm) -> Self {
+    /// Construct a sum of two games. Alias for [`+`] operator
+    pub fn construct_sum(g: &Self, h: &Self) -> Self {
         if let (CanonicalFormInner::Nus(g_nus), CanonicalFormInner::Nus(h_nus)) = (&g.0, &h.0) {
             return Self::new_nus(g_nus + h_nus);
         }
@@ -921,19 +917,19 @@ impl CanonicalForm {
         moves.right.sort();
 
         if let Some(nus) = moves.to_nus() {
-            return CanonicalForm::new_nus(nus);
+            return Self::new_nus(nus);
         }
 
         // Game is not a nus
-        CanonicalForm(CanonicalFormInner::Moves(moves))
+        Self(CanonicalFormInner::Moves(moves))
     }
 
     /// Safe function to construct a game from possible moves
     pub fn new_from_moves(mut moves: Moves) -> Self {
         moves.eliminate_duplicates();
 
-        let left_mex = CanonicalForm::mex(&moves.left);
-        let right_mex = CanonicalForm::mex(&moves.right);
+        let left_mex = Self::mex(&moves.left);
+        let right_mex = Self::mex(&moves.right);
         if let (Some(left_mex), Some(right_mex)) = (left_mex, right_mex) {
             if left_mex == right_mex {
                 let nus = Nus {
@@ -941,7 +937,7 @@ impl CanonicalForm {
                     up_multiple: 0,
                     nimber: Nimber::from(left_mex),
                 };
-                return CanonicalForm::new_nus(nus);
+                return Self::new_nus(nus);
             }
         }
 
@@ -959,7 +955,7 @@ impl CanonicalForm {
     }
 
     /// Calculate mex if possible. Assumes that input is sorted
-    fn mex(moves: &[CanonicalForm]) -> Option<u32> {
+    fn mex(moves: &[Self]) -> Option<u32> {
         let mut i = 0;
         let mut mex = 0;
         loop {
@@ -1003,7 +999,7 @@ impl CanonicalForm {
 
     /// Check if game is a Number Up Star sum
     #[inline]
-    pub fn is_number_up_star(&self) -> bool {
+    pub const fn is_number_up_star(&self) -> bool {
         matches!(self.0, CanonicalFormInner::Nus(_))
     }
 
@@ -1036,9 +1032,8 @@ impl CanonicalForm {
                         return true;
                     } else if lhs_nus.up_multiple() < rhs_nus.up_multiple() {
                         return (lhs_nus.nimber() + rhs_nus.nimber()) != Nimber::from(1);
-                    } else {
-                        return false;
                     }
+                    return false;
                 }
             }
         }
@@ -1064,8 +1059,9 @@ impl CanonicalForm {
         true
     }
 
-    // TODO: Should be dyadic but not sure how to handle infinities
     /// Calculate temperature of the game. Avoids computing a thermograph is game is a NUS
+    // TODO: Should be dyadic but not sure how to handle infinities
+    #[cfg_attr(feature = "cargo-clippy", allow(clippy::missing_panics_doc))]
     pub fn temperature(&self) -> Rational {
         match self.0 {
             CanonicalFormInner::Nus(nus) => {
@@ -1086,54 +1082,53 @@ impl CanonicalForm {
     /// Construct a thermograph of a game, using thermographic intersection of
     /// left and right scaffolds
     pub fn thermograph(&self) -> Thermograph {
-        let thermograph = match self.0 {
+        match self.0 {
             CanonicalFormInner::Moves(ref moves) => moves.thermograph(),
             CanonicalFormInner::Nus(nus) => {
-                if nus.number().to_integer().is_some() && nus.is_number() {
-                    Thermograph::with_mast(Rational::new(nus.number().to_integer().unwrap(), 1))
-                } else {
-                    if nus.up_multiple() == 0
-                        || (nus.nimber() == Nimber::from(1) && nus.up_multiple().abs() == 1)
-                    {
-                        // This looks like 0 or * (depending on whether nimberPart is 0 or 1).
-                        let new_game = Self::new_nus(Nus {
-                            number: nus.number(),
-                            up_multiple: 0,
-                            nimber: Nimber::from(nus.nimber().value().cmp(&0) as u32), // signum(nus.nimber)
-                        });
-                        let new_game_moves = new_game.to_moves();
-                        new_game_moves.thermograph()
-                    } else {
-                        let new_game = Self::new_nus(Nus {
-                            number: nus.number(),
-                            up_multiple: nus.up_multiple().cmp(&0) as i32, // signum(nus.up_multiple)
-                            nimber: Nimber::from(0),
-                        });
-                        let new_game_moves = new_game.to_moves();
-                        new_game_moves.thermograph()
+                if let Some(nus_integer) = nus.number().to_integer() {
+                    if nus.is_number() {
+                        return Thermograph::with_mast(Rational::new(nus_integer, 1));
                     }
                 }
+
+                if nus.up_multiple() == 0
+                    || (nus.nimber() == Nimber::from(1) && nus.up_multiple().abs() == 1)
+                {
+                    // This looks like 0 or * (depending on whether nimberPart is 0 or 1).
+                    let new_game = Self::new_nus(Nus {
+                        number: nus.number(),
+                        up_multiple: 0,
+                        nimber: Nimber::from(nus.nimber().value().cmp(&0) as u32), // signum(nus.nimber)
+                    });
+                    let new_game_moves = new_game.to_moves();
+                    new_game_moves.thermograph()
+                } else {
+                    let new_game = Self::new_nus(Nus {
+                        number: nus.number(),
+                        up_multiple: nus.up_multiple().cmp(&0) as i32, // signum(nus.up_multiple)
+                        nimber: Nimber::from(0),
+                    });
+                    let new_game_moves = new_game.to_moves();
+                    new_game_moves.thermograph()
+                }
             }
-        };
-        thermograph
+        }
     }
 
     /// Parse game using `{a,b,...|c,d,...}` notation
-    pub fn parse(input: &str) -> nom::IResult<&str, CanonicalForm> {
+    #[cfg_attr(feature = "cargo-clippy", allow(clippy::missing_errors_doc))]
+    pub fn parse(input: &str) -> nom::IResult<&str, Self> {
         alt((
-            |input| Nus::parse(input).map(|(input, nus)| (input, CanonicalForm::new_nus(nus))),
-            |input| {
-                Moves::parse(input)
-                    .map(|(input, moves)| (input, CanonicalForm::new_from_moves(moves)))
-            },
+            |input| Nus::parse(input).map(|(input, nus)| (input, Self::new_nus(nus))),
+            |input| Moves::parse(input).map(|(input, moves)| (input, Self::new_from_moves(moves))),
         ))(input)
     }
 }
 
-impl_op_ex!(+|g: &CanonicalForm, h: &CanonicalForm| -> CanonicalForm { CanonicalForm::construct_sum(&g, &h) });
-impl_op_ex!(-|g: &CanonicalForm| -> CanonicalForm { CanonicalForm::construct_negative(&g) });
+impl_op_ex!(+|g: &CanonicalForm, h: &CanonicalForm| -> CanonicalForm { CanonicalForm::construct_sum(g, h) });
+impl_op_ex!(-|g: &CanonicalForm| -> CanonicalForm { CanonicalForm::construct_negative(g) });
 impl_op_ex!(-|g: &CanonicalForm, h: &CanonicalForm| -> CanonicalForm {
-    CanonicalForm::construct_sum(&g, &CanonicalForm::construct_negative(&h))
+    CanonicalForm::construct_sum(g, &CanonicalForm::construct_negative(h))
 });
 
 impl Display for CanonicalForm {

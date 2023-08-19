@@ -19,7 +19,7 @@ pub struct Trajectory {
 impl Trajectory {
     /// Constructs a new `Trajectory` with constant value `r`
     pub fn new_constant(r: Rational) -> Self {
-        Trajectory {
+        Self {
             critical_points: vec![],
             slopes: vec![Rational::from(0)],
             x_intercepts: vec![r],
@@ -68,22 +68,22 @@ impl Trajectory {
 
         // Actual construction
         let mut x_intercepts = Vec::with_capacity(slopes.len());
-        if critical_points.len() == 0 {
+        if critical_points.is_empty() {
             x_intercepts[0] = mast;
         } else {
             let mut value = mast;
             let mut i = 0;
             for _ in 0..critical_points.len() {
                 if i > 0 {
-                    value -= &(&critical_points[i - 1] - &critical_points[i]) * &slopes[i];
+                    value -= (critical_points[i - 1] - critical_points[i]) * slopes[i];
                 }
-                x_intercepts[i] = &value - &(&critical_points[i] * &slopes[i]);
+                x_intercepts[i] = value - (critical_points[i] * slopes[i]);
                 i += 1;
             }
-            x_intercepts[i] = value - (&critical_points[i - 1] * &slopes[i]);
+            x_intercepts[i] = value - (critical_points[i - 1] * slopes[i]);
         }
 
-        Some(Trajectory {
+        Some(Self {
             critical_points,
             slopes,
             x_intercepts,
@@ -105,14 +105,14 @@ impl Trajectory {
         if r.is_infinite() && self.slopes[i] == Rational::from(0) {
             self.x_intercepts[i]
         } else {
-            &(r * self.slopes[i]) + &self.x_intercepts[i]
+            (r * self.slopes[i]) + self.x_intercepts[i]
         }
     }
 
-    pub(crate) fn compare_to_at(&self, other: &Trajectory, t: Rational) -> Ordering {
-        if t < Rational::from(-1) {
-            panic!("t < -1");
-        }
+    /// # Panics
+    /// - When `t < -1`
+    pub(crate) fn compare_to_at(&self, other: &Self, t: Rational) -> Ordering {
+        assert!(t >= Rational::from(-1), "t < -1");
 
         if t == Rational::PositiveInfinity {
             if self.slopes[0] == other.slopes[0] {
@@ -145,7 +145,6 @@ impl Trajectory {
         new_x_intercept: &Rational,
     ) {
         if new_cp == &Rational::from(-1) || (!cps.is_empty() && cps.last().unwrap() == new_cp) {
-            return;
         } else if !slopes.is_empty() && slopes.last().unwrap() == new_slope {
             // The x-intercept must also be the same (since the trajectory is connected).
             // So just set the critical point higher.
@@ -168,16 +167,20 @@ impl Trajectory {
     }
 
     #[inline]
-    pub(crate) fn max(&self, other: &Trajectory) -> Trajectory {
+    pub(crate) fn max(&self, other: &Self) -> Self {
         self.minmax::<true>(other)
     }
 
     #[inline]
-    pub(crate) fn min(&self, other: &Trajectory) -> Trajectory {
+    pub(crate) fn min(&self, other: &Self) -> Self {
         self.minmax::<false>(other)
     }
 
-    fn minmax<const MAX: bool>(&self, other: &Trajectory) -> Trajectory {
+    #[cfg_attr(
+        feature = "cargo-clippy",
+        allow(clippy::useless_let_if_seq, clippy::cognitive_complexity)
+    )]
+    fn minmax<const MAX: bool>(&self, other: &Self) -> Self {
         let max_multiplier = if MAX { -1 } else { 1 };
         // We scan down through the critical points.  We keep track of which
         // trajectory was dominant at the previous critical point:
@@ -243,10 +246,10 @@ impl Trajectory {
                 // must have been a crossover since the last critical point.
                 // The crossover occurs at the intersection of the two line
                 // segments above this critical point.
-                let crossover_point = (&other.x_intercepts[next_critical_point_other]
-                    - &self.x_intercepts[next_critical_point_self])
-                    / (&self.slopes[next_critical_point_self]
-                        - &other.slopes[next_critical_point_other]);
+                let crossover_point = (other.x_intercepts[next_critical_point_other]
+                    - self.x_intercepts[next_critical_point_self])
+                    / (self.slopes[next_critical_point_self]
+                        - other.slopes[next_critical_point_other]);
                 new_critical_points.push(crossover_point);
                 new_slopes.push(if dominant_at_previous_critical_point < 0 {
                     self.slopes[next_critical_point_self]
@@ -346,7 +349,7 @@ impl Trajectory {
                     .slopes
                     .last()
                     .unwrap()
-                    .cmp(&other.slopes.last().unwrap()) as i32)
+                    .cmp(other.slopes.last().unwrap()) as i32);
         }
 
         new_slopes.push(if dominant_at_tail < 0 {
@@ -361,12 +364,10 @@ impl Trajectory {
             *other.x_intercepts.last().unwrap()
         });
 
-        let result = Trajectory {
+        Self {
             critical_points: new_critical_points,
             slopes: new_slopes,
             x_intercepts: new_x_intercepts,
-        };
-
-        result
+        }
     }
 }

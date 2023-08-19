@@ -20,16 +20,24 @@ pub struct DyadicRationalNumber {
 
 impl DyadicRationalNumber {
     /// Create a new dyadic
-    pub fn new(numerator: i64, denominator_exponent: u32) -> DyadicRationalNumber {
-        DyadicRationalNumber {
+    pub fn new(numerator: i64, denominator_exponent: u32) -> Self {
+        Self {
             numerator,
             denominator_exponent,
         }
         .normalized()
     }
 
+    /// Create a new integer
+    pub const fn new_integer(number: i64) -> Self {
+        Self {
+            numerator: number,
+            denominator_exponent: 0,
+        }
+    }
+
     /// Create a new fraction. Returns [None] if denominator is zero, or the number is not dyadic
-    pub fn new_fraction(numerator: i64, mut denominator: u32) -> Option<DyadicRationalNumber> {
+    pub fn new_fraction(numerator: i64, mut denominator: u32) -> Option<Self> {
         let mut denominator_exponent = 0;
 
         if denominator == 0 {
@@ -41,26 +49,19 @@ impl DyadicRationalNumber {
             denominator_exponent += 1;
         }
 
-        if denominator == 1 {
-            Some(
-                DyadicRationalNumber {
-                    numerator,
-                    denominator_exponent,
-                }
-                .normalized(),
-            )
-        } else {
-            None
-        }
+        (denominator == 1).then_some(Self {
+            numerator,
+            denominator_exponent,
+        })
     }
 
     /// Get the numerator (`n` from `n/2^m`)
-    pub fn numerator(&self) -> i64 {
+    pub const fn numerator(&self) -> i64 {
         self.numerator
     }
 
     /// Get the denominator (`2^m` from `n/2^m`) if it fits in [u128]
-    pub fn denominator(&self) -> Option<u128> {
+    pub const fn denominator(&self) -> Option<u128> {
         if self.denominator_exponent as usize >= std::mem::size_of::<u128>() * 8 {
             None
         } else {
@@ -70,7 +71,7 @@ impl DyadicRationalNumber {
     }
 
     /// Get denominator exponent (`m` from `n/2^m`)
-    pub fn denominator_exponent(&self) -> u32 {
+    pub const fn denominator_exponent(&self) -> u32 {
         self.denominator_exponent
     }
 
@@ -79,18 +80,21 @@ impl DyadicRationalNumber {
         self
     }
 
+    #[cfg_attr(feature = "cargo-clippy", allow(clippy::modulo_arithmetic))] // It's correct here
     /// Internal function to normalize numbers
     fn normalize(&mut self) {
         // [2*(n)]/[2*d] = n/d
+        // while self.numerator.rem_euclid(2) == 0 && self.denominator_exponent != 0 {
         while self.numerator % 2 == 0 && self.denominator_exponent != 0 {
-            self.numerator >>= 1;
+            self.numerator >>= 1_i32;
             self.denominator_exponent -= 1;
         }
     }
 
     /// Add to numerator. It is **NOT** addition function
+    #[must_use]
     pub fn step(&self, n: i64) -> Self {
-        DyadicRationalNumber {
+        Self {
             // numerator: self.numerator + (n << self.denominator_exponent),
             numerator: self.numerator + n,
             denominator_exponent: self.denominator_exponent,
@@ -101,20 +105,38 @@ impl DyadicRationalNumber {
     /// Convert to intger if it's an integer
     pub fn to_integer(&self) -> Option<i64> {
         // exponent == 0 => denominator == 1 => It's an integer
-        if self.denominator_exponent == 0 {
-            Some(self.numerator)
-        } else {
-            None
-        }
+        (self.denominator_exponent == 0).then_some(self.numerator)
     }
 
     /// Arithmetic mean of two rationals
+    #[must_use]
     pub fn mean(&self, rhs: &Self) -> Self {
         let mut res = *self + *rhs;
         res.denominator_exponent += 1; // divide by 2
         res.normalized()
     }
+
+    pub(crate) fn parse(input: &str) -> nom::IResult<&str, Self> {
+        let (input, numerator) = lexeme(nom::character::complete::i64)(input)?;
+        match lexeme(nom::bytes::complete::tag::<&str, &str, ()>("/"))(input) {
+            Ok((input, _)) => {
+                let (input, denominator) = lexeme(nom::character::complete::u32)(input)?;
+                Self::new_fraction(numerator, denominator).map_or_else(
+                    || {
+                        Err(nom::Err::Error(nom::error::Error::new(
+                            "Not a dyadic fraction",
+                            nom::error::ErrorKind::Verify,
+                        )))
+                    },
+                    |d| Ok((input, d)),
+                )
+            }
+            Err(_) => Ok((input, Self::from(numerator))),
+        }
+    }
 }
+
+impl_from_str_via_nom!(DyadicRationalNumber);
 
 #[test]
 fn step_works() {
@@ -174,17 +196,18 @@ fn half_is_less_than_forty_two() {
 }
 
 impl_op_ex!(+|lhs: &DyadicRationalNumber, rhs: &DyadicRationalNumber| -> DyadicRationalNumber {
-    let denominator_exponent;
-    let numerator;
+    let (numerator, denominator_exponent) =
     if lhs.denominator_exponent >= rhs.denominator_exponent {
-        denominator_exponent = lhs.denominator_exponent;
-        numerator = lhs.numerator
-            + (rhs.numerator << (lhs.denominator_exponent - rhs.denominator_exponent))
+            let denominator_exponent = lhs.denominator_exponent;
+            let numerator = lhs.numerator
+        + (rhs.numerator << (lhs.denominator_exponent - rhs.denominator_exponent));
+        (numerator, denominator_exponent)
     } else {
-        denominator_exponent = rhs.denominator_exponent;
-        numerator = rhs.numerator
-            + (lhs.numerator << (rhs.denominator_exponent - lhs.denominator_exponent))
-    }
+            let denominator_exponent = rhs.denominator_exponent;
+            let numerator = rhs.numerator
+        + (lhs.numerator << (rhs.denominator_exponent - lhs.denominator_exponent));
+            (numerator, denominator_exponent)
+    };
     DyadicRationalNumber {
         numerator,
         denominator_exponent,
@@ -247,7 +270,7 @@ impl Display for DyadicRationalNumber {
         } else {
             write!(f, "{}/2^{}", self.numerator(), self.denominator_exponent())?;
         }
-        return Ok(());
+        Ok(())
     }
 }
 
@@ -259,27 +282,6 @@ fn dyadic_rationals_pretty() {
         "21/2^200"
     );
 }
-
-impl DyadicRationalNumber {
-    pub(crate) fn parse(input: &str) -> nom::IResult<&str, DyadicRationalNumber> {
-        let (input, numerator) = lexeme(nom::character::complete::i64)(input)?;
-        match lexeme(nom::bytes::complete::tag::<&str, &str, ()>("/"))(input) {
-            Ok((input, _)) => {
-                let (input, denominator) = lexeme(nom::character::complete::u32)(input)?;
-                match DyadicRationalNumber::new_fraction(numerator, denominator) {
-                    Some(d) => Ok((input, d)),
-                    None => Err(nom::Err::Error(nom::error::Error::new(
-                        "Not a dyadic fraction",
-                        nom::error::ErrorKind::Verify,
-                    ))),
-                }
-            }
-            Err(_) => Ok((input, DyadicRationalNumber::from(numerator))),
-        }
-    }
-}
-
-impl_from_str_via_nom!(DyadicRationalNumber);
 
 #[cfg(test)]
 fn test_parsing_works(inp: &str) {

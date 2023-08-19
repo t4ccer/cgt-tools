@@ -12,19 +12,34 @@ pub struct Nimber(u32);
 
 impl Nimber {
     /// Construct new nimber
-    pub fn new(value: u32) -> Nimber {
-        Nimber(value)
+    pub const fn new(value: u32) -> Self {
+        Self(value)
     }
 
     /// Get the underlying nimber value
-    pub fn value(&self) -> u32 {
+    pub const fn value(&self) -> u32 {
         self.0
+    }
+
+    /// Compute the minimum excluded value from a vector of nimbers.
+    /// See <https://en.wikipedia.org/wiki/Mex_(mathematics)>
+    pub fn mex(mut nimbers: Vec<Self>) -> Self {
+        nimbers.sort();
+        let mut current = 0;
+        for n in nimbers {
+            match current.cmp(&n.0) {
+                std::cmp::Ordering::Less => return Self(current),
+                std::cmp::Ordering::Equal => current += 1,
+                std::cmp::Ordering::Greater => {}
+            }
+        }
+        Self(current)
     }
 }
 
 impl From<u32> for Nimber {
     fn from(value: u32) -> Self {
-        Nimber(value)
+        Self(value)
     }
 }
 
@@ -48,23 +63,6 @@ impl Display for Nimber {
         } else {
             write!(f, "*{}", self.0)
         }
-    }
-}
-
-impl Nimber {
-    /// Compute the minimum excluded value from a vector of nimbers.
-    /// See <https://en.wikipedia.org/wiki/Mex_(mathematics)>
-    pub fn mex(mut nimbers: Vec<Nimber>) -> Nimber {
-        nimbers.sort();
-        let mut current = 0;
-        for n in nimbers {
-            if current < n.0 {
-                return Nimber(current);
-            } else if current == n.0 {
-                current += 1;
-            }
-        }
-        return Nimber(current);
     }
 }
 

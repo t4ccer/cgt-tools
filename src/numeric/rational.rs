@@ -29,44 +29,57 @@ impl Rational {
     /// Create a new rational. Panics if denominator is zero.
     #[inline]
     pub fn new(numerator: i64, denominator: u32) -> Self {
-        Rational::Value(Rational64::new(numerator, denominator as i64))
+        Self::Value(Rational64::new(numerator, denominator as i64))
     }
 
     /// Check if value is infinite
     #[inline]
-    pub fn is_infinite(&self) -> bool {
-        !matches!(self, Rational::Value(_))
+    pub const fn is_infinite(&self) -> bool {
+        !matches!(self, Self::Value(_))
+    }
+
+    // NOTE: Doesn't handle infinities
+    fn parse(input: &str) -> nom::IResult<&str, Self> {
+        let (input, numerator) = nom_utils::lexeme(nom::character::complete::i64)(input)?;
+        match nom_utils::lexeme(nom::bytes::complete::tag::<&str, &str, ()>("/"))(input) {
+            Ok((input, _)) => {
+                let (input, denominator) = nom_utils::lexeme(nom::character::complete::u32)(input)?;
+                let (input, _eof) = nom_utils::lexeme(nom::combinator::eof)(input)?;
+                // NOTE: zero denominator not handled
+                Ok((input, Self::new(numerator, denominator)))
+            }
+            Err(_) => Ok((input, Self::from(numerator))),
+        }
     }
 }
 
 impl From<Rational64> for Rational {
     fn from(value: Rational64) -> Self {
-        Rational::Value(value)
+        Self::Value(value)
     }
 }
 
 impl From<i64> for Rational {
     fn from(value: i64) -> Self {
-        Rational::from(Rational64::from(value))
+        Self::from(Rational64::from(value))
     }
 }
 
 impl From<i32> for Rational {
     fn from(value: i32) -> Self {
-        Rational::from(value as i64)
+        Self::from(value as i64)
     }
 }
 
 impl_op_ex!(+|lhs: &Rational, rhs: &Rational| -> Rational {
     match (lhs, rhs) {
         (Rational::Value(lhs), Rational::Value(rhs)) => Rational::from(lhs + rhs),
-        (Rational::Value(_), Rational::PositiveInfinity) => Rational::PositiveInfinity,
+        (Rational::Value(_), Rational::PositiveInfinity) |
         (Rational::PositiveInfinity, Rational::Value(_)) => Rational::PositiveInfinity,
-        (Rational::Value(_), Rational::NegativeInfinity) => Rational::NegativeInfinity,
+        (Rational::Value(_), Rational::NegativeInfinity) |
         (Rational::NegativeInfinity, Rational::Value(_)) => Rational::NegativeInfinity,
         _ => {
-            dbg!(lhs, rhs);
-            unimplemented!()
+            panic!()
         }
     }
 });
@@ -77,7 +90,7 @@ impl_op_ex!(-|lhs: &Rational, rhs: &Rational| -> Rational {
     if let (Rational::Value(lhs), Rational::Value(rhs)) = (lhs, rhs) {
         Rational::from(lhs - rhs)
     } else {
-        unimplemented!()
+        panic!()
     }
 });
 
@@ -99,8 +112,7 @@ impl_op_ex!(*|lhs: &Rational, rhs: &Rational| -> Rational {
             Rational::PositiveInfinity
         }
         (Rational::Value(_), _) => {
-            dbg!(&lhs, &rhs);
-            unimplemented!()
+            panic!()
         }
         (rhs, lhs) => Mul::mul(lhs, rhs), // NOTE: Be careful here not to loop
     }
@@ -112,7 +124,7 @@ impl_op_ex!(/|lhs: &Rational, rhs: &Rational| -> Rational {
     if let (Rational::Value(lhs), Rational::Value(rhs)) = (lhs, rhs) {
         Rational::from(lhs / rhs)
     } else {
-        unimplemented!()
+        panic!()
     }
 });
 impl_op_ex!(/=|lhs: &mut Rational, rhs: &Rational| {*lhs = lhs.div(rhs) });
@@ -128,25 +140,9 @@ impl_op_ex!(-|lhs: &Rational| -> Rational {
 impl Display for Rational {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Rational::NegativeInfinity => write!(f, "-∞"),
-            Rational::Value(val) => write!(f, "{}", val),
-            Rational::PositiveInfinity => write!(f, "∞"),
-        }
-    }
-}
-
-impl Rational {
-    // NOTE: Doesn't handle infinities
-    fn parse(input: &str) -> nom::IResult<&str, Rational> {
-        let (input, numerator) = nom_utils::lexeme(nom::character::complete::i64)(input)?;
-        match nom_utils::lexeme(nom::bytes::complete::tag::<&str, &str, ()>("/"))(input) {
-            Ok((input, _)) => {
-                let (input, denominator) = nom_utils::lexeme(nom::character::complete::u32)(input)?;
-                let (input, _eof) = nom_utils::lexeme(nom::combinator::eof)(input)?;
-                // NOTE: zero denominator not handled
-                Ok((input, Rational::new(numerator, denominator)))
-            }
-            Err(_) => Ok((input, Rational::from(numerator))),
+            Self::NegativeInfinity => write!(f, "-∞"),
+            Self::Value(val) => write!(f, "{}", val),
+            Self::PositiveInfinity => write!(f, "∞"),
         }
     }
 }

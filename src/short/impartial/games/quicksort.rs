@@ -28,19 +28,20 @@ impl Display for Quicksort {
 impl Quicksort {
     /// Create new quicksort position from a given sequence
     #[inline]
-    pub fn new(sequence: Vec<u32>) -> Quicksort {
-        Quicksort { sequence }
+    pub fn new(sequence: Vec<u32>) -> Self {
+        Self { sequence }
     }
 
     /// Get the sequence of the quicksort position
     #[inline]
-    pub fn sequence(&self) -> &Vec<u32> {
+    pub const fn sequence(&self) -> &Vec<u32> {
         &self.sequence
     }
 
     /// pivot on `pivot`
+    #[must_use]
     pub fn pivot_on(&self, pivot: u32) -> Self {
-        let mut res = Quicksort::new(Vec::with_capacity(self.sequence().len()));
+        let mut res = Self::new(Vec::with_capacity(self.sequence().len()));
         for elem in self.sequence() {
             if *elem < pivot {
                 res.sequence.push(*elem);

@@ -15,7 +15,7 @@ impl Thermograph {
     /// Construct a thermograph with only a mast at given value
     pub fn with_mast(mast: Rational) -> Self {
         let t = Trajectory::new_constant(mast);
-        Thermograph {
+        Self {
             left_wall: t.clone(),
             right_wall: t,
         }
@@ -51,6 +51,10 @@ impl Thermograph {
 
     /// Calculate a thermograph given left and right scaffold. Note that scaffolds should be
     /// [tilted](Trajectory::tilt) before.
+    #[cfg_attr(
+        feature = "cargo-clippy",
+        allow(clippy::cognitive_complexity, clippy::missing_panics_doc)
+    )]
     pub fn thermographic_intersection(
         left_scaffold: Trajectory,
         right_scaffold: Trajectory,
@@ -58,7 +62,7 @@ impl Thermograph {
         if left_scaffold == Trajectory::new_constant(Rational::PositiveInfinity)
             || right_scaffold == Trajectory::new_constant(Rational::NegativeInfinity)
         {
-            return Thermograph {
+            return Self {
                 left_wall: left_scaffold,
                 right_wall: right_scaffold,
             };
@@ -128,9 +132,9 @@ impl Thermograph {
                         as i32;
                 }
                 current_cp = if current_cp_owner <= 0 {
-                    left_scaffold.critical_points[next_cp_left as usize].clone()
+                    left_scaffold.critical_points[next_cp_left as usize]
                 } else {
-                    right_scaffold.critical_points[next_cp_right as usize].clone()
+                    right_scaffold.critical_points[next_cp_right as usize]
                 }
             }
 
@@ -179,25 +183,23 @@ impl Thermograph {
                 if left_scaffold.value_at(current_cp) > left_scaffold.value_at(crossover_point) {
                     // The left scaffold moves to the left above the crossover point.
                     // The cave mast follows the left scaffold.
-                    cave_mast_slope = left_scaffold.slopes[(next_cp_left + 1) as usize].clone();
-                    cave_mast_intercept =
-                        left_scaffold.x_intercepts[(next_cp_left + 1) as usize].clone();
+                    cave_mast_slope = left_scaffold.slopes[(next_cp_left + 1) as usize];
+                    cave_mast_intercept = left_scaffold.x_intercepts[(next_cp_left + 1) as usize];
                     previous_cave_value = Some(left_scaffold.value_at(current_cp));
                 } else if right_scaffold.value_at(current_cp)
                     < right_scaffold.value_at(crossover_point)
                 {
                     // The right scaffold moves to the right above the crossover point.
                     // The cave mast follows the right scaffold.
-                    cave_mast_slope = right_scaffold.slopes[(next_cp_right + 1) as usize].clone();
-                    cave_mast_intercept =
-                        right_scaffold.x_intercepts[(next_cp_right + 1) as usize].clone();
+                    cave_mast_slope = right_scaffold.slopes[(next_cp_right + 1) as usize];
+                    cave_mast_intercept = right_scaffold.x_intercepts[(next_cp_right + 1) as usize];
                     previous_cave_value = Some(right_scaffold.value_at(current_cp));
                 } else {
                     // Neither of the above.
                     // The cave mast extends vertically above the crossover point.
                     cave_mast_slope = Rational::from(0);
                     cave_mast_intercept = left_scaffold.value_at(crossover_point);
-                    previous_cave_value = Some(cave_mast_intercept.clone());
+                    previous_cave_value = Some(cave_mast_intercept);
                 }
 
                 // Extend the trajectories according to the cave mast/intercept.
@@ -208,7 +210,7 @@ impl Thermograph {
                     &mut left_wall_x_intercepts,
                     &current_cp,
                     &cave_mast_slope,
-                    &&cave_mast_intercept,
+                    &cave_mast_intercept,
                 );
                 Trajectory::extend_trajectory(
                     true,
@@ -217,7 +219,7 @@ impl Thermograph {
                     &mut right_wall_x_intercepts,
                     &current_cp,
                     &cave_mast_slope,
-                    &&cave_mast_intercept,
+                    &cave_mast_intercept,
                 );
             } else if let Some(previous_cave_value_r) = &previous_cave_value {
                 // We were previously in a cave region. There are three cases:
@@ -232,9 +234,9 @@ impl Thermograph {
                 let left_scaffold_crossing_point =
                     if &left_scaffold.value_at(current_cp) > previous_cave_value_r {
                         Some(
-                            &(previous_cave_value_r
-                                - &left_scaffold.x_intercepts[(next_cp_left + 1) as usize])
-                                / &left_scaffold.slopes[(next_cp_left + 1) as usize],
+                            (previous_cave_value_r
+                                - left_scaffold.x_intercepts[(next_cp_left + 1) as usize])
+                                / left_scaffold.slopes[(next_cp_left + 1) as usize],
                         )
                     } else {
                         None
@@ -242,9 +244,9 @@ impl Thermograph {
                 let right_scaffold_crossing_point =
                     if &right_scaffold.value_at(current_cp) < previous_cave_value_r {
                         Some(
-                            &(previous_cave_value_r
-                                - &right_scaffold.x_intercepts[(next_cp_right + 1) as usize])
-                                / &right_scaffold.slopes[(next_cp_right + 1) as usize],
+                            (previous_cave_value_r
+                                - right_scaffold.x_intercepts[(next_cp_right + 1) as usize])
+                                / right_scaffold.slopes[(next_cp_right + 1) as usize],
                         )
                     } else {
                         None
@@ -253,7 +255,7 @@ impl Thermograph {
                 if left_scaffold_crossing_point.is_some()
                     && (right_scaffold_crossing_point.is_none()
                         || left_scaffold_crossing_point.as_ref().unwrap()
-                            <= &right_scaffold_crossing_point.as_ref().unwrap())
+                            <= right_scaffold_crossing_point.as_ref().unwrap())
                 {
                     // We are in case (i). First add the truncated vertical mast.
                     Trajectory::extend_trajectory(
@@ -289,18 +291,17 @@ impl Thermograph {
 
                     // To handle the right wall we need to know whether we've re-entered a hill
                     // region or not.
-                    let new_right_cp: Rational;
-                    if now_in_hill_region {
-                        new_right_cp = Trajectory::intersection_point(
+                    let new_right_cp = if now_in_hill_region {
+                        Trajectory::intersection_point(
                             &left_scaffold.slopes[(next_cp_left + 1) as usize],
                             &left_scaffold.x_intercepts[(next_cp_left + 1) as usize],
                             &right_scaffold.slopes[(next_cp_right + 1) as usize],
                             &right_scaffold.x_intercepts[(next_cp_right + 1) as usize],
-                        );
+                        )
                     } else {
                         previous_cave_value = Some(left_scaffold.value_at(current_cp));
-                        new_right_cp = current_cp.clone();
-                    }
+                        current_cp
+                    };
 
                     // Extend the right trajectory.
                     Trajectory::extend_trajectory(
@@ -348,20 +349,19 @@ impl Thermograph {
 
                     // To handle the left wall we need to know whether we've re-entered a hill
                     // region or not.
-                    let new_left_cp: Rational;
-                    if now_in_hill_region {
+                    let new_left_cp = if now_in_hill_region {
                         // A hill region is indeed re-entered.  So the tilted mast for Left extends
                         // just up to the scaffolds' next point of intersection.
-                        new_left_cp = Trajectory::intersection_point(
+                        Trajectory::intersection_point(
                             &left_scaffold.slopes[(next_cp_left + 1) as usize],
                             &left_scaffold.x_intercepts[(next_cp_left + 1) as usize],
                             &right_scaffold.slopes[(next_cp_right + 1) as usize],
                             &right_scaffold.x_intercepts[(next_cp_right + 1) as usize],
-                        );
+                        )
                     } else {
                         previous_cave_value = Some(right_scaffold.value_at(current_cp));
-                        new_left_cp = current_cp.clone();
-                    }
+                        current_cp
+                    };
                     Trajectory::extend_trajectory(
                         true,
                         &mut left_wall_cps,
@@ -380,7 +380,7 @@ impl Thermograph {
                         &mut left_wall_x_intercepts,
                         &current_cp,
                         &Rational::from(0),
-                        &previous_cave_value_r,
+                        previous_cave_value_r,
                     );
                     Trajectory::extend_trajectory(
                         true,
@@ -389,7 +389,7 @@ impl Thermograph {
                         &mut right_wall_x_intercepts,
                         &current_cp,
                         &Rational::from(0),
-                        &previous_cave_value_r,
+                        previous_cave_value_r,
                     );
                 }
             }
@@ -450,7 +450,7 @@ impl Thermograph {
             x_intercepts: right_wall_x_intercepts,
         };
 
-        Thermograph {
+        Self {
             left_wall,
             right_wall,
         }

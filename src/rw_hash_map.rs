@@ -1,5 +1,7 @@
 //! Simple thread safe hashmap
 
+#![cfg_attr(feature = "cargo-clippy", allow(clippy::missing_panics_doc))]
+
 use std::{collections::HashMap, hash::Hash, ops::Deref, sync::RwLock};
 
 /// Thread safe hashmap
@@ -13,10 +15,11 @@ where
 {
     /// Create new, empty collection
     pub fn new() -> Self {
-        RwHashMap(RwLock::new(HashMap::new()))
+        Self(RwLock::new(HashMap::new()))
     }
 
     /// Lookup the key in hashmap
+
     pub fn get(&self, key: &K) -> Option<V> {
         self.0.read().unwrap().deref().get(key).cloned()
     }
@@ -30,6 +33,11 @@ where
     /// Get number of elements in the hashmap
     pub fn len(&self) -> usize {
         self.0.read().unwrap().len()
+    }
+
+    /// Check if hashmap is empty
+    pub fn is_empty(&self) -> bool {
+        self.0.read().unwrap().is_empty()
     }
 
     /// Remove all elements from hashmap

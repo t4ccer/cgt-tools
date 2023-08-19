@@ -11,6 +11,7 @@ use super::directed;
 pub struct Graph(directed::Graph);
 
 impl Display for Graph {
+    #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.fmt(f)
     }
@@ -31,13 +32,14 @@ impl Graph {
 
     /// Create a graph from adjecency matrix. Must be correct length
     #[inline]
-    pub fn from_matrix(size: usize, matrix: Vec<Vec<bool>>) -> Option<Self> {
+    pub fn from_matrix(size: usize, matrix: &[Vec<bool>]) -> Option<Self> {
         Some(Self(directed::Graph::from_matrix(size, matrix)?))
     }
 
     /// Create a graph from list of edges
+    #[inline]
     pub fn from_edges(size: usize, edges: &[(usize, usize)]) -> Self {
-        let mut graph = Graph::empty(size);
+        let mut graph = Self::empty(size);
         for (v, u) in edges {
             graph.connect(*v, *u, true);
         }
@@ -46,7 +48,7 @@ impl Graph {
 
     /// Get number of vertices in the graph.
     #[inline]
-    pub fn size(&self) -> usize {
+    pub const fn size(&self) -> usize {
         self.0.size()
     }
 
@@ -64,26 +66,31 @@ impl Graph {
     }
 
     /// Get vertices adjacent to `vertex`.
+    #[inline]
     pub fn adjacent_to(&self, vertex: usize) -> Vec<usize> {
         self.0.adjacent_to(vertex)
     }
 
     /// Get iterator over vertices
+    #[inline]
     pub fn vertices(&self) -> Range<usize> {
         self.0.vertices()
     }
 
     /// Add a new disconnected vertex at the end of the graph
+    #[inline]
     pub fn add_vertex(&mut self) {
         self.0.add_vertex();
     }
 
     /// Remove a given vertex from the graph, remove all its edges
+    #[inline]
     pub fn remove_vertex(&mut self, vertex_to_remove: usize) {
         self.0.remove_vertex(vertex_to_remove);
     }
 
     /// Get degrees of all vertices in the graph
+    #[inline]
     pub fn degrees(&self) -> Vec<usize> {
         let mut degrees = vec![0; self.size()];
         for v in self.vertices() {
@@ -97,6 +104,7 @@ impl Graph {
     }
 
     /// Get graph degree (highest vertex degree)
+    #[inline]
     pub fn degree(&self) -> usize {
         *self
             .degrees()
@@ -106,6 +114,7 @@ impl Graph {
     }
 
     /// Check if graph is connected
+    #[inline]
     pub fn is_connected(&self) -> bool {
         if self.size() == 0 {
             return true;

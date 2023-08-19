@@ -19,24 +19,22 @@ impl Display for Sub {
 }
 
 impl Sub {
-    /// Get the subtraction set of the game
-    #[inline]
-    pub fn subtraction_set(&self) -> &Vec<u32> {
-        &self.subtraction_set
-    }
-}
-
-impl Sub {
     /// Define new subtraction game with a given subtraction set
     #[inline]
-    pub fn new(mut subtraction_set: Vec<u32>) -> Sub {
-        subtraction_set.sort();
-        Sub { subtraction_set }
+    pub fn new(mut subtraction_set: Vec<u32>) -> Self {
+        subtraction_set.sort_unstable();
+        Self { subtraction_set }
+    }
+
+    /// Get the subtraction set of the game
+    #[inline]
+    pub const fn subtraction_set(&self) -> &Vec<u32> {
+        &self.subtraction_set
     }
 
     /// Get the infinite Grundy sequence of the subtraction game
     #[inline]
-    pub fn grundy_sequence(self) -> GrundySequence {
+    pub const fn grundy_sequence(self) -> GrundySequence {
         GrundySequence {
             game: self,
             previous: vec![],
