@@ -34,6 +34,174 @@ pub struct Nus {
 }
 
 impl Nus {
+    /// Create new number-up-start sum
+    #[inline]
+    pub fn new(number: DyadicRationalNumber, up_multiple: i32, nimber: Nimber) -> Self {
+        Nus {
+            number,
+            up_multiple,
+            nimber,
+        }
+    }
+
+    /// Create new number-up-star game equal to an integer.
+    #[inline]
+    pub fn new_integer(integer: i64) -> Self {
+        Nus::new(DyadicRationalNumber::from(integer), 0, Nimber::from(0))
+    }
+
+    /// Create new number-up-star game equal to an rational.
+    #[inline]
+    pub fn new_number(number: DyadicRationalNumber) -> Self {
+        Nus::new(number, 0, Nimber::from(0))
+    }
+
+    /// Create new number-up-star game equal to an rational.
+    #[inline]
+    pub fn new_nimber(nimber: Nimber) -> Self {
+        Nus::new(DyadicRationalNumber::from(0), 0, nimber)
+    }
+
+    /// Get number part of the NUS sum
+    #[inline]
+    pub fn number(&self) -> DyadicRationalNumber {
+        self.number
+    }
+
+    /// Get up/down part of the NUS sum. Positive for up, negative for down.
+    #[inline]
+    pub fn up_multiple(&self) -> i32 {
+        self.up_multiple
+    }
+
+    /// Get nimber part of the NUS sum
+    #[inline]
+    pub fn nimber(&self) -> Nimber {
+        self.nimber
+    }
+
+    /// Check if the game has only number part (i.e. up multiple and nimber are zero).
+    #[inline]
+    pub fn is_number(&self) -> bool {
+        self.up_multiple() == 0 && self.nimber() == Nimber::from(0)
+    }
+
+    /// Check if the game is a nimber.
+    #[inline]
+    pub fn is_nimber(&self) -> bool {
+        self.number() == DyadicRationalNumber::from(0) && self.up_multiple() == 0
+    }
+
+    fn to_moves(&self) -> Moves {
+        // Case: Just a number
+        if self.is_number() {
+            if self.number() == DyadicRationalNumber::from(0) {
+                return Moves {
+                    left: vec![],
+                    right: vec![],
+                };
+            }
+
+            if let Some(integer) = self.number().to_integer() {
+                let sign = if integer >= 0 { 1 } else { -1 };
+                let prev = CanonicalForm::new_nus(Nus::new_integer(integer - sign));
+
+                if sign > 0 {
+                    return Moves {
+                        left: vec![prev],
+                        right: vec![],
+                    };
+                } else if sign < 0 {
+                    return Moves {
+                        left: vec![],
+                        right: vec![prev],
+                    };
+                }
+            } else {
+                let rational = self.number();
+                let left_move = CanonicalForm::new_nus(Nus::new_number(rational.step(-1)));
+                let right_move = CanonicalForm::new_nus(Nus::new_number(rational.step(1)));
+                return Moves {
+                    left: vec![left_move],
+                    right: vec![right_move],
+                };
+            }
+        }
+
+        // Case: number + nimber but no up/down
+        if self.up_multiple() == 0 {
+            let rational = self.number();
+            let nimber = self.nimber();
+
+            let mut moves = Moves::empty();
+            for i in 0..nimber.value() {
+                let new_nus = Nus {
+                    number: rational,
+                    up_multiple: 0,
+                    nimber: Nimber::from(i),
+                };
+                moves.left.push(CanonicalForm::new_nus(new_nus));
+                moves.right.push(CanonicalForm::new_nus(new_nus));
+            }
+            return moves;
+        }
+
+        // Case: number-up-star
+        let number_move = Nus::new_number(self.number());
+
+        let sign = if self.up_multiple() >= 0 { 1 } else { -1 };
+        let prev_up = self.up_multiple() - sign;
+        let up_parity: u32 = (self.up_multiple() & 1) as u32;
+        let prev_nimber = self.nimber().value() ^ up_parity ^ (prev_up as u32 & 1);
+        let moves;
+
+        if self.up_multiple() == 1 && self.nimber() == Nimber::from(1) {
+            // Special case: n^*
+            let star_move = CanonicalForm::new_nus(Nus {
+                number: self.number(),
+                up_multiple: 0,
+                nimber: Nimber::from(1),
+            });
+            moves = Moves {
+                left: vec![CanonicalForm::new_nus(number_move), star_move],
+                right: vec![CanonicalForm::new_nus(number_move)],
+            };
+        } else if self.up_multiple() == -1 && self.nimber() == Nimber::from(1) {
+            // Special case: nv*
+            let star_move = CanonicalForm::new_nus(Nus {
+                number: self.number(),
+                up_multiple: 0,
+                nimber: Nimber::from(1),
+            });
+            moves = Moves {
+                left: vec![CanonicalForm::new_nus(number_move)],
+                right: vec![CanonicalForm::new_nus(number_move), star_move],
+            };
+        } else if self.up_multiple() > 0 {
+            let prev_nus = CanonicalForm::new_nus(Nus {
+                number: self.number(),
+                up_multiple: prev_up,
+                nimber: Nimber::from(prev_nimber),
+            });
+            moves = Moves {
+                left: vec![CanonicalForm::new_nus(number_move)],
+                right: vec![prev_nus],
+            };
+        } else {
+            let prev_nus = CanonicalForm::new_nus(Nus {
+                number: self.number(),
+                up_multiple: prev_up,
+                nimber: Nimber::from(prev_nimber),
+            });
+            moves = Moves {
+                left: vec![prev_nus],
+                right: vec![CanonicalForm::new_nus(number_move)],
+            };
+        }
+
+        moves
+    }
+
     /// Parse nus from string, using notation without pluses between number, up, and star components
     ///
     /// Pattern: `\d*([v^]\d*)?(\*\d*)`
@@ -142,158 +310,6 @@ fn parse_nus() {
     parse_nus_succeed!("  123 v   58 *  43784");
 }
 
-impl Nus {
-    /// Create new number-up-start sum
-    #[inline]
-    pub fn new(number: DyadicRationalNumber, up_multiple: i32, nimber: Nimber) -> Self {
-        Nus {
-            number,
-            up_multiple,
-            nimber,
-        }
-    }
-
-    /// Create new number-up-star game equal to an integer.
-    #[inline]
-    pub fn new_integer(integer: i64) -> Self {
-        Nus::new(DyadicRationalNumber::from(integer), 0, Nimber::from(0))
-    }
-
-    /// Create new number-up-star game equal to an rational.
-    #[inline]
-    pub fn new_rational(number: DyadicRationalNumber) -> Self {
-        Nus::new(number, 0, Nimber::from(0))
-    }
-
-    /// Create new number-up-star game equal to an rational.
-    #[inline]
-    pub fn new_nimber(nimber: Nimber) -> Self {
-        Nus::new(DyadicRationalNumber::from(0), 0, nimber)
-    }
-
-    /// Check if the game has only number part (i.e. up multiple and nimber are zero).
-    #[inline]
-    pub fn is_number(&self) -> bool {
-        self.up_multiple == 0 && self.nimber == Nimber::from(0)
-    }
-
-    /// Check if the game is a nimber.
-    #[inline]
-    pub fn is_nimber(&self) -> bool {
-        self.number == DyadicRationalNumber::from(0) && self.up_multiple == 0
-    }
-
-    fn to_moves(&self) -> Moves {
-        // Case: Just a number
-        if self.is_number() {
-            if self.number == DyadicRationalNumber::from(0) {
-                return Moves {
-                    left: vec![],
-                    right: vec![],
-                };
-            }
-
-            if let Some(integer) = self.number.to_integer() {
-                let sign = if integer >= 0 { 1 } else { -1 };
-                let prev = CanonicalForm::new_nus(Nus::new_integer(integer - sign));
-
-                if sign > 0 {
-                    return Moves {
-                        left: vec![prev],
-                        right: vec![],
-                    };
-                } else if sign < 0 {
-                    return Moves {
-                        left: vec![],
-                        right: vec![prev],
-                    };
-                }
-            } else {
-                let rational = self.number;
-                let left_move = CanonicalForm::new_nus(Nus::new_rational(rational.step(-1)));
-                let right_move = CanonicalForm::new_nus(Nus::new_rational(rational.step(1)));
-                return Moves {
-                    left: vec![left_move],
-                    right: vec![right_move],
-                };
-            }
-        }
-
-        // Case: number + nimber but no up/down
-        if self.up_multiple == 0 {
-            let rational = self.number;
-            let nimber = self.nimber;
-
-            let mut moves = Moves::empty();
-            for i in 0..nimber.value() {
-                let new_nus = Nus {
-                    number: rational,
-                    up_multiple: 0,
-                    nimber: Nimber::from(i),
-                };
-                moves.left.push(CanonicalForm::new_nus(new_nus));
-                moves.right.push(CanonicalForm::new_nus(new_nus));
-            }
-            return moves;
-        }
-
-        // Case: number-up-star
-        let number_move = Nus::new_rational(self.number);
-
-        let sign = if self.up_multiple >= 0 { 1 } else { -1 };
-        let prev_up = self.up_multiple - sign;
-        let up_parity: u32 = (self.up_multiple & 1) as u32;
-        let prev_nimber = self.nimber.value() ^ up_parity ^ (prev_up as u32 & 1);
-        let moves;
-
-        if self.up_multiple == 1 && self.nimber == Nimber::from(1) {
-            // Special case: n^*
-            let star_move = CanonicalForm::new_nus(Nus {
-                number: self.number,
-                up_multiple: 0,
-                nimber: Nimber::from(1),
-            });
-            moves = Moves {
-                left: vec![CanonicalForm::new_nus(number_move), star_move],
-                right: vec![CanonicalForm::new_nus(number_move)],
-            };
-        } else if self.up_multiple == -1 && self.nimber == Nimber::from(1) {
-            // Special case: nv*
-            let star_move = CanonicalForm::new_nus(Nus {
-                number: self.number,
-                up_multiple: 0,
-                nimber: Nimber::from(1),
-            });
-            moves = Moves {
-                left: vec![CanonicalForm::new_nus(number_move)],
-                right: vec![CanonicalForm::new_nus(number_move), star_move],
-            };
-        } else if self.up_multiple > 0 {
-            let prev_nus = CanonicalForm::new_nus(Nus {
-                number: self.number,
-                up_multiple: prev_up,
-                nimber: Nimber::from(prev_nimber),
-            });
-            moves = Moves {
-                left: vec![CanonicalForm::new_nus(number_move)],
-                right: vec![prev_nus],
-            };
-        } else {
-            let prev_nus = CanonicalForm::new_nus(Nus {
-                number: self.number,
-                up_multiple: prev_up,
-                nimber: Nimber::from(prev_nimber),
-            });
-            moves = Moves {
-                left: vec![prev_nus],
-                right: vec![CanonicalForm::new_nus(number_move)],
-            };
-        }
-
-        moves
-    }
-}
-
 impl_op_ex!(+|lhs: &Nus, rhs: &Nus| -> Nus {
     Nus {
         number: lhs.number + rhs.number,
@@ -312,30 +328,30 @@ impl_op_ex!(-|lhs: &Nus| -> Nus {
 
 impl Display for Nus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.number == DyadicRationalNumber::from(0)
-            && self.up_multiple == 0
-            && self.nimber == Nimber::from(0)
+        if self.number() == DyadicRationalNumber::from(0)
+            && self.up_multiple() == 0
+            && self.nimber() == Nimber::from(0)
         {
             write!(f, "0")?;
             return Ok(());
         }
 
-        if self.number != DyadicRationalNumber::from(0) {
-            write!(f, "{}", self.number)?;
+        if self.number() != DyadicRationalNumber::from(0) {
+            write!(f, "{}", self.number())?;
         }
 
-        if self.up_multiple == 1 {
+        if self.up_multiple() == 1 {
             write!(f, "^")?;
-        } else if self.up_multiple == -1 {
+        } else if self.up_multiple() == -1 {
             write!(f, "v")?;
-        } else if self.up_multiple > 0 {
-            write!(f, "^{}", self.up_multiple)?;
-        } else if self.up_multiple < 0 {
-            write!(f, "v{}", self.up_multiple.abs())?;
+        } else if self.up_multiple() > 0 {
+            write!(f, "^{}", self.up_multiple())?;
+        } else if self.up_multiple() < 0 {
+            write!(f, "v{}", self.up_multiple().abs())?;
         }
 
-        if self.nimber != Nimber::from(0) {
-            write!(f, "{}", self.nimber)?;
+        if self.nimber() != Nimber::from(0) {
+            write!(f, "{}", self.nimber())?;
         }
 
         Ok(())
@@ -394,7 +410,7 @@ impl Moves {
                 // right entry that's a number
                 debug_assert!(num_ro == 1, "Entry not normalized");
                 result.number =
-                    self.right[0].get_nus_unchecked().number - DyadicRationalNumber::from(1);
+                    self.right[0].get_nus_unchecked().number() - DyadicRationalNumber::from(1);
             }
             result.up_multiple = 0;
             result.nimber = Nimber::from(0);
@@ -402,7 +418,8 @@ impl Moves {
             // Case: n+1 = {n|}
             // No right options so there must be a left move that is a number
             debug_assert!(num_lo == 1, "Entry not normalized");
-            result.number = self.left[0].get_nus_unchecked().number + DyadicRationalNumber::from(1);
+            result.number =
+                self.left[0].get_nus_unchecked().number() + DyadicRationalNumber::from(1);
             result.up_multiple = 0;
             result.nimber = Nimber::from(0);
         } else if num_lo == 1
@@ -411,15 +428,15 @@ impl Moves {
             && self.right[0].is_number()
             && self.left[0]
                 .get_nus_unchecked()
-                .number
-                .cmp(&self.right[0].get_nus_unchecked().number)
+                .number()
+                .cmp(&self.right[0].get_nus_unchecked().number())
                 .is_lt()
         {
             // Case: {n|m}, n < m
             // We're a number but not an integer.  Conveniently, since the option lists are
             // canonicalized, the value of this game is the mean of its left & right moves.
-            let l_num = self.left[0].get_nus_unchecked().number;
-            let r_num = self.right[0].get_nus_unchecked().number;
+            let l_num = self.left[0].get_nus_unchecked().number();
+            let r_num = self.right[0].get_nus_unchecked().number();
             result.number = DyadicRationalNumber::mean(&l_num, &r_num);
             result.up_multiple = 0;
             result.nimber = Nimber::from(0);
@@ -430,14 +447,14 @@ impl Moves {
             && self.left[1].is_number_up_star()
             && self.left[0]
                 .get_nus_unchecked()
-                .number
-                .cmp(&self.left[1].get_nus_unchecked().number)
+                .number()
+                .cmp(&self.left[1].get_nus_unchecked().number())
                 .is_eq()
-            && self.left[1].get_nus_unchecked().up_multiple == 0
-            && self.left[1].get_nus_unchecked().nimber == Nimber::from(1)
+            && self.left[1].get_nus_unchecked().up_multiple() == 0
+            && self.left[1].get_nus_unchecked().nimber() == Nimber::from(1)
         {
             // Case: {G,H|G}
-            result.number = self.left[0].get_nus_unchecked().number;
+            result.number = self.left[0].get_nus_unchecked().number();
             result.up_multiple = 1;
             result.nimber = Nimber::from(1);
         } else if num_lo == 1
@@ -447,14 +464,14 @@ impl Moves {
             && self.right[1].is_number_up_star()
             && self.right[0]
                 .get_nus_unchecked()
-                .number
-                .cmp(&self.right[1].get_nus_unchecked().number)
+                .number()
+                .cmp(&self.right[1].get_nus_unchecked().number())
                 .is_eq()
-            && self.right[1].get_nus_unchecked().up_multiple == 0
-            && self.right[1].get_nus_unchecked().nimber == Nimber::from(1)
+            && self.right[1].get_nus_unchecked().up_multiple() == 0
+            && self.right[1].get_nus_unchecked().nimber() == Nimber::from(1)
         {
             // Inverse of the previous one
-            result.number = self.right[0].get_nus_unchecked().number;
+            result.number = self.right[0].get_nus_unchecked().number();
             result.up_multiple = -1;
             result.nimber = Nimber::from(1);
         } else if num_lo == 1
@@ -464,15 +481,15 @@ impl Moves {
             && !self.right[0].is_number()
             && self.left[0]
                 .get_nus_unchecked()
-                .number
-                .cmp(&self.right[0].get_nus_unchecked().number)
+                .number()
+                .cmp(&self.right[0].get_nus_unchecked().number())
                 .is_eq()
-            && self.right[0].get_nus_unchecked().up_multiple >= 0
+            && self.right[0].get_nus_unchecked().up_multiple() >= 0
         {
             // Case: n + {0|G}, G is a number-up-star of up multiple >= 0
-            result.number = self.left[0].get_nus_unchecked().number;
-            result.up_multiple = self.right[0].get_nus_unchecked().up_multiple + 1;
-            result.nimber = self.right[0].get_nus_unchecked().nimber + Nimber::from(1);
+            result.number = self.left[0].get_nus_unchecked().number();
+            result.up_multiple = self.right[0].get_nus_unchecked().up_multiple() + 1;
+            result.nimber = self.right[0].get_nus_unchecked().nimber() + Nimber::from(1);
         } else if num_lo == 1
             && num_ro == 1
             && self.right[0].is_number()
@@ -480,15 +497,15 @@ impl Moves {
             && !self.left[0].is_number()
             && self.left[0]
                 .get_nus_unchecked()
-                .number
-                .cmp(&self.right[0].get_nus_unchecked().number)
+                .number()
+                .cmp(&self.right[0].get_nus_unchecked().number())
                 .is_eq()
-            && self.left[0].get_nus_unchecked().up_multiple <= 0
+            && self.left[0].get_nus_unchecked().up_multiple() <= 0
         {
             // Inverse of the previous one
-            result.number = self.left[0].get_nus_unchecked().number;
-            result.up_multiple = self.left[0].get_nus_unchecked().up_multiple - 1;
-            result.nimber = self.left[0].get_nus_unchecked().nimber + Nimber::from(1);
+            result.number = self.left[0].get_nus_unchecked().number();
+            result.up_multiple = self.left[0].get_nus_unchecked().up_multiple() - 1;
+            result.nimber = self.left[0].get_nus_unchecked().nimber() + Nimber::from(1);
         } else if num_lo >= 1
             && num_lo == num_ro
             && self.left[0].is_number()
@@ -502,19 +519,19 @@ impl Moves {
 
                 if l != r
                     || !l.is_number_up_star()
-                    || l.get_nus_unchecked().number != r.get_nus_unchecked().number
+                    || l.get_nus_unchecked().number() != r.get_nus_unchecked().number()
                 {
                     return None;
                 }
 
-                if l.get_nus_unchecked().up_multiple != 0
-                    || l.get_nus_unchecked().nimber.value() != (i as u32)
+                if l.get_nus_unchecked().up_multiple() != 0
+                    || l.get_nus_unchecked().nimber().value() != (i as u32)
                 {
                     return None;
                 }
             }
             // It's a nimber
-            result.number = self.left[0].get_nus_unchecked().number;
+            result.number = self.left[0].get_nus_unchecked().number();
             result.up_multiple = 0;
             result.nimber = Nimber::from(num_lo as u32);
         } else {
@@ -821,7 +838,7 @@ impl CanonicalForm {
     /// Construct NUS with only dyadic rational
     #[inline]
     pub fn new_rational(rational: DyadicRationalNumber) -> Self {
-        Self::new_nus(Nus::new_rational(rational))
+        Self::new_nus(Nus::new_number(rational))
     }
 
     /// Construct NUS with only nimber
@@ -956,7 +973,7 @@ impl CanonicalForm {
                         return None;
                     }
 
-                    if nus.nimber == Nimber::from(mex) {
+                    if nus.nimber() == Nimber::from(mex) {
                         mex += 1;
                     } else {
                         break;
@@ -1011,14 +1028,14 @@ impl CanonicalForm {
         if let (CanonicalFormInner::Nus(lhs_nus), CanonicalFormInner::Nus(rhs_nus)) =
             (&lhs_game.0, &rhs_game.0)
         {
-            match lhs_nus.number.cmp(&rhs_nus.number) {
+            match lhs_nus.number().cmp(&rhs_nus.number()) {
                 Ordering::Less => return true,
                 Ordering::Greater => return false,
                 Ordering::Equal => {
-                    if lhs_nus.up_multiple < rhs_nus.up_multiple - 1 {
+                    if lhs_nus.up_multiple() < rhs_nus.up_multiple() - 1 {
                         return true;
-                    } else if lhs_nus.up_multiple < rhs_nus.up_multiple {
-                        return (lhs_nus.nimber + rhs_nus.nimber) != Nimber::from(1);
+                    } else if lhs_nus.up_multiple() < rhs_nus.up_multiple() {
+                        return (lhs_nus.nimber() + rhs_nus.nimber()) != Nimber::from(1);
                     } else {
                         return false;
                     }
@@ -1055,7 +1072,7 @@ impl CanonicalForm {
                 if nus.is_number() {
                     // It's a number k/2^n, so the temperature is -1/2^n
                     // DyadicRationalNumber::new(-1, nus.number.denominator_exponent())
-                    Rational::new(-1, nus.number.denominator().unwrap() as u32)
+                    Rational::new(-1, nus.number().denominator().unwrap() as u32)
                 } else {
                     // It's a number plus a nonzero infinitesimal, thus the temperature is 0
                     // DyadicRationalNumber::from(0)
@@ -1072,24 +1089,24 @@ impl CanonicalForm {
         let thermograph = match self.0 {
             CanonicalFormInner::Moves(ref moves) => moves.thermograph(),
             CanonicalFormInner::Nus(nus) => {
-                if nus.number.to_integer().is_some() && nus.is_number() {
-                    Thermograph::with_mast(Rational::new(nus.number.to_integer().unwrap(), 1))
+                if nus.number().to_integer().is_some() && nus.is_number() {
+                    Thermograph::with_mast(Rational::new(nus.number().to_integer().unwrap(), 1))
                 } else {
-                    if nus.up_multiple == 0
-                        || (nus.nimber == Nimber::from(1) && nus.up_multiple.abs() == 1)
+                    if nus.up_multiple() == 0
+                        || (nus.nimber() == Nimber::from(1) && nus.up_multiple().abs() == 1)
                     {
                         // This looks like 0 or * (depending on whether nimberPart is 0 or 1).
                         let new_game = Self::new_nus(Nus {
-                            number: nus.number,
+                            number: nus.number(),
                             up_multiple: 0,
-                            nimber: Nimber::from(nus.nimber.value().cmp(&0) as u32), // signum(nus.nimber)
+                            nimber: Nimber::from(nus.nimber().value().cmp(&0) as u32), // signum(nus.nimber)
                         });
                         let new_game_moves = new_game.to_moves();
                         new_game_moves.thermograph()
                     } else {
                         let new_game = Self::new_nus(Nus {
-                            number: nus.number,
-                            up_multiple: nus.up_multiple.cmp(&0) as i32, // signum(nus.up_multiple)
+                            number: nus.number(),
+                            up_multiple: nus.up_multiple().cmp(&0) as i32, // signum(nus.up_multiple)
                             nimber: Nimber::from(0),
                         });
                         let new_game_moves = new_game.to_moves();
