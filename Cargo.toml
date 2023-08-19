@@ -14,22 +14,20 @@ keywords = ["cgt", "combinatorial-game-theory"]
 categories = ["mathematics", "science"]
 
 [dependencies]
-gcd = "2.3.0"
+auto_ops = "0.3.0"
 itertools = "0.10.5"
-num-rational = { version = "0.4.1", default-features = false, features = ["std"]}
 nom = "7.1.3"
 num = "0.4.0"
 num-derive = "0.4.0"
+num-rational = { version = "0.4.1", default-features = false, features = ["std"]}
 num-traits = "0.2.15"
-serde_repr = { version = "0.1.12", optional = true}
 # Later versions introduce binary blob: https://github.com/serde-rs/serde/issues/2538
 serde = { version = "<=1.0.171", optional = true}
-elsa = "1.8.1"
-auto_ops = "0.3.0"
+serde_repr = { version = "0.1.12", optional = true}
+
 
 [features]
 serde = ["dep:serde", "dep:serde_repr", "num-rational/serde"]
-statistics = []
 pedantic = []
 
 [workspace]

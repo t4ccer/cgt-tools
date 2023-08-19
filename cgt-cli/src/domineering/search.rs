@@ -274,20 +274,6 @@ fn progress_report(progress_tracker: Arc<ProgressTracker>) {
 	     \tSaved games: {saved}\n"
         );
         stderr.lock().write_all(to_write.as_bytes()).unwrap();
-        #[cfg(feature = "statistics")]
-        {
-            let to_write = format!(
-                "\tStatistics: {stats}\n",
-                stats = progress_tracker
-                    .cache
-                    .game_backend()
-                    .statistics
-                    .lock()
-                    .unwrap()
-            );
-            stderr.lock().write_all(to_write.as_bytes()).unwrap();
-        }
-
         {
             let mut buf = progress_tracker.output_buffer.lock().unwrap();
             buf.flush().unwrap();

@@ -71,6 +71,7 @@
             pkgs.cargo-leptos
             pkgs.cargo-modules
             pkgs.cargo-tarpaulin
+            pkgs.cargo-udeps
             pkgs.fd
             pkgs.graphviz
             pkgs.heaptrack
