@@ -73,24 +73,36 @@ pub struct Nus {
 impl Nus {
     pub(crate) fn parse(input: &str) -> nom::IResult<&str, Self> {
         use nom::{
-            character::complete::{char, i32, one_of, u32},
+            character::complete::{char, one_of, u32},
             error::ErrorKind,
         };
 
+        let full_input = input;
+        // This flag is set if we explicitly parse a number, rather than set it to zero if
+        // it is omitted. It makes expressions like `*` a valid input, however it also makes
+        // empty input parse to a zero game, which is undesired. We handle that case explicitly.
+        let parsed_number: bool;
+
         let (input, number) = match DyadicRationalNumber::parser(input) {
-            Ok((input, number)) => (input, number),
-            Err(_) => (input, DyadicRationalNumber::from(0)),
+            Ok((input, number)) => {
+                parsed_number = true;
+                (input, number)
+            }
+            Err(_) => {
+                parsed_number = false;
+                (input, DyadicRationalNumber::from(0))
+            }
         };
 
         let (input, up_multiple) = match one_of::<_, _, (&str, ErrorKind)>("^v")(input) {
             Ok((input, chr)) => {
-                let (input, up_multiple) = i32::<_, (&str, ErrorKind)>(input).unwrap_or((input, 1));
+                let (input, up_multiple) = u32::<_, (&str, ErrorKind)>(input).unwrap_or((input, 1));
                 (
                     input,
                     if chr == 'v' {
-                        -up_multiple
+                        -(up_multiple as i32)
                     } else {
-                        up_multiple
+                        up_multiple as i32
                     },
                 )
             }
@@ -102,14 +114,20 @@ impl Nus {
             Err(_) => (input, 0),
         };
 
-        Ok((
-            input,
-            Nus {
-                number,
-                up_multiple,
-                nimber: Nimber::from(star_multiple),
-            },
-        ))
+        let nus = Nus {
+            number,
+            up_multiple,
+            nimber: Nimber::from(star_multiple),
+        };
+
+        if nus == Nus::integer(0) && !parsed_number {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                full_input,
+                ErrorKind::Fail,
+            )));
+        }
+
+        Ok((input, nus))
     }
 }
 
@@ -122,30 +140,41 @@ impl FromStr for Nus {
 }
 
 #[cfg(test)]
-fn test_nus(inp: &str) {
-    assert_eq!(
-        &format!(
-            "{}",
-            Nus::from_str(inp).expect(&format!("Could not parse: '{}'", inp))
-        ),
-        inp
-    );
+macro_rules! parse_nus_roundtrip {
+    ($inp: expr) => {
+        assert_eq!(
+            &format!(
+                "{}",
+                Nus::from_str($inp).expect(&format!("Could not parse: '{}'", $inp))
+            ),
+            $inp
+        );
+    };
+}
+
+#[cfg(test)]
+macro_rules! parse_nus_fail {
+    ($inp: expr) => {
+        assert!(Nus::from_str($inp).is_err(), "Parse should fail");
+    };
 }
 
 #[test]
 fn parse_nus() {
-    test_nus("42");
-    test_nus("-8");
-    test_nus("13^");
-    test_nus("123v");
-    test_nus("13^3");
-    test_nus("123v58");
-    test_nus("13^3*");
-    test_nus("123v58*");
-    test_nus("13^3*8");
-    test_nus("123v58*34");
-    test_nus("-13^3*");
-    test_nus("-123v58*");
+    parse_nus_fail!("");
+    parse_nus_roundtrip!("42");
+    parse_nus_roundtrip!("1/2");
+    parse_nus_roundtrip!("-8");
+    parse_nus_roundtrip!("13^");
+    parse_nus_roundtrip!("123v");
+    parse_nus_roundtrip!("13^3");
+    parse_nus_roundtrip!("123v58");
+    parse_nus_roundtrip!("13^3*");
+    parse_nus_roundtrip!("123v58*");
+    parse_nus_roundtrip!("13^3*8");
+    parse_nus_roundtrip!("123v58*34");
+    parse_nus_roundtrip!("-13^3*");
+    parse_nus_roundtrip!("-123v58*");
 }
 
 impl Nus {
@@ -1473,4 +1502,57 @@ fn temp_of_one_minus_one_is_one() {
     };
     let g = b.construct_from_moves(moves);
     assert_eq!(b.temperature(&g), Rational::from(1));
+}
+
+impl GameBackend {
+    /// Parse comma-separated games
+    fn parse_list<'a, 'b>(&'a self, input: &'b str) -> nom::IResult<&'b str, Vec<Game>> {
+        use crate::nom_utils::lexeme;
+        use nom::multi::separated_list0;
+
+        separated_list0(lexeme(nom::bytes::complete::tag(",")), |input| {
+            self.parse(input)
+        })(input)
+    }
+
+    /// Parse game using `{a,b,...|c,d,...}` notation
+    pub fn parse<'a, 'b>(&'a self, input: &'b str) -> nom::IResult<&'b str, Game> {
+        use crate::nom_utils::lexeme;
+        use nom::{character::complete::char, error::ErrorKind};
+
+        let first_char = lexeme(char::<_, (&str, ErrorKind)>('{'))(input);
+        match first_char {
+            Ok((input, _)) => {
+                let (input, left) = self.parse_list(input)?;
+                let (input, _) = lexeme(char('|'))(input)?;
+                let (input, right) = self.parse_list(input)?;
+                let (input, _) = lexeme(char('}'))(input)?;
+                let game = self.construct_from_moves(Moves { left, right });
+                Ok((input, game))
+            }
+            Err(_) => {
+                let (input, nus) = Nus::parse(input)?;
+                Ok((input, Game::Nus(nus)))
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+macro_rules! test_game_parse {
+    ($b: expr, $inp: expr, $expected: expr) => {{
+        let g = $b.parse($inp).expect("Could not parse").1;
+        assert_eq!($expected, $b.print_game_to_str(&g));
+    }};
+}
+
+#[test]
+fn parse_games() {
+    let b = GameBackend::new();
+
+    test_game_parse!(b, "{|}", "0");
+    test_game_parse!(b, "{1,2|}", "3");
+    test_game_parse!(b, "{42|*}", "{42|*}");
+    test_game_parse!(b, "123", "123");
+    test_game_parse!(b, "{1/2|2}", "1");
 }
