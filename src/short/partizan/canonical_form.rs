@@ -34,14 +34,17 @@ pub struct Nus {
 }
 
 impl Nus {
-    pub(crate) fn parse(input: &str) -> nom::IResult<&str, Self> {
+    /// Parse nus from string, using notation without pluses between number, up, and star components
+    ///
+    /// Pattern: `\d*([v^]\d*)?(\*\d*)`
+    pub fn parse(input: &str) -> nom::IResult<&str, Self> {
         let full_input = input;
         // This flag is set if we explicitly parse a number, rather than set it to zero if
         // it is omitted. It makes expressions like `*` a valid input, however it also makes
         // empty input parse to a zero game, which is undesired. We handle that case explicitly.
         let parsed_number: bool;
 
-        let (input, number) = match DyadicRationalNumber::parse(input) {
+        let (input, number) = match lexeme(DyadicRationalNumber::parse)(input) {
             Ok((input, number)) => {
                 parsed_number = true;
                 (input, number)
@@ -52,9 +55,10 @@ impl Nus {
             }
         };
 
-        let (input, up_multiple) = match one_of::<_, _, (&str, ErrorKind)>("^v")(input) {
+        let (input, up_multiple) = match lexeme(one_of::<_, _, (&str, ErrorKind)>("^v"))(input) {
             Ok((input, chr)) => {
-                let (input, up_multiple) = u32::<_, (&str, ErrorKind)>(input).unwrap_or((input, 1));
+                let (input, up_multiple) =
+                    lexeme(u32::<_, (&str, ErrorKind)>)(input).unwrap_or((input, 1));
                 (
                     input,
                     if chr == 'v' {
@@ -67,8 +71,8 @@ impl Nus {
             Err(_) => (input, 0),
         };
 
-        let (input, star_multiple) = match char::<_, (&str, ErrorKind)>('*')(input) {
-            Ok((input, _)) => u32::<_, (&str, ErrorKind)>(input).unwrap_or((input, 1)),
+        let (input, star_multiple) = match lexeme(char::<_, (&str, ErrorKind)>('*'))(input) {
+            Ok((input, _)) => lexeme(u32::<_, (&str, ErrorKind)>)(input).unwrap_or((input, 1)),
             Err(_) => (input, 0),
         };
 
@@ -105,6 +109,13 @@ macro_rules! parse_nus_roundtrip {
 }
 
 #[cfg(test)]
+macro_rules! parse_nus_succeed {
+    ($inp: expr) => {
+        assert!(Nus::from_str($inp).is_ok(), "Parse should succeed");
+    };
+}
+
+#[cfg(test)]
 macro_rules! parse_nus_fail {
     ($inp: expr) => {
         assert!(Nus::from_str($inp).is_err(), "Parse should fail");
@@ -114,6 +125,7 @@ macro_rules! parse_nus_fail {
 #[test]
 fn parse_nus() {
     parse_nus_fail!(""); // this shoult NOT parse to 0
+    parse_nus_fail!("42 foo");
     parse_nus_roundtrip!("42");
     parse_nus_roundtrip!("1/2");
     parse_nus_roundtrip!("-8");
@@ -127,6 +139,7 @@ fn parse_nus() {
     parse_nus_roundtrip!("123v58*34");
     parse_nus_roundtrip!("-13^3*");
     parse_nus_roundtrip!("-123v58*");
+    parse_nus_succeed!("  123 v   58 *  43784");
 }
 
 impl Nus {
