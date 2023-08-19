@@ -20,7 +20,8 @@ num = "0.4.0"
 num-derive = "0.3.3"
 num-traits = "0.2.15"
 serde_repr = { version = "0.1.12", optional = true}
-serde = { version = "1.0.164", optional = true}
+# Later versions introduce binary blob: https://github.com/serde-rs/serde/issues/2538
+serde = { version = "<=1.0.171", optional = true}
 elsa = "1.8.1"
 
 [features]
