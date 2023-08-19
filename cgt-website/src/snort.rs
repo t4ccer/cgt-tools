@@ -1,7 +1,7 @@
 use cgt::{
     numeric::rational::Rational,
     short::partizan::{
-        games::snort, partizan_game::PartizanGame, transposition_table::TranspositionTable,
+        games::snort::Snort, partizan_game::PartizanGame, transposition_table::TranspositionTable,
     },
 };
 use std::fmt::Write;
@@ -11,12 +11,12 @@ use wasm_bindgen::UnwrapThrowExt;
 
 #[derive(Clone, Copy)]
 pub struct SnortState<'a> {
-    position_history: &'a Signal<Vec<snort::Position>>,
-    cache: &'a ReadSignal<TranspositionTable<snort::Position>>,
+    position_history: &'a Signal<Vec<Snort>>,
+    cache: &'a ReadSignal<TranspositionTable<Snort>>,
 }
 
 impl<'a> SnortState<'a> {
-    pub fn new(cx: Scope<'a>, position: snort::Position) -> Self {
+    pub fn new(cx: Scope<'a>, position: Snort) -> Self {
         let position_history = create_signal(cx, vec![position]);
         let cache = create_signal(cx, TranspositionTable::new());
         Self {

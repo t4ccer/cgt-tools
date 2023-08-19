@@ -80,7 +80,7 @@ pub struct Args {
 }
 
 struct ProgressTracker {
-    cache: TranspositionTable<domineering::Position>,
+    cache: TranspositionTable<domineering::Domineering>,
     args: Args,
     iteration: AtomicU64,
     saved: AtomicU64,
@@ -90,7 +90,7 @@ struct ProgressTracker {
 
 impl ProgressTracker {
     fn new(
-        cache: TranspositionTable<domineering::Position>,
+        cache: TranspositionTable<domineering::Domineering>,
         args: Args,
         output_file: File,
     ) -> ProgressTracker {
@@ -153,7 +153,7 @@ pub fn run(args: Args) -> Result<()> {
 
             progress_tracker.next_iteration();
 
-            let grid = domineering::Position::from_number(
+            let grid = domineering::Domineering::from_number(
                 progress_tracker.args.width,
                 progress_tracker.args.height,
                 i,

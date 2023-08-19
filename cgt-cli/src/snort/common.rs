@@ -1,4 +1,4 @@
-use cgt::{numeric::rational::Rational, short::partizan::games::snort};
+use cgt::{numeric::rational::Rational, short::partizan::games::snort::Snort};
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub enum Log {
@@ -17,12 +17,12 @@ pub enum Log {
 
 #[derive(Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct Scored {
-    pub position: snort::Position,
+    pub position: Snort,
     pub score: Rational,
 }
 
 impl Scored {
-    pub fn without_score(position: snort::Position) -> Self {
+    pub fn without_score(position: Snort) -> Self {
         Scored {
             position,
             score: Rational::NegativeInfinity,

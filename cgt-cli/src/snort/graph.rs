@@ -3,7 +3,7 @@ use cgt::{
     graph::undirected::Graph,
     numeric::rational::Rational,
     short::partizan::{
-        games::snort::{Position, VertexColor},
+        games::snort::{Snort, VertexColor},
         partizan_game::PartizanGame,
         transposition_table::TranspositionTable,
     },
@@ -99,7 +99,7 @@ pub fn run(args: Args) -> Result<()> {
         vertices[v as usize] = VertexColor::TintRight;
     }
 
-    let position = Position::with_colors(vertices, graph).unwrap();
+    let position = Snort::with_colors(vertices, graph).unwrap();
 
     let tt = TranspositionTable::new();
     let canonical_form = position.canonical_form(&tt);
@@ -140,7 +140,7 @@ pub fn run(args: Args) -> Result<()> {
     Ok(())
 }
 
-fn render_snort(position: &Position, filename: &str, format: &str, engine: &str) -> Result<()> {
+fn render_snort(position: &Snort, filename: &str, format: &str, engine: &str) -> Result<()> {
     let mut graphviz_proc = Command::new(engine)
         .stdin(Stdio::piped())
         .arg(format!("-T{}", format))

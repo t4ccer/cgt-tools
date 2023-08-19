@@ -31,7 +31,7 @@ pub enum VertexColor {
 /// Position of a [snort](self) game
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct Position {
+pub struct Snort {
     /// Vertices colors of the game graph
     pub vertices: Vec<VertexColor>,
 
@@ -39,7 +39,7 @@ pub struct Position {
     pub graph: Graph,
 }
 
-impl Position {
+impl Snort {
     /// Create new Snort position with all vertices empty.
     pub fn new(graph: Graph) -> Self {
         Self {
@@ -184,7 +184,7 @@ impl Position {
     }
 }
 
-impl PartizanGame for Position {
+impl PartizanGame for Snort {
     fn left_moves(&self) -> Vec<Self> {
         self.moves_for::<{ VertexColor::TintLeft as u8 }>()
     }
@@ -199,14 +199,14 @@ impl PartizanGame for Position {
     ///
     /// ```
     /// use cgt::graph::undirected::Graph;
-    /// use cgt::short::partizan::games::snort::Position;
+    /// use cgt::short::partizan::games::snort::Snort;
     /// use cgt::short::partizan::partizan_game::PartizanGame;
     ///
     /// assert_eq!(
-    ///     Position::new(Graph::from_edges(5, &[(0, 1), (0, 2), (1, 2), (3, 4)])).decompositions(),
+    ///     Snort::new(Graph::from_edges(5, &[(0, 1), (0, 2), (1, 2), (3, 4)])).decompositions(),
     ///     vec![
-    ///         Position::new(Graph::from_edges(3, &[(0, 1), (0, 2), (1, 2)])),
-    ///         Position::new(Graph::from_edges(2, &[(0, 1)]))
+    ///         Snort::new(Graph::from_edges(3, &[(0, 1), (0, 2), (1, 2)])),
+    ///         Snort::new(Graph::from_edges(2, &[(0, 1)]))
     ///     ]
     /// );
     /// ```
@@ -226,7 +226,7 @@ impl PartizanGame for Position {
 
 #[test]
 fn no_moves() {
-    let position = Position::new(Graph::empty(0));
+    let position = Snort::new(Graph::empty(0));
     assert_eq!(position.left_moves(), vec![]);
     assert_eq!(position.right_moves(), vec![]);
 }
@@ -235,7 +235,7 @@ fn no_moves() {
 fn correct_sensible() {
     use crate::short::partizan::transposition_table::TranspositionTable;
 
-    let position = Position::with_colors(
+    let position = Snort::with_colors(
         vec![VertexColor::Empty, VertexColor::TintLeft],
         Graph::empty(2),
     )
@@ -243,7 +243,7 @@ fn correct_sensible() {
     let tt = TranspositionTable::new();
     assert_eq!(
         position.sensible_left_moves(&tt),
-        vec![Position::with_colors(
+        vec![Snort::with_colors(
             vec![VertexColor::Taken, VertexColor::TintLeft],
             Graph::empty(2),
         )

@@ -11,7 +11,7 @@ use std::{
 #[derive(Debug, Clone)]
 struct DomineeringEntry {
     temperature: Rational,
-    grid: domineering::Position,
+    grid: domineering::Domineering,
 }
 
 impl DomineeringEntry {
@@ -20,7 +20,7 @@ impl DomineeringEntry {
             temperature: Rational::from_str(&result.temperature)
                 .ok()
                 .context("Invalid temperature")?,
-            grid: domineering::Position::from_str(&result.grid)
+            grid: domineering::Domineering::from_str(&result.grid)
                 .ok()
                 .context("Invalid grid")?,
         })

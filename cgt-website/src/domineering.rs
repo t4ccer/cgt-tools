@@ -6,12 +6,12 @@ use sycamore::prelude::*;
 
 #[derive(Clone, Copy)]
 pub struct DomineeringState<'a> {
-    position: &'a Signal<domineering::Position>,
-    cache: &'a ReadSignal<TranspositionTable<domineering::Position>>,
+    position: &'a Signal<domineering::Domineering>,
+    cache: &'a ReadSignal<TranspositionTable<domineering::Domineering>>,
 }
 
 impl<'a> DomineeringState<'a> {
-    pub fn new(cx: Scope<'a>, position: domineering::Position) -> Self {
+    pub fn new(cx: Scope<'a>, position: domineering::Domineering) -> Self {
         let position = create_signal(cx, position);
         let cache = create_signal(cx, TranspositionTable::new());
         DomineeringState { position, cache }
@@ -60,7 +60,7 @@ fn resize<'a>(state: DomineeringState<'a>, dx: i8, dy: i8) {
     let new_width = (old_position.width() as i8 + dx) as u8;
     let new_height = (old_position.height() as i8 + dy) as u8;
 
-    let mut new_position = match domineering::Position::empty(new_width, new_height) {
+    let mut new_position = match domineering::Domineering::empty(new_width, new_height) {
         Err(_) => return,
         Ok(pos) => pos,
     };

@@ -4,7 +4,9 @@ use cgt::{
     graph::undirected,
     numeric::rational::Rational,
     short::partizan::{
-        games::snort, partizan_game::PartizanGame, transposition_table::TranspositionTable,
+        games::snort::{Snort, VertexColor},
+        partizan_game::PartizanGame,
+        transposition_table::TranspositionTable,
     },
 };
 use clap::{self, Parser};
@@ -50,27 +52,27 @@ pub struct Args {
 
 #[derive(serde::Serialize, serde::Deserialize)]
 struct Snapshot {
-    specimen: Vec<snort::Position>,
+    specimen: Vec<Snort>,
 }
 
 struct Alg {
     args: Args,
     specimen: Vec<Scored>,
-    cache: TranspositionTable<snort::Position>,
+    cache: TranspositionTable<Snort>,
     all_time_best: HashSet<Scored>,
     log_writer: BufWriter<Box<dyn Write>>,
 }
 
-fn random_position(max_graph_vertices: usize) -> snort::Position {
+fn random_position(max_graph_vertices: usize) -> Snort {
     let mut rng = rand::thread_rng();
     let graph_size = rng.gen_range(1..=max_graph_vertices);
     let graph = undirected::Graph::empty(graph_size);
-    let mut position = snort::Position::new(graph);
+    let mut position = Snort::new(graph);
     mutate(&mut position, 1.0);
     position
 }
 
-fn mutate(position: &mut snort::Position, mutation_rate: f32) {
+fn mutate(position: &mut Snort, mutation_rate: f32) {
     let mut rng = rand::thread_rng();
 
     // Mutate vertices
@@ -87,7 +89,7 @@ fn mutate(position: &mut snort::Position, mutation_rate: f32) {
     let mutation_roll: f32 = rng.gen();
     if mutation_roll < mutation_rate {
         position.graph.add_vertex();
-        position.vertices.push(snort::VertexColor::Empty);
+        position.vertices.push(VertexColor::Empty);
         let another_vertex = rng.gen_range(0..position.graph.size() - 1);
         position
             .graph
@@ -112,9 +114,9 @@ fn mutate(position: &mut snort::Position, mutation_rate: f32) {
 
     // Mutate colors
     let available_colors = vec![
-        snort::VertexColor::Empty,
-        snort::VertexColor::TintLeft,
-        snort::VertexColor::TintRight,
+        VertexColor::Empty,
+        VertexColor::TintLeft,
+        VertexColor::TintRight,
     ];
     for idx in 0..position.vertices.len() {
         let mutation_roll: f32 = rng.gen();
@@ -124,7 +126,7 @@ fn mutate(position: &mut snort::Position, mutation_rate: f32) {
     }
 }
 
-fn score(position: &snort::Position, cache: &TranspositionTable<snort::Position>) -> Rational {
+fn score(position: &Snort, cache: &TranspositionTable<Snort>) -> Rational {
     let degree_sum = position.graph.degrees().iter().sum::<usize>();
     if position.vertices.is_empty() || degree_sum == 0 || !position.graph.is_connected() {
         return Rational::NegativeInfinity;
@@ -133,14 +135,14 @@ fn score(position: &snort::Position, cache: &TranspositionTable<snort::Position>
     temp_dif(position, cache)
 }
 
-fn temp_dif(position: &snort::Position, cache: &TranspositionTable<snort::Position>) -> Rational {
+fn temp_dif(position: &Snort, cache: &TranspositionTable<Snort>) -> Rational {
     let game = position.canonical_form(cache);
     let temp = game.temperature();
     let degree = position.graph.degree();
     temp - Rational::from(degree as i64)
 }
 
-fn cross(lhs: &snort::Position, rhs: &snort::Position) -> snort::Position {
+fn cross(lhs: &Snort, rhs: &Snort) -> Snort {
     let mut rng = rand::thread_rng();
 
     let mut positions = [lhs, rhs];
@@ -167,10 +169,10 @@ fn cross(lhs: &snort::Position, rhs: &snort::Position) -> snort::Position {
             [(min(new_size, smaller.graph.size()))..(min(new_size, larger.graph.size()))],
     );
 
-    snort::Position::with_colors(colors, new_graph).unwrap()
+    Snort::with_colors(colors, new_graph).unwrap()
 }
 
-fn seed_positions() -> Vec<snort::Position> {
+fn seed_positions() -> Vec<Snort> {
     // 0   5   6     11
     //  \   \ /     /
     // 1--3--4--10-12
@@ -194,7 +196,7 @@ fn seed_positions() -> Vec<snort::Position> {
             (10, 13),
         ],
     );
-    let pos1 = snort::Position::new(g1);
+    let pos1 = Snort::new(g1);
 
     //         9
     //         |
@@ -224,7 +226,7 @@ fn seed_positions() -> Vec<snort::Position> {
             (8, 14),
         ],
     );
-    let pos2 = snort::Position::new(g2);
+    let pos2 = Snort::new(g2);
     vec![pos1, pos2]
 }
 

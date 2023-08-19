@@ -18,7 +18,7 @@ pub type GridBits = u64;
 
 /// A Domineering position on a rectengular grid.
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Position {
+pub struct Domineering {
     width: u8,
     height: u8,
     grid: GridBits,
@@ -83,7 +83,7 @@ pub enum PositionError {
     CouldNotParse,
 }
 
-impl Position {
+impl Domineering {
     /// Check if dimensions are small enough to fit in the fixed-size bit representation.
     const fn check_dimensions(width: u8, height: u8) -> Result<(), PositionError> {
         if (width as usize * height as usize) > 8 * std::mem::size_of::<GridBits>() {
@@ -97,8 +97,8 @@ impl Position {
     /// # Examples
     ///
     /// ```
-    /// use cgt::short::partizan::games::domineering::Position;
-    /// assert_eq!(&format!("{}", Position::empty(2, 3).unwrap()), "..|..|..");
+    /// use cgt::short::partizan::games::domineering::Domineering;
+    /// assert_eq!(&format!("{}", Domineering::empty(2, 3).unwrap()), "..|..|..");
     /// ```
     ///
     /// # Errors
@@ -128,8 +128,8 @@ impl Position {
     /// # Examples
     ///
     /// ```
-    /// use cgt::short::partizan::games::domineering::Position;
-    /// assert_eq!(&format!("{}", Position::filled(3, 2).unwrap()), "###|###");
+    /// use cgt::short::partizan::games::domineering::Domineering;
+    /// assert_eq!(&format!("{}", Domineering::filled(3, 2).unwrap()), "###|###");
     /// ```
     ///
     /// # Errors
@@ -153,8 +153,8 @@ impl Position {
     /// # Examples
     ///
     /// ```
-    /// use cgt::short::partizan::games::domineering::Position;
-    /// Position::parse("..#|.#.|##.").unwrap();
+    /// use cgt::short::partizan::games::domineering::Domineering;
+    /// Domineering::parse("..#|.#.|##.").unwrap();
     /// ```
     ///
     /// # Errors
@@ -209,8 +209,8 @@ impl Position {
     /// # Examples
     ///
     /// ```
-    /// use cgt::short::partizan::games::domineering::Position;
-    /// assert_eq!(&format!("{}", Position::from_number(3, 2, 0b101110).unwrap()), ".##|#.#");
+    /// use cgt::short::partizan::games::domineering::Domineering;
+    /// assert_eq!(&format!("{}", Domineering::from_number(3, 2, 0b101110).unwrap()), ".##|#.#");
     /// ```
     ///
     /// # Errors
@@ -233,8 +233,8 @@ impl Position {
     /// # Examples
     ///
     /// ```
-    /// use cgt::short::partizan::games::domineering::Position;
-    /// Position::from_arr(2, 3, &[true, true, false, false, false, true]).unwrap();
+    /// use cgt::short::partizan::games::domineering::Domineering;
+    /// Domineering::from_arr(2, 3, &[true, true, false, false, false, true]).unwrap();
     /// ```
     ///
     /// # Errors
@@ -339,8 +339,8 @@ impl Position {
     ///
     /// # Examples
     /// ```
-    /// use cgt::short::partizan::games::domineering::Position;
-    /// let position = Position::parse("###|.#.|##.").unwrap();
+    /// use cgt::short::partizan::games::domineering::Domineering;
+    /// let position = Domineering::parse("###|.#.|##.").unwrap();
     /// assert_eq!(&format!("{}", position.move_top_left()), ".#.|##.");
     /// ```
     // Panic at `Self::empty(minimized_width, minimized_height).unwrap();` is unreachable
@@ -516,7 +516,7 @@ impl Position {
     }
 }
 
-impl FromStr for Position {
+impl FromStr for Domineering {
     type Err = PositionError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -527,7 +527,7 @@ impl FromStr for Position {
 #[test]
 #[should_panic]
 fn grid_max_size_is_respected() {
-    Position::empty(10, 10).unwrap();
+    Domineering::empty(10, 10).unwrap();
 }
 
 #[test]
@@ -535,8 +535,8 @@ fn parse_grid() {
     let width = 3;
     let height = 3;
     assert_eq!(
-        Position::parse("..#|.#.|##.").unwrap(),
-        Position::from_arr(
+        Domineering::parse("..#|.#.|##.").unwrap(),
+        Domineering::from_arr(
             width,
             height,
             &[false, false, true, false, true, false, true, true, false]
@@ -547,14 +547,14 @@ fn parse_grid() {
 
 #[test]
 fn set_works() {
-    let mut grid = Position::parse(".#.|##.").unwrap();
+    let mut grid = Domineering::parse(".#.|##.").unwrap();
     grid.set(2, 1, true);
     grid.set(0, 0, true);
     grid.set(1, 0, false);
     assert_eq!(&format!("{}", grid), "#..|###",);
 }
 
-impl PartizanGame for Position {
+impl PartizanGame for Domineering {
     /// Get moves for the Left player as positions she can move to.
     ///
     /// # Examples
@@ -564,15 +564,15 @@ impl PartizanGame for Position {
     /// // .#.  = {  .# , #. | <...> }
     /// // ##.            #. |
     ///
-    /// use cgt::short::partizan::games::domineering::Position;
+    /// use cgt::short::partizan::games::domineering::Domineering;
     /// use crate::cgt::short::partizan::partizan_game::PartizanGame;
     ///
-    /// let position = Position::parse("..#|.#.|##.").unwrap();
+    /// let position = Domineering::parse("..#|.#.|##.").unwrap();
     /// assert_eq!(
     ///     position.left_moves(),
     ///     vec![
-    ///         Position::parse("..|.#").unwrap(),
-    ///         Position::parse(".#|#.|#.").unwrap(),
+    ///         Domineering::parse("..|.#").unwrap(),
+    ///         Domineering::parse(".#|#.|#.").unwrap(),
     ///     ]
     /// );
     /// ```
@@ -589,13 +589,13 @@ impl PartizanGame for Position {
     /// // .#.  = {  <...> | .#. ,
     /// // ##.             | ##.
     ///
-    /// use cgt::short::partizan::games::domineering::Position;
+    /// use cgt::short::partizan::games::domineering::Domineering;
     /// use crate::cgt::short::partizan::partizan_game::PartizanGame;
     ///
-    /// let position = Position::parse("..#|.#.|##.").unwrap();
+    /// let position = Domineering::parse("..#|.#.|##.").unwrap();
     /// assert_eq!(
     ///     position.right_moves(),
-    ///     vec![Position::parse(".#.|##.").unwrap(),]
+    ///     vec![Domineering::parse(".#.|##.").unwrap(),]
     /// );
     /// ```
     fn right_moves(&self) -> Vec<Self> {
@@ -610,15 +610,15 @@ impl PartizanGame for Position {
     /// // .#. = .## + ##.
     /// // ##.   ###   ##.
     ///
-    /// use cgt::short::partizan::games::domineering::Position;
+    /// use cgt::short::partizan::games::domineering::Domineering;
     /// use crate::cgt::short::partizan::partizan_game::PartizanGame;
     ///
-    /// let position = Position::parse("..#|.#.|##.").unwrap();
+    /// let position = Domineering::parse("..#|.#.|##.").unwrap();
     /// assert_eq!(
     ///    position.decompositions(),
     ///    vec![
-    ///        Position::parse("..|.#").unwrap(),
-    ///        Position::parse(".|.").unwrap(),
+    ///        Domineering::parse("..|.#").unwrap(),
+    ///        Domineering::parse(".|.").unwrap(),
     ///    ]
     /// );
     /// ```
@@ -638,7 +638,7 @@ impl PartizanGame for Position {
     }
 }
 
-impl Display for Position {
+impl Display for Domineering {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for y in 0..self.height {
             for x in 0..self.width {
@@ -656,13 +656,13 @@ impl Display for Position {
 #[test]
 fn parse_display_roundtrip() {
     let inp = "...|#.#|##.|###";
-    assert_eq!(&format!("{}", Position::parse(inp).unwrap()), inp,);
+    assert_eq!(&format!("{}", Domineering::parse(inp).unwrap()), inp,);
 }
 
 // Values confirmed with gcsuite
 
 #[cfg(test)]
-fn test_grid_canonical_form(grid: Position, canonical_form: &str) {
+fn test_grid_canonical_form(grid: Domineering, canonical_form: &str) {
     let cache = TranspositionTable::new();
     let game_id = grid.canonical_form(&cache);
     assert_eq!(&game_id.to_string(), canonical_form);
@@ -670,52 +670,52 @@ fn test_grid_canonical_form(grid: Position, canonical_form: &str) {
 
 #[test]
 fn finds_canonical_form_of_one() {
-    test_grid_canonical_form(Position::empty(1, 2).unwrap(), "1");
+    test_grid_canonical_form(Domineering::empty(1, 2).unwrap(), "1");
 }
 
 #[test]
 fn finds_canonical_form_of_minus_one() {
-    test_grid_canonical_form(Position::empty(2, 1).unwrap(), "-1");
+    test_grid_canonical_form(Domineering::empty(2, 1).unwrap(), "-1");
 }
 
 #[test]
 fn finds_canonical_form_of_two_by_two() {
-    test_grid_canonical_form(Position::empty(2, 2).unwrap(), "{1|-1}");
+    test_grid_canonical_form(Domineering::empty(2, 2).unwrap(), "{1|-1}");
 }
 
 #[test]
 fn finds_canonical_form_of_two_by_two_with_noise() {
-    test_grid_canonical_form(Position::parse("..#|..#|##.").unwrap(), "{1|-1}");
+    test_grid_canonical_form(Domineering::parse("..#|..#|##.").unwrap(), "{1|-1}");
 }
 
 #[test]
 fn finds_canonical_form_of_minus_two() {
-    test_grid_canonical_form(Position::empty(4, 1).unwrap(), "-2");
+    test_grid_canonical_form(Domineering::empty(4, 1).unwrap(), "-2");
 }
 
 #[test]
 fn finds_canonical_form_of_l_shape() {
-    test_grid_canonical_form(Position::parse(".#|..").unwrap(), "*");
+    test_grid_canonical_form(Domineering::parse(".#|..").unwrap(), "*");
 }
 
 #[test]
 fn finds_canonical_form_of_long_l_shape() {
-    test_grid_canonical_form(Position::parse(".##|.##|...").unwrap(), "0");
+    test_grid_canonical_form(Domineering::parse(".##|.##|...").unwrap(), "0");
 }
 
 #[test]
 fn finds_canonical_form_of_weird_l_shape() {
-    test_grid_canonical_form(Position::parse("..#|..#|...").unwrap(), "{1/2|-2}");
+    test_grid_canonical_form(Domineering::parse("..#|..#|...").unwrap(), "{1/2|-2}");
 }
 
 #[test]
 fn finds_canonical_form_of_three_by_three() {
-    test_grid_canonical_form(Position::empty(3, 3).unwrap(), "{1|-1}");
+    test_grid_canonical_form(Domineering::empty(3, 3).unwrap(), "{1|-1}");
 }
 
 #[test]
 fn finds_canonical_form_of_num_nim_sum() {
-    test_grid_canonical_form(Position::parse(".#.#|.#..").unwrap(), "1*");
+    test_grid_canonical_form(Domineering::parse(".#.#|.#..").unwrap(), "1*");
 }
 
 #[test]
@@ -723,7 +723,7 @@ fn finds_temperature_of_four_by_four_grid() {
     use crate::numeric::rational::Rational;
 
     let cache = TranspositionTable::new();
-    let grid = Position::parse("#...|....|....|....").unwrap();
+    let grid = Domineering::parse("#...|....|....|....").unwrap();
     let game_id = grid.canonical_form(&cache);
     let temp = game_id.temperature();
     assert_eq!(&game_id.to_string(), "{1*|-1*}");
@@ -732,7 +732,7 @@ fn finds_temperature_of_four_by_four_grid() {
 
 #[test]
 fn latex_works() {
-    let position = Position::parse("##..|....|#...|..##").unwrap();
+    let position = Domineering::parse("##..|....|#...|..##").unwrap();
     let latex = position.to_latex();
     assert_eq!(
         &latex,
@@ -742,7 +742,7 @@ fn latex_works() {
 
 #[test]
 fn rotation_works() {
-    let position = Position::parse(
+    let position = Domineering::parse(
         "##..|\
 	 ....|\
 	 #..#",
@@ -769,7 +769,7 @@ fn rotation_works() {
 
 #[test]
 fn flip_works() {
-    let position = Position::parse(
+    let position = Domineering::parse(
         "##..|\
 	 ....|\
 	 #..#",
@@ -805,9 +805,9 @@ macro_rules! assert_temperature {
 
 #[test]
 fn temperature_without_game_works() {
-    assert_temperature!(Position::empty(0, 0), -1);
-    assert_temperature!(Position::parse(".."), -1);
-    assert_temperature!(Position::parse("..|.#"), 0);
+    assert_temperature!(Domineering::empty(0, 0), -1);
+    assert_temperature!(Domineering::parse(".."), -1);
+    assert_temperature!(Domineering::parse("..|.#"), 0);
     // FIXME: takes too long
-    // assert_temperature!(Position::parse("#...|....|....|...."), 1);
+    // assert_temperature!(Domineering::parse("#...|....|....|...."), 1);
 }
