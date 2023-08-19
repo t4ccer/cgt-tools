@@ -357,6 +357,12 @@ impl Moves {
         self.right.dedup();
     }
 
+    /// Construct a canoical form of arbitrary moves.
+    /// It is an alias of [CanonicalForm::new_from_moves]
+    pub fn canonical_form(self) -> CanonicalForm {
+        CanonicalForm::new_from_moves(self)
+    }
+
     /// Try converting moves to NUS. Returns [None] if moves do not form a NUS
     pub fn to_nus(&self) -> Option<Nus> {
         let mut result = Nus::new_integer(0);
@@ -775,17 +781,22 @@ impl Moves {
 
 impl_from_str_via_nom!(Moves);
 
-// TODO: figure out how to hide constructors
+// NOTE: Is there really no way to have an enum with private constructors?
 
 /// Canonical game form
 #[derive(Debug, Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub enum CanonicalForm {
+enum CanonicalFormInner {
     /// Number Up Star sum
     Nus(Nus),
 
     /// Not a NUS - list of left/right moves
     Moves(Moves),
 }
+
+#[repr(transparent)]
+#[derive(Debug, Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
+/// Canonical game form
+pub struct CanonicalForm(CanonicalFormInner);
 
 impl CanonicalForm {
     /// Construct NUS with only integer
@@ -813,14 +824,14 @@ impl CanonicalForm {
     /// Construct NUS
     #[inline]
     pub fn new_nus(nus: Nus) -> Self {
-        CanonicalForm::Nus(nus)
+        CanonicalForm(CanonicalFormInner::Nus(nus))
     }
 
-    /// Construct negative of a game
+    /// Construct negative.0 of a game
     fn construct_negative(&self) -> Self {
-        match self {
-            CanonicalForm::Nus(nus) => CanonicalForm::new_nus(-*nus),
-            CanonicalForm::Moves(moves) => {
+        match &self.0 {
+            CanonicalFormInner::Nus(nus) => CanonicalForm::new_nus(-nus),
+            CanonicalFormInner::Moves(moves) => {
                 let new_left_moves = moves
                     .left
                     .iter()
@@ -842,7 +853,7 @@ impl CanonicalForm {
 
     /// Construct a sum of two games
     fn construct_sum(g: &CanonicalForm, h: &CanonicalForm) -> Self {
-        if let (CanonicalForm::Nus(g_nus), CanonicalForm::Nus(h_nus)) = (g, h) {
+        if let (CanonicalFormInner::Nus(g_nus), CanonicalFormInner::Nus(h_nus)) = (&g.0, &h.0) {
             return Self::new_nus(g_nus + h_nus);
         }
 
@@ -884,7 +895,7 @@ impl CanonicalForm {
         }
 
         // Game is not a nus
-        CanonicalForm::Moves(moves)
+        CanonicalForm(CanonicalFormInner::Moves(moves))
     }
 
     /// Safe function to construct a game from possible moves
@@ -911,9 +922,9 @@ impl CanonicalForm {
 
     /// Get left and right moves from a canonical form
     pub fn to_moves(&self) -> Moves {
-        match self {
-            CanonicalForm::Nus(nus) => nus.to_moves(),
-            CanonicalForm::Moves(moves) => moves.clone(),
+        match &self.0 {
+            CanonicalFormInner::Nus(nus) => nus.to_moves(),
+            CanonicalFormInner::Moves(moves) => moves.clone(),
         }
     }
 
@@ -926,8 +937,8 @@ impl CanonicalForm {
                 break;
             }
 
-            match moves[i] {
-                CanonicalForm::Nus(nus) => {
+            match moves[i].0 {
+                CanonicalFormInner::Nus(nus) => {
                     if !nus.is_nimber() {
                         return None;
                     }
@@ -939,7 +950,7 @@ impl CanonicalForm {
                     }
                     i += 1;
                 }
-                CanonicalForm::Moves(_) => return None,
+                CanonicalFormInner::Moves(_) => return None,
             }
         }
 
@@ -954,28 +965,28 @@ impl CanonicalForm {
 
     #[inline]
     fn get_nus_unchecked(&self) -> Nus {
-        match self {
-            CanonicalForm::Nus(nus) => *nus,
-            CanonicalForm::Moves(_) => panic!("Not a nus"),
+        match self.0 {
+            CanonicalFormInner::Nus(nus) => nus,
+            CanonicalFormInner::Moves(_) => panic!("Not a nus"),
         }
     }
 
     /// Check if game is a Number Up Star sum
     #[inline]
     pub fn is_number_up_star(&self) -> bool {
-        matches!(self, CanonicalForm::Nus(_))
+        matches!(self.0, CanonicalFormInner::Nus(_))
     }
 
     /// Check if a game is only a number
     #[inline]
     pub fn is_number(&self) -> bool {
-        matches!(self, CanonicalForm::Nus(nus) if nus.is_number())
+        matches!(self.0, CanonicalFormInner::Nus(nus) if nus.is_number())
     }
 
     /// Check if a game is only a nimber
     #[inline]
     pub fn is_nimber(&self) -> bool {
-        matches!(self, CanonicalForm::Nus(nus) if nus.is_nimber())
+        matches!(self.0, CanonicalFormInner::Nus(nus) if nus.is_nimber())
     }
 
     /// Less than or equals comparison on two games
@@ -984,7 +995,9 @@ impl CanonicalForm {
             return true;
         }
 
-        if let (CanonicalForm::Nus(lhs_nus), CanonicalForm::Nus(rhs_nus)) = (lhs_game, rhs_game) {
+        if let (CanonicalFormInner::Nus(lhs_nus), CanonicalFormInner::Nus(rhs_nus)) =
+            (&lhs_game.0, &rhs_game.0)
+        {
             match lhs_nus.number.cmp(&rhs_nus.number) {
                 Ordering::Less => return true,
                 Ordering::Greater => return false,
@@ -1024,8 +1037,8 @@ impl CanonicalForm {
     // TODO: Should be dyadic but not sure how to handle infinities
     /// Calculate temperature of the game. Avoids computing a thermograph is game is a NUS
     pub fn temperature(&self) -> Rational {
-        match self {
-            CanonicalForm::Nus(nus) => {
+        match self.0 {
+            CanonicalFormInner::Nus(nus) => {
                 if nus.is_number() {
                     // It's a number k/2^n, so the temperature is -1/2^n
                     // DyadicRationalNumber::new(-1, nus.number.denominator_exponent())
@@ -1036,16 +1049,16 @@ impl CanonicalForm {
                     Rational::from(0)
                 }
             }
-            CanonicalForm::Moves(_) => Self::thermograph(self).get_temperature(),
+            CanonicalFormInner::Moves(_) => Self::thermograph(self).get_temperature(),
         }
     }
 
     /// Construct a thermograph of a game, using thermographic intersection of
     /// left and right scaffolds
     pub fn thermograph(&self) -> Thermograph {
-        let thermograph = match self {
-            CanonicalForm::Moves(moves) => moves.thermograph(),
-            CanonicalForm::Nus(nus) => {
+        let thermograph = match self.0 {
+            CanonicalFormInner::Moves(ref moves) => moves.thermograph(),
+            CanonicalFormInner::Nus(nus) => {
                 if nus.number.to_integer().is_some() && nus.is_number() {
                     Thermograph::with_mast(Rational::new(nus.number.to_integer().unwrap(), 1))
                 } else {
@@ -1095,9 +1108,9 @@ impl_op_ex!(-|g: &CanonicalForm, h: &CanonicalForm| -> CanonicalForm {
 
 impl Display for CanonicalForm {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self {
-            CanonicalForm::Nus(nus) => nus.fmt(f),
-            CanonicalForm::Moves(moves) => moves.fmt(f),
+        match &self.0 {
+            CanonicalFormInner::Nus(nus) => nus.fmt(f),
+            CanonicalFormInner::Moves(moves) => moves.fmt(f),
         }
     }
 }
