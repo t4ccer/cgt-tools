@@ -3,7 +3,7 @@
 use crate::{
     numeric::rational::Rational,
     short::partizan::{
-        short_canonical_game::{Game, Moves},
+        canonical_form::{CanonicalForm, Moves},
         thermograph::Thermograph,
         trajectory::Trajectory,
         transposition_table::TranspositionTable,
@@ -60,12 +60,12 @@ pub trait PartizanGame: Sized + Clone + Hash + Send + Sync + Eq {
     }
 
     /// Get the canonical form of the game position
-    fn canonical_form(&self, cache: &TranspositionTable<Self>) -> Game {
+    fn canonical_form(&self, cache: &TranspositionTable<Self>) -> CanonicalForm {
         if let Some(id) = cache.grids_get(self) {
             return id;
         }
 
-        let mut result = cache.game_backend().construct_integer(0);
+        let mut result = CanonicalForm::new_integer(0);
         for position in self.decompositions() {
             let sub_result = match cache.grids_get(&position) {
                 Some(canonical_form) => canonical_form,
@@ -83,16 +83,16 @@ pub trait PartizanGame: Sized + Clone + Hash + Send + Sync + Eq {
                             .collect(),
                     };
 
-                    let canonical_form = cache.game_backend().construct_from_moves(moves);
-                    cache.grids_insert(position, canonical_form);
+                    let canonical_form = CanonicalForm::new_from_moves(moves);
+                    cache.grids_insert(position, canonical_form.clone());
                     canonical_form
                 }
             };
 
-            result = cache.game_backend().construct_sum(sub_result, result);
+            result = sub_result + result;
         }
 
-        cache.grids_insert(self.clone(), result);
+        cache.grids_insert(self.clone(), result.clone());
         result
     }
 
@@ -101,7 +101,7 @@ pub trait PartizanGame: Sized + Clone + Hash + Send + Sync + Eq {
     /// List of canonical moves for the Left player
     fn sensible_left_moves(&self, cache: &TranspositionTable<Self>) -> Vec<Self> {
         let canonical_form = self.canonical_form(cache);
-        let moves = cache.game_backend().get_game_moves(&canonical_form);
+        let moves = canonical_form.to_moves();
         let left_canonical = moves.left;
 
         self.left_moves()
@@ -110,7 +110,7 @@ pub trait PartizanGame: Sized + Clone + Hash + Send + Sync + Eq {
                 let move_game_form = m.canonical_form(cache);
                 let res = left_canonical
                     .iter()
-                    .any(|k| cache.game_backend().leq(k, &move_game_form));
+                    .any(|k| CanonicalForm::leq(k, &move_game_form));
                 res
             })
             .collect::<Vec<_>>()
@@ -119,7 +119,7 @@ pub trait PartizanGame: Sized + Clone + Hash + Send + Sync + Eq {
     /// List of canonical moves for the Right player
     fn sensible_right_moves(&self, cache: &TranspositionTable<Self>) -> Vec<Self> {
         let canonical_form = self.canonical_form(cache);
-        let moves = cache.game_backend().get_game_moves(&canonical_form);
+        let moves = canonical_form.to_moves();
         let right_canonical = moves.right;
 
         self.right_moves()
@@ -128,7 +128,7 @@ pub trait PartizanGame: Sized + Clone + Hash + Send + Sync + Eq {
                 let move_game_form = m.canonical_form(cache);
                 let res = right_canonical
                     .iter()
-                    .any(|k| cache.game_backend().leq(&move_game_form, k));
+                    .any(|k| CanonicalForm::leq(&move_game_form, k));
                 res
             })
             .collect::<Vec<_>>()

@@ -135,7 +135,7 @@ fn score(position: &snort::Position, cache: &TranspositionTable<snort::Position>
 
 fn temp_dif(position: &snort::Position, cache: &TranspositionTable<snort::Position>) -> Rational {
     let game = position.canonical_form(cache);
-    let temp = cache.game_backend().temperature(&game);
+    let temp = game.temperature();
     let degree = position.graph.degree();
     temp - Rational::from(degree as i64)
 }
@@ -285,11 +285,8 @@ impl Alg {
                     let canonical_form = spec.position.canonical_form(&self.cache);
                     let log = Log::HighFitness {
                         position: spec.clone(),
-                        canonical_form: self
-                            .cache
-                            .game_backend()
-                            .print_game_to_str(&canonical_form),
-                        temperature: self.cache.game_backend().temperature(&canonical_form),
+                        canonical_form: canonical_form.to_string(),
+                        temperature: canonical_form.temperature(),
                         degree: spec.position.graph.degree(),
                     };
                     Alg::emit_log(&mut self.log_writer, &log);
@@ -383,10 +380,7 @@ pub fn run(args: Args) -> Result<()> {
             &Log::Generation {
                 generation,
                 top_score,
-                temperature: alg
-                    .cache
-                    .game_backend()
-                    .temperature(&top.canonical_form(&alg.cache)),
+                temperature: top.canonical_form(&alg.cache).temperature(),
             },
         );
         alg.cross();

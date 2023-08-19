@@ -49,16 +49,8 @@ pub async fn Snort<'a, G: Html>(cx: Scope<'a>, state: SnortState<'a>) -> View<G>
         View::new_fragment(
             map_indexed(cx, state.position_history, move |cx, pos| {
                 let canonical_form = pos.canonical_form(&state.cache.get());
-                let canonical_form_str = state
-                    .cache
-                    .get()
-                    .game_backend()
-                    .print_game_to_str(&canonical_form);
-                let temperature = state
-                    .cache
-                    .get()
-                    .game_backend()
-                    .temperature(&canonical_form);
+                let canonical_form_str = canonical_form.to_string();
+                let temperature = canonical_form.temperature();
                 let degree = pos.graph.degree();
                 let fitness = temperature - Rational::from(degree as i32);
 

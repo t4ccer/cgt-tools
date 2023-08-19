@@ -186,10 +186,7 @@ pub fn run(args: Args) -> Result<()> {
             let thermograph = match progress_tracker.args.thermograph_method {
                 ThermographMethod::CanonicalForm => {
                     let canonical_form = grid.canonical_form(&progress_tracker.cache);
-                    progress_tracker
-                        .cache
-                        .game_backend()
-                        .thermograph(&canonical_form)
+                    canonical_form.thermograph()
                 }
                 ThermographMethod::Direct => grid.thermograph_direct(),
             };

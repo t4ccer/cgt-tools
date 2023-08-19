@@ -23,6 +23,7 @@ serde_repr = { version = "0.1.12", optional = true}
 # Later versions introduce binary blob: https://github.com/serde-rs/serde/issues/2538
 serde = { version = "<=1.0.171", optional = true}
 elsa = "1.8.1"
+auto_ops = "0.3.0"
 
 [features]
 serde = ["dep:serde", "dep:serde_repr", "num-rational/serde"]

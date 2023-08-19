@@ -1,11 +1,15 @@
 //! Number in form `n/2^m`
 
-use crate::nom_utils;
+use auto_ops::impl_op_ex;
+
+use crate::nom_utils::{impl_from_str_via_nom, lexeme};
 use std::{
     fmt::Display,
-    ops::{Add, AddAssign, Neg, Sub},
-    str::FromStr,
+    ops::{Add, Sub},
 };
+
+#[cfg(test)]
+use std::str::FromStr;
 
 /// Number in form `n/2^m`
 #[derive(Debug, Hash, Clone, Copy, PartialEq, Eq)]
@@ -169,36 +173,41 @@ fn half_is_less_than_forty_two() {
     assert!(forty_two != half);
 }
 
-impl Add for &DyadicRationalNumber {
-    type Output = DyadicRationalNumber;
-
-    fn add(self, rhs: &DyadicRationalNumber) -> DyadicRationalNumber {
-        let denominator_exponent;
-        let numerator;
-        if self.denominator_exponent >= rhs.denominator_exponent {
-            denominator_exponent = self.denominator_exponent;
-            numerator = self.numerator
-                + (rhs.numerator << (self.denominator_exponent - rhs.denominator_exponent))
-        } else {
-            denominator_exponent = rhs.denominator_exponent;
-            numerator = rhs.numerator
-                + (self.numerator << (rhs.denominator_exponent - self.denominator_exponent))
-        }
-        DyadicRationalNumber {
-            numerator,
-            denominator_exponent,
-        }
-        .normalized()
+impl_op_ex!(+|lhs: &DyadicRationalNumber, rhs: &DyadicRationalNumber| -> DyadicRationalNumber {
+    let denominator_exponent;
+    let numerator;
+    if lhs.denominator_exponent >= rhs.denominator_exponent {
+        denominator_exponent = lhs.denominator_exponent;
+        numerator = lhs.numerator
+            + (rhs.numerator << (lhs.denominator_exponent - rhs.denominator_exponent))
+    } else {
+        denominator_exponent = rhs.denominator_exponent;
+        numerator = rhs.numerator
+            + (lhs.numerator << (rhs.denominator_exponent - lhs.denominator_exponent))
     }
-}
-
-impl Add for DyadicRationalNumber {
-    type Output = DyadicRationalNumber;
-
-    fn add(self, rhs: DyadicRationalNumber) -> DyadicRationalNumber {
-        &self + &rhs
+    DyadicRationalNumber {
+        numerator,
+        denominator_exponent,
     }
-}
+    .normalized()
+});
+
+impl_op_ex!(+=|lhs: &mut DyadicRationalNumber, rhs: &DyadicRationalNumber| { *lhs = lhs.add(rhs); });
+
+impl_op_ex!(
+    -|lhs: &DyadicRationalNumber, rhs: &DyadicRationalNumber| -> DyadicRationalNumber {
+        lhs + (-rhs)
+    }
+);
+
+impl_op_ex!(-=|lhs: &mut DyadicRationalNumber, rhs: &DyadicRationalNumber| { *lhs = lhs.sub(rhs); });
+
+impl_op_ex!(-|lhs: &DyadicRationalNumber| -> DyadicRationalNumber {
+    DyadicRationalNumber {
+        numerator: -lhs.numerator,
+        denominator_exponent: lhs.denominator_exponent,
+    }
+});
 
 #[test]
 fn one_plus_half() {
@@ -206,34 +215,6 @@ fn one_plus_half() {
     let half = DyadicRationalNumber::new(1, 1);
     assert_eq!(one + half, DyadicRationalNumber::new(3, 1));
     assert_eq!(half + one, DyadicRationalNumber::new(3, 1));
-}
-
-impl Sub for DyadicRationalNumber {
-    type Output = Self;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        self + (-rhs)
-    }
-}
-
-impl AddAssign for DyadicRationalNumber {
-    fn add_assign(&mut self, rhs: DyadicRationalNumber) {
-        let lhs: &DyadicRationalNumber = self;
-        let new: DyadicRationalNumber = lhs + &rhs;
-        self.numerator = new.numerator;
-        self.denominator_exponent = new.denominator_exponent;
-    }
-}
-
-impl Neg for DyadicRationalNumber {
-    type Output = Self;
-
-    fn neg(self) -> Self::Output {
-        DyadicRationalNumber {
-            numerator: -self.numerator,
-            denominator_exponent: self.denominator_exponent,
-        }
-    }
 }
 
 #[test]
@@ -280,11 +261,11 @@ fn dyadic_rationals_pretty() {
 }
 
 impl DyadicRationalNumber {
-    pub(crate) fn parser(input: &str) -> nom::IResult<&str, DyadicRationalNumber> {
-        let (input, numerator) = nom_utils::lexeme(nom::character::complete::i64)(input)?;
-        match nom_utils::lexeme(nom::bytes::complete::tag::<&str, &str, ()>("/"))(input) {
+    pub(crate) fn parse(input: &str) -> nom::IResult<&str, DyadicRationalNumber> {
+        let (input, numerator) = lexeme(nom::character::complete::i64)(input)?;
+        match lexeme(nom::bytes::complete::tag::<&str, &str, ()>("/"))(input) {
             Ok((input, _)) => {
-                let (input, denominator) = nom_utils::lexeme(nom::character::complete::u32)(input)?;
+                let (input, denominator) = lexeme(nom::character::complete::u32)(input)?;
                 match DyadicRationalNumber::new_fraction(numerator, denominator) {
                     Some(d) => Ok((input, d)),
                     None => Err(nom::Err::Error(nom::error::Error::new(
@@ -298,15 +279,7 @@ impl DyadicRationalNumber {
     }
 }
 
-impl FromStr for DyadicRationalNumber {
-    type Err = &'static str;
-
-    fn from_str(input: &str) -> Result<Self, Self::Err> {
-        DyadicRationalNumber::parser(input)
-            .map_err(|_| "Invalid dyadic number")
-            .map(|(_, d)| d)
-    }
-}
+impl_from_str_via_nom!(DyadicRationalNumber);
 
 #[cfg(test)]
 fn test_parsing_works(inp: &str) {

@@ -1,9 +1,7 @@
 //! Nimber is a number that represents a Nim heap of a given size.
 
-use std::{
-    fmt::Display,
-    ops::{Add, AddAssign, Neg, Sub, SubAssign},
-};
+use auto_ops::impl_op_ex;
+use std::fmt::Display;
 
 /// Number that represents a Nim heap of given size.
 ///
@@ -30,41 +28,16 @@ impl From<u32> for Nimber {
     }
 }
 
-impl Add for Nimber {
-    type Output = Nimber;
+// xor is correct, that's how nimbers additon works
+impl_op_ex!(+|lhs: &Nimber, rhs: &Nimber| -> Nimber { Nimber(lhs.0 ^ rhs.0) });
+impl_op_ex!(+=|lhs: &mut Nimber, rhs: &Nimber| { lhs.0 ^= rhs.0 });
 
-    fn add(self, rhs: Nimber) -> Nimber {
-        Nimber(self.0 ^ rhs.0)
-    }
-}
+// Subtraction is the same as addition
+impl_op_ex!(-|lhs: &Nimber, rhs: &Nimber| -> Nimber { Nimber(lhs.0 ^ rhs.0) });
+impl_op_ex!(-=|lhs: &mut Nimber, rhs: &Nimber| { lhs.0 ^= rhs.0 });
 
-impl AddAssign for Nimber {
-    fn add_assign(&mut self, rhs: Self) {
-        self.0 ^= rhs.0
-    }
-}
-
-impl Neg for Nimber {
-    type Output = Nimber;
-
-    fn neg(self) -> Nimber {
-        self
-    }
-}
-
-impl Sub for Nimber {
-    type Output = Nimber;
-
-    fn sub(self, rhs: Nimber) -> Nimber {
-        Nimber::add(self, rhs)
-    }
-}
-
-impl SubAssign for Nimber {
-    fn sub_assign(&mut self, rhs: Self) {
-        Nimber::add_assign(self, rhs)
-    }
-}
+// Nimber is its own negative
+impl_op_ex!(-|lhs: &Nimber| -> Nimber { *lhs });
 
 impl Display for Nimber {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

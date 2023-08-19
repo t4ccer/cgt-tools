@@ -103,7 +103,7 @@ pub fn run(args: Args) -> Result<()> {
 
     let tt = TranspositionTable::new();
     let canonical_form = position.canonical_form(&tt);
-    let temperature = tt.game_backend().temperature(&canonical_form);
+    let temperature = canonical_form.temperature();
 
     let timestamp = time::SystemTime::now()
         .duration_since(time::SystemTime::UNIX_EPOCH)
@@ -131,7 +131,7 @@ pub fn run(args: Args) -> Result<()> {
 
     let log = Log::HighFitness {
         position: Scored { position, score },
-        canonical_form: tt.game_backend().print_game_to_str(&canonical_form),
+        canonical_form: canonical_form.to_string(),
         temperature,
         degree,
     };
