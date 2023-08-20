@@ -30,4 +30,5 @@ pub mod rw_hash_map;
 pub mod short;
 
 mod display;
+mod macros;
 mod nom_utils;

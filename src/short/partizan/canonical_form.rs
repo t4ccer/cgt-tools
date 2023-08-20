@@ -2,6 +2,7 @@
 
 use crate::{
     display,
+    macros::if_chain,
     nom_utils::{impl_from_str_via_nom, lexeme},
     numeric::dyadic_rational_number::DyadicRationalNumber,
     numeric::nimber::Nimber,
@@ -282,7 +283,11 @@ macro_rules! parse_nus_roundtrip {
 #[cfg(test)]
 macro_rules! parse_nus_succeed {
     ($inp: expr) => {
-        assert!(Nus::from_str($inp).is_ok(), "Parse should succeed");
+        let res = Nus::from_str($inp);
+        if let Err(err) = res {
+            eprintln!("Parse error: {}", err);
+            panic!("Parse should succeed");
+        }
     };
 }
 
@@ -396,150 +401,158 @@ impl Moves {
     }
 
     /// Try converting moves to NUS. Returns [None] if moves do not form a NUS
+    // Macro expands to loads of ifs
+    #[cfg_attr(feature = "cargo-clippy", allow(clippy::cognitive_complexity))]
     pub fn to_nus(&self) -> Option<Nus> {
         let mut result = Nus::new_integer(0);
 
         let num_lo = self.left.len();
         let num_ro = self.right.len();
 
-        if num_lo == 0 {
-            if num_ro == 0 {
+        if_chain! {
+            if num_lo == 0;
+            if num_ro == 0;
+            then {
                 // Case: {|}
                 // No left or right moves so the game is 0
                 result.number = DyadicRationalNumber::from(0);
-            } else {
+                result.up_multiple = 0;
+                result.nimber = Nimber::from(0);
+            };
+
+            if num_lo == 0;
+            then {
                 // Case: n-1 = {|n}
                 // We assume that entry is normalized, no left moves, thus there must be only one
                 // right entry that's a number
                 debug_assert!(num_ro == 1, "Entry not normalized");
                 result.number =
                     self.right[0].get_nus_unchecked().number() - DyadicRationalNumber::from(1);
-            }
-            result.up_multiple = 0;
-            result.nimber = Nimber::from(0);
-        } else if num_ro == 0 {
-            // Case: n+1 = {n|}
-            // No right options so there must be a left move that is a number
-            debug_assert!(num_lo == 1, "Entry not normalized");
-            result.number =
-                self.left[0].get_nus_unchecked().number() + DyadicRationalNumber::from(1);
-            result.up_multiple = 0;
-            result.nimber = Nimber::from(0);
-        } else if num_lo == 1
-            && num_ro == 1
-            && self.left[0].is_number()
-            && self.right[0].is_number()
-            && self.left[0]
-                .get_nus_unchecked()
-                .number()
-                .cmp(&self.right[0].get_nus_unchecked().number())
-                .is_lt()
-        {
-            // Case: {n|m}, n < m
-            // We're a number but not an integer.  Conveniently, since the option lists are
-            // canonicalized, the value of this game is the mean of its left & right moves.
-            let l_num = self.left[0].get_nus_unchecked().number();
-            let r_num = self.right[0].get_nus_unchecked().number();
-            result.number = DyadicRationalNumber::mean(&l_num, &r_num);
-            result.up_multiple = 0;
-            result.nimber = Nimber::from(0);
-        } else if num_lo == 2
-            && num_ro == 1
-            && self.left[0].is_number()
-            && self.left[0] == self.right[0]
-            && self.left[1].is_number_up_star()
-            && self.left[0]
-                .get_nus_unchecked()
-                .number()
-                .cmp(&self.left[1].get_nus_unchecked().number())
-                .is_eq()
-            && self.left[1].get_nus_unchecked().up_multiple() == 0
-            && self.left[1].get_nus_unchecked().nimber() == Nimber::from(1)
-        {
-            // Case: {G,H|G}
-            result.number = self.left[0].get_nus_unchecked().number();
-            result.up_multiple = 1;
-            result.nimber = Nimber::from(1);
-        } else if num_lo == 1
-            && num_ro == 2
-            && self.left[0].is_number()
-            && self.left[0] == self.right[0]
-            && self.right[1].is_number_up_star()
-            && self.right[0]
-                .get_nus_unchecked()
-                .number()
-                .cmp(&self.right[1].get_nus_unchecked().number())
-                .is_eq()
-            && self.right[1].get_nus_unchecked().up_multiple() == 0
-            && self.right[1].get_nus_unchecked().nimber() == Nimber::from(1)
-        {
-            // Inverse of the previous one
-            result.number = self.right[0].get_nus_unchecked().number();
-            result.up_multiple = -1;
-            result.nimber = Nimber::from(1);
-        } else if num_lo == 1
-            && num_ro == 1
-            && self.left[0].is_number()
-            && self.right[0].is_number_up_star()
-            && !self.right[0].is_number()
-            && self.left[0]
-                .get_nus_unchecked()
-                .number()
-                .cmp(&self.right[0].get_nus_unchecked().number())
-                .is_eq()
-            && self.right[0].get_nus_unchecked().up_multiple() >= 0
-        {
-            // Case: n + {0|G}, G is a number-up-star of up multiple >= 0
-            result.number = self.left[0].get_nus_unchecked().number();
-            result.up_multiple = self.right[0].get_nus_unchecked().up_multiple() + 1;
-            result.nimber = self.right[0].get_nus_unchecked().nimber() + Nimber::from(1);
-        } else if num_lo == 1
-            && num_ro == 1
-            && self.right[0].is_number()
-            && self.left[0].is_number_up_star()
-            && !self.left[0].is_number()
-            && self.left[0]
-                .get_nus_unchecked()
-                .number()
-                .cmp(&self.right[0].get_nus_unchecked().number())
-                .is_eq()
-            && self.left[0].get_nus_unchecked().up_multiple() <= 0
-        {
-            // Inverse of the previous one
-            result.number = self.left[0].get_nus_unchecked().number();
-            result.up_multiple = self.left[0].get_nus_unchecked().up_multiple() - 1;
-            result.nimber = self.left[0].get_nus_unchecked().nimber() + Nimber::from(1);
-        } else if num_lo >= 1
-            && num_lo == num_ro
-            && self.left[0].is_number()
-            && self.left[0] == self.right[0]
-        {
-            // Case: n + *k
-            // If doesn't hold then it's not a NUS
-            for i in 0..num_lo {
-                let l = &self.left[i];
-                let r = &self.right[i];
+                result.up_multiple = 0;
+                result.nimber = Nimber::from(0);
+            };
 
-                if l != r
-                    || !l.is_number_up_star()
-                    || l.get_nus_unchecked().number() != r.get_nus_unchecked().number()
-                {
-                    return None;
-                }
+            if num_ro == 0;
+            then {
+                // Case: n+1 = {n|}
+                // We assume that entry is normalized, no left moves, thus there must be only one
+                // right entry that's a number
+                debug_assert!(num_lo == 1, "Entry not normalized");
+                result.number =
+                    self.left[0].get_nus_unchecked().number() + DyadicRationalNumber::from(1);
+                result.up_multiple = 0;
+                result.nimber = Nimber::from(0);
+            };
 
-                if l.get_nus_unchecked().up_multiple() != 0
-                    || l.get_nus_unchecked().nimber().value() != (i as u32)
-                {
-                    return None;
+            if let [left_move] = &self.left[..];
+            if let [right_move] = &self.right[..];
+            if let Some(left_number) = left_move.to_number();
+            if let Some(right_number) = right_move.to_number();
+            if left_number < right_number;
+            then {
+                // Case: {n|m}, n < m
+                // We're a number but not an integer.  Conveniently, since the option lists are
+                // canonicalized, the value of this game is the mean of its left & right moves.
+                let l_num = self.left[0].get_nus_unchecked().number();
+                let r_num = self.right[0].get_nus_unchecked().number();
+                result.number = DyadicRationalNumber::mean(&l_num, &r_num);
+                result.up_multiple = 0;
+                result.nimber = Nimber::from(0);
+            };
+
+            if let [left_move1, ref left_move2] = &self.left[..];
+            if let [right_move] = &self.right[..];
+            if let Some(left_number) = left_move1.to_number();
+            if left_move1 == right_move;
+            if let Some(left_nus) = left_move2.to_nus();
+            if left_number == left_nus.number();
+            if left_nus.up_multiple() == 0;
+            if left_nus.nimber() == Nimber::new(1);
+            then {
+                // Case: {n,n*|n}
+                result.number = left_number;
+                result.up_multiple = 1;
+                result.nimber = Nimber::from(1);
+            };
+
+            if let [left_move] = &self.left[..];
+            if let [right_move1, ref right_move2] = &self.right[..];
+            if let Some(right_number) = right_move1.to_number();
+            if left_move == right_move1;
+            if let Some(right_nus) = right_move2.to_nus();
+            if right_number == right_nus.number();
+            if right_nus.up_multiple() == 0;
+            if right_nus.nimber() == Nimber::new(1);
+            then {
+                // Inverse of the previous one
+                result.number = right_number;
+                result.up_multiple = -1;
+                result.nimber = Nimber::from(1);
+            };
+
+            if let [left_move] = &self.left[..];
+            if let [right_move] = &self.right[..];
+            if let Some(left_number) = left_move.to_number();
+            if let Some(right_nus) = right_move.to_nus();
+            if !right_nus.is_number();
+            if left_number == right_nus.number();
+            if right_nus.up_multiple() >= 0;
+            then {
+                // Case: n + {0|G}, G is a number-up-star of up multiple >= 0
+                result.number = right_nus.number();
+                result.up_multiple = right_nus.up_multiple() + 1;
+                result.nimber = right_nus.nimber() + Nimber::from(1);
+            };
+
+            if let [left_move] = &self.left[..];
+            if let [right_move] = &self.right[..];
+            if let Some(left_nus) = left_move.to_nus();
+            if let Some(right_number) = right_move.to_number();
+            if !left_nus.is_number();
+            if right_number == left_nus.number();
+            if left_nus.up_multiple() <= 0;
+            then {
+                // Inverse of the previous one
+                result.number = left_nus.number();
+                result.up_multiple = left_nus.up_multiple() - 1;
+                result.nimber = left_nus.nimber() + Nimber::from(1);
+            };
+
+            if num_lo >= 1;
+            if num_lo == num_ro;
+            if let Some(left_number) = self.left[0].to_number();
+            if self.left[0] == self.right[0];
+            then {
+                // Case: n + *k
+                // If doesn't hold then it's not a NUS
+
+                for i in 0..num_lo {
+                    let l = &self.left[i];
+                    let r = &self.right[i];
+
+                    if l != r
+                        || !l.is_number_up_star()
+                        || l.get_nus_unchecked().number() != r.get_nus_unchecked().number()
+                    {
+                        return None;
+                    }
+
+                    if l.get_nus_unchecked().up_multiple() != 0
+                        || l.get_nus_unchecked().nimber().value() != (i as u32)
+                    {
+                        return None;
+                    }
                 }
-            }
-            // It's a nimber
-            result.number = self.left[0].get_nus_unchecked().number();
-            result.up_multiple = 0;
-            result.nimber = Nimber::from(num_lo as u32);
-        } else {
-            return None;
-        }
+                // It's a nimber
+                result.number = left_number;
+                result.up_multiple = 0;
+                result.nimber = Nimber::from(num_lo as u32);
+            };
+
+            else {
+                return None;
+            };
+        };
 
         Some(result)
     }
@@ -1015,6 +1028,24 @@ impl CanonicalForm {
         matches!(self.0, CanonicalFormInner::Nus(nus) if nus.is_nimber())
     }
 
+    /// Convert game to NUS if it is a NUS
+    #[inline]
+    pub const fn to_nus(&self) -> Option<Nus> {
+        match self.0 {
+            CanonicalFormInner::Nus(nus) => Some(nus),
+            // Don't call Moves::to_nus here, because (a) it's already canonical and (b)
+            // it calls here.
+            CanonicalFormInner::Moves(_) => None,
+        }
+    }
+
+    /// Convert game to number if it is only a number (i.e. [`Self::is_number`])
+    #[inline]
+    pub fn to_number(&self) -> Option<DyadicRationalNumber> {
+        self.to_nus()
+            .and_then(|nus| nus.is_number().then_some(nus.number()))
+    }
+
     /// Less than or equals comparison on two games
     pub fn leq(lhs_game: &Self, rhs_game: &Self) -> bool {
         if lhs_game == rhs_game {
@@ -1126,6 +1157,7 @@ impl CanonicalForm {
 }
 
 impl_op_ex!(+|g: &CanonicalForm, h: &CanonicalForm| -> CanonicalForm { CanonicalForm::construct_sum(g, h) });
+impl_op_ex!(+=|g: &mut CanonicalForm, h: &CanonicalForm| { *g = CanonicalForm::construct_sum(g, h) });
 impl_op_ex!(-|g: &CanonicalForm| -> CanonicalForm { CanonicalForm::construct_negative(g) });
 impl_op_ex!(-|g: &CanonicalForm, h: &CanonicalForm| -> CanonicalForm {
     CanonicalForm::construct_sum(g, &CanonicalForm::construct_negative(h))

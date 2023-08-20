@@ -72,7 +72,9 @@
             pkgs.cargo-modules
             pkgs.cargo-tarpaulin
             pkgs.cargo-udeps
+            pkgs.cargo-expand
             pkgs.fd
+            pkgs.linuxKernel.packages.linux_5_15.perf
             pkgs.graphviz
             pkgs.heaptrack
             pkgs.nodePackages.tailwindcss
