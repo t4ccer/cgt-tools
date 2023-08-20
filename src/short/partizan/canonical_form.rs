@@ -427,7 +427,7 @@ impl Moves {
                 // right entry that's a number
                 debug_assert!(num_ro == 1, "Entry not normalized");
                 result.number =
-                    self.right[0].get_nus_unchecked().number() - DyadicRationalNumber::from(1);
+                    self.right[0].to_nus_unchecked().number() - DyadicRationalNumber::from(1);
                 result.up_multiple = 0;
                 result.nimber = Nimber::from(0);
             };
@@ -439,7 +439,7 @@ impl Moves {
                 // right entry that's a number
                 debug_assert!(num_lo == 1, "Entry not normalized");
                 result.number =
-                    self.left[0].get_nus_unchecked().number() + DyadicRationalNumber::from(1);
+                    self.left[0].to_nus_unchecked().number() + DyadicRationalNumber::from(1);
                 result.up_multiple = 0;
                 result.nimber = Nimber::from(0);
             };
@@ -458,7 +458,7 @@ impl Moves {
                 result.nimber = Nimber::from(0);
             };
 
-            if let [left_move1, ref left_move2] = &self.left[..];
+            if let [left_move1, left_move2] = &self.left[..];
             if let [right_move] = &self.right[..];
             if let Some(left_number) = left_move1.to_number();
             if left_move1 == right_move;
@@ -474,7 +474,7 @@ impl Moves {
             };
 
             if let [left_move] = &self.left[..];
-            if let [right_move1, ref right_move2] = &self.right[..];
+            if let [right_move1, right_move2] = &self.right[..];
             if let Some(right_number) = right_move1.to_number();
             if left_move == right_move1;
             if let Some(right_nus) = right_move2.to_nus();
@@ -530,13 +530,13 @@ impl Moves {
 
                     if l != r
                         || !l.is_number_up_star()
-                        || l.get_nus_unchecked().number() != r.get_nus_unchecked().number()
+                        || l.to_nus_unchecked().number() != r.to_nus_unchecked().number()
                     {
                         return None;
                     }
 
-                    if l.get_nus_unchecked().up_multiple() != 0
-                        || l.get_nus_unchecked().nimber().value() != (i as u32)
+                    if l.to_nus_unchecked().up_multiple() != 0
+                        || l.to_nus_unchecked().nimber().value() != (i as u32)
                     {
                         return None;
                     }
@@ -1000,14 +1000,6 @@ impl CanonicalForm {
         Some(mex)
     }
 
-    #[inline]
-    fn get_nus_unchecked(&self) -> Nus {
-        match self.0 {
-            CanonicalFormInner::Nus(nus) => nus,
-            CanonicalFormInner::Moves(_) => panic!("Not a nus"),
-        }
-    }
-
     /// Check if game is a Number Up Star sum
     #[inline]
     pub const fn is_number_up_star(&self) -> bool {
@@ -1035,6 +1027,11 @@ impl CanonicalForm {
             // it calls here.
             CanonicalFormInner::Moves(_) => None,
         }
+    }
+
+    #[inline]
+    fn to_nus_unchecked(&self) -> Nus {
+        self.to_nus().expect("Not a nus")
     }
 
     /// Convert game to number if it is only a number (i.e. [`Self::is_number`])
@@ -1375,4 +1372,63 @@ fn parse_games() {
     test_game_parse!("{42|*}", "{42|*}");
     test_game_parse!("123", "123");
     test_game_parse!("{1/2|2}", "1");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use num_traits::Euclid;
+    use quickcheck::{Arbitrary, Gen, QuickCheck};
+    use std::ops::Neg;
+
+    impl Arbitrary for Nus {
+        fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+            Nus {
+                number: arbitrary_sign(
+                    DyadicRationalNumber::new(arbitrary_mod(1000, g), arbitrary_mod(16, g)),
+                    g,
+                ),
+                up_multiple: arbitrary_sign(arbitrary_mod(1000, g), g),
+                nimber: Nimber::new(arbitrary_mod(1000, g)),
+            }
+        }
+    }
+
+    #[test]
+    fn nus_moves_nus_roundtrip() {
+        // We really need to stress test it to hit all branches.
+        // Confirmed with
+        // cargo tarpaulin --out html -- short::partizan::canonical_form::tests --nocapture
+        let tests = 250_000;
+        let mut qc = QuickCheck::new()
+            .max_tests(tests)
+            .min_tests_passed(tests)
+            .tests(tests);
+        qc.quickcheck(nus_moves_nus_roundtrip_impl as fn(Nus));
+    }
+
+    fn nus_moves_nus_roundtrip_impl(nus: Nus) {
+        let moves = nus.to_moves();
+        let nus_from_moves = moves.to_nus().expect("Should be a NUS");
+        assert_eq!(nus, nus_from_moves, "Should be equal");
+    }
+
+    fn arbitrary_mod<T>(n: T, g: &mut Gen) -> T
+    where
+        T: Arbitrary + Euclid,
+    {
+        let res: T = Arbitrary::arbitrary(g);
+        res.rem_euclid(&n)
+    }
+
+    fn arbitrary_sign<T>(n: T, g: &mut Gen) -> T
+    where
+        T: Neg<Output = T>,
+    {
+        if Arbitrary::arbitrary(g) {
+            n
+        } else {
+            -n
+        }
+    }
 }

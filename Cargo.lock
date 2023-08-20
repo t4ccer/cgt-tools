@@ -160,6 +160,7 @@ dependencies = [
  "num-derive",
  "num-rational",
  "num-traits",
+ "quickcheck",
  "serde",
  "serde_repr",
 ]
@@ -777,6 +778,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fa1fb82fc0c281dd9671101b66b771ebbe1eaf967b96ac8740dcba4b70005ca8"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "quickcheck"
+version = "1.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "588f6378e4dd99458b60ec275b4477add41ce4fa9f64dcba6f15adccb19b50d6"
+dependencies = [
+ "rand",
 ]
 
 [[package]]
