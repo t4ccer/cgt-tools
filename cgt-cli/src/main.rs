@@ -8,6 +8,10 @@ mod quicksort;
 mod snort;
 mod wind_up;
 
+#[cfg(all(not(windows), target_env = "musl"))]
+#[global_allocator]
+static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
+
 #[derive(Subcommand, Debug)]
 enum Command {
     Domineering(domineering::Args),

@@ -39,12 +39,30 @@
         rustToolchain = pkgs.rust-bin.fromRustupToolchain {
           channel = "stable";
           components = ["rust-analyzer" "rust-src" "rustfmt" "rustc" "cargo"];
-          targets = ["x86_64-unknown-linux-gnu" "wasm32-unknown-unknown"];
+          targets = ["x86_64-unknown-linux-gnu" "x86_64-unknown-linux-musl" "wasm32-unknown-unknown"];
+        };
+
+        # See https://github.com/flamegraph-rs/flamegraph/pull/278
+        cargoFlamegraphWithTargetOverlay = final: prev: {
+          cargo-flamegraph = prev.cargo-flamegraph.overrideAttrs (oldAttrs: {
+            patches =
+              (oldAttrs.patches or [])
+              ++ [
+                (prev.fetchpatch {
+                  name = "add-target-option";
+                  url = "https://github.com/t4ccer/flamegraph/commit/9f5e52d7534954ebe4e6c35ac8411a3192c45bd6.patch";
+                  hash = "sha256-57j0TH4fNeIfgG3gSrymfgLbl57q0Qn0g8+2NgPO6xI=";
+                })
+              ];
+          });
         };
       in {
         _module.args.pkgs = import self.inputs.nixpkgs {
           inherit system;
-          overlays = [inputs.rust-overlay.overlays.rust-overlay];
+          overlays = [
+            inputs.rust-overlay.overlays.rust-overlay
+            cargoFlamegraphWithTargetOverlay
+          ];
         };
 
         pre-commit.settings = {

@@ -143,7 +143,13 @@ pub fn run(args: Args) -> Result<()> {
     let progress_tracker = Arc::new(ProgressTracker::new(cache, args, output_file));
 
     let progress_tracker_cpy = progress_tracker.clone();
-    let progress_pid = thread::spawn(move || progress_report(progress_tracker_cpy));
+
+    let progress_pid;
+    if progress_tracker.args.progress_interval != 0 {
+        progress_pid = Some(thread::spawn(move || progress_report(progress_tracker_cpy)));
+    } else {
+        progress_pid = None;
+    }
 
     (progress_tracker.args.start_id..last_id)
         .into_par_iter()
@@ -214,7 +220,7 @@ pub fn run(args: Args) -> Result<()> {
                 }
             }
         });
-    progress_pid.join().unwrap();
+    progress_pid.map(|pid| pid.join().unwrap());
 
     Ok(())
 }
