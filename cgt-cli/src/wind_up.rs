@@ -15,9 +15,6 @@ pub struct Args {
     /// Final graph size
     #[arg(long, default_value_t = 20)]
     end_n: u32,
-
-    #[arg(short, default_value_t = 20)]
-    m: u32,
 }
 
 pub fn run(args: Args) -> Result<()> {

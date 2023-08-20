@@ -453,9 +453,7 @@ impl Moves {
                 // Case: {n|m}, n < m
                 // We're a number but not an integer.  Conveniently, since the option lists are
                 // canonicalized, the value of this game is the mean of its left & right moves.
-                let l_num = self.left[0].get_nus_unchecked().number();
-                let r_num = self.right[0].get_nus_unchecked().number();
-                result.number = DyadicRationalNumber::mean(&l_num, &r_num);
+                result.number = DyadicRationalNumber::mean(&left_number, &right_number);
                 result.up_multiple = 0;
                 result.nimber = Nimber::from(0);
             };
@@ -1052,9 +1050,7 @@ impl CanonicalForm {
             return true;
         }
 
-        if let (CanonicalFormInner::Nus(lhs_nus), CanonicalFormInner::Nus(rhs_nus)) =
-            (&lhs_game.0, &rhs_game.0)
-        {
+        if let (Some(lhs_nus), Some(rhs_nus)) = (&lhs_game.to_nus(), &rhs_game.to_nus()) {
             match lhs_nus.number().cmp(&rhs_nus.number()) {
                 Ordering::Less => return true,
                 Ordering::Greater => return false,

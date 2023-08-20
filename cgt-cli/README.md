@@ -23,5 +23,5 @@ You will find the binary in `./target/release` directory created by `cargo`.
 Once you have `cgt-cli` you can use it to print available options.
 
 ```console
-$ ./cgt-cli --help
+$ cgt-cli --help
 ```
