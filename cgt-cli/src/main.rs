@@ -2,6 +2,7 @@ use anyhow::Result;
 use clap::{self, Parser, Subcommand};
 
 mod anyhow_utils;
+mod canonical_form;
 mod domineering;
 mod quicksort;
 mod snort;
@@ -13,6 +14,7 @@ enum Command {
     Snort(snort::Args),
     Quicksort(quicksort::Args),
     WindUp(wind_up::Args),
+    CanonicalForm(canonical_form::Args),
 }
 
 #[derive(Parser)]
@@ -28,5 +30,6 @@ fn main() -> Result<()> {
         Command::Snort(args) => snort::run(args),
         Command::Quicksort(args) => quicksort::run(args),
         Command::WindUp(args) => wind_up::run(args),
+        Command::CanonicalForm(args) => canonical_form::run(args),
     }
 }
