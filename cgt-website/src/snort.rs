@@ -28,16 +28,13 @@ impl<'a> SnortState<'a> {
 
 #[component(inline_props)]
 pub async fn Snort<'a, G: Html>(cx: Scope<'a>, state: SnortState<'a>) -> View<G> {
-    let left_moves = state.position_history.map(cx, |pos| {
-        pos.last()
-            .unwrap_throw()
-            .sensible_left_moves(&state.cache.get())
-    });
-    let right_moves = state.position_history.map(cx, |pos| {
-        pos.last()
-            .unwrap_throw()
-            .sensible_right_moves(&state.cache.get())
-    });
+    let left_moves = state
+        .position_history
+        .map(cx, |pos| pos.last().unwrap_throw().left_moves());
+    let right_moves = state
+        .position_history
+        .map(cx, |pos| pos.last().unwrap_throw().right_moves());
+    // .map(cx, |pos| pos.last().unwrap_throw().sensible_right_moves(&state.cache.get()));
 
     let set_pos = move |new| {
         log::info!("Selected {:?}", new);
@@ -49,11 +46,9 @@ pub async fn Snort<'a, G: Html>(cx: Scope<'a>, state: SnortState<'a>) -> View<G>
         View::new_fragment(
             map_indexed(cx, state.position_history, move |cx, pos| {
                 let canonical_form = pos.canonical_form(&state.cache.get());
-                let canonical_form_str = canonical_form.to_string();
                 let temperature = canonical_form.temperature();
                 let degree = pos.graph.degree();
                 let fitness = temperature - Rational::from(degree as i32);
-
                 let edges = {
                     let mut first = true;
                     let mut buf = String::new();
@@ -83,19 +78,10 @@ pub async fn Snort<'a, G: Html>(cx: Scope<'a>, state: SnortState<'a>) -> View<G>
                         .class("flex flex-col gap-y-1")
                         .c(html::span()
                             .class("text-white font-mono")
-                            .dyn_t(move || format!("Canonical Form: {}", canonical_form_str)))
+                            .dyn_t(move || format!("Canonical Form: {}", canonical_form)))
                         .c(html::span()
                             .class("text-white font-mono")
-                            .dyn_t(move || format!("Temperature: {}", temperature)))
-                        .c(html::span()
-                            .class("text-white font-mono")
-                            .dyn_t(move || format!("Degree: {}", degree)))
-                        .c(html::span()
-                            .class("text-white font-mono")
-                            .dyn_t(move || format!("Fitness: {}", fitness)))
-                        .c(html::span()
-                            .class("text-white font-mono")
-                            .dyn_t(move || format!("Edges: {}", edges))))
+                            .dyn_t(move || format!("Temperature: {}", temperature))))
                     .view(cx)
             })
             .get()
@@ -107,7 +93,7 @@ pub async fn Snort<'a, G: Html>(cx: Scope<'a>, state: SnortState<'a>) -> View<G>
     html::div()
         .c(history)
         .c(html::div().class("").c(html::div()
-            .class("")
+            .class("gap-2")
             .c(html::span().t("Left:").class("text-white font-mono"))
             .c(html::div()
                 .class("flex gap-x-1")
@@ -116,9 +102,18 @@ pub async fn Snort<'a, G: Html>(cx: Scope<'a>, state: SnortState<'a>) -> View<G>
                         map_indexed(cx, left_moves, move |cx, pos| {
                             let dot: &Signal<String> = create_signal(cx, pos.to_graphviz());
                             let dot: &ReadSignal<String> = &*dot;
+                            let pos2 = pos.clone();
 
                             html::div()
                                 .c(view! {cx, SnortPosition(dot=dot)})
+                                .c(html::span()
+                                    .dyn_t(move || {
+                                        format!(
+                                            "{}",
+                                            pos2.clone().canonical_form(&state.cache.get())
+                                        )
+                                    })
+                                    .class("text-white font-mono"))
                                 .on("click", move |_| set_pos(pos.clone()))
                                 .view(cx)
                         })
@@ -135,9 +130,18 @@ pub async fn Snort<'a, G: Html>(cx: Scope<'a>, state: SnortState<'a>) -> View<G>
                         map_indexed(cx, right_moves, move |cx, pos| {
                             let dot: &Signal<String> = create_signal(cx, pos.to_graphviz());
                             let dot: &ReadSignal<String> = &*dot;
+                            let pos2 = pos.clone();
 
                             html::div()
                                 .c(view! {cx, SnortPosition(dot=dot)})
+                                .c(html::span()
+                                    .dyn_t(move || {
+                                        format!(
+                                            "{}",
+                                            pos2.clone().canonical_form(&state.cache.get())
+                                        )
+                                    })
+                                    .class("text-white font-mono"))
                                 .on("click", move |_| set_pos(pos.clone()))
                                 .view(cx)
                         })

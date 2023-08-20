@@ -4,7 +4,7 @@ use cgt::{
     graph::undirected,
     numeric::rational::Rational,
     short::partizan::{
-        games::snort::{Snort, VertexColor},
+        games::snort::{Snort, VertexColor, VertexKind},
         partizan_game::PartizanGame,
         transposition_table::TranspositionTable,
     },
@@ -89,7 +89,9 @@ fn mutate(position: &mut Snort, mutation_rate: f32) {
     let mutation_roll: f32 = rng.gen();
     if mutation_roll < mutation_rate {
         position.graph.add_vertex();
-        position.vertices.push(VertexColor::Empty);
+        position
+            .vertices
+            .push(VertexKind::Single(VertexColor::Empty));
         let another_vertex = rng.gen_range(0..position.graph.size() - 1);
         position
             .graph
@@ -121,7 +123,8 @@ fn mutate(position: &mut Snort, mutation_rate: f32) {
     for idx in 0..position.vertices.len() {
         let mutation_roll: f32 = rng.gen();
         if mutation_roll < mutation_rate {
-            position.vertices[idx] = *available_colors.choose(&mut rng).unwrap();
+            position.vertices[idx] =
+                VertexKind::Single(*available_colors.choose(&mut rng).unwrap());
         }
     }
 }
@@ -138,7 +141,7 @@ fn score(position: &Snort, cache: &TranspositionTable<Snort>) -> Rational {
 fn temp_dif(position: &Snort, cache: &TranspositionTable<Snort>) -> Rational {
     let game = position.canonical_form(cache);
     let temp = game.temperature();
-    let degree = position.graph.degree();
+    let degree = position.degree();
     temp - Rational::from(degree as i64)
 }
 
@@ -289,7 +292,7 @@ impl Alg {
                         position: spec.clone(),
                         canonical_form: canonical_form.to_string(),
                         temperature: canonical_form.temperature(),
-                        degree: spec.position.graph.degree(),
+                        degree: spec.position.degree(),
                     };
                     Alg::emit_log(&mut self.log_writer, &log);
                 }

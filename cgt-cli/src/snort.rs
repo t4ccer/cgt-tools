@@ -5,12 +5,14 @@ mod common;
 pub mod genetic;
 pub mod graph;
 pub mod latex;
+pub mod three_star;
 
 #[derive(Subcommand, Debug)]
 pub enum Command {
     Genetic(genetic::Args),
     Latex(latex::Args),
     Graph(graph::Args),
+    ThreeStar(three_star::Args),
 }
 
 #[derive(Parser, Debug)]
@@ -24,5 +26,6 @@ pub fn run(args: Args) -> Result<()> {
         Command::Genetic(args) => genetic::run(args),
         Command::Latex(args) => latex::run(args),
         Command::Graph(args) => graph::run(args),
+        Command::ThreeStar(args) => three_star::run(args),
     }
 }

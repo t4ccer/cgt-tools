@@ -43,8 +43,7 @@ fn App<'a, G: Html>(cx: Scope<'a>) -> View<G> {
 			let domineering_state = DomineeringState::new(cx, domineering_position);
 			let snort_state = SnortState::new(
 			    cx,
-			    cgt::short::partizan::games::snort::Snort::new(
-				Graph::from_edges(4, &[(0,1),(1,2),(0,2),(2,3)])));
+			    cgt::short::partizan::games::snort::Snort::new_three_star(10).unwrap());
 			
 			match route.get().as_ref() {
 			    Routes::Domineering => view! {cx, Domineering(state=domineering_state)},

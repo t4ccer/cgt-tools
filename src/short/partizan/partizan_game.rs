@@ -59,10 +59,19 @@ pub trait PartizanGame: Sized + Clone + Hash + Send + Sync + Eq {
         Thermograph::thermographic_intersection(left_scaffold, right_scaffold)
     }
 
+    /// Handle special cases when computing canonical form doesn't have to compute all moves.
+    fn canonical_form_special_cases(&self) -> Option<CanonicalForm> {
+        None
+    }
+
     /// Get the canonical form of the game position
     fn canonical_form(&self, cache: &TranspositionTable<Self>) -> CanonicalForm {
         if let Some(id) = cache.grids_get(self) {
             return id;
+        }
+
+        if let Some(cf) = self.canonical_form_special_cases() {
+            return cf;
         }
 
         let mut result = CanonicalForm::new_integer(0);

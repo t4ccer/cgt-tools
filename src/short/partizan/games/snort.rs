@@ -2,9 +2,13 @@
 //! a vertex red. Players can only choose a vertex that is adjecent to only empty vertices or to
 //! vertices in their own color.
 
-use crate::{graph::undirected::Graph, short::partizan::partizan_game::PartizanGame};
+use crate::{
+    graph::undirected::Graph,
+    numeric::{dyadic_rational_number::DyadicRationalNumber, nimber::Nimber},
+    short::partizan::{canonical_form::CanonicalForm, partizan_game::PartizanGame},
+};
 use num_derive::FromPrimitive;
-use std::{collections::VecDeque, fmt::Write};
+use std::{collections::VecDeque, fmt::Write, num::NonZeroU32};
 
 /// Color of Snort vertex. Note that we are taking tinting apporach rather than direct tracking
 /// of adjacent colors.
@@ -28,12 +32,41 @@ pub enum VertexColor {
     Taken = 3,
 }
 
+/// Type of vertex (or group of them) in the graph. We abstract over vertices to support efficient
+/// calculations of positions with star-like structure
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum VertexKind {
+    /// Single graph vertex
+    Single(VertexColor),
+
+    /// Cluster of vertices that are not connected to each other, but may be connected to other
+    /// vertices in the graph.
+    Cluster(VertexColor, NonZeroU32),
+}
+
+impl VertexKind {
+    fn color(self) -> VertexColor {
+        match self {
+            VertexKind::Single(color) => color,
+            VertexKind::Cluster(color, _) => color,
+        }
+    }
+
+    fn color_mut(&mut self) -> &mut VertexColor {
+        match self {
+            VertexKind::Single(color) => color,
+            VertexKind::Cluster(color, _) => color,
+        }
+    }
+}
+
 /// Position of a [snort](self) game
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Snort {
     /// Vertices colors of the game graph
-    pub vertices: Vec<VertexColor>,
+    pub vertices: Vec<VertexKind>,
 
     /// Get graph of the game. This includes only edges
     pub graph: Graph,
@@ -43,7 +76,7 @@ impl Snort {
     /// Create new Snort position with all vertices empty.
     pub fn new(graph: Graph) -> Self {
         Self {
-            vertices: vec![VertexColor::Empty; graph.size()],
+            vertices: vec![VertexKind::Single(VertexColor::Empty); graph.size()],
             graph,
         }
     }
@@ -52,12 +85,57 @@ impl Snort {
     /// Create a Snort position with initial colors. It's up to the user to ensure that no conflicting
     /// colors are connected in the graph.
     /// Returns `None` if `vertices` and `graph` have conflicting sizes.
-    pub fn with_colors(vertices: Vec<VertexColor>, graph: Graph) -> Option<Self> {
+    pub fn with_colors(vertices: Vec<VertexKind>, graph: Graph) -> Option<Self> {
         if vertices.len() != graph.size() {
             return None;
         }
 
         Some(Self { vertices, graph })
+    }
+
+    /// Construct new "three star" position with `n+1` leafs on edges and `n` in the center
+    ///
+    /// # Errors
+    /// - When number of leafs would be non-positive.
+    pub fn new_three_star(n: u32) -> Option<Self> {
+        let on_edges = NonZeroU32::new(n + 1)?;
+        let in_center = NonZeroU32::new(n)?;
+
+        Snort::with_colors(
+            vec![
+                VertexKind::Single(VertexColor::Empty),
+                VertexKind::Single(VertexColor::Empty),
+                VertexKind::Single(VertexColor::Empty),
+                VertexKind::Cluster(VertexColor::Empty, on_edges),
+                VertexKind::Cluster(VertexColor::Empty, in_center),
+                VertexKind::Cluster(VertexColor::Empty, on_edges),
+            ],
+            Graph::from_edges(6, &[(0, 1), (0, 2), (0, 4), (1, 3), (2, 5)]),
+        )
+    }
+
+    /// Get degree of the underlying game graph, correctly counting clusters of vertices
+    ///
+    /// Note that using [`Graph::degree`] will yield incorrect results
+    pub fn degree(&self) -> usize {
+        let mut degrees = vec![0usize; self.graph.size()];
+        for v in self.graph.vertices() {
+            for u in self.graph.vertices() {
+                if u != v && self.graph.are_adjacent(v, u) {
+                    match self.vertices[v] {
+                        VertexKind::Single(_) => degrees[u] += 1,
+                        VertexKind::Cluster(_, cluster_size) => {
+                            degrees[u] += cluster_size.get() as usize
+                        }
+                    }
+                }
+            }
+        }
+
+        degrees
+            .into_iter()
+            .max()
+            .expect("graph to have at least 1 vertex")
     }
 
     /// Get moves for a given player. Works only for `TintLeft` and `TintRight`.
@@ -73,28 +151,47 @@ impl Snort {
             .vertices
             .iter()
             .enumerate()
-            .filter(|(_, vertex_color)| {
-                **vertex_color == own_tint_color || **vertex_color == VertexColor::Empty
+            .filter(|(_, vertex)| {
+                let vertex_color = vertex.color();
+                vertex_color == own_tint_color || vertex_color == VertexColor::Empty
             })
             .map(|(idx, _)| idx);
 
         // Go through list of vertices with legal move
-        for move_vertex in move_vertices {
+        for move_vertex_idx in move_vertices {
             let mut position: Self = self.clone();
 
             // Take vertex
-            position.vertices[move_vertex] = VertexColor::Taken;
+            let move_vertex = &mut position.vertices[move_vertex_idx];
+            match move_vertex {
+                VertexKind::Single(move_vertex_color) => *move_vertex_color = VertexColor::Taken,
+                VertexKind::Cluster(_, cluster_size) => {
+                    if *cluster_size == NonZeroU32::new(1).unwrap() {
+                        *move_vertex = VertexKind::Single(VertexColor::Taken);
+                    } else {
+                        // Vertices in cluster are disconnected so nothing changes color
+                        *cluster_size = NonZeroU32::new(cluster_size.get() - 1).unwrap();
+                    }
+                }
+            }
 
             // Disconnect `move_vertex` from adjecent vertices and tint them
-            for adjacent_vertex in self.graph.adjacent_to(move_vertex) {
-                // Disconnect move vertex from adjecent
-                position.graph.connect(move_vertex, adjacent_vertex, false);
+            for adjacent_vertex_idx in self.graph.adjacent_to(move_vertex_idx) {
+                // Disconnect move vertex from adjecent, we disconnect only single vertices
+                // because clusters are still alive. If cluster is dead it's turned into single
+                // before (See: 'take vertex' above), so it still works.
+                if let VertexKind::Single(_) = position.vertices[move_vertex_idx] {
+                    position
+                        .graph
+                        .connect(move_vertex_idx, adjacent_vertex_idx, false);
+                }
 
                 // No loops in snort graphs
-                if adjacent_vertex != move_vertex {
-                    let adjacent_vertex_color = &mut position.vertices[adjacent_vertex];
-                    // Tint adjacent vertex
+                if adjacent_vertex_idx != move_vertex_idx {
+                    let adjacent_vertex = &mut position.vertices[adjacent_vertex_idx];
+                    let adjacent_vertex_color = adjacent_vertex.color_mut();
 
+                    // Tint adjacent vertex
                     if *adjacent_vertex_color == own_tint_color
                         || *adjacent_vertex_color == VertexColor::Empty
                     {
@@ -105,7 +202,7 @@ impl Snort {
                         // move there, thus we mark is as taken and disconnect from the graph
                         *adjacent_vertex_color = VertexColor::Taken;
                         for v in position.graph.vertices() {
-                            position.graph.connect(v, adjacent_vertex, false);
+                            position.graph.connect(v, adjacent_vertex_idx, false);
                         }
                     }
                 }
@@ -161,14 +258,30 @@ impl Snort {
 
         write!(buf, "graph G {{").unwrap();
 
-        for (v, color) in self.vertices.iter().enumerate() {
-            let col = match color {
+        for (vertex_idx, vertex) in self.vertices.iter().enumerate() {
+            let color = match vertex.color() {
                 VertexColor::Empty => "white",
                 VertexColor::TintLeft => "blue",
                 VertexColor::TintRight => "red",
                 VertexColor::Taken => continue,
             };
-            write!(buf, "{} [fillcolor={}, style=filled, shape=circle, fixedsize=true, width=1, height=1, fontsize=24];", v, col).unwrap();
+            let shape = match vertex {
+                VertexKind::Single(_) => "circle",
+                VertexKind::Cluster(_, _) => "square",
+            };
+            let label = match vertex {
+                VertexKind::Single(_) => format!("\"{}\"", vertex_idx),
+                VertexKind::Cluster(_, cluster_size) => {
+                    format!("\"{}\\n<{}>\"", vertex_idx, cluster_size.get())
+                }
+            };
+
+            write!(buf,
+                   "{} [label={}, fillcolor={}, style=filled, shape={}, fixedsize=true, width=1, height=1, fontsize=24];",
+                   vertex_idx,
+                   label,
+                   color,
+                   shape).unwrap();
         }
 
         for v in self.graph.vertices() {
@@ -182,6 +295,15 @@ impl Snort {
         write!(buf, "}}").unwrap();
         buf
     }
+}
+
+#[test]
+fn degree_works() {
+    let snort = Snort::new_three_star(8).unwrap();
+    assert_eq!(snort.degree(), 10);
+
+    let snort = Snort::new_three_star(10).unwrap();
+    assert_eq!(snort.degree(), 12);
 }
 
 impl PartizanGame for Snort {
@@ -215,12 +337,39 @@ impl PartizanGame for Snort {
         let mut res = Vec::new();
 
         for v in self.graph.vertices() {
-            if !matches!(self.vertices[v], VertexColor::Taken) && !visited[v] {
+            if !matches!(self.vertices[v].color(), VertexColor::Taken) && !visited[v] {
                 res.push(self.bfs(&mut visited, v));
             }
         }
 
         res
+    }
+
+    fn canonical_form_special_cases(&self) -> Option<CanonicalForm> {
+        if let &[vertex] = &self.vertices[..] {
+            let cf = match vertex {
+                VertexKind::Single(VertexColor::Empty) => {
+                    CanonicalForm::new_nimber(DyadicRationalNumber::from(0), Nimber::new(1))
+                }
+                VertexKind::Single(VertexColor::TintLeft) => CanonicalForm::new_integer(1),
+                VertexKind::Single(VertexColor::TintRight) => CanonicalForm::new_integer(-1),
+                VertexKind::Single(VertexColor::Taken) => CanonicalForm::new_integer(0),
+                VertexKind::Cluster(VertexColor::Empty, cluster_size) => {
+                    let nimber = Nimber::new(cluster_size.get() % 2);
+                    CanonicalForm::new_nimber(DyadicRationalNumber::from(0), nimber)
+                }
+                VertexKind::Cluster(VertexColor::TintLeft, cluster_size) => {
+                    CanonicalForm::new_integer(cluster_size.get() as i64)
+                }
+                VertexKind::Cluster(VertexColor::TintRight, cluster_size) => {
+                    CanonicalForm::new_integer(-(cluster_size.get() as i64))
+                }
+                VertexKind::Cluster(VertexColor::Taken, _) => CanonicalForm::new_integer(0),
+            };
+            return Some(cf);
+        }
+
+        None
     }
 }
 
@@ -232,11 +381,42 @@ fn no_moves() {
 }
 
 #[test]
+fn correct_canonical_forms() {
+    use crate::short::partizan::transposition_table::TranspositionTable;
+    let tt = TranspositionTable::new();
+
+    let snort = Snort::with_colors(
+        vec![VertexKind::Cluster(
+            VertexColor::Empty,
+            NonZeroU32::new(10).unwrap(),
+        )],
+        Graph::empty(1),
+    )
+    .unwrap();
+    let canonical_form = snort.canonical_form(&tt);
+    assert_eq!(canonical_form.to_string(), "0");
+
+    let snort = Snort::with_colors(
+        vec![VertexKind::Cluster(
+            VertexColor::Empty,
+            NonZeroU32::new(11).unwrap(),
+        )],
+        Graph::empty(1),
+    )
+    .unwrap();
+    let canonical_form = snort.canonical_form(&tt);
+    assert_eq!(canonical_form.to_string(), "*");
+}
+
+#[test]
 fn correct_sensible() {
     use crate::short::partizan::transposition_table::TranspositionTable;
 
     let position = Snort::with_colors(
-        vec![VertexColor::Empty, VertexColor::TintLeft],
+        vec![
+            VertexKind::Single(VertexColor::Empty),
+            VertexKind::Single(VertexColor::TintLeft),
+        ],
         Graph::empty(2),
     )
     .unwrap();
@@ -244,7 +424,10 @@ fn correct_sensible() {
     assert_eq!(
         position.sensible_left_moves(&tt),
         vec![Snort::with_colors(
-            vec![VertexColor::Taken, VertexColor::TintLeft],
+            vec![
+                VertexKind::Single(VertexColor::Taken),
+                VertexKind::Single(VertexColor::TintLeft)
+            ],
             Graph::empty(2),
         )
         .unwrap()]
