@@ -46,17 +46,17 @@ pub enum VertexKind {
 }
 
 impl VertexKind {
-    fn color(self) -> VertexColor {
+    #[inline]
+    const fn color(self) -> VertexColor {
         match self {
-            VertexKind::Single(color) => color,
-            VertexKind::Cluster(color, _) => color,
+            Self::Single(color) | Self::Cluster(color, _) => color,
         }
     }
 
+    #[inline]
     fn color_mut(&mut self) -> &mut VertexColor {
         match self {
-            VertexKind::Single(color) => color,
-            VertexKind::Cluster(color, _) => color,
+            Self::Single(color) | Self::Cluster(color, _) => color,
         }
     }
 }
@@ -101,7 +101,7 @@ impl Snort {
         let on_edges = NonZeroU32::new(n + 1)?;
         let in_center = NonZeroU32::new(n)?;
 
-        Snort::with_colors(
+        Self::with_colors(
             vec![
                 VertexKind::Single(VertexColor::Empty),
                 VertexKind::Single(VertexColor::Empty),
@@ -117,6 +117,7 @@ impl Snort {
     /// Get degree of the underlying game graph, correctly counting clusters of vertices
     ///
     /// Note that using [`Graph::degree`] will yield incorrect results
+    #[cfg_attr(feature = "cargo-clippy", allow(clippy::match_on_vec_items))]
     pub fn degree(&self) -> usize {
         let mut degrees = vec![0usize; self.graph.size()];
         for v in self.graph.vertices() {
@@ -125,7 +126,7 @@ impl Snort {
                     match self.vertices[v] {
                         VertexKind::Single(_) => degrees[u] += 1,
                         VertexKind::Cluster(_, cluster_size) => {
-                            degrees[u] += cluster_size.get() as usize
+                            degrees[u] += cluster_size.get() as usize;
                         }
                     }
                 }
@@ -353,7 +354,6 @@ impl PartizanGame for Snort {
                 }
                 VertexKind::Single(VertexColor::TintLeft) => CanonicalForm::new_integer(1),
                 VertexKind::Single(VertexColor::TintRight) => CanonicalForm::new_integer(-1),
-                VertexKind::Single(VertexColor::Taken) => CanonicalForm::new_integer(0),
                 VertexKind::Cluster(VertexColor::Empty, cluster_size) => {
                     let nimber = Nimber::new(cluster_size.get() % 2);
                     CanonicalForm::new_nimber(DyadicRationalNumber::from(0), nimber)
@@ -364,7 +364,8 @@ impl PartizanGame for Snort {
                 VertexKind::Cluster(VertexColor::TintRight, cluster_size) => {
                     CanonicalForm::new_integer(-(cluster_size.get() as i64))
                 }
-                VertexKind::Cluster(VertexColor::Taken, _) => CanonicalForm::new_integer(0),
+                VertexKind::Single(VertexColor::Taken)
+                | VertexKind::Cluster(VertexColor::Taken, _) => CanonicalForm::new_integer(0),
             };
             return Some(cf);
         }

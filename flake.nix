@@ -70,7 +70,7 @@
           hooks = {
             alejandra.enable = true;
             rustfmt.enable = true;
-            clippy.enable = true;
+            # clippy.enable = true; # leptos breaks offline mode
           };
           tools = {
             rustfmt = lib.mkForce rustToolchain;
@@ -83,6 +83,11 @@
             ${config.pre-commit.installationScript}
             PATH=$PATH:$(pwd)/target/release
           '';
+
+          env = {
+            "RUSTFLAGS" = "--cfg=web_sys_unstable_apis";
+          };
+
           nativeBuildInputs = [
             pkgs.alejandra
             pkgs.cargo-flamegraph

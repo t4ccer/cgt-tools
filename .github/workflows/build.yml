@@ -55,7 +55,7 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         working-directory: ./cgt-website
         run: |
-          trunk build --release
+          RUSTFLAGS=--cfg=web_sys_unstable_apis trunk build --release
           cp dist/index.html dist/404.html
           echo "cgt.t4ccer.com" > dist/CNAME
 
