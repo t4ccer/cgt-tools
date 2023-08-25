@@ -266,6 +266,8 @@ dependencies = [
  "leptos",
  "leptos-use",
  "log",
+ "serde",
+ "serde_json",
  "viz-js",
  "wasm-bindgen",
  "wasm-bindgen-futures",

@@ -784,7 +784,11 @@ impl Moves {
         buf
     }
 
-    /// Parse comma-separated games
+    /// Parse comma-separated games, ie. the underlined part:
+    ///
+    /// `{a,b,...|c,d,...}`
+    ///
+    /// ` ^^^^^^^`
     fn parse_list(input: &str) -> nom::IResult<&str, Vec<CanonicalForm>> {
         separated_list0(lexeme(nom::bytes::complete::tag(",")), |input| {
             CanonicalForm::parse(input)

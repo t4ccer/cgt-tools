@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 
 use crate::mouse::{MouseState, Position};
-use cgt::short::partizan::games::snort::Snort;
+use cgt::short::partizan::{
+    games::snort::Snort, partizan_game::PartizanGame, transposition_table::TranspositionTable,
+};
 use leptos::{ev::mousedown, *};
 use leptos_use::use_element_size;
 use viz_js::VizInstance;
@@ -85,6 +87,9 @@ pub fn Playground(cx: Scope) -> impl IntoView {
         )));
     });
 
+    // FIXME: It may be actually OK. It needs to live through whole app anyway
+    let snort_tt: &'static _ = Box::leak(Box::new(TranspositionTable::new()));
+
     let rw_focused = create_rw_signal(cx, None);
 
     let workspace = svg::svg(cx)
@@ -116,10 +121,36 @@ pub fn Playground(cx: Scope) -> impl IntoView {
                                 x: 150.0 + viewport_x.get_untracked(),
                                 y: 50.0 + viewport_y.get_untracked(),
                             })
-                            .snort(snort.clone())
+                            .snort(move || snort.get())
                             .build(),
-                    ),
-                    Component::LeftMovesOf(_) => todo!(),
+                    )
+                    .into_view(cx),
+                    Component::LeftMovesOf(snort) => For(
+                        cx,
+                        ForProps::builder()
+                            .each(move || snort.get().sensible_left_moves(&snort_tt))
+                            .key(|p| p.clone())
+                            .view(move |cx, snort_move| {
+                                let snort_move = snort_move.clone();
+                                let get_snort_move = move || snort_move.clone();
+                                SnortComponent(
+                                    cx,
+                                    SnortComponentProps::builder()
+                                        .idx(component.0)
+                                        .details(rw_focused)
+                                        .mouse(mouse)
+                                        .initial_position(Position {
+                                            x: 150.0 + viewport_x.get_untracked(),
+                                            y: 50.0 + viewport_y.get_untracked(),
+                                        })
+                                        .snort(get_snort_move)
+                                        .build(),
+                                )
+                                .into_view(cx)
+                            })
+                            .build(),
+                    )
+                    .into_view(cx),
                 })
                 .build(),
         ));
@@ -169,58 +200,138 @@ fn Details(cx: Scope, focused: RwSignal<Option<u32>>, state: RwSignal<State>) ->
             .and_then(|idx| state.get().nodes.get(&idx).copied())
     };
     html::span(cx).child(move || match component() {
+        // FIXME: Re-render this without unfocusing
         None => html::div(cx),
         Some(component) => match component {
-            Component::Snort(snort) => html::div(cx)
-                .child(html::span(cx).child(move || format!("Degree: {}", snort.get().degree()))),
-            Component::LeftMovesOf(_) => todo!(),
+            Component::Snort(snort) => {
+                let invalid_pos_input = create_rw_signal(cx, false);
+                html::div(cx)
+                    .classes("flex flex-col")
+                    .child(
+                        html::span(cx).child(move || format!("Degree: {}", snort.get().degree())),
+                    )
+                    .child(
+                        html::span(cx).child("Position: ").child(
+                            html::input(cx)
+                                .prop("value", serde_json::to_string(&snort.get()).unwrap())
+                                .on(ev::input, move |ev| {
+                                    let pos_str = event_target_value(&ev);
+                                    let new_snort = serde_json::from_str::<Snort>(&pos_str);
+                                    match new_snort {
+                                        Ok(new_snort) => {
+                                            invalid_pos_input.set(false);
+                                            snort.set(new_snort);
+                                        }
+                                        Err(_) => {
+                                            invalid_pos_input.set(true);
+                                        }
+                                    }
+                                }),
+                        ),
+                    )
+                    .child(
+                        html::span(cx)
+                            .classes("text-pink font-bold")
+                            .child(move || {
+                                if invalid_pos_input.get() {
+                                    "Invalid Position"
+                                } else {
+                                    ""
+                                }
+                            }),
+                    )
+                    .child(
+                        html::button(cx)
+                            .child("Get Sensible Left")
+                            .on(ev::click, move |_| {
+                                state.update(|state| {
+                                    state.add_component(Component::LeftMovesOf(snort.read_only()));
+                                });
+                            }),
+                    )
+            }
+            Component::LeftMovesOf(_) => html::div(cx),
         },
     })
 }
 
-async fn snort_to_svg(snort: Snort) -> (String, String) {
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct Svg {
+    inner: String,
+    attributes: Vec<(String, String)>,
+}
+
+impl Svg {
+    fn render(&self, elem: HtmlElement<svg::Svg>) {
+        for (attr_name, attr_value) in &self.attributes {
+            let attr_value = if &*attr_name == "width" || &*attr_name == "height" {
+                attr_value.strip_suffix("pt").unwrap_or(&*attr_value)
+            } else {
+                &*attr_value
+            };
+            elem.set_attribute(&attr_name, &attr_value).unwrap_throw();
+        }
+        elem.set_inner_html(&self.inner);
+    }
+}
+
+async fn snort_to_svg(snort: Snort) -> Svg {
     let graphviz = VizInstance::new().await;
     let dot = snort.to_graphviz();
     let svg = graphviz
         .render_svg_element(dot, viz_js::Options::default())
         .expect_throw("Could not render graphviz");
-    let view_box = svg.get_attribute("viewBox").unwrap_throw();
-    let html = svg.inner_html();
-    (html, view_box)
+    let inner = svg.inner_html();
+    let attributes = svg
+        .get_attribute_names()
+        .iter()
+        .map(|name| {
+            let name = name.as_string().expect_throw("Attribute is not a string");
+            let value = svg.get_attribute(&name).expect_throw("Unrechable");
+            (name, value)
+        })
+        .collect::<Vec<_>>();
+    Svg { inner, attributes }
+}
+
+fn snap_to_grid(inp: f64) -> f64 {
+    let grid_size = 25.;
+    (inp / grid_size).round() * grid_size
 }
 
 #[component]
-fn SnortComponent(
+fn SnortComponent<F>(
     cx: Scope,
     idx: u32,
     mouse: MouseState,
     initial_position: Position,
     details: RwSignal<Option<u32>>,
-    snort: RwSignal<Snort>,
-) -> impl IntoView {
+    snort: F,
+) -> impl IntoView
+where
+    F: Fn() -> Snort + 'static,
+{
     let svg_ref = create_node_ref(cx);
 
     let block_pos = BlockPosition::new(cx, initial_position, mouse);
 
     let snort_svg = create_resource(
         cx,
-        move || snort.get(),
+        move || snort(),
         |snort| async move { snort_to_svg(snort).await },
     );
 
     create_effect(cx, move |_| {
         let rect: HtmlElement<svg::Svg> = retry_option!(svg_ref.get());
-        let (snort_svg, view_box) = retry_option!(snort_svg.read(cx));
-
-        rect.set_attribute("viewBox", &view_box).unwrap_throw();
-        rect.set_inner_html(&snort_svg);
+        let svg = retry_option!(snort_svg.read(cx));
+        svg.render(rect);
     });
 
     svg::svg(cx)
         .on(mousedown, move |_| block_pos.set_can_be_moved.set(true)) // TODO: Do it only in 'moving' mode
         .on(ev::click, move |_| details.set(Some(idx)))
-        .attr("x", move || block_pos.x.get())
-        .attr("y", move || block_pos.y.get())
+        .attr("x", move || snap_to_grid(block_pos.x.get()))
+        .attr("y", move || snap_to_grid(block_pos.y.get()))
         .child(
             svg::svg(cx)
                 .node_ref(svg_ref)
