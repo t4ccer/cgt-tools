@@ -58,7 +58,6 @@ struct Snapshot {
 struct Alg {
     args: Args,
     specimen: Vec<Scored>,
-    cache: TranspositionTable<Snort>,
     all_time_best: HashSet<Scored>,
     log_writer: BufWriter<Box<dyn Write>>,
 }
@@ -129,7 +128,10 @@ fn mutate(position: &mut Snort, mutation_rate: f32) {
     }
 }
 
-fn score(position: &Snort, cache: &TranspositionTable<Snort>) -> Rational {
+fn score<'pos, 'cache>(
+    position: &'pos Snort,
+    cache: &'cache TranspositionTable<'cache, Snort>,
+) -> Rational {
     let degree_sum = position.graph.degrees().iter().sum::<usize>();
     if position.vertices.is_empty() || degree_sum == 0 || !position.graph.is_connected() {
         return Rational::NegativeInfinity;
@@ -138,7 +140,10 @@ fn score(position: &Snort, cache: &TranspositionTable<Snort>) -> Rational {
     temp_dif(position, cache)
 }
 
-fn temp_dif(position: &Snort, cache: &TranspositionTable<Snort>) -> Rational {
+fn temp_dif<'pos, 'cache>(
+    position: &'pos Snort,
+    cache: &'cache TranspositionTable<'cache, Snort>,
+) -> Rational {
     let game = position.canonical_form(cache);
     let temp = game.temperature();
     let degree = position.degree();
@@ -234,7 +239,7 @@ fn seed_positions() -> Vec<Snort> {
 }
 
 impl Alg {
-    fn new_random(args: Args) -> Alg {
+    fn new_random(args: Args) -> Self {
         let mut specimen = Vec::with_capacity(args.generation_size);
 
         // TODO: Add --no-seed flag to omit this
@@ -250,7 +255,7 @@ impl Alg {
         Alg::with_specimen(args, specimen)
     }
 
-    fn from_snapshot(args: Args, snapshot: Snapshot) -> Alg {
+    fn from_snapshot(args: Args, snapshot: Snapshot) -> Self {
         let specimen = snapshot
             .specimen
             .into_iter()
@@ -262,7 +267,7 @@ impl Alg {
         Alg::with_specimen(args, specimen)
     }
 
-    fn with_specimen(args: Args, specimen: Vec<Scored>) -> Alg {
+    fn with_specimen(args: Args, specimen: Vec<Scored>) -> Self {
         let file = if Path::new(&args.out_file).exists() {
             File::open(&args.out_file)
         } else {
@@ -274,20 +279,19 @@ impl Alg {
         Alg {
             args,
             specimen,
-            cache: TranspositionTable::new(),
             all_time_best: HashSet::new(),
             log_writer,
         }
     }
 
     // TODO: parallel with rayon
-    fn score(&mut self) {
+    fn score<'cache>(&mut self, tt: &'cache TranspositionTable<'cache, Snort>) {
         let specimen = &mut self.specimen;
         for spec in specimen {
-            spec.score = score(&spec.position, &self.cache);
+            spec.score = score(&spec.position, tt);
             if spec.score >= self.args.save_eq_or_above {
                 if self.all_time_best.insert(spec.clone()) {
-                    let canonical_form = spec.position.canonical_form(&self.cache);
+                    let canonical_form = spec.position.canonical_form(tt);
                     let log = Log::HighFitness {
                         position: spec.clone(),
                         canonical_form: canonical_form.to_string(),
@@ -358,6 +362,7 @@ pub fn run(args: Args) -> Result<()> {
     let generation_limit = args.generation_limit;
     let output_file_path = args.snapshot_save_file.clone();
 
+    let tt = TranspositionTable::new();
     let mut alg = if let Some(snapshot_file) = args.snapshot_load_file.clone() {
         let f = BufReader::new(File::open(snapshot_file).unwrap());
         let snapshot: Snapshot = serde_json::de::from_reader(f).unwrap();
@@ -373,7 +378,7 @@ pub fn run(args: Args) -> Result<()> {
             break;
         }
 
-        alg.score();
+        alg.score(&tt);
 
         let mut output = BufWriter::new(File::create(&output_file_path).unwrap());
         alg.save_progress(&mut output);
@@ -385,16 +390,12 @@ pub fn run(args: Args) -> Result<()> {
             &Log::Generation {
                 generation,
                 top_score,
-                temperature: top.canonical_form(&alg.cache).temperature(),
+                temperature: top.canonical_form(&tt).temperature(),
             },
         );
         alg.cross();
 
         generation += 1;
-
-        if generation % alg.args.cleanup_interval == 0 {
-            alg.cache = TranspositionTable::new();
-        }
     }
 
     Ok(())

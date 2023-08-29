@@ -80,7 +80,6 @@ pub struct Args {
 }
 
 struct ProgressTracker {
-    cache: TranspositionTable<domineering::Domineering>,
     args: Args,
     iteration: AtomicU64,
     saved: AtomicU64,
@@ -89,13 +88,8 @@ struct ProgressTracker {
 }
 
 impl ProgressTracker {
-    fn new(
-        cache: TranspositionTable<domineering::Domineering>,
-        args: Args,
-        output_file: File,
-    ) -> ProgressTracker {
+    fn new(args: Args, output_file: File) -> ProgressTracker {
         ProgressTracker {
-            cache,
             args,
             iteration: AtomicU64::new(0),
             saved: AtomicU64::new(0),
@@ -137,10 +131,11 @@ pub fn run(args: Args) -> Result<()> {
     }
 
     let cache = TranspositionTable::new();
+    let cache = &cache;
 
     let output_file =
         File::create(&args.output_path).with_context(|| "Could not open output file")?;
-    let progress_tracker = Arc::new(ProgressTracker::new(cache, args, output_file));
+    let progress_tracker = Arc::new(ProgressTracker::new(args, output_file));
 
     let progress_tracker_cpy = progress_tracker.clone();
 
@@ -191,7 +186,7 @@ pub fn run(args: Args) -> Result<()> {
 
             let thermograph = match progress_tracker.args.thermograph_method {
                 ThermographMethod::CanonicalForm => {
-                    let canonical_form = grid.canonical_form(&progress_tracker.cache);
+                    let canonical_form = grid.canonical_form(cache);
                     canonical_form.thermograph()
                 }
                 ThermographMethod::Direct => grid.thermograph_direct(),

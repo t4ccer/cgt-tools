@@ -65,8 +65,8 @@ pub trait PartizanGame: Sized + Clone + Hash + Send + Sync + Eq {
     }
 
     /// Get the canonical form of the game position
-    fn canonical_form(&self, cache: &TranspositionTable<Self>) -> CanonicalForm {
-        if let Some(id) = cache.grids_get(self) {
+    fn canonical_form<'a>(&self, cache: &'a TranspositionTable<'a, Self>) -> CanonicalForm {
+        if let Some(id) = cache.grids_get(&self) {
             return id;
         }
 
@@ -105,7 +105,7 @@ pub trait PartizanGame: Sized + Clone + Hash + Send + Sync + Eq {
     // TODO: Find a way to reduce duplication - maybe macro?
 
     /// List of canonical moves for the Left player
-    fn sensible_left_moves(&self, cache: &TranspositionTable<Self>) -> Vec<Self> {
+    fn sensible_left_moves<'a>(&self, cache: &'a TranspositionTable<'a, Self>) -> Vec<Self> {
         let canonical_form = self.canonical_form(cache);
         let moves = canonical_form.to_moves();
         let left_canonical = moves.left;
@@ -123,7 +123,7 @@ pub trait PartizanGame: Sized + Clone + Hash + Send + Sync + Eq {
     }
 
     /// List of canonical moves for the Right player
-    fn sensible_right_moves(&self, cache: &TranspositionTable<Self>) -> Vec<Self> {
+    fn sensible_right_moves<'a>(&self, cache: &'a TranspositionTable<'a, Self>) -> Vec<Self> {
         let canonical_form = self.canonical_form(cache);
         let moves = canonical_form.to_moves();
         let right_canonical = moves.right;

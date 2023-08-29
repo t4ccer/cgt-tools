@@ -1,16 +1,19 @@
 //! Thread safe transposition table for game values
 
+use elsa::FrozenIndexSet;
+
 // TODO: Move to short positional game module
 use crate::{rw_hash_map::RwHashMap, short::partizan::canonical_form::CanonicalForm};
-use std::hash::Hash;
+use std::{hash::Hash, sync::Mutex};
 
 /// Transaction table (cache) of game positions and canonical forms.
-pub struct TranspositionTable<G> {
-    grids: RwHashMap<G, CanonicalForm>,
+pub struct TranspositionTable<'a, G> {
+    known_games: Mutex<FrozenIndexSet<Box<CanonicalForm>>>,
+    grids: RwHashMap<G, &'a CanonicalForm>,
 }
 
 #[cfg_attr(feature = "cargo-clippy", allow(clippy::new_without_default))]
-impl<G> TranspositionTable<G>
+impl<'a, G> TranspositionTable<'a, G>
 where
     G: Eq + Hash + Clone + Sync + Send,
 {
@@ -18,6 +21,7 @@ where
     #[inline]
     pub fn new() -> Self {
         Self {
+            known_games: Mutex::new(FrozenIndexSet::new()),
             grids: RwHashMap::new(),
         }
     }
@@ -26,14 +30,16 @@ where
 
     /// Lookup a position
     #[inline]
-    pub fn grids_get(&self, grid: &G) -> Option<CanonicalForm> {
-        self.grids.get(grid)
+    pub fn grids_get<'b, 'c>(&'b self, grid: &'c G) -> Option<CanonicalForm> {
+        self.grids.get(grid).cloned()
     }
 
     /// Save position and its game value
     #[inline]
-    pub fn grids_insert(&self, grid: G, game: CanonicalForm) {
-        self.grids.insert(grid, game);
+    pub fn grids_insert(&'a self, grid: G, game: CanonicalForm) {
+        let known_games = self.known_games.lock().unwrap();
+        let inserted: *const CanonicalForm = known_games.insert(Box::new(game));
+        self.grids.insert(grid, unsafe { &*inserted });
     }
 
     /// Get number of saved games
