@@ -30,15 +30,16 @@ where
 
     /// Lookup a position
     #[inline]
-    pub fn grids_get<'b, 'c>(&'b self, grid: &'c G) -> Option<CanonicalForm> {
+    pub fn grids_get(&self, grid: &G) -> Option<CanonicalForm> {
         self.grids.get(grid).cloned()
     }
 
     /// Save position and its game value
+    #[cfg_attr(feature = "cargo-clippy", allow(clippy::missing_panics_doc))]
     #[inline]
     pub fn grids_insert(&'a self, grid: G, game: CanonicalForm) {
-        let known_games = self.known_games.lock().unwrap();
-        let inserted: *const CanonicalForm = known_games.insert(Box::new(game));
+        let inserted: *const CanonicalForm =
+            self.known_games.lock().unwrap().insert(Box::new(game));
         self.grids.insert(grid, unsafe { &*inserted });
     }
 

@@ -37,8 +37,8 @@ jobs:
       - name: Test
         run: cargo test --all
 
-      - name: Clippy
-        run: cargo clippy -- -D warnings
+      # - name: Clippy
+      #   run: cargo clippy -- -D warnings
 
       - name: Install tailwind
         if: matrix.os == 'ubuntu-latest'

@@ -66,7 +66,7 @@ pub trait PartizanGame: Sized + Clone + Hash + Send + Sync + Eq {
 
     /// Get the canonical form of the game position
     fn canonical_form<'a>(&self, cache: &'a TranspositionTable<'a, Self>) -> CanonicalForm {
-        if let Some(id) = cache.grids_get(&self) {
+        if let Some(id) = cache.grids_get(self) {
             return id;
         }
 
