@@ -9,7 +9,7 @@ use std::{hash::Hash, sync::Mutex};
 /// Transaction table (cache) of game positions and canonical forms.
 pub struct TranspositionTable<'a, G> {
     known_games: Mutex<FrozenIndexSet<Box<CanonicalForm>>>,
-    grids: RwHashMap<G, &'a CanonicalForm>,
+    grids: RwHashMap<G, &'a CanonicalForm, ahash::RandomState>,
 }
 
 #[cfg_attr(feature = "cargo-clippy", allow(clippy::new_without_default))]
@@ -22,7 +22,7 @@ where
     pub fn new() -> Self {
         Self {
             known_games: Mutex::new(FrozenIndexSet::new()),
-            grids: RwHashMap::new(),
+            grids: RwHashMap::with_hasher(ahash::RandomState::new()),
         }
     }
 

@@ -11,7 +11,7 @@ static ALLOC: dhat::Alloc = dhat::Alloc;
 fn bench_domineering() {
     let profiler = dhat::Profiler::builder().build();
 
-    let width = black_box(5);
+    let width = black_box(4);
     let height = black_box(4);
 
     let tt = TranspositionTable::new();

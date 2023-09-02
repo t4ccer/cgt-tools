@@ -2,11 +2,27 @@
 
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::missing_panics_doc))]
 
-use std::{collections::HashMap, hash::Hash, ops::Deref, sync::RwLock};
+use std::{
+    collections::{hash_map::RandomState, HashMap},
+    hash::{BuildHasher, Hash},
+    ops::Deref,
+    sync::RwLock,
+};
 
 /// Thread safe hashmap
 #[derive(Debug)]
-pub struct RwHashMap<K, V>(pub(crate) RwLock<HashMap<K, V>>);
+pub struct RwHashMap<K, V, S = RandomState>(pub(crate) RwLock<HashMap<K, V, S>>);
+
+impl<K, V, S> RwHashMap<K, V, S>
+where
+    K: Eq + Hash,
+    V: Clone,
+{
+    /// Creates an empty `RwHashMap` which will use the given hash builder to hash keys.
+    pub fn with_hasher(hash_builder: S) -> Self {
+        Self(RwLock::new(HashMap::with_hasher(hash_builder)))
+    }
+}
 
 impl<K, V> RwHashMap<K, V>
 where
@@ -17,9 +33,15 @@ where
     pub fn new() -> Self {
         Self(RwLock::new(HashMap::new()))
     }
+}
 
+impl<K, V, S> RwHashMap<K, V, S>
+where
+    K: Eq + Hash,
+    V: Clone,
+    S: BuildHasher,
+{
     /// Lookup the key in hashmap
-
     pub fn get(&self, key: &K) -> Option<V> {
         self.0.read().unwrap().deref().get(key).cloned()
     }
