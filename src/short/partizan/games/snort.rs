@@ -384,7 +384,7 @@ fn no_moves() {
 #[test]
 fn correct_canonical_forms() {
     use crate::short::partizan::transposition_table::TranspositionTable;
-    let tt = TranspositionTable::new();
+    let transposition_table = TranspositionTable::new();
 
     let snort = Snort::with_colors(
         vec![VertexKind::Cluster(
@@ -394,7 +394,7 @@ fn correct_canonical_forms() {
         Graph::empty(1),
     )
     .unwrap();
-    let canonical_form = snort.canonical_form(&tt);
+    let canonical_form = snort.canonical_form(&transposition_table);
     assert_eq!(canonical_form.to_string(), "0");
 
     let snort = Snort::with_colors(
@@ -405,7 +405,7 @@ fn correct_canonical_forms() {
         Graph::empty(1),
     )
     .unwrap();
-    let canonical_form = snort.canonical_form(&tt);
+    let canonical_form = snort.canonical_form(&transposition_table);
     assert_eq!(canonical_form.to_string(), "*");
 }
 
@@ -421,9 +421,9 @@ fn correct_sensible() {
         Graph::empty(2),
     )
     .unwrap();
-    let tt = TranspositionTable::new();
+    let transposition_table = TranspositionTable::new();
     assert_eq!(
-        position.sensible_left_moves(&tt),
+        position.sensible_left_moves(&transposition_table),
         vec![Snort::with_colors(
             vec![
                 VertexKind::Single(VertexColor::Taken),

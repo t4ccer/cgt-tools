@@ -130,8 +130,8 @@ pub fn run(args: Args) -> Result<()> {
         );
     }
 
-    let cache = TranspositionTable::new();
-    let cache = &cache;
+    let transposition_table = TranspositionTable::new();
+    let transposition_table = &transposition_table;
 
     let output_file =
         File::create(&args.output_path).with_context(|| "Could not open output file")?;
@@ -186,7 +186,7 @@ pub fn run(args: Args) -> Result<()> {
 
             let thermograph = match progress_tracker.args.thermograph_method {
                 ThermographMethod::CanonicalForm => {
-                    let canonical_form = grid.canonical_form(cache);
+                    let canonical_form = grid.canonical_form(transposition_table);
                     canonical_form.thermograph()
                 }
                 ThermographMethod::Direct => grid.thermograph_direct(),

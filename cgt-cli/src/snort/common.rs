@@ -91,8 +91,8 @@ fn dump_edges(w: &mut impl Write, graph: &Graph) -> io::Result<()> {
 }
 
 pub fn analyze_position(position: Snort) -> Result<()> {
-    let tt = TranspositionTable::new();
-    let canonical_form = position.canonical_form(&tt);
+    let transposition_table = TranspositionTable::new();
+    let canonical_form = position.canonical_form(&transposition_table);
     let temperature = canonical_form.temperature();
 
     let timestamp = time::SystemTime::now()
@@ -104,13 +104,21 @@ pub fn analyze_position(position: Snort) -> Result<()> {
     render_snort(&position, "snort.png", "png", "fdp")?;
     eprintln!("Graph: {}", filename);
 
-    for (idx, m) in position.sensible_left_moves(&tt).iter().enumerate() {
+    for (idx, m) in position
+        .sensible_left_moves(&transposition_table)
+        .iter()
+        .enumerate()
+    {
         let filename = format!("snort{}-left{}.png", timestamp, idx);
         render_snort(&m, &filename, "png", "fdp")?;
         eprintln!("Left Move {} Graph: {}", idx, filename);
         dump_edges(&mut stderr(), &m.graph)?;
     }
-    for (idx, m) in position.sensible_right_moves(&tt).iter().enumerate() {
+    for (idx, m) in position
+        .sensible_right_moves(&transposition_table)
+        .iter()
+        .enumerate()
+    {
         let filename = format!("snort{}-right{}.png", timestamp, idx);
         render_snort(&m, &filename, "png", "fdp")?;
         eprintln!("Right Move {} Graph: {}", idx, filename);

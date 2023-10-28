@@ -65,8 +65,11 @@ pub trait PartizanGame: Sized + Clone + Hash + Send + Sync + Eq {
     }
 
     /// Get the canonical form of the game position
-    fn canonical_form<'a>(&self, cache: &'a TranspositionTable<'a, Self>) -> CanonicalForm {
-        if let Some(id) = cache.grids_get(self) {
+    fn canonical_form<'a>(
+        &self,
+        transposition_table: &'a TranspositionTable<'a, Self>,
+    ) -> CanonicalForm {
+        if let Some(id) = transposition_table.grids_get(self) {
             return id;
         }
 
@@ -76,44 +79,47 @@ pub trait PartizanGame: Sized + Clone + Hash + Send + Sync + Eq {
 
         let mut result = CanonicalForm::new_integer(0);
         for position in self.decompositions() {
-            let sub_result = cache.grids_get(&position).unwrap_or_else(|| {
+            let sub_result = transposition_table.grids_get(&position).unwrap_or_else(|| {
                 let moves = Moves {
                     left: position
                         .left_moves()
                         .iter()
-                        .map(|o| o.canonical_form(cache))
+                        .map(|o| o.canonical_form(transposition_table))
                         .collect(),
                     right: position
                         .right_moves()
                         .iter()
-                        .map(|o| o.canonical_form(cache))
+                        .map(|o| o.canonical_form(transposition_table))
                         .collect(),
                 };
 
                 let canonical_form = CanonicalForm::new_from_moves(moves);
-                cache.grids_insert(position, canonical_form.clone());
+                transposition_table.grids_insert(position, canonical_form.clone());
                 canonical_form
             });
 
             result = sub_result + result;
         }
 
-        cache.grids_insert(self.clone(), result.clone());
+        transposition_table.grids_insert(self.clone(), result.clone());
         result
     }
 
     // TODO: Find a way to reduce duplication - maybe macro?
 
     /// List of canonical moves for the Left player
-    fn sensible_left_moves<'a>(&self, cache: &'a TranspositionTable<'a, Self>) -> Vec<Self> {
-        let canonical_form = self.canonical_form(cache);
+    fn sensible_left_moves<'a>(
+        &self,
+        transposition_table: &'a TranspositionTable<'a, Self>,
+    ) -> Vec<Self> {
+        let canonical_form = self.canonical_form(transposition_table);
         let moves = canonical_form.to_moves();
         let left_canonical = moves.left;
 
         self.left_moves()
             .into_iter()
             .filter(|m| {
-                let move_game_form = m.canonical_form(cache);
+                let move_game_form = m.canonical_form(transposition_table);
                 let res = left_canonical
                     .iter()
                     .any(|k| CanonicalForm::leq(k, &move_game_form));
@@ -123,15 +129,18 @@ pub trait PartizanGame: Sized + Clone + Hash + Send + Sync + Eq {
     }
 
     /// List of canonical moves for the Right player
-    fn sensible_right_moves<'a>(&self, cache: &'a TranspositionTable<'a, Self>) -> Vec<Self> {
-        let canonical_form = self.canonical_form(cache);
+    fn sensible_right_moves<'a>(
+        &self,
+        transposition_table: &'a TranspositionTable<'a, Self>,
+    ) -> Vec<Self> {
+        let canonical_form = self.canonical_form(transposition_table);
         let moves = canonical_form.to_moves();
         let right_canonical = moves.right;
 
         self.right_moves()
             .into_iter()
             .filter(|m| {
-                let move_game_form = m.canonical_form(cache);
+                let move_game_form = m.canonical_form(transposition_table);
                 let res = right_canonical
                     .iter()
                     .any(|k| CanonicalForm::leq(&move_game_form, k));

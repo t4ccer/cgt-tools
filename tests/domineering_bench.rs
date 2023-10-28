@@ -14,10 +14,10 @@ fn bench_domineering() {
     let width = black_box(4);
     let height = black_box(4);
 
-    let tt = TranspositionTable::new();
+    let transposition_table = TranspositionTable::new();
     for i in 0..(width * height) {
         let domineering = Domineering::from_number(width as u8, height as u8, i).unwrap();
-        let _ = domineering.canonical_form(&tt);
+        let _ = domineering.canonical_form(&transposition_table);
     }
 
     let stats = dhat::HeapStats::get();

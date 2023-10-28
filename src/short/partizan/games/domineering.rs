@@ -663,8 +663,8 @@ fn parse_display_roundtrip() {
 
 #[cfg(test)]
 fn test_grid_canonical_form(grid: Domineering, canonical_form: &str) {
-    let cache = TranspositionTable::new();
-    let game_id = grid.canonical_form(&cache);
+    let transposition_table = TranspositionTable::new();
+    let game_id = grid.canonical_form(&transposition_table);
     assert_eq!(&game_id.to_string(), canonical_form);
 }
 
@@ -722,9 +722,9 @@ fn finds_canonical_form_of_num_nim_sum() {
 fn finds_temperature_of_four_by_four_grid() {
     use crate::numeric::rational::Rational;
 
-    let cache = TranspositionTable::new();
+    let transposition_table = TranspositionTable::new();
     let grid = Domineering::parse("#...|....|....|....").unwrap();
-    let game_id = grid.canonical_form(&cache);
+    let game_id = grid.canonical_form(&transposition_table);
     let temp = game_id.temperature();
     assert_eq!(&game_id.to_string(), "{1*|-1*}");
     assert_eq!(temp, Rational::from(1));

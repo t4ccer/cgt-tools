@@ -128,23 +128,23 @@ fn mutate(position: &mut Snort, mutation_rate: f32) {
     }
 }
 
-fn score<'pos, 'cache>(
+fn score<'pos, 'transposition_table>(
     position: &'pos Snort,
-    cache: &'cache TranspositionTable<'cache, Snort>,
+    transposition_table: &'transposition_table TranspositionTable<'transposition_table, Snort>,
 ) -> Rational {
     let degree_sum = position.graph.degrees().iter().sum::<usize>();
     if position.vertices.is_empty() || degree_sum == 0 || !position.graph.is_connected() {
         return Rational::NegativeInfinity;
     }
 
-    temp_dif(position, cache)
+    temp_dif(position, transposition_table)
 }
 
-fn temp_dif<'pos, 'cache>(
+fn temp_dif<'pos, 'transposition_table>(
     position: &'pos Snort,
-    cache: &'cache TranspositionTable<'cache, Snort>,
+    transposition_table: &'transposition_table TranspositionTable<'transposition_table, Snort>,
 ) -> Rational {
-    let game = position.canonical_form(cache);
+    let game = position.canonical_form(transposition_table);
     let temp = game.temperature();
     let degree = position.degree();
     temp - Rational::from(degree as i64)
@@ -285,7 +285,10 @@ impl Alg {
     }
 
     // TODO: parallel with rayon
-    fn score<'cache>(&mut self, tt: &'cache TranspositionTable<'cache, Snort>) {
+    fn score<'transposition_table>(
+        &mut self,
+        tt: &'transposition_table TranspositionTable<'transposition_table, Snort>,
+    ) {
         let specimen = &mut self.specimen;
         for spec in specimen {
             spec.score = score(&spec.position, tt);
@@ -362,7 +365,7 @@ pub fn run(args: Args) -> Result<()> {
     let generation_limit = args.generation_limit;
     let output_file_path = args.snapshot_save_file.clone();
 
-    let tt = TranspositionTable::new();
+    let transposition_table = TranspositionTable::new();
     let mut alg = if let Some(snapshot_file) = args.snapshot_load_file.clone() {
         let f = BufReader::new(File::open(snapshot_file).unwrap());
         let snapshot: Snapshot = serde_json::de::from_reader(f).unwrap();
@@ -378,7 +381,7 @@ pub fn run(args: Args) -> Result<()> {
             break;
         }
 
-        alg.score(&tt);
+        alg.score(&transposition_table);
 
         let mut output = BufWriter::new(File::create(&output_file_path).unwrap());
         alg.save_progress(&mut output);
@@ -390,7 +393,7 @@ pub fn run(args: Args) -> Result<()> {
             &Log::Generation {
                 generation,
                 top_score,
-                temperature: top.canonical_form(&tt).temperature(),
+                temperature: top.canonical_form(&transposition_table).temperature(),
             },
         );
         alg.cross();
