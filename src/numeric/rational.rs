@@ -44,8 +44,12 @@ impl Rational {
         match nom_utils::lexeme(nom::bytes::complete::tag::<&str, &str, ()>("/"))(input) {
             Ok((input, _)) => {
                 let (input, denominator) = nom_utils::lexeme(nom::character::complete::u32)(input)?;
-                let (input, _eof) = nom_utils::lexeme(nom::combinator::eof)(input)?;
-                // NOTE: zero denominator not handled
+                if denominator == 0 {
+                    return Err(nom::Err::Error(nom::error::Error::new(
+                        input,
+                        nom::error::ErrorKind::Verify,
+                    )));
+                }
                 Ok((input, Self::new(numerator, denominator)))
             }
             Err(_) => Ok((input, Self::from(numerator))),
