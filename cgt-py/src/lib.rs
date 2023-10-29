@@ -31,6 +31,7 @@ fn cgt_py(_py: Python, m: &PyModule) -> PyResult<()> {
     add_function!(mex);
 
     add_class!(PyDomineering);
+    add_class!(PyDomineeringTranspositionTable);
 
     Ok(())
 }

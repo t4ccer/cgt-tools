@@ -1,4 +1,8 @@
-use cgt::short::partizan::{games::domineering::Domineering, partizan_game::PartizanGame};
+use crate::canonical_form::PyCanonicalForm;
+use cgt::short::partizan::{
+    games::domineering::Domineering, partizan_game::PartizanGame,
+    transposition_table::TranspositionTable,
+};
 use pyo3::prelude::*;
 
 #[pyclass(name = "Domineering")]
@@ -10,6 +14,19 @@ pub struct PyDomineering {
 impl From<Domineering> for PyDomineering {
     fn from(domineering: Domineering) -> Self {
         Self { inner: domineering }
+    }
+}
+
+#[pyclass(name = "DomineeringTranspositionTable")]
+pub struct PyDomineeringTranspositionTable {
+    inner: TranspositionTable<Domineering>,
+}
+
+impl From<TranspositionTable<Domineering>> for PyDomineeringTranspositionTable {
+    fn from(transposition_table: TranspositionTable<Domineering>) -> Self {
+        Self {
+            inner: transposition_table,
+        }
     }
 }
 
@@ -36,5 +53,17 @@ impl PyDomineering {
             .into_iter()
             .map(Self::from)
             .collect()
+    }
+
+    #[staticmethod]
+    fn transposition_table() -> PyDomineeringTranspositionTable {
+        PyDomineeringTranspositionTable::from(TranspositionTable::new())
+    }
+
+    fn canonical_form(
+        &self,
+        transposition_table: &PyDomineeringTranspositionTable,
+    ) -> PyCanonicalForm {
+        PyCanonicalForm::from(self.inner.canonical_form(&transposition_table.inner))
     }
 }
