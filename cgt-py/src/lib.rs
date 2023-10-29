@@ -1,9 +1,11 @@
 use pyo3::prelude::*;
 
 mod canonical_form;
+mod domineering;
 mod nimber;
 
 use crate::canonical_form::*;
+use crate::domineering::*;
 use crate::nimber::*;
 
 // TODO: Pretty printers
@@ -24,8 +26,11 @@ fn cgt_py(_py: Python, m: &PyModule) -> PyResult<()> {
     }
 
     add_class!(PyCanonicalForm);
+
     add_class!(PyNimber);
     add_function!(mex);
+
+    add_class!(PyDomineering);
 
     Ok(())
 }

@@ -110,6 +110,7 @@
             pkgs.maturin
             pkgs.${pythonToolchain}
             pkgs.${pythonToolchain}.pkgs.pip
+            pkgs.sage
           ];
         };
         formatter = pkgs.alejandra;
