@@ -42,6 +42,8 @@
           targets = ["x86_64-unknown-linux-gnu" "x86_64-unknown-linux-musl" "wasm32-unknown-unknown"];
         };
 
+        pythonToolchain = "python311";
+
         # See https://github.com/flamegraph-rs/flamegraph/pull/278
         cargoFlamegraphWithTargetOverlay = final: prev: {
           cargo-flamegraph = prev.cargo-flamegraph.overrideAttrs (oldAttrs: {
@@ -106,8 +108,8 @@
             pkgs.trunk
             rustToolchain
             pkgs.maturin
-            pkgs.python3
-            pkgs.python3Packages.pip
+            pkgs.${pythonToolchain}
+            pkgs.${pythonToolchain}.pkgs.pip
           ];
         };
         formatter = pkgs.alejandra;
