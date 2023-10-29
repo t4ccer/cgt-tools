@@ -1,5 +1,5 @@
 use cgt::short::partizan::canonical_form::CanonicalForm;
-use pyo3::prelude::*;
+use pyo3::{prelude::*, pyclass::CompareOp};
 use std::{
     ops::{Add, Neg, Sub},
     str::FromStr,
@@ -40,7 +40,7 @@ impl PyCanonicalForm {
     }
 
     fn __repr__(&self) -> String {
-        format!("CanonicalForm({})", self.0)
+        format!("CanonicalForm('{}')", self.0)
     }
 
     fn __add__(&self, other: &Self) -> Self {
@@ -53,6 +53,12 @@ impl PyCanonicalForm {
 
     fn __neg__(&self) -> Self {
         PyCanonicalForm(Neg::neg(&self.0))
+    }
+
+    fn __richcmp__(&self, other: &Self, op: CompareOp) -> bool {
+        self.0
+            .partial_cmp(&other.0)
+            .map_or(false, |ord| op.matches(ord))
     }
 }
 
