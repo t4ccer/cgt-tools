@@ -4,4 +4,4 @@
 .PHONY: repl
 repl: .venv
 	maturin develop
-	.venv/bin/python -i -c 'import cgt_py'
+	.venv/bin/python -i -c 'from cgt_py import *'
