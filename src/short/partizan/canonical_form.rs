@@ -1378,7 +1378,7 @@ fn parse_games() {
     test_game_parse!("{1/2|2}", "1");
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(miri)))]
 mod tests {
     use super::*;
     use quickcheck::{Arbitrary, Gen, QuickCheck};

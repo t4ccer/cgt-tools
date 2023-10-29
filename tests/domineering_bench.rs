@@ -8,6 +8,7 @@ use std::hint::black_box;
 static ALLOC: dhat::Alloc = dhat::Alloc;
 
 #[test]
+#[cfg(not(miri))]
 fn bench_domineering() {
     let profiler = dhat::Profiler::builder().build();
 

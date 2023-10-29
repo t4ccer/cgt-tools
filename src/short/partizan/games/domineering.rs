@@ -719,6 +719,7 @@ fn finds_canonical_form_of_num_nim_sum() {
 }
 
 #[test]
+#[cfg(not(miri))]
 fn finds_temperature_of_four_by_four_grid() {
     use crate::numeric::rational::Rational;
 

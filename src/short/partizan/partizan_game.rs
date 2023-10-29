@@ -70,7 +70,7 @@ pub trait PartizanGame: Sized + Clone + Hash + Send + Sync + Eq {
         transposition_table: &'a TranspositionTable<'a, Self>,
     ) -> CanonicalForm {
         if let Some(id) = transposition_table.grids_get(self) {
-            return id;
+            return id.clone();
         }
 
         if let Some(cf) = self.canonical_form_special_cases() {
@@ -79,26 +79,25 @@ pub trait PartizanGame: Sized + Clone + Hash + Send + Sync + Eq {
 
         let mut result = CanonicalForm::new_integer(0);
         for position in self.decompositions() {
-            let sub_result = transposition_table.grids_get(&position).unwrap_or_else(|| {
-                let moves = Moves {
-                    left: position
-                        .left_moves()
-                        .iter()
-                        .map(|o| o.canonical_form(transposition_table))
-                        .collect(),
-                    right: position
-                        .right_moves()
-                        .iter()
-                        .map(|o| o.canonical_form(transposition_table))
-                        .collect(),
-                };
-
-                let canonical_form = CanonicalForm::new_from_moves(moves);
-                transposition_table.grids_insert(position, canonical_form.clone());
-                canonical_form
-            });
-
-            result = sub_result + result;
+            match transposition_table.grids_get(&position) {
+                Some(cached_sub_result) => result += cached_sub_result,
+                None => {
+                    let moves = Moves {
+                        left: position
+                            .left_moves()
+                            .iter()
+                            .map(|o| o.canonical_form(transposition_table))
+                            .collect(),
+                        right: position
+                            .right_moves()
+                            .iter()
+                            .map(|o| o.canonical_form(transposition_table))
+                            .collect(),
+                    };
+                    let sub_result = CanonicalForm::new_from_moves(moves);
+                    result += sub_result;
+                }
+            }
         }
 
         transposition_table.grids_insert(self.clone(), result.clone());
