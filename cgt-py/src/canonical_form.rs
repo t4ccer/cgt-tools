@@ -29,7 +29,7 @@ impl PyCanonicalForm {
             match CanonicalForm::from_str(string) {
                 Ok(cf) => return Ok(Self::from(cf)),
                 Err(_) => {
-                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
                         "Could not parse CanonicalForm. Invalid input format.",
                     ))
                 }

@@ -128,10 +128,7 @@ fn mutate(position: &mut Snort, mutation_rate: f32) {
     }
 }
 
-fn score<'pos, 'transposition_table>(
-    position: &'pos Snort,
-    transposition_table: &'transposition_table TranspositionTable<'transposition_table, Snort>,
-) -> Rational {
+fn score<'pos>(position: &'pos Snort, transposition_table: &TranspositionTable<Snort>) -> Rational {
     let degree_sum = position.graph.degrees().iter().sum::<usize>();
     if position.vertices.is_empty() || degree_sum == 0 || !position.graph.is_connected() {
         return Rational::NegativeInfinity;
@@ -140,9 +137,9 @@ fn score<'pos, 'transposition_table>(
     temp_dif(position, transposition_table)
 }
 
-fn temp_dif<'pos, 'transposition_table>(
+fn temp_dif<'pos>(
     position: &'pos Snort,
-    transposition_table: &'transposition_table TranspositionTable<'transposition_table, Snort>,
+    transposition_table: &TranspositionTable<Snort>,
 ) -> Rational {
     let game = position.canonical_form(transposition_table);
     let temp = game.temperature();
@@ -285,10 +282,7 @@ impl Alg {
     }
 
     // TODO: parallel with rayon
-    fn score<'transposition_table>(
-        &mut self,
-        tt: &'transposition_table TranspositionTable<'transposition_table, Snort>,
-    ) {
+    fn score(&mut self, tt: &TranspositionTable<Snort>) {
         let specimen = &mut self.specimen;
         for spec in specimen {
             spec.score = score(&spec.position, tt);
