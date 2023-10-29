@@ -195,6 +195,11 @@ impl Domineering {
             );
             x += 1;
         }
+
+        if x != width {
+            // Not a rectangle in the last row
+            return Err(PositionError::CouldNotParse);
+        }
         Ok(grid)
     }
 
