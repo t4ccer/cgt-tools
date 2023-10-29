@@ -7,12 +7,11 @@ use crate::{
     numeric::{dyadic_rational_number::DyadicRationalNumber, nimber::Nimber},
     short::partizan::{canonical_form::CanonicalForm, partizan_game::PartizanGame},
 };
-use num_derive::FromPrimitive;
 use std::{collections::VecDeque, fmt::Write, num::NonZeroU32};
 
 /// Color of Snort vertex. Note that we are taking tinting apporach rather than direct tracking
 /// of adjacent colors.
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, FromPrimitive)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 #[cfg_attr(
     feature = "serde",
     derive(serde_repr::Serialize_repr, serde_repr::Deserialize_repr)
@@ -30,6 +29,21 @@ pub enum VertexColor {
 
     /// Vertex that is either taken or connected to both colors
     Taken = 3,
+}
+
+impl TryFrom<u8> for VertexColor {
+    type Error = ();
+
+    #[inline]
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Self::Empty),
+            1 => Ok(Self::TintLeft),
+            2 => Ok(Self::TintRight),
+            3 => Ok(Self::Taken),
+            _ => Err(()),
+        }
+    }
 }
 
 /// Type of vertex (or group of them) in the graph. We abstract over vertices to support efficient
@@ -143,7 +157,7 @@ impl Snort {
     /// Any other input is undefined.
     fn moves_for<const COLOR: u8>(&self) -> Vec<Self> {
         // const ADT generics are unsable, so here we go
-        let own_tint_color: VertexColor = num::FromPrimitive::from_u8(COLOR).unwrap();
+        let own_tint_color: VertexColor = VertexColor::try_from(COLOR).unwrap();
 
         let mut moves = Vec::with_capacity(self.graph.size());
 

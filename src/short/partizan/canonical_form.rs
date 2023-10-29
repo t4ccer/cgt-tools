@@ -1381,19 +1381,27 @@ fn parse_games() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use num_traits::Euclid;
     use quickcheck::{Arbitrary, Gen, QuickCheck};
     use std::ops::Neg;
 
+    // TODO: Rewrite with proptest
+
     impl Arbitrary for Nus {
         fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+            macro_rules! arbitrary_mod {
+                ($n: expr, $g: expr) => {{
+                    let res: i64 = Arbitrary::arbitrary($g);
+                    res.rem_euclid($n).try_into().unwrap()
+                }};
+            }
+
             Nus {
                 number: arbitrary_sign(
-                    DyadicRationalNumber::new(arbitrary_mod(1000, g), arbitrary_mod(16, g)),
+                    DyadicRationalNumber::new(arbitrary_mod!(1000, g), arbitrary_mod!(16, g)),
                     g,
                 ),
-                up_multiple: arbitrary_sign(arbitrary_mod(1000, g), g),
-                nimber: Nimber::new(arbitrary_mod(1000, g)),
+                up_multiple: arbitrary_sign(arbitrary_mod!(1000, g), g),
+                nimber: Nimber::new(arbitrary_mod!(1000, g)),
             }
         }
     }
@@ -1415,14 +1423,6 @@ mod tests {
         let moves = nus.to_moves();
         let nus_from_moves = moves.to_nus().expect("Should be a NUS");
         assert_eq!(nus, nus_from_moves, "Should be equal");
-    }
-
-    fn arbitrary_mod<T>(n: T, g: &mut Gen) -> T
-    where
-        T: Arbitrary + Euclid,
-    {
-        let res: T = Arbitrary::arbitrary(g);
-        res.rem_euclid(&n)
     }
 
     fn arbitrary_sign<T>(n: T, g: &mut Gen) -> T

@@ -1,6 +1,6 @@
 //! Directed graph
 
-use num::{iter::Range, range};
+use core::ops::Range;
 use std::fmt::Display;
 
 /// Directed graph
@@ -91,7 +91,7 @@ impl Graph {
     /// Get iterator over vertices
     #[inline]
     pub fn vertices(&self) -> Range<usize> {
-        range(0, self.size())
+        0..self.size()
     }
 
     /// Add a new disconnected vertex at the end of the graph

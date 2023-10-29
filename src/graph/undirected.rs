@@ -1,6 +1,6 @@
 //! Undirected graph
 
-use num::iter::Range;
+use core::ops::Range;
 use std::{collections::VecDeque, fmt::Display};
 
 use super::directed;
