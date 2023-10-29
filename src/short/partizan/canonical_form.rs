@@ -367,13 +367,32 @@ impl Display for Nus {
 }
 
 /// Left and Right moves from a given position
-#[derive(Debug, Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Hash, Clone, PartialEq, Eq, PartialOrd)]
 pub struct Moves {
     /// Left player's moves
     pub left: Vec<CanonicalForm>,
 
     /// Right player's moves
     pub right: Vec<CanonicalForm>,
+}
+
+impl Ord for Moves {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let left = self
+            .left
+            .iter()
+            .map(|cf| &cf.inner)
+            .cmp(other.left.iter().map(|cf| &cf.inner));
+
+        if left.is_eq() {
+            self.right
+                .iter()
+                .map(|cf| &cf.inner)
+                .cmp(other.right.iter().map(|cf| &cf.inner))
+        } else {
+            left
+        }
+    }
 }
 
 impl Moves {
@@ -387,11 +406,11 @@ impl Moves {
 
     #[inline]
     fn eliminate_duplicates(&mut self) {
-        self.left.sort();
-        self.left.dedup();
+        self.left.sort_by(|lhs, rhs| lhs.inner.cmp(&rhs.inner));
+        self.left.dedup_by(|lhs, rhs| lhs.inner == rhs.inner);
 
-        self.right.sort();
-        self.right.dedup();
+        self.right.sort_by(|lhs, rhs| lhs.inner.cmp(&rhs.inner));
+        self.right.dedup_by(|lhs, rhs| lhs.inner == rhs.inner);
     }
 
     /// Construct a canoical form of arbitrary moves.
@@ -820,9 +839,10 @@ impl Display for Moves {
 
 impl_from_str_via_nom!(Moves);
 
-// NOTE: Is there really no way to have an enum with private constructors?
-
 /// Canonical game form
+///
+/// Note that ordering is defined structurally for the sake of data structures. For proper partial
+/// ordering see instance for [`CanonicalForm`].
 #[derive(Debug, Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
 enum CanonicalFormInner {
     /// Number Up Star sum
@@ -833,9 +853,11 @@ enum CanonicalFormInner {
 }
 
 #[repr(transparent)]
-#[derive(Debug, Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Hash, Clone, PartialEq, Eq)]
 /// Canonical game form
-pub struct CanonicalForm(CanonicalFormInner);
+pub struct CanonicalForm {
+    inner: CanonicalFormInner,
+}
 
 impl CanonicalForm {
     /// Construct NUS with only integer
@@ -864,13 +886,13 @@ impl CanonicalForm {
     #[inline]
     #[must_use]
     pub const fn new_nus(nus: Nus) -> Self {
-        Self(CanonicalFormInner::Nus(nus))
+        Self::from_inner(CanonicalFormInner::Nus(nus))
     }
 
     /// Construct negative.0 of a game. Alias for negation [`-`] operator
     #[must_use]
     pub fn construct_negative(&self) -> Self {
-        match &self.0 {
+        match &self.inner {
             CanonicalFormInner::Nus(nus) => Self::new_nus(-nus),
             CanonicalFormInner::Moves(moves) => {
                 let new_left_moves = moves
@@ -894,7 +916,9 @@ impl CanonicalForm {
 
     /// Construct a sum of two games. Alias for [`+`] operator
     pub fn construct_sum(g: &Self, h: &Self) -> Self {
-        if let (CanonicalFormInner::Nus(g_nus), CanonicalFormInner::Nus(h_nus)) = (&g.0, &h.0) {
+        if let (CanonicalFormInner::Nus(g_nus), CanonicalFormInner::Nus(h_nus)) =
+            (&g.inner, &h.inner)
+        {
             return Self::new_nus(g_nus + h_nus);
         }
 
@@ -928,15 +952,15 @@ impl CanonicalForm {
 
     /// VERY INTERNAL
     fn construct_from_canonical_moves(mut moves: Moves) -> Self {
-        moves.left.sort();
-        moves.right.sort();
+        moves.left.sort_by(|lhs, rhs| lhs.inner.cmp(&rhs.inner));
+        moves.right.sort_by(|lhs, rhs| lhs.inner.cmp(&rhs.inner));
 
         if let Some(nus) = moves.to_nus() {
             return Self::new_nus(nus);
         }
 
         // Game is not a nus
-        Self(CanonicalFormInner::Moves(moves))
+        Self::from_inner(CanonicalFormInner::Moves(moves))
     }
 
     /// Safe function to construct a game from possible moves
@@ -961,9 +985,14 @@ impl CanonicalForm {
         Self::construct_from_canonical_moves(moves)
     }
 
+    #[inline]
+    const fn from_inner(inner: CanonicalFormInner) -> Self {
+        Self { inner }
+    }
+
     /// Get left and right moves from a canonical form
     pub fn to_moves(&self) -> Moves {
-        match &self.0 {
+        match &self.inner {
             CanonicalFormInner::Nus(nus) => nus.to_moves(),
             CanonicalFormInner::Moves(moves) => moves.clone(),
         }
@@ -978,7 +1007,7 @@ impl CanonicalForm {
                 break;
             }
 
-            match moves[i].0 {
+            match moves[i].inner {
                 CanonicalFormInner::Nus(nus) => {
                     if !nus.is_nimber() {
                         return None;
@@ -1007,25 +1036,25 @@ impl CanonicalForm {
     /// Check if game is a Number Up Star sum
     #[inline]
     pub const fn is_number_up_star(&self) -> bool {
-        matches!(self.0, CanonicalFormInner::Nus(_))
+        matches!(self.inner, CanonicalFormInner::Nus(_))
     }
 
     /// Check if a game is only a number
     #[inline]
     pub fn is_number(&self) -> bool {
-        matches!(self.0, CanonicalFormInner::Nus(nus) if nus.is_number())
+        matches!(self.inner, CanonicalFormInner::Nus(nus) if nus.is_number())
     }
 
     /// Check if a game is only a nimber
     #[inline]
     pub fn is_nimber(&self) -> bool {
-        matches!(self.0, CanonicalFormInner::Nus(nus) if nus.is_nimber())
+        matches!(self.inner, CanonicalFormInner::Nus(nus) if nus.is_nimber())
     }
 
     /// Convert game to NUS if it is a NUS
     #[inline]
     pub const fn to_nus(&self) -> Option<Nus> {
-        match self.0 {
+        match self.inner {
             CanonicalFormInner::Nus(nus) => Some(nus),
             // Don't call Moves::to_nus here, because (a) it's already canonical and (b)
             // it calls here.
@@ -1091,7 +1120,7 @@ impl CanonicalForm {
     // TODO: Should be dyadic but not sure how to handle infinities
     #[cfg_attr(feature = "cargo-clippy", allow(clippy::missing_panics_doc))]
     pub fn temperature(&self) -> Rational {
-        match self.0 {
+        match self.inner {
             CanonicalFormInner::Nus(nus) => {
                 if nus.is_number() {
                     // It's a number k/2^n, so the temperature is -1/2^n
@@ -1110,7 +1139,7 @@ impl CanonicalForm {
     /// Construct a thermograph of a game, using thermographic intersection of
     /// left and right scaffolds
     pub fn thermograph(&self) -> Thermograph {
-        match self.0 {
+        match self.inner {
             CanonicalFormInner::Moves(ref moves) => moves.thermograph(),
             CanonicalFormInner::Nus(nus) => {
                 if let Some(nus_integer) = nus.number().to_integer() {
@@ -1153,6 +1182,21 @@ impl CanonicalForm {
     }
 }
 
+impl PartialOrd for CanonicalForm {
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        if self == other {
+            Some(Ordering::Equal)
+        } else if Self::leq(self, other) {
+            Some(Ordering::Less)
+        } else if Self::leq(other, self) {
+            Some(Ordering::Greater)
+        } else {
+            None
+        }
+    }
+}
+
 impl_op_ex!(+|g: &CanonicalForm, h: &CanonicalForm| -> CanonicalForm { CanonicalForm::construct_sum(g, h) });
 impl_op_ex!(+=|g: &mut CanonicalForm, h: &CanonicalForm| { *g = CanonicalForm::construct_sum(g, h) });
 impl_op_ex!(-|g: &CanonicalForm| -> CanonicalForm { CanonicalForm::construct_negative(g) });
@@ -1162,7 +1206,7 @@ impl_op_ex!(-|g: &CanonicalForm, h: &CanonicalForm| -> CanonicalForm {
 
 impl Display for CanonicalForm {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self.0 {
+        match &self.inner {
             CanonicalFormInner::Nus(nus) => nus.fmt(f),
             CanonicalFormInner::Moves(moves) => moves.fmt(f),
         }
@@ -1340,7 +1384,7 @@ fn sum_works() {
         left: vec![zero],
         right: vec![one],
     });
-    // let sum = Game::construct_sum(&one_zero, &zero_one);
+
     let sum = one_zero + zero_one;
     assert_eq!(&sum.to_string(), "{3/2|1/2}");
 }
@@ -1360,22 +1404,45 @@ fn temp_of_one_minus_one_is_one() {
 
 impl_from_str_via_nom!(CanonicalForm);
 
-#[cfg(test)]
-macro_rules! test_game_parse {
-    ($inp: expr, $expected: expr) => {{
-        let g = CanonicalForm::parse($inp).expect("Could not parse").1;
-        dbg!(&g);
-        assert_eq!($expected, g.to_string());
-    }};
-}
-
 #[test]
 fn parse_games() {
+    macro_rules! test_game_parse {
+        ($inp: expr, $expected: expr) => {{
+            let g = CanonicalForm::parse($inp).expect("Could not parse").1;
+            dbg!(&g);
+            assert_eq!($expected, g.to_string());
+        }};
+    }
+
     test_game_parse!("{|}", "0");
     test_game_parse!("{1,2|}", "3");
     test_game_parse!("{42|*}", "{42|*}");
     test_game_parse!("123", "123");
     test_game_parse!("{1/2|2}", "1");
+}
+
+#[test]
+fn ordering_works() {
+    macro_rules! test_ordering {
+        ($lhs:expr, $rhs:expr, $expected:expr) => {
+            assert_eq!(
+                PartialOrd::partial_cmp(
+                    &CanonicalForm::from_str($lhs).unwrap(),
+                    &CanonicalForm::from_str($rhs).unwrap()
+                ),
+                $expected
+            )
+        };
+    }
+
+    test_ordering!("0", "*", None);
+    test_ordering!("*", "*", Some(Ordering::Equal));
+    test_ordering!("*2", "*", None);
+    test_ordering!("*2", "*2", Some(Ordering::Equal));
+    test_ordering!("*", "*2", None);
+    test_ordering!("1", "2", Some(Ordering::Less));
+    test_ordering!("-1", "*", Some(Ordering::Less));
+    test_ordering!("1", "*", Some(Ordering::Greater));
 }
 
 #[cfg(all(test, not(miri)))]
