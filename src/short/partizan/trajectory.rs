@@ -1,9 +1,9 @@
 //! A continuous piecewise linear trajectory with rational slopes. Usually used as
 //! [thermograph](crate::short::partizan::thermograph) scaffolds.
 
-use crate::numeric::rational::Rational;
+use crate::{display, numeric::rational::Rational};
 use itertools::Itertools;
-use std::cmp::Ordering;
+use std::{cmp::Ordering, fmt::Display};
 
 /// A continuous piecewise linear trajectory with rational slopes and critical points.
 /// Each trajectory is defined for all rational numbers on the interval `-1 ≤ x < ∞`.
@@ -369,5 +369,17 @@ impl Trajectory {
             slopes: new_slopes,
             x_intercepts: new_x_intercepts,
         }
+    }
+}
+
+impl Display for Trajectory {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Trajectory")?;
+        display::parens(f, |f| {
+            write!(f, "{}, ", self.mast_x_intercept())?;
+            display::brackets(f, |f| display::commas(f, &self.critical_points))?;
+            write!(f, ", ")?;
+            display::brackets(f, |f| display::commas(f, &self.slopes))
+        })
     }
 }
