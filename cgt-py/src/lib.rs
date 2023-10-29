@@ -5,6 +5,9 @@ use std::{
     str::FromStr,
 };
 
+// TODO: Pretty printers
+// TODO: SVG rendering & html()
+
 #[pyclass(name = "Nimber")]
 #[derive(Clone)]
 struct PyNimber {
@@ -43,6 +46,16 @@ impl PyNimber {
     fn __richcmp__(&self, other: &Self, op: CompareOp) -> bool {
         op.matches(self.inner.cmp(&other.inner))
     }
+}
+
+#[pyfunction]
+fn mex(nimbers: Vec<PyNimber>) -> PyNimber {
+    PyNimber::from(Nimber::mex(
+        nimbers
+            .into_iter()
+            .map(|py_nimber| py_nimber.inner)
+            .collect(),
+    ))
 }
 
 #[pyclass(name = "CanonicalForm")]
@@ -122,6 +135,7 @@ fn cgt_py(_py: Python, m: &PyModule) -> PyResult<()> {
 
     add_class!(PyCanonicalForm);
     add_class!(PyNimber);
+    add_function!(mex);
 
     Ok(())
 }
