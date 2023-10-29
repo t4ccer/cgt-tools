@@ -1,3 +1,4 @@
+use crate::rational::PyRational;
 use cgt::short::partizan::canonical_form::CanonicalForm;
 use pyo3::{prelude::*, pyclass::CompareOp};
 use std::{
@@ -63,5 +64,14 @@ impl PyCanonicalForm {
         self.inner
             .partial_cmp(&other.inner)
             .map_or(false, |ord| op.matches(ord))
+    }
+
+    fn temperature(&self) -> PyRational {
+        self.inner.temperature().into()
+    }
+
+    // TODO: Convert to svg
+    fn thermograph(&self) -> String {
+        self.inner.thermograph().to_string()
     }
 }

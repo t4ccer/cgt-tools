@@ -3,10 +3,12 @@ use pyo3::prelude::*;
 mod canonical_form;
 mod domineering;
 mod nimber;
+mod rational;
 
 use crate::canonical_form::*;
 use crate::domineering::*;
 use crate::nimber::*;
+use crate::rational::*;
 
 // TODO: Pretty printers
 // TODO: SVG rendering & html()
@@ -32,6 +34,8 @@ fn cgt_py(_py: Python, m: &PyModule) -> PyResult<()> {
 
     add_class!(PyDomineering);
     add_class!(PyDomineeringTranspositionTable);
+
+    add_class!(PyRational);
 
     Ok(())
 }

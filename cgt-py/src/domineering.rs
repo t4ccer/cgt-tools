@@ -62,8 +62,16 @@ impl PyDomineering {
 
     fn canonical_form(
         &self,
-        transposition_table: &PyDomineeringTranspositionTable,
+        transposition_table: Option<&PyDomineeringTranspositionTable>,
     ) -> PyCanonicalForm {
-        PyCanonicalForm::from(self.inner.canonical_form(&transposition_table.inner))
+        match transposition_table {
+            Some(transposition_table) => {
+                PyCanonicalForm::from(self.inner.canonical_form(&transposition_table.inner))
+            }
+            None => PyCanonicalForm::from(
+                self.inner
+                    .canonical_form(&Self::transposition_table().inner),
+            ),
+        }
     }
 }
