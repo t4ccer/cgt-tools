@@ -39,29 +39,3 @@ jobs:
 
       # - name: Clippy
       #   run: cargo clippy -- -D warnings
-
-      - name: Install tailwind
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          wget https://github.com/tailwindlabs/tailwindcss/releases/download/v3.3.3/tailwindcss-linux-x64 -O /usr/local/bin/tailwindcss
-          chmod +x /usr/local/bin/tailwindcss
-          tailwindcss --help
-
-      - name: Install trunk
-        if: matrix.os == 'ubuntu-latest'
-        run: cargo install --locked trunk
-
-      - name: Build website
-        if: matrix.os == 'ubuntu-latest'
-        working-directory: ./cgt-website
-        run: |
-          RUSTFLAGS=--cfg=web_sys_unstable_apis trunk build --release
-          cp dist/index.html dist/404.html
-          echo "cgt.t4ccer.com" > dist/CNAME
-
-      - name: Deploy website
-        if: matrix.os == 'ubuntu-latest'
-        uses: peaceiris/actions-gh-pages@373f7f263a76c20808c831209c920827a82a2847
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./cgt-website/dist

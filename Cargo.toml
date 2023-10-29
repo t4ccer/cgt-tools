@@ -33,7 +33,7 @@ serde = ["dep:serde", "dep:serde_repr", "num-rational/serde"]
 pedantic = []
 
 [workspace]
-members = ["cgt-cli", "cgt-website", "cgt-py"]
+members = ["cgt-cli", "cgt-py"]
 
 [profile.release]
 lto = true
