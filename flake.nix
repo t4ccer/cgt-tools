@@ -105,6 +105,9 @@
             pkgs.texlive.combined.scheme-full
             pkgs.trunk
             rustToolchain
+            pkgs.maturin
+            pkgs.python3
+            pkgs.python3Packages.pip
           ];
         };
         formatter = pkgs.alejandra;
