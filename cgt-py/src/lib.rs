@@ -47,11 +47,15 @@ impl PyNimber {
 
 #[pyclass(name = "CanonicalForm")]
 #[derive(Clone)]
-struct PyCanonicalForm(CanonicalForm);
+struct PyCanonicalForm {
+    inner: CanonicalForm,
+}
 
 impl From<CanonicalForm> for PyCanonicalForm {
-    fn from(cf: CanonicalForm) -> Self {
-        Self(cf)
+    fn from(canonical_form: CanonicalForm) -> Self {
+        Self {
+            inner: canonical_form,
+        }
     }
 }
 
@@ -60,10 +64,10 @@ impl PyCanonicalForm {
     #[new]
     fn py_new(value: &PyAny) -> PyResult<Self> {
         if let Ok(integer) = value.extract::<i64>() {
-            return Ok(Self(CanonicalForm::new_integer(integer)));
+            return Ok(Self::from(CanonicalForm::new_integer(integer)));
         } else if let Ok(string) = value.extract::<&str>() {
             match CanonicalForm::from_str(string) {
-                Ok(cf) => return Ok(Self(cf)),
+                Ok(cf) => return Ok(Self::from(cf)),
                 Err(_) => {
                     return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                         "Could not parse CanonicalForm. Invalid input format.",
@@ -80,24 +84,24 @@ impl PyCanonicalForm {
     }
 
     fn __repr__(&self) -> String {
-        format!("CanonicalForm('{}')", self.0)
+        format!("CanonicalForm('{}')", self.inner)
     }
 
     fn __add__(&self, other: &Self) -> Self {
-        PyCanonicalForm(Add::add(&self.0, &other.0))
+        Self::from(Add::add(&self.inner, &other.inner))
     }
 
     fn __sub__(&self, other: &Self) -> Self {
-        PyCanonicalForm(Sub::sub(&self.0, &other.0))
+        Self::from(Sub::sub(&self.inner, &other.inner))
     }
 
     fn __neg__(&self) -> Self {
-        PyCanonicalForm(Neg::neg(&self.0))
+        Self::from(Neg::neg(&self.inner))
     }
 
     fn __richcmp__(&self, other: &Self, op: CompareOp) -> bool {
-        self.0
-            .partial_cmp(&other.0)
+        self.inner
+            .partial_cmp(&other.inner)
             .map_or(false, |ord| op.matches(ord))
     }
 }
