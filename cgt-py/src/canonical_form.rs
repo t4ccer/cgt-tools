@@ -70,8 +70,8 @@ impl PyCanonicalForm {
         self.inner.temperature().into()
     }
 
-    // TODO: Convert to svg
     fn thermograph(&self) -> String {
-        self.inner.thermograph().to_string()
+        // format!("{:?}", self.inner.thermograph())
+        self.inner.thermograph().to_svg()
     }
 }

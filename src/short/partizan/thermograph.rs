@@ -1,8 +1,12 @@
 //! Thermograph constructed from scaffolds with support for subzero thermography
 
-use crate::{display, numeric::rational::Rational, short::partizan::trajectory::Trajectory};
-use std::cmp::Ordering;
-use std::fmt::Display;
+use crate::{
+    display, drawing::svg::Svg, numeric::rational::Rational,
+    short::partizan::trajectory::Trajectory,
+};
+use ahash::{HashSet, HashSetExt};
+use core::fmt;
+use std::{cmp::Ordering, fmt::Display, iter::once};
 
 /// See [thermograph](self) header
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
@@ -454,6 +458,141 @@ impl Thermograph {
             left_wall,
             right_wall,
         }
+    }
+
+    /// Render thermograph as SVG image
+    pub fn to_svg(&self) -> String {
+        fn rescale(x: i64, in_min: i64, in_max: i64, out_min: i64, out_max: i64) -> i64 {
+            (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
+        }
+
+        // Chosen arbitrarily, may be customizable in the future
+        let svg_width = 450;
+        let svg_height = 300;
+        let mast_arrow_len = Rational::from(3);
+        let axis_weight = 1;
+        let thermograph_line_weight = 3;
+        let padding = 32;
+
+        let thermograph_x_min = self
+            .right_wall
+            .value_at(Rational::from(-1))
+            .try_round()
+            .unwrap();
+        let thermograph_x_max = self
+            .left_wall
+            .value_at(Rational::from(-1))
+            .try_round()
+            .unwrap();
+
+        let thermograph_y_min = 0;
+        let thermograph_y_max = (self.get_temperature() + mast_arrow_len)
+            .try_round()
+            .unwrap();
+
+        let x_axis_location = (svg_height as f32 * 0.9) as i32;
+        let y_axis_location = rescale(
+            0,
+            thermograph_x_min,
+            thermograph_x_max,
+            svg_width as i64 - padding,
+            padding,
+        ) as i32;
+
+        let from_thermograph_horizontal = |value| {
+            rescale(
+                value,
+                thermograph_x_min,
+                thermograph_x_max,
+                svg_width as i64 - padding,
+                padding,
+            )
+        };
+        let from_thermograph_vertical = |value| {
+            rescale(
+                value,
+                thermograph_y_min,
+                thermograph_y_max,
+                x_axis_location as i64,
+                padding,
+            )
+        };
+
+        let draw_scaffold = |w: &mut String,
+                             seen: &mut HashSet<(i64, i64)>,
+                             trajectory: &Trajectory|
+         -> fmt::Result {
+            let mut previous = None;
+
+            let y_points = once(trajectory.mast_x_intercept() + mast_arrow_len).chain(
+                trajectory
+                    .critical_points
+                    .iter()
+                    .copied()
+                    .chain(once(Rational::from(-1))),
+            );
+
+            for point_y in y_points {
+                let point_x = trajectory.value_at(point_y);
+
+                let image_x = from_thermograph_horizontal(point_x.try_round().unwrap());
+                let image_y = from_thermograph_vertical(point_y.try_round().unwrap());
+
+                if !seen.contains(&(image_x, image_y)) {
+                    // TODO: Make it less ugly, maybe move values to axis rather than having them on
+                    // critical points
+                    Svg::text(
+                        w,
+                        image_x as i32,
+                        image_y as i32,
+                        &format!("({}, {})", point_x, point_y),
+                    )?;
+                    seen.insert((image_x, image_y));
+                }
+
+                if let Some((previous_x, previous_y)) = previous {
+                    Svg::line(
+                        w,
+                        previous_x as i32,
+                        previous_y as i32,
+                        image_x as i32,
+                        image_y as i32,
+                        thermograph_line_weight,
+                    )?;
+                }
+
+                previous = Some((image_x, image_y));
+            }
+            Ok(())
+        };
+
+        let mut buf = String::new();
+        Svg::new(&mut buf, svg_width, svg_height, |buf| {
+            Svg::g(buf, "black", |buf| {
+                Svg::line(
+                    buf,
+                    0,
+                    x_axis_location,
+                    svg_width as i32,
+                    x_axis_location,
+                    axis_weight,
+                )?;
+                Svg::line(
+                    buf,
+                    y_axis_location,
+                    0,
+                    y_axis_location,
+                    svg_height as i32,
+                    axis_weight,
+                )?;
+
+                let mut seen = HashSet::new();
+                draw_scaffold(buf, &mut seen, &self.left_wall)?;
+                draw_scaffold(buf, &mut seen, &self.right_wall)
+            })
+        })
+        .unwrap();
+        buf
     }
 }
 

@@ -23,6 +23,7 @@
     )
 )]
 
+pub mod drawing;
 pub mod graph;
 pub mod loopy;
 pub mod numeric;

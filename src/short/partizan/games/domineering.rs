@@ -2,7 +2,7 @@
 //! horizontal dominoes.
 
 extern crate alloc;
-use crate::short::partizan::partizan_game::PartizanGame;
+use crate::{drawing::svg::Svg, short::partizan::partizan_game::PartizanGame};
 use alloc::collections::vec_deque::VecDeque;
 use std::{fmt::Display, str::FromStr};
 
@@ -342,67 +342,57 @@ impl Domineering {
 
     /// Output SVG string with domineering grid
     pub fn to_svg(&self) -> String {
-        use std::fmt::Write;
-        let mut buf = String::new();
-
+        // Chosen arbitrarily
         let tile_size = 48;
         let grid_width = 4;
+
         let offset = grid_width / 2;
+        let svg_width = self.width() as u32 * tile_size + grid_width;
+        let svg_height = self.height() as u32 * tile_size + grid_width;
 
-        let svg_width = self.width() * tile_size + grid_width;
-        let svg_height = self.height() * tile_size + grid_width;
-
-        write!(
-            buf,
-            "<svg width=\"{}\" height=\"{}\">",
-            svg_width, svg_height,
-        )
-        .unwrap();
-
-        for y in 0..self.height() {
-            for x in 0..self.width() {
-                let fill = if self.at(x, y) { "gray" } else { "white" };
-
-                write!(
-                    buf,
-                    "<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" style=\"fill:{};\"/>",
-                    x * tile_size + offset,
-                    y * tile_size + offset,
-                    tile_size,
-                    tile_size,
-                    fill,
-                )
-                .unwrap();
+        let mut buf = String::new();
+        Svg::new(&mut buf, svg_width, svg_width, |buf| {
+            for y in 0..self.height() {
+                for x in 0..self.width() {
+                    let fill = if self.at(x, y) { "gray" } else { "white" };
+                    Svg::rect(
+                        buf,
+                        (x as u32 * tile_size + offset) as i32,
+                        (y as u32 * tile_size + offset) as i32,
+                        tile_size,
+                        tile_size,
+                        fill,
+                    )?;
+                }
             }
-        }
 
-        write!(buf, "<g stroke=\"black\">",).unwrap();
-        for y in 0..(self.height() + 1) {
-            write!(
-                buf,
-                "<line x1=\"{}\" y1=\"{}\" x2=\"{}\" y2=\"{}\" style=\"stroke-width:{};\"/>",
-                0,
-                y * tile_size + offset,
-                svg_width,
-                y * tile_size + offset,
-                grid_width
-            )
-            .unwrap();
-        }
-        for x in 0..(self.width() + 1) {
-            write!(
-                buf,
-                "<line x1=\"{}\" y1=\"{}\" x2=\"{}\" y2=\"{}\" style=\"stroke-width:{};\"/>",
-                x * tile_size + offset,
-                0,
-                x * tile_size + offset,
-                svg_height,
-                grid_width
-            )
-            .unwrap();
-        }
+            Svg::g(buf, "black", |buf| {
+                for y in 0..(self.height() + 1) {
+                    Svg::line(
+                        buf,
+                        0,
+                        (y as u32 * tile_size + offset) as i32,
+                        svg_width as i32,
+                        (y as u32 * tile_size + offset) as i32,
+                        grid_width,
+                    )?;
+                }
 
-        write!(buf, "</g></svg>",).unwrap();
+                for x in 0..(self.width() + 1) {
+                    Svg::line(
+                        buf,
+                        (x as u32 * tile_size + offset) as i32,
+                        0,
+                        (x as u32 * tile_size + offset) as i32,
+                        svg_height as i32,
+                        grid_width,
+                    )?;
+                }
+
+                Ok(())
+            })
+        })
+        .unwrap();
 
         buf
     }

@@ -55,6 +55,15 @@ impl Rational {
             Err(_) => Ok((input, Self::from(numerator))),
         }
     }
+
+    /// Rounding towards zero if finite
+    pub fn try_round(&self) -> Option<i64> {
+        match self {
+            Self::NegativeInfinity => None,
+            Self::Value(val) => Some(val.to_integer()),
+            Self::PositiveInfinity => None,
+        }
+    }
 }
 
 impl From<Rational64> for Rational {

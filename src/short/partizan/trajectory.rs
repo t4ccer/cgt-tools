@@ -95,7 +95,7 @@ impl Trajectory {
         self.x_intercepts[0]
     }
 
-    /// Gets the value of this trajectory at the specified point.
+    /// Gets the value of this trajectory at the specified height (y value).
     pub fn value_at(&self, r: Rational) -> Rational {
         let i = self
             .critical_points
