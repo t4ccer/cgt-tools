@@ -5,30 +5,12 @@ use cgt::short::partizan::{
 };
 use pyo3::prelude::*;
 
-#[pyclass(name = "Domineering")]
-#[derive(Clone)]
-pub struct PyDomineering {
-    inner: Domineering,
-}
-
-impl From<Domineering> for PyDomineering {
-    fn from(domineering: Domineering) -> Self {
-        Self { inner: domineering }
-    }
-}
-
-#[pyclass(name = "DomineeringTranspositionTable")]
-pub struct PyDomineeringTranspositionTable {
-    inner: TranspositionTable<Domineering>,
-}
-
-impl From<TranspositionTable<Domineering>> for PyDomineeringTranspositionTable {
-    fn from(transposition_table: TranspositionTable<Domineering>) -> Self {
-        Self {
-            inner: transposition_table,
-        }
-    }
-}
+crate::wrap_struct!(Domineering, PyDomineering, "Domineering", Clone);
+crate::wrap_struct!(
+    TranspositionTable<Domineering>,
+    PyDomineeringTranspositionTable,
+    "DomineeringTranspositionTable"
+);
 
 #[pymethods]
 impl PyDomineering {

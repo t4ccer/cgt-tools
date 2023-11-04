@@ -4,14 +4,30 @@ mod canonical_form;
 mod domineering;
 mod nimber;
 mod rational;
+mod thermograph;
 
-use crate::canonical_form::*;
-use crate::domineering::*;
-use crate::nimber::*;
-use crate::rational::*;
+use crate::{canonical_form::*, domineering::*, nimber::*, rational::*, thermograph::*};
 
 // TODO: Pretty printers
 // TODO: SVG rendering & html()
+
+#[macro_export]
+macro_rules! wrap_struct {
+    ($struct:path, $py_struct:ident, $py_class:expr $(, $trait:tt)*) => {
+        #[derive($($trait),*)]
+        #[pyclass(name = $py_class)]
+        #[repr(transparent)]
+        pub struct $py_struct {
+            inner: $struct,
+        }
+
+        impl From<$struct> for $py_struct {
+            fn from(inner: $struct) -> Self {
+                $py_struct { inner }
+            }
+        }
+    };
+}
 
 #[pymodule]
 fn cgt_py(_py: Python, m: &PyModule) -> PyResult<()> {
@@ -36,6 +52,8 @@ fn cgt_py(_py: Python, m: &PyModule) -> PyResult<()> {
     add_class!(PyDomineeringTranspositionTable);
 
     add_class!(PyRational);
+
+    add_class!(PyThermograph);
 
     Ok(())
 }

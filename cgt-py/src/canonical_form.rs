@@ -1,4 +1,4 @@
-use crate::rational::PyRational;
+use crate::{rational::PyRational, thermograph::PyThermograph};
 use cgt::short::partizan::canonical_form::CanonicalForm;
 use pyo3::{prelude::*, pyclass::CompareOp};
 use std::{
@@ -6,19 +6,7 @@ use std::{
     str::FromStr,
 };
 
-#[pyclass(name = "CanonicalForm")]
-#[derive(Clone)]
-pub struct PyCanonicalForm {
-    inner: CanonicalForm,
-}
-
-impl From<CanonicalForm> for PyCanonicalForm {
-    fn from(canonical_form: CanonicalForm) -> Self {
-        Self {
-            inner: canonical_form,
-        }
-    }
-}
+crate::wrap_struct!(CanonicalForm, PyCanonicalForm, "CanonicalForm", Clone);
 
 #[pymethods]
 impl PyCanonicalForm {
@@ -70,8 +58,7 @@ impl PyCanonicalForm {
         self.inner.temperature().into()
     }
 
-    fn thermograph(&self) -> String {
-        // format!("{:?}", self.inner.thermograph())
-        self.inner.thermograph().to_svg()
+    fn thermograph(&self) -> PyThermograph {
+        PyThermograph::from(self.inner.thermograph())
     }
 }

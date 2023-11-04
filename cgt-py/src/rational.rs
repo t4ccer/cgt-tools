@@ -5,17 +5,7 @@ use std::{
     str::FromStr,
 };
 
-#[pyclass(name = "Rational")]
-#[derive(Clone)]
-pub struct PyRational {
-    inner: Rational,
-}
-
-impl From<Rational> for PyRational {
-    fn from(rational: Rational) -> Self {
-        Self { inner: rational }
-    }
-}
+crate::wrap_struct!(Rational, PyRational, "Rational", Clone);
 
 #[pymethods]
 impl PyRational {

@@ -2,17 +2,7 @@ use cgt::numeric::nimber::Nimber;
 use pyo3::{prelude::*, pyclass::CompareOp};
 use std::ops::{Add, Neg, Sub};
 
-#[pyclass(name = "Nimber")]
-#[derive(Clone)]
-pub struct PyNimber {
-    inner: Nimber,
-}
-
-impl From<Nimber> for PyNimber {
-    fn from(nimber: Nimber) -> Self {
-        Self { inner: nimber }
-    }
-}
+crate::wrap_struct!(Nimber, PyNimber, "Nimber", Clone);
 
 #[pymethods]
 impl PyNimber {
