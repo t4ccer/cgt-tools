@@ -1,5 +1,6 @@
 use anyhow::{bail, Context, Result};
 use cgt::{
+    grid::{small_bit_grid::SmallBitGrid, FiniteGrid},
     numeric::rational::Rational,
     short::partizan::{
         games::domineering, partizan_game::PartizanGame, transposition_table::TranspositionTable,
@@ -154,13 +155,13 @@ pub fn run(args: Args) -> Result<()> {
 
             progress_tracker.next_iteration();
 
-            let grid = domineering::Domineering::from_number(
+            let grid = SmallBitGrid::from_number(
                 progress_tracker.args.width,
                 progress_tracker.args.height,
                 i,
             )
-            .unwrap()
-            .move_top_left();
+            .unwrap();
+            let grid = domineering::Domineering::new(grid).move_top_left();
 
             let decompositions = grid.decompositions();
 
@@ -172,8 +173,8 @@ pub fn run(args: Args) -> Result<()> {
             }
 
             // Generated grid has filled edges, so we can skip
-            if grid.width() != progress_tracker.args.width
-                || grid.height() != progress_tracker.args.height
+            if grid.grid().width() != progress_tracker.args.width
+                || grid.grid().height() != progress_tracker.args.height
             {
                 return;
             }

@@ -1,7 +1,10 @@
 use crate::canonical_form::PyCanonicalForm;
-use cgt::short::partizan::{
-    games::domineering::Domineering, partizan_game::PartizanGame,
-    transposition_table::TranspositionTable,
+use cgt::{
+    grid::small_bit_grid::SmallBitGrid,
+    short::partizan::{
+        games::domineering::Domineering, partizan_game::PartizanGame,
+        transposition_table::TranspositionTable,
+    },
 };
 use pyo3::prelude::*;
 
@@ -16,9 +19,11 @@ crate::wrap_struct!(
 impl PyDomineering {
     #[new]
     fn py_new(position: &str) -> PyResult<Self> {
-        Ok(Self::from(Domineering::parse(position).map_err(|err| {
-            PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("{:?}", err))
-        })?))
+        let grid = SmallBitGrid::parse(position)
+            .ok_or(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "Parse error",
+            ))?;
+        Ok(Self::from(Domineering::new(grid)))
     }
 
     fn __repr__(&self) -> String {

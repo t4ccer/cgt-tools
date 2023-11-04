@@ -1,6 +1,6 @@
 use super::common::DomineeringResult;
 use anyhow::{anyhow, Context, Result};
-use cgt::{numeric::rational::Rational, short::partizan::games::domineering};
+use cgt::{grid::FiniteGrid, numeric::rational::Rational, short::partizan::games::domineering};
 use clap::Parser;
 use std::{
     fs::File,
@@ -85,11 +85,12 @@ pub fn run(args: Args) -> Result<()> {
         let mut input_without_rotations =
             input.iter().cloned().map(|e| Some(e)).collect::<Vec<_>>();
         for (idx, entry) in input.iter().enumerate() {
-            let rot_90deg = entry.grid.rotate();
+            let grid = *entry.grid.grid();
+            let rot_90deg = grid.rotate();
             let rot_180deg = rot_90deg.rotate();
             let rot_270deg = rot_180deg.rotate();
-            let vertical_flip = entry.grid.vertical_flip();
-            let horizontal_flip = entry.grid.horizontal_flip();
+            let vertical_flip = grid.vertical_flip();
+            let horizontal_flip = grid.horizontal_flip();
             let equivalent_grids = [
                 rot_90deg,
                 rot_180deg,
@@ -99,7 +100,7 @@ pub fn run(args: Args) -> Result<()> {
             ];
             for idx in (idx + 1)..input_without_rotations.len() {
                 if let Some(next_entry) = &input_without_rotations[idx] {
-                    if equivalent_grids.contains(&next_entry.grid) {
+                    if equivalent_grids.contains(&next_entry.grid.grid()) {
                         input_without_rotations[idx] = None;
                     }
                 }
@@ -115,7 +116,7 @@ pub fn run(args: Args) -> Result<()> {
 
     let max_grid_width = input
         .iter()
-        .map(|entry| entry.grid.width())
+        .map(|entry| entry.grid.grid().width())
         .max()
         .context("Input file was empty")?;
 
