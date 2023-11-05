@@ -776,22 +776,22 @@ impl Moves {
     /// Print moves with NUS unwrapped using `{G^L | G^R}` notation
     #[cfg_attr(feature = "cargo-clippy", allow(clippy::missing_errors_doc))]
     pub fn print_deep(&self, f: &mut impl Write) -> fmt::Result {
-        write!(f, "{{")?;
-        for (idx, l) in self.left.iter().enumerate() {
-            if idx != 0 {
-                write!(f, ",")?;
+        display::braces(f, |f| {
+            for (idx, l) in self.left.iter().enumerate() {
+                if idx != 0 {
+                    write!(f, ",")?;
+                }
+                Self::print_deep(&l.to_moves(), f)?;
             }
-            Self::print_deep(&l.to_moves(), f)?;
-        }
-        write!(f, "|")?;
-        for (idx, r) in self.right.iter().enumerate() {
-            if idx != 0 {
-                write!(f, ",")?;
+            write!(f, "|")?;
+            for (idx, r) in self.right.iter().enumerate() {
+                if idx != 0 {
+                    write!(f, ",")?;
+                }
+                Self::print_deep(&r.to_moves(), f)?;
             }
-            Self::print_deep(&r.to_moves(), f)?;
-        }
-        write!(f, "}}")?;
-        Ok(())
+            Ok(())
+        })
     }
 
     /// Print moves to string with NUS unwrapped using `{G^L | G^R}` notation
