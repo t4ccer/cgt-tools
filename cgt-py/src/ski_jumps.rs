@@ -51,4 +51,20 @@ impl PySkiJumps {
             ),
         }
     }
+
+    fn left_moves(&self) -> Vec<Self> {
+        self.inner
+            .left_moves()
+            .into_iter()
+            .map(Self::from)
+            .collect()
+    }
+
+    fn right_moves(&self) -> Vec<Self> {
+        self.inner
+            .right_moves()
+            .into_iter()
+            .map(Self::from)
+            .collect()
+    }
 }
