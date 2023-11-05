@@ -2,7 +2,7 @@
 
 use crate::{
     grid::{vec_grid::VecGrid, CharTile, FiniteGrid, Grid},
-    short::partizan::partizan_game::PartizanGame,
+    short::partizan::{canonical_form::CanonicalForm, partizan_game::PartizanGame},
 };
 use std::{fmt::Display, str::FromStr};
 
@@ -15,7 +15,7 @@ pub enum Skier {
     Slipper,
 }
 
-/// Game grid tile
+/// Ski Jumps game grid tile
 #[derive(Debug, Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Tile {
     /// Empty tile, without skiers
@@ -84,9 +84,44 @@ impl SkiJumps {
     pub fn new(grid: VecGrid<Tile>) -> Self {
         SkiJumps { grid }
     }
+
+    fn jump_available_for(&self, own: Tile, can_jump_over: fn(Tile) -> bool) -> bool {
+        for y in 0..self.grid.height() {
+            for x in 0..self.grid.width() {
+                // Check if in a row below current row, there is a tile that can be jumped over
+                for dx in 0..self.grid.width() {
+                    if self.grid.get(x, y) == own
+                        && y + 1 < self.grid.height()
+                        && can_jump_over(self.grid.get(dx, y + 1))
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        false
+    }
+
+    /// Check if left player has any jumping moves
+    #[inline]
+    pub fn left_jump_available(&self) -> bool {
+        // Left jumper can jump over any right piece
+        self.jump_available_for(Tile::Left(Skier::Jumper), |other| {
+            matches!(other, Tile::Right(_))
+        })
+    }
+
+    /// Check if right player has any jumping moves
+    #[inline]
+    pub fn right_jump_available(&self) -> bool {
+        // Right jumper can jump over any left piece
+        self.jump_available_for(Tile::Right(Skier::Jumper), |other| {
+            matches!(other, Tile::Left(_))
+        })
+    }
 }
 
-// TODO: Detect when no jumps are possible and reduce the position instantly to CF
 impl PartizanGame for SkiJumps {
     fn left_moves(&self) -> Vec<Self> {
         let mut moves = vec![];
@@ -185,6 +220,26 @@ impl PartizanGame for SkiJumps {
         }
 
         moves
+    }
+
+    fn canonical_form_special_cases(&self) -> Option<CanonicalForm> {
+        // If neither player can jump, the optimal move is to move any of the pieces by one tile
+        // so the game value is the difference of sum of distances to the board edge
+        if !self.left_jump_available() && !self.right_jump_available() {
+            let mut value = 0i64;
+            for y in 0..self.grid.height() {
+                for x in 0..self.grid.width() {
+                    match self.grid.get(x, y) {
+                        Tile::Empty => {}
+                        Tile::Left(_) => value += self.grid.width() as i64 - x as i64,
+                        Tile::Right(_) => value -= (x + 1) as i64,
+                    }
+                }
+            }
+            return Some(CanonicalForm::new_integer(value));
+        }
+
+        None
     }
 }
 

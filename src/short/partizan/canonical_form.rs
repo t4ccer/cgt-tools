@@ -1348,8 +1348,6 @@ fn simplifies_moves() {
     let weird_right = CanonicalForm::new_from_moves(weird_right);
     assert_eq!(&weird_right.to_string(), "{^|-2}");
     let weird_right_moves = weird_right.to_moves();
-    dbg!(&weird_right);
-    dbg!(&weird_right_moves);
     assert_eq!(&weird_right_moves.to_string(), "{^|-2}");
     assert_eq!(
         &weird_right_moves.print_deep_to_str(),
@@ -1409,7 +1407,6 @@ fn parse_games() {
     macro_rules! test_game_parse {
         ($inp: expr, $expected: expr) => {{
             let g = CanonicalForm::parse($inp).expect("Could not parse").1;
-            dbg!(&g);
             assert_eq!($expected, g.to_string());
         }};
     }
