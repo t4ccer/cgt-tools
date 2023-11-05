@@ -245,7 +245,7 @@ impl Domineering {
 
     fn bfs(&self, visited: &mut SmallBitGrid, x: u8, y: u8) -> Self {
         let mut grid =
-            Self::new(SmallBitGrid::filled(self.grid.width(), self.grid.height()).unwrap());
+            Self::new(SmallBitGrid::filled(self.grid.width(), self.grid.height(), true).unwrap());
 
         let mut q: VecDeque<(u8, u8)> =
             VecDeque::with_capacity(self.grid.width() as usize * self.grid.height() as usize);
@@ -411,16 +411,7 @@ impl PartizanGame for Domineering {
 
 impl Display for Domineering {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for y in 0..self.grid.height() {
-            for x in 0..self.grid.width() {
-                let chr = if self.grid.get(x, y) { '#' } else { '.' };
-                write!(f, "{}", chr)?;
-            }
-            if y != self.grid.height() - 1 {
-                write!(f, "|")?;
-            }
-        }
-        Ok(())
+        self.grid.display(f, '|')
     }
 }
 

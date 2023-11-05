@@ -2,6 +2,8 @@
 
 use std::fmt::{self, Write};
 
+// TODO: trait SVG
+// TODO: ImmSvg
 /// SVG renderer
 pub struct Svg;
 

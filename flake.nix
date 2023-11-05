@@ -98,6 +98,7 @@
             pkgs.cargo-tarpaulin
             pkgs.cargo-udeps
             pkgs.cargo-expand
+            pkgs.cargo-nextest
             pkgs.fd
             pkgs.linuxKernel.packages.linux_5_15.perf
             pkgs.graphviz

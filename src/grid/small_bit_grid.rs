@@ -37,20 +37,21 @@ impl FiniteGrid for SmallBitGrid {
     fn height(&self) -> u8 {
         self.height
     }
+
+    fn filled(width: u8, height: u8, value: bool) -> Option<Self> {
+        Self::check_dimensions(width, height)?;
+
+        Some(Self {
+            width,
+            height,
+            grid: if value { GridBits::MAX } else { 0 },
+        })
+    }
 }
 
 impl Display for SmallBitGrid {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for y in 0..self.height {
-            for x in 0..self.width {
-                let chr = if self.get(x, y) { '#' } else { '.' };
-                write!(f, "{}", chr)?;
-            }
-            if y != self.height - 1 {
-                write!(f, "|")?;
-            }
-        }
-        Ok(())
+        self.display(f, '|')
     }
 }
 
@@ -93,28 +94,6 @@ impl SmallBitGrid {
             height: 0,
             grid: 0,
         }
-    }
-
-    /// Creates filled grid with given size.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use cgt::grid::small_bit_grid::SmallBitGrid;
-    ///
-    /// assert_eq!(&format!("{}", SmallBitGrid::filled(3, 2).unwrap()), "###|###");
-    /// ```
-    ///
-    /// # Errors
-    /// - Grid has more than 64 tiles
-    pub fn filled(width: u8, height: u8) -> Option<Self> {
-        Self::check_dimensions(width, height)?;
-
-        Some(Self {
-            width,
-            height,
-            grid: GridBits::MAX,
-        })
     }
 
     /// Create a grid that correspondes to given size and "internal id".
@@ -339,6 +318,24 @@ fn parse_grid() {
         )
         .unwrap()
     );
+}
+
+#[should_panic]
+#[test]
+fn parse_invalid_char() {
+    SmallBitGrid::from_str("...#|..X#|.#..").unwrap();
+}
+
+#[should_panic]
+#[test]
+fn parse_non_rectangular() {
+    SmallBitGrid::from_str("...#|..#|.#..").unwrap();
+}
+
+#[should_panic]
+#[test]
+fn parse_non_rectangular_last() {
+    SmallBitGrid::from_str("...#|..#.|.#.").unwrap();
 }
 
 #[test]
