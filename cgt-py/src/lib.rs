@@ -4,9 +4,12 @@ mod canonical_form;
 mod domineering;
 mod nimber;
 mod rational;
+mod ski_jumps;
 mod thermograph;
 
-use crate::{canonical_form::*, domineering::*, nimber::*, rational::*, thermograph::*};
+use crate::{
+    canonical_form::*, domineering::*, nimber::*, rational::*, ski_jumps::*, thermograph::*,
+};
 
 // TODO: Pretty printers
 // TODO: SVG rendering & html()
@@ -54,6 +57,8 @@ fn cgt_py(_py: Python, m: &PyModule) -> PyResult<()> {
     add_class!(PyRational);
 
     add_class!(PyThermograph);
+
+    add_class!(PySkiJumps);
 
     Ok(())
 }
