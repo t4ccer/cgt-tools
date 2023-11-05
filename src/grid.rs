@@ -44,21 +44,22 @@ pub trait FiniteGrid: Grid + Sized {
         Ok(())
     }
 
-    /// Parse grid from string following notation from [`display`]
+    /// Parse grid from string following notation from [`Self::display`]
     fn parse(input: &str) -> Option<Self>
     where
         Self: Sized,
         Self::Item: CharTile + Default,
     {
-        let width = input.split('|').next()?.len() as u8;
-        let height = input.chars().filter(|c| *c == '|').count() as u8 + 1;
+        let row_separator = '|';
+        let width = input.split(row_separator).next()?.len() as u8;
+        let height = input.chars().filter(|c| *c == row_separator).count() as u8 + 1;
 
         let mut grid = Self::filled(width, height, Default::default())?;
         let mut x = 0;
         let mut y = 0;
 
         for chr in input.chars() {
-            if chr == '|' {
+            if chr == row_separator {
                 if x == width {
                     x = 0;
                     y += 1;

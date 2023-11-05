@@ -143,64 +143,6 @@ impl SmallBitGrid {
         Self::from_number(width, height, arr_to_bits(grid))
     }
 
-    // NOTE: I'm not sure if that's a good place, or is it too domineering-specific
-    /// Parses a grid from `.#` notation.
-    ///
-    /// # Arguments
-    ///
-    /// * `input` - `.#` notation with `|` as rows separator
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use cgt::grid::small_bit_grid::SmallBitGrid;
-    /// use std::str::FromStr;
-    ///
-    /// SmallBitGrid::from_str("..#|.#.|##.").unwrap();
-    /// ```
-    ///
-    /// # Errors
-    /// - Grid has more than 64 tiles
-    /// - Input is in invalid format
-    pub fn parse(input: &str) -> Option<Self> {
-        // number of chars till first '|' or eof is the width
-        // number of '|' + 1 is the height
-        let width = input.split('|').next()?.len() as u8;
-        let height = input.chars().filter(|c| *c == '|').count() as u8 + 1;
-
-        let mut grid = Self::empty(width, height)?;
-        let mut x = 0;
-        let mut y = 0;
-
-        for chr in input.chars() {
-            if chr == '|' {
-                if x == width {
-                    x = 0;
-                    y += 1;
-                    continue;
-                }
-                // Not a rectangle
-                return None;
-            }
-            grid.set(
-                x,
-                y,
-                match chr {
-                    '.' => false,
-                    '#' => true,
-                    _ => return None,
-                },
-            );
-            x += 1;
-        }
-
-        if x != width {
-            // Not a rectangle in the last row
-            return None;
-        }
-        Some(grid)
-    }
-
     /// Rotate grid 90° clockwise
     #[must_use]
     #[cfg_attr(feature = "cargo-clippy", allow(clippy::missing_panics_doc))]

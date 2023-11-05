@@ -7,6 +7,7 @@ use cgt::{
     },
 };
 use pyo3::prelude::*;
+use std::str::FromStr;
 
 crate::wrap_struct!(Domineering, PyDomineering, "Domineering", Clone);
 crate::wrap_struct!(
@@ -19,10 +20,10 @@ crate::wrap_struct!(
 impl PyDomineering {
     #[new]
     fn py_new(position: &str) -> PyResult<Self> {
-        let grid = SmallBitGrid::parse(position)
-            .ok_or(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+        let grid = SmallBitGrid::from_str(position)
+            .or(Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
                 "Parse error",
-            ))?;
+            )))?;
         Ok(Self::from(Domineering::new(grid)))
     }
 
