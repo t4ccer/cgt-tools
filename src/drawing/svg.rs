@@ -55,6 +55,27 @@ impl Default for Text {
     }
 }
 
+/// Custom grid element
+pub struct Grid {
+    /// Top left corner X position
+    pub x1: i32,
+
+    /// Top left corner Y position
+    pub y1: i32,
+
+    /// Bottom right corner X position
+    pub x2: i32,
+
+    /// Bottom right corner Y position
+    pub y2: i32,
+
+    /// Width of grid lines
+    pub grid_width: u32,
+
+    /// Width and height of each tile
+    pub tile_size: u32,
+}
+
 impl Svg {
     /// Create new SVG
     pub fn new<W>(
@@ -118,5 +139,38 @@ impl Svg {
             text.y,
             text.text,
         )
+    }
+
+    /// Draw grid
+    pub fn grid<W>(w: &mut W, grid: &Grid) -> fmt::Result
+    where
+        W: Write,
+    {
+        let offset = grid.grid_width / 2;
+        Svg::g(w, "black", |w| {
+            for y in 0..(((grid.y2 - grid.y1) as u32 / grid.tile_size) + 1) {
+                Svg::line(
+                    w,
+                    grid.x1,
+                    (y as u32 * grid.tile_size + offset) as i32,
+                    grid.x2,
+                    (y as u32 * grid.tile_size + offset) as i32,
+                    grid.grid_width,
+                )?;
+            }
+
+            for x in 0..(((grid.x2 - grid.x1) as u32 / grid.tile_size) + 1) {
+                Svg::line(
+                    w,
+                    (x as u32 * grid.tile_size + offset) as i32,
+                    grid.y1,
+                    (x as u32 * grid.tile_size + offset) as i32,
+                    grid.y2,
+                    grid.grid_width,
+                )?;
+            }
+
+            Ok(())
+        })
     }
 }

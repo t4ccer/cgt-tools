@@ -3,7 +3,7 @@
 
 extern crate alloc;
 use crate::{
-    drawing::svg::Svg,
+    drawing::svg::{self, Svg},
     grid::{small_bit_grid::SmallBitGrid, FiniteGrid, Grid},
     short::partizan::partizan_game::PartizanGame,
 };
@@ -106,31 +106,15 @@ impl Domineering {
                 }
             }
 
-            Svg::g(buf, "black", |buf| {
-                for y in 0..(self.grid.height() + 1) {
-                    Svg::line(
-                        buf,
-                        0,
-                        (y as u32 * tile_size + offset) as i32,
-                        svg_width as i32,
-                        (y as u32 * tile_size + offset) as i32,
-                        grid_width,
-                    )?;
-                }
-
-                for x in 0..(self.grid.width() + 1) {
-                    Svg::line(
-                        buf,
-                        (x as u32 * tile_size + offset) as i32,
-                        0,
-                        (x as u32 * tile_size + offset) as i32,
-                        svg_height as i32,
-                        grid_width,
-                    )?;
-                }
-
-                Ok(())
-            })
+            let grid = svg::Grid {
+                x1: 0,
+                y1: 0,
+                x2: svg_width as i32,
+                y2: svg_height as i32,
+                grid_width,
+                tile_size,
+            };
+            Svg::grid(buf, &grid)
         })
         .unwrap();
 
