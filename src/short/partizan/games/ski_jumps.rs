@@ -1,6 +1,7 @@
 //! Ski Jumps game
 
 use crate::{
+    drawing::svg::{self, Svg},
     grid::{vec_grid::VecGrid, CharTile, FiniteGrid, Grid},
     short::partizan::{canonical_form::CanonicalForm, partizan_game::PartizanGame},
 };
@@ -108,6 +109,68 @@ impl SkiJumps {
         }
 
         false
+    }
+
+    /// Draw position as SVG image
+    pub fn to_svg(&self) -> String {
+        // Chosen arbitrarily
+        let tile_size = 48;
+        let grid_width = 4;
+
+        let offset = grid_width / 2;
+        let svg_width = self.grid.width() as u32 * tile_size + grid_width;
+        let svg_height = self.grid.height() as u32 * tile_size + grid_width;
+
+        let mut buf = String::new();
+        Svg::new(&mut buf, svg_width, svg_width, |buf| {
+            for y in 0..self.grid.height() {
+                for x in 0..self.grid.width() {
+                    match self.grid.get(x, y) {
+                        Tile::Empty => {}
+                        tile => {
+                            let text = svg::Text {
+                                x: (x as u32 * tile_size + offset + tile_size / 2) as i32,
+                                y: (y as u32 * tile_size + offset + (0.6 * tile_size as f32) as u32)
+                                    as i32,
+                                text: tile.tile_to_char().to_string(),
+                                text_anchor: svg::TextAnchor::Middle,
+                                ..svg::Text::default()
+                            };
+                            Svg::text(buf, &text)?;
+                        }
+                    }
+                }
+            }
+
+            Svg::g(buf, "black", |buf| {
+                for y in 0..(self.grid.height() + 1) {
+                    Svg::line(
+                        buf,
+                        0,
+                        (y as u32 * tile_size + offset) as i32,
+                        svg_width as i32,
+                        (y as u32 * tile_size + offset) as i32,
+                        grid_width,
+                    )?;
+                }
+
+                for x in 0..(self.grid.width() + 1) {
+                    Svg::line(
+                        buf,
+                        (x as u32 * tile_size + offset) as i32,
+                        0,
+                        (x as u32 * tile_size + offset) as i32,
+                        svg_height as i32,
+                        grid_width,
+                    )?;
+                }
+
+                Ok(())
+            })
+        })
+        .unwrap();
+
+        buf
     }
 }
 

@@ -1,7 +1,9 @@
 //! Thermograph constructed from scaffolds with support for subzero thermography
 
 use crate::{
-    display, drawing::svg::Svg, numeric::rational::Rational,
+    display,
+    drawing::svg::{self, Svg},
+    numeric::rational::Rational,
     short::partizan::trajectory::Trajectory,
 };
 use ahash::{HashSet, HashSetExt};
@@ -541,12 +543,13 @@ impl Thermograph {
                 if !seen.contains(&(image_x, image_y)) {
                     // TODO: Make it less ugly, maybe move values to axis rather than having them on
                     // critical points
-                    Svg::text(
-                        w,
-                        image_x as i32,
-                        image_y as i32,
-                        &format!("({}, {})", point_x, point_y),
-                    )?;
+                    let text = svg::Text {
+                        x: image_x as i32,
+                        y: image_y as i32,
+                        text: format!("({}, {})", point_x, point_y),
+                        ..svg::Text::default()
+                    };
+                    Svg::text(w, &text)?;
                     seen.insert((image_x, image_y));
                 }
 

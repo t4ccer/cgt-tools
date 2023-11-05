@@ -7,6 +7,54 @@ use std::fmt::{self, Write};
 /// SVG renderer
 pub struct Svg;
 
+/// SVG text element anchor
+pub enum TextAnchor {
+    /// The rendered characters are aligned such that the start of the text string is at the
+    /// initial current text position
+    Start,
+
+    /// The rendered characters are aligned such that the middle of the text string is at the
+    /// current text position
+    Middle,
+
+    /// The rendered characters are shifted such that the end of the resulting rendered text
+    End,
+}
+
+impl TextAnchor {
+    /// Get text anchor as string
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            TextAnchor::Start => "start",
+            TextAnchor::Middle => "middle",
+            TextAnchor::End => "end",
+        }
+    }
+}
+
+/// SVG text element
+pub struct Text {
+    /// X position
+    pub x: i32,
+    /// Y position
+    pub y: i32,
+    /// Text to display
+    pub text: String,
+    /// Text anchor
+    pub text_anchor: TextAnchor,
+}
+
+impl Default for Text {
+    fn default() -> Self {
+        Text {
+            x: 0,
+            y: 0,
+            text: String::new(),
+            text_anchor: TextAnchor::Start,
+        }
+    }
+}
+
 impl Svg {
     /// Create new SVG
     pub fn new<W>(
@@ -58,10 +106,17 @@ impl Svg {
     }
 
     /// Create [text element](https://developer.mozilla.org/en-US/docs/Web/SVG/Element/text)
-    pub fn text<W>(w: &mut W, x: i32, y: i32, text: &str) -> fmt::Result
+    pub fn text<W>(w: &mut W, text: &Text) -> fmt::Result
     where
         W: Write,
     {
-        write!(w, "<text x=\"{}\" y=\"{}\">{}</text>", x, y, text,)
+        write!(
+            w,
+            "<text text-anchor=\"{}\" x=\"{}\" y=\"{}\">{}</text>",
+            text.text_anchor.as_str(),
+            text.x,
+            text.y,
+            text.text,
+        )
     }
 }
