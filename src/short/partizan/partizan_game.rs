@@ -60,7 +60,7 @@ pub trait PartizanGame: Sized + Clone + Hash + Send + Sync + Eq {
     }
 
     /// Handle special cases when computing canonical form doesn't have to compute all moves.
-    fn canonical_form_special_cases(&self) -> Option<CanonicalForm> {
+    fn reductions(&self) -> Option<CanonicalForm> {
         None
     }
 
@@ -70,7 +70,7 @@ pub trait PartizanGame: Sized + Clone + Hash + Send + Sync + Eq {
             return id.clone();
         }
 
-        if let Some(cf) = self.canonical_form_special_cases() {
+        if let Some(cf) = self.reductions() {
             return cf;
         }
 

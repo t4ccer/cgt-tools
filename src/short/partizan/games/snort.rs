@@ -360,7 +360,7 @@ impl PartizanGame for Snort {
         res
     }
 
-    fn canonical_form_special_cases(&self) -> Option<CanonicalForm> {
+    fn reductions(&self) -> Option<CanonicalForm> {
         if let &[vertex] = &self.vertices[..] {
             let cf = match vertex {
                 VertexKind::Single(VertexColor::Empty) => {

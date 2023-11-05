@@ -222,7 +222,7 @@ impl PartizanGame for SkiJumps {
         moves
     }
 
-    fn canonical_form_special_cases(&self) -> Option<CanonicalForm> {
+    fn reductions(&self) -> Option<CanonicalForm> {
         // If neither player can jump, the optimal move is to move any of the pieces by one tile
         // so the game value is the difference of sum of distances to the board edge
         if !self.left_jump_available() && !self.right_jump_available() {
