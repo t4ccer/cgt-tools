@@ -1,6 +1,6 @@
 [package]
 name = "cgt"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 authors = ["Tomasz Maciosowski <t4ccer@gmail.com>"]
 license = "AGPL-3.0"
@@ -10,7 +10,7 @@ description = "Library to work with Combinatorial Games"
 homepage = "https://cgt.t4ccer.com/"
 documentation = "https://docs.rs/cgt"
 exclude = ["papers"]
-keywords = ["cgt", "combinatorial-game-theory"]
+keywords = ["cgt"]
 categories = ["mathematics", "science"]
 
 [dependencies]
