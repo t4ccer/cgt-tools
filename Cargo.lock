@@ -126,7 +126,6 @@ version = "0.3.0"
 dependencies = [
  "ahash",
  "auto_ops",
- "id-arena",
  "itertools",
  "nom",
  "num-rational",
@@ -352,12 +351,6 @@ checksum = "f31827a206f56af32e590ba56d5d2d085f558508192593743f16b2306495269f"
 dependencies = [
  "cc",
 ]
-
-[[package]]
-name = "id-arena"
-version = "2.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "25a2bc672d1148e28034f176e01fffebb08b35768468cc954630da77a1449005"
 
 [[package]]
 name = "indoc"

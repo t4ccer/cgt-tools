@@ -24,6 +24,18 @@ where
     }
 }
 
+impl<K, V, S> Default for RwHashMap<K, V, S>
+where
+    K: Eq + Hash,
+    V: Clone,
+    S: Default,
+{
+    /// Creates an empty `RwHashMap<K, V, S>`, with the `Default` value for the hasher.
+    fn default() -> Self {
+        Self(RwLock::new(HashMap::with_hasher(S::default())))
+    }
+}
+
 impl<K, V> RwHashMap<K, V>
 where
     K: Eq + Hash,

@@ -66,7 +66,7 @@ pub trait PartizanGame: Sized + Clone + Hash + Send + Sync + Eq {
 
     /// Get the canonical form of the game position
     fn canonical_form<'a>(&self, transposition_table: &TranspositionTable<Self>) -> CanonicalForm {
-        if let Some(id) = transposition_table.grids_get(self) {
+        if let Some(id) = transposition_table.lookup_position(self) {
             return id.clone();
         }
 
@@ -76,7 +76,7 @@ pub trait PartizanGame: Sized + Clone + Hash + Send + Sync + Eq {
 
         let mut result = CanonicalForm::new_integer(0);
         for position in self.decompositions() {
-            match transposition_table.grids_get(&position) {
+            match transposition_table.lookup_position(&position) {
                 Some(cached_sub_result) => result += cached_sub_result,
                 None => {
                     let moves = Moves {
@@ -97,7 +97,7 @@ pub trait PartizanGame: Sized + Clone + Hash + Send + Sync + Eq {
             }
         }
 
-        transposition_table.grids_insert(self.clone(), result.clone());
+        transposition_table.insert_position(self.clone(), result.clone());
         result
     }
 
