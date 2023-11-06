@@ -473,6 +473,7 @@ fn finds_temperature_of_four_by_four_grid() {
     let grid = Domineering::from_str("#...|....|....|....").unwrap();
     let game_id = grid.canonical_form(&transposition_table);
     let temp = game_id.temperature();
+    dbg!(transposition_table.len());
     assert_eq!(&game_id.to_string(), "{1*|-1*}");
     assert_eq!(temp, Rational::from(1));
 }

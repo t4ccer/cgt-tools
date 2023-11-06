@@ -1,12 +1,14 @@
 //! Thread safe transposition table for game values
 
 use crate::{rw_hash_map::RwHashMap, short::partizan::canonical_form::CanonicalForm};
-use std::{hash::Hash, sync::RwLock};
+use append_only_vec::AppendOnlyVec;
+use std::hash::Hash;
 
 /// Transaction table (cache) of game positions and canonical forms.
 pub struct TranspositionTable<G> {
-    values: RwLock<Vec<CanonicalForm>>,
+    values: AppendOnlyVec<CanonicalForm>,
     positions: RwHashMap<G, usize, ahash::RandomState>,
+    known_values: RwHashMap<CanonicalForm, usize, ahash::RandomState>,
 }
 
 impl<G> TranspositionTable<G>
@@ -20,22 +22,25 @@ where
     }
 
     /// Lookup a position
+    #[cfg_attr(feature = "cargo-clippy", allow(clippy::missing_panics_doc))]
     #[inline]
     pub fn lookup_position(&self, position: &G) -> Option<CanonicalForm> {
         self.positions
             .get(position)
-            .and_then(|id| self.values.read().unwrap().get(id).cloned())
+            .map(|id| self.values[id].clone())
     }
 
     /// Save position and its game value
     #[cfg_attr(feature = "cargo-clippy", allow(clippy::missing_panics_doc))]
     #[inline]
     pub fn insert_position(&self, position: G, value: CanonicalForm) {
-        let mut arena = self.values.write().unwrap();
-        let inserted = arena.len();
-        arena.push(value);
-        drop(arena);
-        self.positions.insert(position, inserted);
+        if let Some(known) = self.known_values.get(&value) {
+            self.positions.insert(position, known);
+        } else {
+            let inserted = self.values.push(value.clone());
+            self.known_values.insert(value, inserted);
+            self.positions.insert(position, inserted);
+        }
     }
 
     /// Get number of saved positions
@@ -52,8 +57,9 @@ where
     #[inline]
     fn default() -> Self {
         Self {
-            values: RwLock::default(),
+            values: AppendOnlyVec::new(),
             positions: RwHashMap::default(),
+            known_values: RwHashMap::default(),
         }
     }
 }
