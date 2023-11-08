@@ -15,7 +15,7 @@ use crate::{
     short::partizan::{canonical_form::CanonicalForm, partizan_game::PartizanGame},
 };
 use core::fmt;
-use std::{fmt::Display, str::FromStr};
+use std::{fmt::Display, hash::Hash, str::FromStr};
 
 /// Skier type
 #[derive(Debug, Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -71,28 +71,37 @@ impl CharTile for Tile {
 // NOTE: Consider caching positions of left and right skiers to avoid quadratic loops
 /// Ski Jumps game
 #[derive(Debug, Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct SkiJumps {
-    grid: VecGrid<Tile>,
+pub struct SkiJumps<G = VecGrid<Tile>> {
+    grid: G,
 }
 
-impl Display for SkiJumps {
+impl<G> Display for SkiJumps<G>
+where
+    G: Grid<Item = Tile> + FiniteGrid,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.grid.display(f, '|')
     }
 }
 
-impl FromStr for SkiJumps {
+impl<G> FromStr for SkiJumps<G>
+where
+    G: Grid<Item = Tile> + FiniteGrid,
+{
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self::new(VecGrid::parse(s).ok_or(())?))
+        Ok(Self::new(G::parse(s).ok_or(())?))
     }
 }
 
-impl SkiJumps {
+impl<G> SkiJumps<G>
+where
+    G: Grid<Item = Tile> + FiniteGrid,
+{
     /// Create new Ski Jumps game from a grid
     #[inline]
-    pub fn new(grid: VecGrid<Tile>) -> Self {
+    pub fn new(grid: G) -> Self {
         SkiJumps { grid }
     }
 
@@ -122,7 +131,10 @@ impl SkiJumps {
     }
 }
 
-impl Svg for SkiJumps {
+impl<G> Svg for SkiJumps<G>
+where
+    G: Grid<Item = Tile> + FiniteGrid,
+{
     fn to_svg<W>(&self, buf: &mut W) -> fmt::Result
     where
         W: fmt::Write,
@@ -168,7 +180,10 @@ impl Svg for SkiJumps {
     }
 }
 
-impl PartizanGame for SkiJumps {
+impl<G> PartizanGame for SkiJumps<G>
+where
+    G: Grid<Item = Tile> + FiniteGrid + Clone + Hash + Send + Sync + Eq,
+{
     fn left_moves(&self) -> Vec<Self> {
         let mut moves = vec![];
 
@@ -297,7 +312,7 @@ mod tests {
     macro_rules! test_canonical_form {
         ($input:expr, $output:expr) => {{
             let tt = TranspositionTable::new();
-            let pos = SkiJumps::from_str($input).expect("Could not parse the game");
+            let pos: SkiJumps = SkiJumps::from_str($input).expect("Could not parse the game");
             let cf = pos.canonical_form(&tt);
             assert_eq!(cf.to_string(), $output)
         }};

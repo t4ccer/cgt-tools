@@ -28,6 +28,9 @@ pub trait FiniteGrid: Grid + Sized {
     /// Create new gird filled with the same tile
     fn filled(width: u8, height: u8, value: Self::Item) -> Option<Self>;
 
+    /// Create new zero-sized grid
+    fn zero_size() -> Self;
+
     /// Default, one-line display function for grids using `|` as row separator
     fn display(&self, w: &mut impl Write, sep: char) -> std::fmt::Result
     where

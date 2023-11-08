@@ -8,7 +8,7 @@ use crate::{
     short::partizan::partizan_game::PartizanGame,
 };
 use alloc::collections::vec_deque::VecDeque;
-use core::fmt;
+use core::{fmt, hash::Hash};
 use std::{fmt::Display, str::FromStr};
 
 #[cfg(test)]
@@ -18,23 +18,26 @@ use crate::{
 
 /// A Domineering position on a rectengular grid.
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Domineering {
-    grid: SmallBitGrid,
+pub struct Domineering<G = SmallBitGrid> {
+    grid: G,
 }
 
-impl Domineering {
+impl<G> Domineering<G>
+where
+    G: Grid<Item = bool> + FiniteGrid + Ord + Clone,
+{
     /// Create a domineering position from a grid.
-    pub fn new(grid: SmallBitGrid) -> Self {
+    pub fn new(grid: G) -> Self {
         Self { grid }
     }
 
     /// Get underlying grid
-    pub fn grid(&self) -> &SmallBitGrid {
+    pub fn grid(&self) -> &G {
         &self.grid
     }
 
     /// Get underlying grid mutably
-    pub fn grid_mut(&mut self) -> &mut SmallBitGrid {
+    pub fn grid_mut(&mut self) -> &mut G {
         &mut self.grid
     }
 
@@ -113,7 +116,7 @@ impl Domineering {
         let filled_top_rows = filled_top_rows;
 
         if filled_top_rows == self.grid.height() {
-            return Self::new(SmallBitGrid::zero_size());
+            return Self::new(G::zero_size());
         }
 
         let mut filled_bottom_rows = 0;
@@ -151,7 +154,7 @@ impl Domineering {
         let filled_left_cols = filled_left_cols;
 
         if filled_left_cols == self.grid.width() {
-            return Self::new(SmallBitGrid::zero_size());
+            return Self::new(G::zero_size());
         }
 
         let mut filled_right_cols = 0;
@@ -174,7 +177,7 @@ impl Domineering {
         let minimized_width = self.grid.width() - filled_left_cols - filled_right_cols;
         let minimized_height = self.grid.height() - filled_top_rows - filled_bottom_rows;
 
-        let mut grid = SmallBitGrid::empty(minimized_width, minimized_height).unwrap();
+        let mut grid = G::filled(minimized_width, minimized_height, false).unwrap();
         for y in filled_top_rows..(self.grid.height() - filled_bottom_rows) {
             for x in filled_left_cols..(self.grid.width() - filled_right_cols) {
                 grid.set(
@@ -188,8 +191,7 @@ impl Domineering {
     }
 
     fn bfs(&self, visited: &mut SmallBitGrid, x: u8, y: u8) -> Self {
-        let mut grid =
-            Self::new(SmallBitGrid::filled(self.grid.width(), self.grid.height(), true).unwrap());
+        let mut grid = Self::new(G::filled(self.grid.width(), self.grid.height(), true).unwrap());
 
         let mut q: VecDeque<(u8, u8)> =
             VecDeque::with_capacity(self.grid.width() as usize * self.grid.height() as usize);
@@ -241,7 +243,7 @@ impl Domineering {
                 let next_x = x + DIR_X;
                 let next_y = y + DIR_Y;
                 if !self.grid.get(x, y) && !self.grid.get(next_x, next_y) {
-                    let mut new_grid = *self;
+                    let mut new_grid: Self = self.clone();
                     new_grid.grid.set(x, y, true);
                     new_grid.grid.set(next_x, next_y, true);
                     moves.push(new_grid.move_top_left());
@@ -295,11 +297,14 @@ impl Svg for Domineering {
     }
 }
 
-impl FromStr for Domineering {
+impl<G> FromStr for Domineering<G>
+where
+    G: Grid<Item = bool> + FiniteGrid + Ord + Clone,
+{
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self::new(SmallBitGrid::parse(s).ok_or(())?))
+        Ok(Self::new(G::parse(s).ok_or(())?))
     }
 }
 
@@ -309,7 +314,10 @@ fn grid_max_size_is_respected() {
     Domineering::new(SmallBitGrid::empty(10, 10).unwrap());
 }
 
-impl PartizanGame for Domineering {
+impl<G> PartizanGame for Domineering<G>
+where
+    G: Grid<Item = bool> + FiniteGrid + Clone + Hash + Send + Sync + Ord,
+{
     /// Get moves for the Left player as positions she can move to.
     ///
     /// # Examples
@@ -394,7 +402,10 @@ impl PartizanGame for Domineering {
     }
 }
 
-impl Display for Domineering {
+impl<G> Display for Domineering<G>
+where
+    G: Grid<Item = bool> + FiniteGrid,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.grid.display(f, '|')
     }
@@ -403,7 +414,8 @@ impl Display for Domineering {
 #[test]
 fn parse_display_roundtrip() {
     let inp = "...|#.#|##.|###";
-    assert_eq!(&format!("{}", Domineering::from_str(inp).unwrap()), inp,);
+    let pos: Domineering = Domineering::from_str(inp).unwrap();
+    assert_eq!(&format!("{}", pos), inp,);
 }
 
 // Values confirmed with gcsuite
@@ -471,7 +483,7 @@ fn finds_temperature_of_four_by_four_grid() {
     use crate::numeric::rational::Rational;
 
     let transposition_table = TranspositionTable::new();
-    let grid = Domineering::from_str("#...|....|....|....").unwrap();
+    let grid: Domineering = Domineering::from_str("#...|....|....|....").unwrap();
     let game_id = grid.canonical_form(&transposition_table);
     let temp = game_id.temperature();
     dbg!(transposition_table.len());
@@ -481,7 +493,7 @@ fn finds_temperature_of_four_by_four_grid() {
 
 #[test]
 fn latex_works() {
-    let position = Domineering::from_str("##..|....|#...|..##").unwrap();
+    let position: Domineering = Domineering::from_str("##..|....|#...|..##").unwrap();
     let latex = position.to_latex();
     assert_eq!(
         &latex,
@@ -494,7 +506,7 @@ fn latex_works() {
 #[cfg(test)]
 macro_rules! assert_temperature {
     ($grid:expr, $temp:expr) => {
-        let grid = $grid.unwrap();
+        let grid: Domineering = $grid.unwrap();
         let thermograph = grid.thermograph_direct();
         let expected_temperature = Rational::from($temp);
         assert_eq!(thermograph.get_temperature(), expected_temperature);

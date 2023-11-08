@@ -44,12 +44,9 @@ where
             grid: vec![value; width as usize * height as usize],
         })
     }
-}
 
-impl<T> VecGrid<T> {
-    /// Creates empty grid of zero size
     #[must_use]
-    pub const fn zero_size() -> Self {
+    fn zero_size() -> Self {
         Self {
             width: 0,
             height: 0,

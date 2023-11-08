@@ -47,6 +47,15 @@ impl FiniteGrid for SmallBitGrid {
             grid: if value { GridBits::MAX } else { 0 },
         })
     }
+
+    #[must_use]
+    fn zero_size() -> Self {
+        Self {
+            width: 0,
+            height: 0,
+            grid: 0,
+        }
+    }
 }
 
 impl Display for SmallBitGrid {
@@ -84,16 +93,6 @@ impl SmallBitGrid {
             height,
             grid: 0,
         })
-    }
-
-    /// Creates empty grid of zero size
-    #[must_use]
-    pub const fn zero_size() -> Self {
-        Self {
-            width: 0,
-            height: 0,
-            grid: 0,
-        }
     }
 
     /// Create a grid that correspondes to given size and "internal id".
