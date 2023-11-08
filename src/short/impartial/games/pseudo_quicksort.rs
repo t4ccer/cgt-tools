@@ -7,7 +7,7 @@
 //!
 //! This game has been proposed in [Andreas Chen's "The Quicksort Game"](https://www.diva-portal.org/smash/get/diva2:935354/FULLTEXT01.pdf>).
 
-use crate::numeric::nimber::Nimber;
+use crate::{display, short::impartial::impartial_game::ImpartialGame};
 use std::fmt::Display;
 
 /// See [`pseudo_quickcheck`](self) header
@@ -18,10 +18,8 @@ pub struct PseudoQuicksort {
 
 impl Display for PseudoQuicksort {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for elem in self.sequence() {
-            write!(f, "{}", elem)?;
-        }
-        Ok(())
+        write!(f, "PseudoQuicksort")?;
+        display::brackets(f, |f| display::commas(f, self.sequence()))
     }
 }
 
@@ -54,9 +52,10 @@ impl PseudoQuicksort {
         }
         res
     }
+}
 
-    /// Get a unique list of moves from the position
-    pub fn moves(&self) -> Vec<Self> {
+impl ImpartialGame for PseudoQuicksort {
+    fn moves(&self) -> Vec<Self> {
         let mut res = vec![];
         for pivot in self.sequence() {
             let new = self.pivot_on(*pivot);
@@ -66,14 +65,28 @@ impl PseudoQuicksort {
         }
         res
     }
+}
 
-    /// Calculate the Nim value of the position
-    pub fn nim_value(&self) -> Nimber {
-        let moves = self.moves();
-        let mut game_moves = Vec::with_capacity(moves.len());
-        for m in moves {
-            game_moves.push(m.nim_value());
-        }
-        Nimber::mex(game_moves)
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::numeric::nimber::Nimber;
+
+    #[test]
+    fn correct_nim_value() {
+        assert_eq!(
+            PseudoQuicksort::new(vec![1, 2, 3, 6, 5, 4]).nim_value(),
+            Nimber::new(0)
+        );
+
+        assert_eq!(
+            PseudoQuicksort::new(vec![4, 1, 6, 5, 7, 3, 8, 2]).nim_value(),
+            Nimber::new(5)
+        );
+
+        assert_eq!(
+            PseudoQuicksort::new(vec![4, 1, 6, 5, 7, 8, 2, 3]).nim_value(),
+            Nimber::new(3)
+        );
     }
 }

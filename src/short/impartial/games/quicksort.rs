@@ -8,7 +8,7 @@
 
 use std::fmt::Display;
 
-use crate::numeric::nimber::Nimber;
+use crate::{display, short::impartial::impartial_game::ImpartialGame};
 
 /// See [quickcheck](self) header
 #[derive(Debug, PartialEq, Eq)]
@@ -18,10 +18,8 @@ pub struct Quicksort {
 
 impl Display for Quicksort {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for elem in self.sequence() {
-            write!(f, "{}", elem)?;
-        }
-        Ok(())
+        write!(f, "Quicksort")?;
+        display::brackets(f, |f| display::commas(f, self.sequence()))
     }
 }
 
@@ -59,27 +57,52 @@ impl Quicksort {
         }
         res
     }
+}
 
-    /// Get a unique list of moves from the position
-    pub fn moves(&self) -> Vec<Self> {
-        let mut res = vec![];
+impl ImpartialGame for Quicksort {
+    fn moves(&self) -> Vec<Self> {
+        let mut moves = Vec::with_capacity(self.sequence().len());
         for pivot in self.sequence() {
             let new = self.pivot_on(*pivot);
-            if !res.contains(&new) && &new != self {
-                res.push(new);
+            if &new != self {
+                moves.push(new);
             }
         }
-        res
+        moves
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::numeric::nimber::Nimber;
+
+    #[test]
+    fn correct_nim_value() {
+        assert_eq!(
+            Quicksort::new(vec![1, 2, 3, 6, 5, 4]).nim_value(),
+            Nimber::new(2)
+        );
+
+        assert_eq!(
+            Quicksort::new(vec![4, 1, 6, 5, 7, 3, 8, 2]).nim_value(),
+            Nimber::new(5)
+        );
+
+        assert_eq!(
+            Quicksort::new(vec![4, 1, 6, 5, 7, 8, 2, 3]).nim_value(),
+            Nimber::new(0)
+        );
     }
 
-    /// Calculate the Nim value of the position
-    pub fn nim_value(&self) -> Nimber {
-        let moves = self.moves();
-        let mut game_moves = Vec::with_capacity(moves.len());
-        for m in moves {
-            game_moves.push(m.nim_value());
+    /// Sequence in form of 2,3,4,...,n,1 has nim-value of *(n-1)
+    #[test]
+    fn one_end_hypothesis() {
+        for end in 2..16 {
+            let mut sequence = (2..=end).collect::<Vec<u32>>();
+            sequence.push(1);
+            let quicksort = Quicksort::new(sequence);
+            assert_eq!(quicksort.nim_value(), Nimber::new(end - 1));
         }
-
-        Nimber::mex(game_moves)
     }
 }
