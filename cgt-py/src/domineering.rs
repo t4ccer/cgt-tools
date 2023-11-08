@@ -1,5 +1,6 @@
 use crate::canonical_form::PyCanonicalForm;
 use cgt::{
+    drawing::svg::Svg,
     grid::small_bit_grid::SmallBitGrid,
     short::partizan::{
         games::domineering::Domineering, partizan_game::PartizanGame,
@@ -32,7 +33,11 @@ impl PyDomineering {
     }
 
     fn to_svg(&self) -> String {
-        self.inner.to_svg()
+        let mut buf = String::new();
+        self.inner
+            .to_svg(&mut buf)
+            .expect("Write to String should not fail");
+        buf
     }
 
     fn decompositions(&self) -> Vec<Self> {

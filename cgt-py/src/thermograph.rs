@@ -1,4 +1,4 @@
-use cgt::short::partizan::thermograph::Thermograph;
+use cgt::{drawing::svg::Svg, short::partizan::thermograph::Thermograph};
 use pyo3::prelude::*;
 
 crate::wrap_struct!(Thermograph, PyThermograph, "Thermograph", Clone);
@@ -10,6 +10,10 @@ impl PyThermograph {
     }
 
     fn to_svg(&self) -> String {
-        self.inner.to_svg()
+        let mut buf = String::new();
+        self.inner
+            .to_svg(&mut buf)
+            .expect("Write to String should not fail");
+        buf
     }
 }

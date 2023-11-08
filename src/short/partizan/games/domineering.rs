@@ -3,11 +3,12 @@
 
 extern crate alloc;
 use crate::{
-    drawing::svg::{self, Svg},
+    drawing::svg::{self, ImmSvg, Svg},
     grid::{small_bit_grid::SmallBitGrid, FiniteGrid, Grid},
     short::partizan::partizan_game::PartizanGame,
 };
 use alloc::collections::vec_deque::VecDeque;
+use core::fmt;
 use std::{fmt::Display, str::FromStr};
 
 #[cfg(test)]
@@ -77,47 +78,6 @@ impl Domineering {
             self.grid.height()
         )
         .unwrap();
-        buf
-    }
-
-    /// Output SVG string with domineering grid
-    pub fn to_svg(&self) -> String {
-        // Chosen arbitrarily
-        let tile_size = 48;
-        let grid_width = 4;
-
-        let offset = grid_width / 2;
-        let svg_width = self.grid.width() as u32 * tile_size + grid_width;
-        let svg_height = self.grid.height() as u32 * tile_size + grid_width;
-
-        let mut buf = String::new();
-        Svg::new(&mut buf, svg_width, svg_width, |buf| {
-            for y in 0..self.grid.height() {
-                for x in 0..self.grid.width() {
-                    let fill = if self.grid.get(x, y) { "gray" } else { "white" };
-                    Svg::rect(
-                        buf,
-                        (x as u32 * tile_size + offset) as i32,
-                        (y as u32 * tile_size + offset) as i32,
-                        tile_size,
-                        tile_size,
-                        fill,
-                    )?;
-                }
-            }
-
-            let grid = svg::Grid {
-                x1: 0,
-                y1: 0,
-                x2: svg_width as i32,
-                y2: svg_height as i32,
-                grid_width,
-                tile_size,
-            };
-            Svg::grid(buf, &grid)
-        })
-        .unwrap();
-
         buf
     }
 
@@ -291,6 +251,47 @@ impl Domineering {
         moves.sort_unstable();
         moves.dedup();
         moves
+    }
+}
+
+impl Svg for Domineering {
+    fn to_svg<W>(&self, buf: &mut W) -> fmt::Result
+    where
+        W: fmt::Write,
+    {
+        // Chosen arbitrarily
+        let tile_size = 48;
+        let grid_width = 4;
+
+        let offset = grid_width / 2;
+        let svg_width = self.grid.width() as u32 * tile_size + grid_width;
+        let svg_height = self.grid.height() as u32 * tile_size + grid_width;
+
+        ImmSvg::new(buf, svg_width, svg_width, |buf| {
+            for y in 0..self.grid.height() {
+                for x in 0..self.grid.width() {
+                    let fill = if self.grid.get(x, y) { "gray" } else { "white" };
+                    ImmSvg::rect(
+                        buf,
+                        (x as u32 * tile_size + offset) as i32,
+                        (y as u32 * tile_size + offset) as i32,
+                        tile_size,
+                        tile_size,
+                        fill,
+                    )?;
+                }
+            }
+
+            let grid = svg::Grid {
+                x1: 0,
+                y1: 0,
+                x2: svg_width as i32,
+                y2: svg_height as i32,
+                grid_width,
+                tile_size,
+            };
+            ImmSvg::grid(buf, &grid)
+        })
     }
 }
 

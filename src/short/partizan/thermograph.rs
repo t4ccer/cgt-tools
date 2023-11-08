@@ -2,7 +2,7 @@
 
 use crate::{
     display,
-    drawing::svg::{self, Svg},
+    drawing::svg::{self, ImmSvg, Svg},
     numeric::rational::Rational,
     short::partizan::trajectory::Trajectory,
 };
@@ -461,9 +461,13 @@ impl Thermograph {
             right_wall,
         }
     }
+}
 
-    /// Render thermograph as SVG image
-    pub fn to_svg(&self) -> String {
+impl Svg for Thermograph {
+    fn to_svg<W>(&self, buf: &mut W) -> fmt::Result
+    where
+        W: fmt::Write,
+    {
         fn rescale(x: i64, in_min: i64, in_max: i64, out_min: i64, out_max: i64) -> i64 {
             (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
         }
@@ -520,60 +524,57 @@ impl Thermograph {
             )
         };
 
-        let draw_scaffold = |w: &mut String,
-                             seen: &mut HashSet<(i64, i64)>,
-                             trajectory: &Trajectory|
-         -> fmt::Result {
-            let mut previous = None;
+        let draw_scaffold =
+            |w: &mut W, seen: &mut HashSet<(i64, i64)>, trajectory: &Trajectory| -> fmt::Result {
+                let mut previous = None;
 
-            let y_points = once(trajectory.mast_x_intercept() + mast_arrow_len).chain(
-                trajectory
-                    .critical_points
-                    .iter()
-                    .copied()
-                    .chain(once(Rational::from(-1))),
-            );
+                let y_points = once(trajectory.mast_x_intercept() + mast_arrow_len).chain(
+                    trajectory
+                        .critical_points
+                        .iter()
+                        .copied()
+                        .chain(once(Rational::from(-1))),
+                );
 
-            for point_y in y_points {
-                let point_x = trajectory.value_at(point_y);
+                for point_y in y_points {
+                    let point_x = trajectory.value_at(point_y);
 
-                let image_x = from_thermograph_horizontal(point_x.try_round().unwrap());
-                let image_y = from_thermograph_vertical(point_y.try_round().unwrap());
+                    let image_x = from_thermograph_horizontal(point_x.try_round().unwrap());
+                    let image_y = from_thermograph_vertical(point_y.try_round().unwrap());
 
-                if !seen.contains(&(image_x, image_y)) {
-                    // TODO: Make it less ugly, maybe move values to axis rather than having them on
-                    // critical points
-                    let text = svg::Text {
-                        x: image_x as i32,
-                        y: image_y as i32,
-                        text: format!("({}, {})", point_x, point_y),
-                        text_anchor: svg::TextAnchor::Middle,
-                        ..svg::Text::default()
-                    };
-                    Svg::text(w, &text)?;
-                    seen.insert((image_x, image_y));
+                    if !seen.contains(&(image_x, image_y)) {
+                        // TODO: Make it less ugly, maybe move values to axis rather than having them on
+                        // critical points
+                        let text = svg::Text {
+                            x: image_x as i32,
+                            y: image_y as i32,
+                            text: format!("({}, {})", point_x, point_y),
+                            text_anchor: svg::TextAnchor::Middle,
+                            ..svg::Text::default()
+                        };
+                        ImmSvg::text(w, &text)?;
+                        seen.insert((image_x, image_y));
+                    }
+
+                    if let Some((previous_x, previous_y)) = previous {
+                        ImmSvg::line(
+                            w,
+                            previous_x as i32,
+                            previous_y as i32,
+                            image_x as i32,
+                            image_y as i32,
+                            thermograph_line_weight,
+                        )?;
+                    }
+
+                    previous = Some((image_x, image_y));
                 }
+                Ok(())
+            };
 
-                if let Some((previous_x, previous_y)) = previous {
-                    Svg::line(
-                        w,
-                        previous_x as i32,
-                        previous_y as i32,
-                        image_x as i32,
-                        image_y as i32,
-                        thermograph_line_weight,
-                    )?;
-                }
-
-                previous = Some((image_x, image_y));
-            }
-            Ok(())
-        };
-
-        let mut buf = String::new();
-        Svg::new(&mut buf, svg_width, svg_height, |buf| {
-            Svg::g(buf, "black", |buf| {
-                Svg::line(
+        ImmSvg::new(buf, svg_width, svg_height, |buf| {
+            ImmSvg::g(buf, "black", |buf| {
+                ImmSvg::line(
                     buf,
                     0,
                     x_axis_location,
@@ -581,7 +582,7 @@ impl Thermograph {
                     x_axis_location,
                     axis_weight,
                 )?;
-                Svg::line(
+                ImmSvg::line(
                     buf,
                     y_axis_location,
                     0,
@@ -595,14 +596,12 @@ impl Thermograph {
                 draw_scaffold(buf, &mut seen, &self.right_wall)
             })
         })
-        .unwrap();
-        buf
     }
 }
 
 impl Display for Thermograph {
     /// Follows cgsuite format
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Thermograph")?;
         display::parens(f, |f| write!(f, "{}, {}", self.left_wall, self.right_wall))
     }

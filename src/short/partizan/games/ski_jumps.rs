@@ -1,10 +1,11 @@
 //! Ski Jumps game
 
 use crate::{
-    drawing::svg::{self, Svg},
+    drawing::svg::{self, ImmSvg, Svg},
     grid::{vec_grid::VecGrid, CharTile, FiniteGrid, Grid},
     short::partizan::{canonical_form::CanonicalForm, partizan_game::PartizanGame},
 };
+use core::fmt;
 use std::{fmt::Display, str::FromStr};
 
 /// Skier type
@@ -110,9 +111,13 @@ impl SkiJumps {
 
         false
     }
+}
 
-    /// Draw position as SVG image
-    pub fn to_svg(&self) -> String {
+impl Svg for SkiJumps {
+    fn to_svg<W>(&self, buf: &mut W) -> fmt::Result
+    where
+        W: fmt::Write,
+    {
         // Chosen arbitrarily
         let tile_size = 48;
         let grid_width = 4;
@@ -121,8 +126,7 @@ impl SkiJumps {
         let svg_width = self.grid.width() as u32 * tile_size + grid_width;
         let svg_height = self.grid.height() as u32 * tile_size + grid_width;
 
-        let mut buf = String::new();
-        Svg::new(&mut buf, svg_width, svg_width, |buf| {
+        ImmSvg::new(buf, svg_width, svg_width, |buf| {
             for y in 0..self.grid.height() {
                 for x in 0..self.grid.width() {
                     match self.grid.get(x, y) {
@@ -136,7 +140,7 @@ impl SkiJumps {
                                 text_anchor: svg::TextAnchor::Middle,
                                 ..svg::Text::default()
                             };
-                            Svg::text(buf, &text)?;
+                            ImmSvg::text(buf, &text)?;
                         }
                     }
                 }
@@ -150,11 +154,8 @@ impl SkiJumps {
                 grid_width,
                 tile_size,
             };
-            Svg::grid(buf, &grid)
+            ImmSvg::grid(buf, &grid)
         })
-        .unwrap();
-
-        buf
     }
 }
 

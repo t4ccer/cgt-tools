@@ -1,7 +1,10 @@
 use crate::canonical_form::PyCanonicalForm;
-use cgt::short::partizan::{
-    games::ski_jumps::SkiJumps, partizan_game::PartizanGame,
-    transposition_table::TranspositionTable,
+use cgt::{
+    drawing::svg::Svg,
+    short::partizan::{
+        games::ski_jumps::SkiJumps, partizan_game::PartizanGame,
+        transposition_table::TranspositionTable,
+    },
 };
 use pyo3::prelude::*;
 use std::str::FromStr;
@@ -29,7 +32,11 @@ impl PySkiJumps {
     }
 
     fn to_svg(&self) -> String {
-        self.inner.to_svg()
+        let mut buf = String::new();
+        self.inner
+            .to_svg(&mut buf)
+            .expect("Write to String should not fail");
+        buf
     }
 
     #[staticmethod]

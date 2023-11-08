@@ -2,10 +2,16 @@
 
 use std::fmt::{self, Write};
 
-// TODO: trait SVG
-// TODO: ImmSvg
+/// Object that can be rendered as SVG
+pub trait Svg {
+    /// Render object as SVG
+    fn to_svg<W>(&self, w: &mut W) -> fmt::Result
+    where
+        W: Write;
+}
+
 /// SVG renderer
-pub struct Svg;
+pub struct ImmSvg;
 
 /// SVG text element anchor
 pub enum TextAnchor {
@@ -76,7 +82,7 @@ pub struct Grid {
     pub tile_size: u32,
 }
 
-impl Svg {
+impl ImmSvg {
     /// Create new SVG
     pub fn new<W>(
         w: &mut W,
@@ -147,9 +153,9 @@ impl Svg {
         W: Write,
     {
         let offset = grid.grid_width / 2;
-        Svg::g(w, "black", |w| {
+        ImmSvg::g(w, "black", |w| {
             for y in 0..(((grid.y2 - grid.y1) as u32 / grid.tile_size) + 1) {
-                Svg::line(
+                ImmSvg::line(
                     w,
                     grid.x1,
                     (y as u32 * grid.tile_size + offset) as i32,
@@ -160,7 +166,7 @@ impl Svg {
             }
 
             for x in 0..(((grid.x2 - grid.x1) as u32 / grid.tile_size) + 1) {
-                Svg::line(
+                ImmSvg::line(
                     w,
                     (x as u32 * grid.tile_size + offset) as i32,
                     grid.y1,
