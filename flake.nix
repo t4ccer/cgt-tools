@@ -43,27 +43,11 @@
         };
 
         pythonToolchain = "python311";
-
-        # See https://github.com/flamegraph-rs/flamegraph/pull/278
-        cargoFlamegraphWithTargetOverlay = final: prev: {
-          cargo-flamegraph = prev.cargo-flamegraph.overrideAttrs (oldAttrs: {
-            patches =
-              (oldAttrs.patches or [])
-              ++ [
-                (prev.fetchpatch {
-                  name = "add-target-option";
-                  url = "https://github.com/t4ccer/flamegraph/commit/9f5e52d7534954ebe4e6c35ac8411a3192c45bd6.patch";
-                  hash = "sha256-57j0TH4fNeIfgG3gSrymfgLbl57q0Qn0g8+2NgPO6xI=";
-                })
-              ];
-          });
-        };
       in {
         _module.args.pkgs = import self.inputs.nixpkgs {
           inherit system;
           overlays = [
             inputs.rust-overlay.overlays.rust-overlay
-            cargoFlamegraphWithTargetOverlay
           ];
         };
 
@@ -99,6 +83,7 @@
             pkgs.cargo-udeps
             pkgs.cargo-expand
             pkgs.cargo-nextest
+            pkgs.cargo-semver-checks
             pkgs.fd
             pkgs.linuxKernel.packages.linux_5_15.perf
             pkgs.graphviz

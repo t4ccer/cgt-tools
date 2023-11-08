@@ -1,7 +1,6 @@
 //! Combinatorial Game Theory framework.
 
 #![warn(missing_docs)]
-#![cfg_attr(feature = "pedantic", deny(warnings))]
 #![cfg_attr(
     feature = "cargo-clippy",
     warn(
