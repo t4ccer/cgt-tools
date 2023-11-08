@@ -547,6 +547,7 @@ impl Thermograph {
                         x: image_x as i32,
                         y: image_y as i32,
                         text: format!("({}, {})", point_x, point_y),
+                        text_anchor: svg::TextAnchor::Middle,
                         ..svg::Text::default()
                     };
                     Svg::text(w, &text)?;
