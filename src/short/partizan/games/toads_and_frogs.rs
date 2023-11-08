@@ -59,6 +59,13 @@ pub struct ToadsAndFrogs {
     tiles: Vec<Tile>,
 }
 
+impl ToadsAndFrogs {
+    /// Creates a new Toads and Frogs game from a row of tiles
+    pub fn new(tiles: Vec<Tile>) -> Self {
+        Self { tiles }
+    }
+}
+
 impl FromStr for ToadsAndFrogs {
     type Err = ();
 
@@ -67,7 +74,7 @@ impl FromStr for ToadsAndFrogs {
         for c in s.chars() {
             tiles.push(Tile::char_to_tile(c).ok_or(())?);
         }
-        Ok(Self { tiles })
+        Ok(Self::new(tiles))
     }
 }
 
@@ -148,7 +155,7 @@ impl PartizanGame for ToadsAndFrogs {
                     let mut new_tiles = self.tiles.clone();
                     new_tiles[idx] = Tile::Empty;
                     new_tiles[idx + 1] = own;
-                    moves.push(Self { tiles: new_tiles });
+                    moves.push(Self::new(new_tiles));
                 } else if idx < self.tiles.len() - 2
                     && self.tiles[idx + 1] == opponent
                     && self.tiles[idx + 2] == Tile::Empty
@@ -156,7 +163,7 @@ impl PartizanGame for ToadsAndFrogs {
                     let mut new_tiles = self.tiles.clone();
                     new_tiles[idx] = Tile::Empty;
                     new_tiles[idx + 2] = own;
-                    moves.push(Self { tiles: new_tiles });
+                    moves.push(Self::new(new_tiles));
                 }
             }
         }
@@ -176,7 +183,7 @@ impl PartizanGame for ToadsAndFrogs {
                     let mut new_tiles = self.tiles.clone();
                     new_tiles[idx] = Tile::Empty;
                     new_tiles[idx - 1] = own;
-                    moves.push(Self { tiles: new_tiles });
+                    moves.push(Self::new(new_tiles));
                 } else if idx > 1
                     && self.tiles[idx - 1] == opponent
                     && self.tiles[idx - 2] == Tile::Empty
@@ -184,7 +191,7 @@ impl PartizanGame for ToadsAndFrogs {
                     let mut new_tiles = self.tiles.clone();
                     new_tiles[idx] = Tile::Empty;
                     new_tiles[idx - 2] = own;
-                    moves.push(Self { tiles: new_tiles });
+                    moves.push(Self::new(new_tiles));
                 }
             }
         }
