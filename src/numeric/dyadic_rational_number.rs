@@ -49,10 +49,13 @@ impl DyadicRationalNumber {
             denominator_exponent += 1;
         }
 
-        (denominator == 1).then_some(Self {
-            numerator,
-            denominator_exponent,
-        })
+        (denominator == 1).then_some(
+            Self {
+                numerator,
+                denominator_exponent,
+            }
+            .normalized(),
+        )
     }
 
     /// Get the numerator (`n` from `n/2^m`)

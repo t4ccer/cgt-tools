@@ -1416,6 +1416,9 @@ fn parse_games() {
     test_game_parse!("{42|*}", "{42|*}");
     test_game_parse!("123", "123");
     test_game_parse!("{1/2|2}", "1");
+    test_game_parse!("{3/4|7/8}", "13/16");
+    test_game_parse!("{6/8|7/8}", "13/16");
+    test_game_parse!("{12/16|14/16}", "13/16");
 }
 
 #[test]
