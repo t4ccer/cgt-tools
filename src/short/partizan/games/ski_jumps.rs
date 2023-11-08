@@ -1,4 +1,13 @@
-//! Ski Jumps game
+//! The game is played on a rectangular grid of squares. Each square is either empty or contains a
+//! skier of Left or Right player that can be either a jumper or a slipper.
+//!
+//! Left may move any of their skiers one or more tiles to the right, but only if the destination
+//! is empty and there is no skier in the way. Skiers are allowed to move off the board. Right moves
+//! their skiers to the left in the same way
+//!
+//! A jumper skier may also jump down over a skier of the opposite color, when a skier of the
+//! opposite color is below and the destination is empty. The skier that was jumped over turns into
+//! a slipper that cannot jump anymore.
 
 use crate::{
     drawing::svg::{self, ImmSvg, Svg},

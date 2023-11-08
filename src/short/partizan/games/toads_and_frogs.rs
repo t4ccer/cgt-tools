@@ -1,12 +1,19 @@
-//! Toads and Frogs game
+//! Game of Toads and Frogs is played on a rectangular grid of squares, altough for simplification
+//! we will consider only a single row of squares, rectangular grids can be modeled as sums of row.
+//!
+//! Left player has trained Toads that can move one square to the right if it is empty, or jump over
+//! a Frog to the empty square behind it. Right player moves Frogs and jumps over Toads to the left
+//! in the same way.
 
 use crate::{
     drawing::svg::{self, ImmSvg, Svg},
     grid::CharTile,
     short::partizan::partizan_game::PartizanGame,
 };
-use core::fmt;
-use std::str::FromStr;
+use std::{
+    fmt::{self, Display},
+    str::FromStr,
+};
 
 /// Tile on the Toads and Frogs board
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -61,6 +68,16 @@ impl FromStr for ToadsAndFrogs {
             tiles.push(Tile::char_to_tile(c).ok_or(())?);
         }
         Ok(Self { tiles })
+    }
+}
+
+impl Display for ToadsAndFrogs {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for tile in self.tiles.iter() {
+            write!(f, "{}", tile.tile_to_char())?;
+        }
+
+        Ok(())
     }
 }
 

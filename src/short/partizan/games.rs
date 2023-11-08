@@ -1,4 +1,4 @@
-//! Partizan games under normal play
+//! Partizan games under normal play i.e. the player that cannot move in their turn loses.
 
 pub mod domineering;
 pub mod ski_jumps;
