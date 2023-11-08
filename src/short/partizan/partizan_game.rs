@@ -107,15 +107,12 @@ pub trait PartizanGame: Sized + Clone + Hash + Send + Sync + Eq {
     fn sensible_left_moves(&self, transposition_table: &TranspositionTable<Self>) -> Vec<Self> {
         let canonical_form = self.canonical_form(transposition_table);
         let moves = canonical_form.to_moves();
-        let left_canonical = moves.left;
 
         self.left_moves()
             .into_iter()
             .filter(|m| {
                 let move_game_form = m.canonical_form(transposition_table);
-                let res = left_canonical
-                    .iter()
-                    .any(|k| CanonicalForm::leq(k, &move_game_form));
+                let res = moves.left.iter().any(|k| k <= &move_game_form);
                 res
             })
             .collect::<Vec<_>>()
@@ -125,15 +122,12 @@ pub trait PartizanGame: Sized + Clone + Hash + Send + Sync + Eq {
     fn sensible_right_moves(&self, transposition_table: &TranspositionTable<Self>) -> Vec<Self> {
         let canonical_form = self.canonical_form(transposition_table);
         let moves = canonical_form.to_moves();
-        let right_canonical = moves.right;
 
         self.right_moves()
             .into_iter()
             .filter(|m| {
                 let move_game_form = m.canonical_form(transposition_table);
-                let res = right_canonical
-                    .iter()
-                    .any(|k| CanonicalForm::leq(&move_game_form, k));
+                let res = moves.right.iter().any(|k| k >= &move_game_form);
                 res
             })
             .collect::<Vec<_>>()
