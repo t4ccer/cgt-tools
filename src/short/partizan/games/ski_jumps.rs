@@ -126,7 +126,7 @@ impl Svg for SkiJumps {
         let svg_width = self.grid.width() as u32 * tile_size + grid_width;
         let svg_height = self.grid.height() as u32 * tile_size + grid_width;
 
-        ImmSvg::new(buf, svg_width, svg_width, |buf| {
+        ImmSvg::new(buf, svg_width, svg_height, |buf| {
             for y in 0..self.grid.height() {
                 for x in 0..self.grid.width() {
                     match self.grid.get(x, y) {
