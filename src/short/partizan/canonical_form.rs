@@ -591,13 +591,13 @@ impl Moves {
                     Some(id) => id.clone(),
                 };
 
-                if (eliminate_smaller_moves && CanonicalForm::leq(&move_i, &move_j))
-                    || (!eliminate_smaller_moves && CanonicalForm::leq(&move_j, &move_i))
+                if (eliminate_smaller_moves && move_i <= move_j)
+                    || (!eliminate_smaller_moves && move_j <= move_i)
                 {
                     moves[i] = None;
                 }
-                if (eliminate_smaller_moves && CanonicalForm::leq(&move_j, &move_i))
-                    || (!eliminate_smaller_moves && CanonicalForm::leq(&move_i, &move_j))
+                if (eliminate_smaller_moves && move_j <= move_i)
+                    || (!eliminate_smaller_moves && move_i <= move_j)
                 {
                     moves[j] = None;
                 }
@@ -615,7 +615,7 @@ impl Moves {
         right_moves: &[Option<CanonicalForm>],
     ) -> bool {
         for r_opt in right_moves.iter().flatten() {
-            if CanonicalForm::leq(r_opt, game) {
+            if r_opt <= game {
                 return false;
             }
         }
@@ -636,7 +636,7 @@ impl Moves {
         right_moves: &[Option<CanonicalForm>],
     ) -> bool {
         for l_opt in left_moves.iter().flatten() {
-            if CanonicalForm::leq(game, l_opt) {
+            if game <= l_opt {
                 return false;
             }
         }
@@ -676,7 +676,7 @@ impl Moves {
                     let mut new_left_moves: Vec<Option<CanonicalForm>> =
                         vec![None; left_moves.len() + g_lr_moves.left.len() - 1];
                     new_left_moves[..(i as usize)].clone_from_slice(&left_moves[..(i as usize)]);
-                    new_left_moves[(i as usize + 1 - 1)..(left_moves.len() - 1)]
+                    new_left_moves[(i as usize)..(left_moves.len() - 1)]
                         .clone_from_slice(&left_moves[(i as usize + 1)..]);
                     for (k, g_lrl) in g_lr_moves.left.iter().enumerate() {
                         if left_moves.contains(&Some(g_lrl.clone())) {
@@ -723,7 +723,7 @@ impl Moves {
                     let mut new_right_moves: Vec<Option<CanonicalForm>> =
                         vec![None; right_moves.len() + g_rl_moves.right.len() - 1];
                     new_right_moves[..(i as usize)].clone_from_slice(&right_moves[..(i as usize)]);
-                    new_right_moves[(i as usize + 1 - 1)..(right_moves.len() - 1)]
+                    new_right_moves[(i as usize)..(right_moves.len() - 1)]
                         .clone_from_slice(&right_moves[(i as usize + 1)..]);
                     for (k, g_rlr) in g_rl_moves.right.iter().enumerate() {
                         if right_moves.contains(&Some(g_rlr.clone())) {
@@ -1194,6 +1194,14 @@ impl PartialOrd for CanonicalForm {
         } else {
             None
         }
+    }
+
+    fn le(&self, other: &Self) -> bool {
+        Self::leq(self, other)
+    }
+
+    fn ge(&self, other: &Self) -> bool {
+        Self::leq(other, self)
     }
 }
 
