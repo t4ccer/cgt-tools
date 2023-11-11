@@ -8,16 +8,21 @@ use crate::{
     short::partizan::partizan_game::PartizanGame,
 };
 use alloc::collections::vec_deque::VecDeque;
+use cgt_derive::Tile;
 use core::{fmt, hash::Hash};
 use std::{fmt::Display, str::FromStr};
 
-#[cfg(test)]
-use crate::{
-    numeric::rational::Rational, short::partizan::transposition_table::TranspositionTable,
-};
+/// Tile on a Domineering grid
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Tile)]
+pub enum Tile {
+    /// Tile where domino can be placed
+    #[tile(char('.'), bool(false), default)]
+    Empty,
 
-// FIXME
-type Tile = bool;
+    /// Tile occupied by domino
+    #[tile(char('#'), bool(true))]
+    Taken,
+}
 
 /// A Domineering position on a rectengular grid.
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
@@ -47,7 +52,7 @@ where
 
 impl<G> Domineering<G>
 where
-    G: Grid<Item = bool> + FiniteGrid,
+    G: Grid<Item = Tile> + FiniteGrid,
 {
     /// Create a domineering position from a grid.
     pub fn new(grid: G) -> Self {
@@ -84,7 +89,7 @@ where
         write!(buf, "\\begin{{tikzpicture}}[scale={}] ", scale).unwrap();
         for y in 0..self.grid.height() {
             for x in 0..self.grid.width() {
-                if self.grid.get(x, y) {
+                if self.grid.get(x, y) == Tile::Taken {
                     write!(
                         buf,
                         "\\fill[fill=gray] ({},{}) rectangle ({},{}); ",
@@ -126,7 +131,7 @@ where
             let mut should_break = false;
             for x in 0..self.grid.width() {
                 // If empty space then break
-                if !self.grid.get(x, y) {
+                if self.grid.get(x, y) == Tile::Empty {
                     should_break = true;
                     break;
                 }
@@ -147,7 +152,7 @@ where
             let mut should_break = false;
             for x in 0..self.grid.width() {
                 // If empty space then break
-                if !self.grid.get(x, self.grid.height() - y - 1) {
+                if self.grid.get(x, self.grid.height() - y - 1) == Tile::Empty {
                     should_break = true;
                     break;
                 }
@@ -164,7 +169,7 @@ where
             let mut should_break = false;
             for y in 0..self.grid.height() {
                 // If empty space then break
-                if !self.grid.get(x, y) {
+                if self.grid.get(x, y) == Tile::Empty {
                     should_break = true;
                     break;
                 }
@@ -185,7 +190,7 @@ where
             let mut should_break = false;
             for y in 0..self.grid.height() {
                 // If empty space then break
-                if !self.grid.get(self.grid.width() - x - 1, y) {
+                if self.grid.get(self.grid.width() - x - 1, y) == Tile::Empty {
                     should_break = true;
                     break;
                 }
@@ -200,7 +205,7 @@ where
         let minimized_width = self.grid.width() - filled_left_cols - filled_right_cols;
         let minimized_height = self.grid.height() - filled_top_rows - filled_bottom_rows;
 
-        let mut grid = G::filled(minimized_width, minimized_height, false).unwrap();
+        let mut grid = G::filled(minimized_width, minimized_height, Tile::Empty).unwrap();
         for y in filled_top_rows..(self.grid.height() - filled_bottom_rows) {
             for x in filled_left_cols..(self.grid.width() - filled_right_cols) {
                 grid.set(
@@ -214,14 +219,15 @@ where
     }
 
     fn bfs(&self, visited: &mut G, x: u8, y: u8) -> Self {
-        let mut grid = Self::new(G::filled(self.grid.width(), self.grid.height(), true).unwrap());
+        let mut grid =
+            Self::new(G::filled(self.grid.width(), self.grid.height(), Tile::Taken).unwrap());
 
         let mut q: VecDeque<(u8, u8)> =
             VecDeque::with_capacity(self.grid.width() as usize * self.grid.height() as usize);
         q.push_back((x, y));
         while let Some((qx, qy)) = q.pop_front() {
-            visited.set(qx, qy, true);
-            grid.grid.set(qx, qy, false);
+            visited.set(qx, qy, Tile::Taken);
+            grid.grid.set(qx, qy, Tile::Empty);
             let directions: [(i64, i64); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
             for (dx, dy) in directions {
                 let lx = (qx as i64) + dx;
@@ -231,8 +237,8 @@ where
                     && lx < (self.grid.width() as i64)
                     && ly >= 0
                     && ly < (self.grid.height() as i64)
-                    && !self.grid.get(lx as u8, ly as u8)
-                    && !visited.get(lx as u8, ly as u8)
+                    && self.grid.get(lx as u8, ly as u8) == Tile::Empty
+                    && visited.get(lx as u8, ly as u8) == Tile::Empty
                 {
                     q.push_back((lx as u8, ly as u8));
                 }
@@ -246,7 +252,7 @@ where
         let mut res = 0;
         for y in 0..self.grid.height() {
             for x in 0..self.grid.width() {
-                if !self.grid.get(x, y) {
+                if self.grid.get(x, y) == Tile::Empty {
                     res += 1;
                 }
             }
@@ -268,10 +274,12 @@ where
             for x in 0..(self.grid.width() - DIR_X) {
                 let next_x = x + DIR_X;
                 let next_y = y + DIR_Y;
-                if !self.grid.get(x, y) && !self.grid.get(next_x, next_y) {
+                if self.grid.get(x, y) == Tile::Empty
+                    && self.grid.get(next_x, next_y) == Tile::Empty
+                {
                     let mut new_grid: Self = self.clone();
-                    new_grid.grid.set(x, y, true);
-                    new_grid.grid.set(next_x, next_y, true);
+                    new_grid.grid.set(x, y, Tile::Taken);
+                    new_grid.grid.set(next_x, next_y, Tile::Taken);
                     moves.push(new_grid.move_top_left());
                 }
             }
@@ -282,7 +290,10 @@ where
     }
 }
 
-impl Svg for Domineering {
+impl<G> Svg for Domineering<G>
+where
+    G: Grid<Item = Tile> + FiniteGrid,
+{
     fn to_svg<W>(&self, buf: &mut W) -> fmt::Result
     where
         W: fmt::Write,
@@ -298,7 +309,10 @@ impl Svg for Domineering {
         ImmSvg::new(buf, svg_width, svg_height, |buf| {
             for y in 0..self.grid.height() {
                 for x in 0..self.grid.width() {
-                    let fill = if self.grid.get(x, y) { "gray" } else { "white" };
+                    let fill = match self.grid.get(x, y) {
+                        Tile::Empty => "white",
+                        Tile::Taken => "gray",
+                    };
                     ImmSvg::rect(
                         buf,
                         (x as u32 * tile_size + offset) as i32,
@@ -323,15 +337,9 @@ impl Svg for Domineering {
     }
 }
 
-#[test]
-#[should_panic]
-fn grid_max_size_is_respected() {
-    Domineering::new(SmallBitGrid::empty(10, 10).unwrap());
-}
-
 impl<G> PartizanGame for Domineering<G>
 where
-    G: Grid<Item = bool> + FiniteGrid + Clone + Hash + Send + Sync + Ord,
+    G: Grid<Item = Tile> + FiniteGrid + Clone + Hash + Send + Sync + Ord,
 {
     /// Get moves for the Left player as positions she can move to.
     ///
@@ -402,12 +410,12 @@ where
     /// );
     /// ```
     fn decompositions(&self) -> Vec<Self> {
-        let mut visited: G = G::filled(self.grid.width(), self.grid.height(), false).unwrap();
+        let mut visited: G = G::filled(self.grid.width(), self.grid.height(), Tile::Empty).unwrap();
         let mut ds = Vec::new();
 
         for y in 0..self.grid.height() {
             for x in 0..self.grid.width() {
-                if !self.grid.get(x, y) && !visited.get(x, y) {
+                if self.grid.get(x, y) == Tile::Empty && visited.get(x, y) == Tile::Empty {
                     ds.push(self.bfs(&mut visited, x, y));
                 }
             }
@@ -420,7 +428,16 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{
+        numeric::rational::Rational, short::partizan::transposition_table::TranspositionTable,
+    };
     use std::str::FromStr;
+
+    #[test]
+    #[should_panic]
+    fn grid_max_size_is_respected() {
+        Domineering::new(SmallBitGrid::empty(10, 10).unwrap());
+    }
 
     #[test]
     fn parse_display_roundtrip() {
@@ -530,6 +547,6 @@ mod tests {
         assert_temperature!(Domineering::from_str(".."), -1);
         assert_temperature!(Domineering::from_str("..|.#"), 0);
         // FIXME: takes too long
-        // assert_temperature!(Domineering::parse("#...|....|....|...."), 1);
+        // assert_temperature!(Domineering::from_str("#...|....|....|...."), 1);
     }
 }
