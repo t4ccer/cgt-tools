@@ -2,7 +2,7 @@
 
 use crate::{
     drawing::svg::{self, ImmSvg, Svg},
-    grid::{small_bit_grid::SmallBitGrid, FiniteGrid, Grid},
+    grid::{vec_grid::VecGrid, FiniteGrid, Grid},
     short::partizan::partizan_game::PartizanGame,
 };
 use cgt_derive::Tile;
@@ -16,17 +16,21 @@ use std::{
 #[derive(Debug, Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Tile)]
 pub enum Tile {
     /// Empty tile without stones
-    #[tile(default, char('.'), bool(false))]
+    #[tile(char('.'), default)]
     Empty,
 
     /// Stone
-    #[tile(char('#'), bool(true))]
+    #[tile(char('x'))]
     Stone,
+
+    /// Tile on which stone cannot be placed
+    #[tile(char('#'))]
+    Blocked,
 }
 
 /// Game of Fission
 #[derive(Debug, Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Fission<G = SmallBitGrid<Tile>> {
+pub struct Fission<G = VecGrid<Tile>> {
     grid: G,
 }
 
@@ -86,8 +90,6 @@ where
                     new_grid.grid.set(x, y, Tile::Empty);
                     new_grid.grid.set(prev_x, prev_y, Tile::Stone);
                     new_grid.grid.set(next_x, next_y, Tile::Stone);
-                    dbg!(format!("{}", &self));
-                    dbg!(format!("{}", &new_grid));
                     moves.push(new_grid);
                 }
             }
@@ -138,6 +140,16 @@ where
                                 tile_size,
                                 tile_size,
                                 "white",
+                            )?;
+                        }
+                        Tile::Blocked => {
+                            ImmSvg::rect(
+                                buf,
+                                (x as u32 * tile_size + offset) as i32,
+                                (y as u32 * tile_size + offset) as i32,
+                                tile_size,
+                                tile_size,
+                                "gray",
                             )?;
                         }
                         Tile::Stone => {
@@ -191,7 +203,10 @@ mod tests {
 
     #[test]
     fn canonical_form() {
-        test_canonical_form!("....|..#.|....|....", "0");
-        test_canonical_form!(".#.#|....|..#.|....", "-1");
+        test_canonical_form!("....|..x.|....|....", "0");
+        test_canonical_form!("..x.|....|..x.|....", "-2");
+        test_canonical_form!(".x.x|....|..x.|....", "-1");
+        test_canonical_form!(".x.x|..x.|....|..x.", "{-1|-4}");
+        test_canonical_form!("....|..x.|....|#..#", "0");
     }
 }
