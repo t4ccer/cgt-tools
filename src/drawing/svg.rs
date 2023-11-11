@@ -1,4 +1,5 @@
 //! Simple SVG immediate drawing utilities
+#![allow(missing_docs)]
 
 use std::fmt::{self, Write};
 
@@ -59,6 +60,16 @@ impl Default for Text {
             text_anchor: TextAnchor::Start,
         }
     }
+}
+
+/// SVG circle element
+pub struct Circle {
+    pub cx: i32,
+    pub cy: i32,
+    pub r: u32,
+    pub stroke: String,
+    pub stroke_width: u32,
+    pub fill: String,
 }
 
 /// Custom grid element
@@ -144,6 +155,17 @@ impl ImmSvg {
             text.x,
             text.y,
             text.text,
+        )
+    }
+
+    pub fn circle<W>(w: &mut W, circle: &Circle) -> fmt::Result
+    where
+        W: Write,
+    {
+        write!(
+            w,
+            "<circle cx=\"{}\" cy=\"{}\" r=\"{}\" stroke=\"{}\" stroke-width=\"{}\" fill=\"{}\" />",
+            circle.cx, circle.cy, circle.r, circle.stroke, circle.stroke_width, circle.fill,
         )
     }
 

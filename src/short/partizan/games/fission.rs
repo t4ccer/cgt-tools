@@ -1,11 +1,16 @@
 //! Fission game
 
 use crate::{
+    drawing::svg::{self, ImmSvg, Svg},
     grid::{small_bit_grid::SmallBitGrid, FiniteGrid, Grid},
     short::partizan::partizan_game::PartizanGame,
 };
 use cgt_derive::Tile;
-use std::{fmt::Display, hash::Hash, str::FromStr};
+use std::{
+    fmt::{self, Display},
+    hash::Hash,
+    str::FromStr,
+};
 
 /// Tile in the game of Fission
 #[derive(Debug, Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Tile)]
@@ -102,6 +107,64 @@ where
 
     fn right_moves(&self) -> Vec<Self> {
         self.moves_for::<1, 0>()
+    }
+}
+
+impl<G> Svg for Fission<G>
+where
+    G: Grid<Item = Tile> + FiniteGrid,
+{
+    fn to_svg<W>(&self, buf: &mut W) -> fmt::Result
+    where
+        W: fmt::Write,
+    {
+        // Chosen arbitrarily
+        let tile_size = 48;
+        let grid_width = 4;
+
+        let offset = grid_width / 2;
+        let svg_width = self.grid.width() as u32 * tile_size + grid_width;
+        let svg_height = self.grid.height() as u32 * tile_size + grid_width;
+
+        ImmSvg::new(buf, svg_width, svg_height, |buf| {
+            for y in 0..self.grid.height() {
+                for x in 0..self.grid.width() {
+                    match self.grid.get(x, y) {
+                        Tile::Empty => {
+                            ImmSvg::rect(
+                                buf,
+                                (x as u32 * tile_size + offset) as i32,
+                                (y as u32 * tile_size + offset) as i32,
+                                tile_size,
+                                tile_size,
+                                "white",
+                            )?;
+                        }
+                        Tile::Stone => {
+                            let circle = svg::Circle {
+                                cx: (x as u32 * tile_size + offset + tile_size / 2) as i32,
+                                cy: (y as u32 * tile_size + offset + tile_size / 2) as i32,
+                                r: tile_size / 3,
+                                stroke: "black".to_owned(),
+                                stroke_width: 2,
+                                fill: "gray".to_owned(),
+                            };
+                            ImmSvg::circle(buf, &circle)?;
+                        }
+                    }
+                }
+            }
+
+            let grid = svg::Grid {
+                x1: 0,
+                y1: 0,
+                x2: svg_width as i32,
+                y2: svg_height as i32,
+                grid_width,
+                tile_size,
+            };
+            ImmSvg::grid(buf, &grid)
+        })
     }
 }
 
