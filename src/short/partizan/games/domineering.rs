@@ -16,15 +16,38 @@ use crate::{
     numeric::rational::Rational, short::partizan::transposition_table::TranspositionTable,
 };
 
+// FIXME
+type Tile = bool;
+
 /// A Domineering position on a rectengular grid.
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Domineering<G = SmallBitGrid> {
     grid: G,
 }
 
+impl<G> Display for Domineering<G>
+where
+    G: Grid<Item = Tile> + FiniteGrid,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.grid.display(f, '|')
+    }
+}
+
+impl<G> FromStr for Domineering<G>
+where
+    G: Grid<Item = Tile> + FiniteGrid,
+{
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self::new(G::parse(s).ok_or(())?))
+    }
+}
+
 impl<G> Domineering<G>
 where
-    G: Grid<Item = bool> + FiniteGrid + Ord + Clone,
+    G: Grid<Item = bool> + FiniteGrid,
 {
     /// Create a domineering position from a grid.
     pub fn new(grid: G) -> Self {
@@ -231,7 +254,10 @@ where
         res
     }
 
-    fn moves_for<const DIR_X: u8, const DIR_Y: u8>(&self) -> Vec<Self> {
+    fn moves_for<const DIR_X: u8, const DIR_Y: u8>(&self) -> Vec<Self>
+    where
+        G: Ord + Clone,
+    {
         let mut moves = Vec::new();
 
         if self.grid.height() == 0 || self.grid.width() == 0 {
@@ -294,17 +320,6 @@ impl Svg for Domineering {
             };
             ImmSvg::grid(buf, &grid)
         })
-    }
-}
-
-impl<G> FromStr for Domineering<G>
-where
-    G: Grid<Item = bool> + FiniteGrid + Ord + Clone,
-{
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self::new(G::parse(s).ok_or(())?))
     }
 }
 
@@ -402,122 +417,119 @@ where
     }
 }
 
-impl<G> Display for Domineering<G>
-where
-    G: Grid<Item = bool> + FiniteGrid,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.grid.display(f, '|')
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::str::FromStr;
+
+    #[test]
+    fn parse_display_roundtrip() {
+        let inp = "...|#.#|##.|###";
+        let pos: Domineering = Domineering::from_str(inp).unwrap();
+        assert_eq!(&format!("{}", pos), inp,);
     }
-}
 
-#[test]
-fn parse_display_roundtrip() {
-    let inp = "...|#.#|##.|###";
-    let pos: Domineering = Domineering::from_str(inp).unwrap();
-    assert_eq!(&format!("{}", pos), inp,);
-}
+    // Values confirmed with gcsuite
 
-// Values confirmed with gcsuite
+    #[cfg(test)]
+    fn test_grid_canonical_form(grid: Domineering, canonical_form: &str) {
+        let transposition_table = TranspositionTable::new();
+        let game_id = grid.canonical_form(&transposition_table);
+        assert_eq!(&game_id.to_string(), canonical_form);
+    }
 
-#[cfg(test)]
-fn test_grid_canonical_form(grid: Domineering, canonical_form: &str) {
-    let transposition_table = TranspositionTable::new();
-    let game_id = grid.canonical_form(&transposition_table);
-    assert_eq!(&game_id.to_string(), canonical_form);
-}
+    #[test]
+    fn finds_canonical_form_of_one() {
+        test_grid_canonical_form(Domineering::from_str(".|.").unwrap(), "1");
+    }
 
-#[test]
-fn finds_canonical_form_of_one() {
-    test_grid_canonical_form(Domineering::from_str(".|.").unwrap(), "1");
-}
+    #[test]
+    fn finds_canonical_form_of_minus_one() {
+        test_grid_canonical_form(Domineering::from_str("..").unwrap(), "-1");
+    }
 
-#[test]
-fn finds_canonical_form_of_minus_one() {
-    test_grid_canonical_form(Domineering::from_str("..").unwrap(), "-1");
-}
+    #[test]
+    fn finds_canonical_form_of_two_by_two() {
+        test_grid_canonical_form(Domineering::from_str("..|..").unwrap(), "{1|-1}");
+    }
 
-#[test]
-fn finds_canonical_form_of_two_by_two() {
-    test_grid_canonical_form(Domineering::from_str("..|..").unwrap(), "{1|-1}");
-}
+    #[test]
+    fn finds_canonical_form_of_two_by_two_with_noise() {
+        test_grid_canonical_form(Domineering::from_str("..#|..#|##.").unwrap(), "{1|-1}");
+    }
 
-#[test]
-fn finds_canonical_form_of_two_by_two_with_noise() {
-    test_grid_canonical_form(Domineering::from_str("..#|..#|##.").unwrap(), "{1|-1}");
-}
+    #[test]
+    fn finds_canonical_form_of_minus_two() {
+        test_grid_canonical_form(Domineering::from_str("....").unwrap(), "-2");
+    }
 
-#[test]
-fn finds_canonical_form_of_minus_two() {
-    test_grid_canonical_form(Domineering::from_str("....").unwrap(), "-2");
-}
+    #[test]
+    fn finds_canonical_form_of_l_shape() {
+        test_grid_canonical_form(Domineering::from_str(".#|..").unwrap(), "*");
+    }
 
-#[test]
-fn finds_canonical_form_of_l_shape() {
-    test_grid_canonical_form(Domineering::from_str(".#|..").unwrap(), "*");
-}
+    #[test]
+    fn finds_canonical_form_of_long_l_shape() {
+        test_grid_canonical_form(Domineering::from_str(".##|.##|...").unwrap(), "0");
+    }
 
-#[test]
-fn finds_canonical_form_of_long_l_shape() {
-    test_grid_canonical_form(Domineering::from_str(".##|.##|...").unwrap(), "0");
-}
+    #[test]
+    fn finds_canonical_form_of_weird_l_shape() {
+        test_grid_canonical_form(Domineering::from_str("..#|..#|...").unwrap(), "{1/2|-2}");
+    }
 
-#[test]
-fn finds_canonical_form_of_weird_l_shape() {
-    test_grid_canonical_form(Domineering::from_str("..#|..#|...").unwrap(), "{1/2|-2}");
-}
+    #[test]
+    fn finds_canonical_form_of_three_by_three() {
+        test_grid_canonical_form(Domineering::from_str("...|...|...").unwrap(), "{1|-1}");
+    }
 
-#[test]
-fn finds_canonical_form_of_three_by_three() {
-    test_grid_canonical_form(Domineering::from_str("...|...|...").unwrap(), "{1|-1}");
-}
+    #[test]
+    fn finds_canonical_form_of_num_nim_sum() {
+        test_grid_canonical_form(Domineering::from_str(".#.#|.#..").unwrap(), "1*");
+    }
 
-#[test]
-fn finds_canonical_form_of_num_nim_sum() {
-    test_grid_canonical_form(Domineering::from_str(".#.#|.#..").unwrap(), "1*");
-}
+    #[test]
+    #[cfg(not(miri))]
+    fn finds_temperature_of_four_by_four_grid() {
+        use crate::numeric::rational::Rational;
 
-#[test]
-#[cfg(not(miri))]
-fn finds_temperature_of_four_by_four_grid() {
-    use crate::numeric::rational::Rational;
+        let transposition_table = TranspositionTable::new();
+        let grid: Domineering = Domineering::from_str("#...|....|....|....").unwrap();
+        let game_id = grid.canonical_form(&transposition_table);
+        let temp = game_id.temperature();
+        dbg!(transposition_table.len());
+        assert_eq!(&game_id.to_string(), "{1*|-1*}");
+        assert_eq!(temp, Rational::from(1));
+    }
 
-    let transposition_table = TranspositionTable::new();
-    let grid: Domineering = Domineering::from_str("#...|....|....|....").unwrap();
-    let game_id = grid.canonical_form(&transposition_table);
-    let temp = game_id.temperature();
-    dbg!(transposition_table.len());
-    assert_eq!(&game_id.to_string(), "{1*|-1*}");
-    assert_eq!(temp, Rational::from(1));
-}
+    #[test]
+    fn latex_works() {
+        let position: Domineering = Domineering::from_str("##..|....|#...|..##").unwrap();
+        let latex = position.to_latex();
+        assert_eq!(
+            &latex,
+            r#"\begin{tikzpicture}[scale=1] \fill[fill=gray] (0,0) rectangle (1,1); \fill[fill=gray] (1,0) rectangle (2,1); \fill[fill=gray] (0,2) rectangle (1,3); \fill[fill=gray] (2,3) rectangle (3,4); \fill[fill=gray] (3,3) rectangle (4,4); \draw[step=1cm,black] (0,0) grid (4, 4); \end{tikzpicture}"#
+        );
+    }
 
-#[test]
-fn latex_works() {
-    let position: Domineering = Domineering::from_str("##..|....|#...|..##").unwrap();
-    let latex = position.to_latex();
-    assert_eq!(
-        &latex,
-        r#"\begin{tikzpicture}[scale=1] \fill[fill=gray] (0,0) rectangle (1,1); \fill[fill=gray] (1,0) rectangle (2,1); \fill[fill=gray] (0,2) rectangle (1,3); \fill[fill=gray] (2,3) rectangle (3,4); \fill[fill=gray] (3,3) rectangle (4,4); \draw[step=1cm,black] (0,0) grid (4, 4); \end{tikzpicture}"#
-    );
-}
+    /// Assert temperature value without going through canonical form
+    /// Using macro yields better error location on assertion failure
+    #[cfg(test)]
+    macro_rules! assert_temperature {
+        ($grid:expr, $temp:expr) => {
+            let grid: Domineering = $grid.unwrap();
+            let thermograph = grid.thermograph_direct();
+            let expected_temperature = Rational::from($temp);
+            assert_eq!(thermograph.get_temperature(), expected_temperature);
+        };
+    }
 
-/// Assert temperature value without going through canonical form
-/// Using macro yields better error location on assertion failure
-#[cfg(test)]
-macro_rules! assert_temperature {
-    ($grid:expr, $temp:expr) => {
-        let grid: Domineering = $grid.unwrap();
-        let thermograph = grid.thermograph_direct();
-        let expected_temperature = Rational::from($temp);
-        assert_eq!(thermograph.get_temperature(), expected_temperature);
-    };
-}
-
-#[test]
-fn temperature_without_game_works() {
-    assert_temperature!(Domineering::from_str(""), -1);
-    assert_temperature!(Domineering::from_str(".."), -1);
-    assert_temperature!(Domineering::from_str("..|.#"), 0);
-    // FIXME: takes too long
-    // assert_temperature!(Domineering::parse("#...|....|....|...."), 1);
+    #[test]
+    fn temperature_without_game_works() {
+        assert_temperature!(Domineering::from_str(""), -1);
+        assert_temperature!(Domineering::from_str(".."), -1);
+        assert_temperature!(Domineering::from_str("..|.#"), 0);
+        // FIXME: takes too long
+        // assert_temperature!(Domineering::parse("#...|....|....|...."), 1);
+    }
 }

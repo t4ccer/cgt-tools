@@ -1,7 +1,10 @@
 use anyhow::Result;
 use cgt::{
     numeric::nimber::Nimber,
-    short::impartial::games::{pseudo_quicksort::PseudoQuicksort, quicksort::Quicksort},
+    short::impartial::{
+        games::{pseudo_quicksort::PseudoQuicksort, quicksort::Quicksort},
+        impartial_game::ImpartialGame,
+    },
 };
 use clap::{self, Parser, ValueEnum};
 use itertools::Itertools;

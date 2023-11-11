@@ -136,6 +136,7 @@ dependencies = [
  "ahash",
  "append-only-vec",
  "auto_ops",
+ "cgt-derive",
  "itertools",
  "nom",
  "num-rational",
@@ -159,6 +160,14 @@ dependencies = [
  "rayon",
  "serde 1.0.192",
  "serde_json",
+]
+
+[[package]]
+name = "cgt-derive"
+version = "0.3.0"
+dependencies = [
+ "quote 1.0.33",
+ "syn 2.0.39",
 ]
 
 [[package]]

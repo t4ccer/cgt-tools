@@ -308,6 +308,7 @@ where
 mod tests {
     use super::*;
     use crate::short::partizan::transposition_table::TranspositionTable;
+    use std::str::FromStr;
 
     macro_rules! test_canonical_form {
         ($input:expr, $output:expr) => {{

@@ -89,6 +89,8 @@ pub trait FiniteGrid: Grid + Sized {
     }
 }
 
+// TODO: BitTile trait
+
 /// Grid tiles that are representable as a single character, other than `'|'`
 pub trait CharTile: Sized {
     /// Convert tile to `char`

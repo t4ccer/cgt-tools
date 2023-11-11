@@ -10,47 +10,26 @@ use crate::{
     grid::CharTile,
     short::partizan::partizan_game::PartizanGame,
 };
+use cgt_derive::Tile;
 use std::{
     fmt::{self, Display},
     str::FromStr,
 };
 
 /// Tile on the Toads and Frogs board
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Tile)]
 pub enum Tile {
     /// Empty tile without any creature
+    #[tile(default, char('.'))]
     Empty,
 
     /// Left player's, moving right
+    #[tile(char('T'))]
     Toad,
 
     /// Right player's, moving left
+    #[tile(char('F'))]
     Frog,
-}
-
-impl Default for Tile {
-    fn default() -> Self {
-        Tile::Empty
-    }
-}
-
-impl CharTile for Tile {
-    fn char_to_tile(input: char) -> Option<Self> {
-        match input {
-            '.' => Some(Tile::Empty),
-            'T' => Some(Tile::Toad),
-            'F' => Some(Tile::Frog),
-            _ => None,
-        }
-    }
-
-    fn tile_to_char(self) -> char {
-        match self {
-            Tile::Empty => '.',
-            Tile::Toad => 'T',
-            Tile::Frog => 'F',
-        }
-    }
 }
 
 /// Singular row of the Toads and Frogs board
