@@ -89,8 +89,6 @@ pub trait FiniteGrid: Grid + Sized {
     }
 }
 
-// TODO: BitTile trait
-
 /// Grid tiles that are representable as a single character, other than `'|'`
 pub trait CharTile: Sized {
     /// Convert tile to `char`
@@ -117,3 +115,26 @@ impl CharTile for bool {
         }
     }
 }
+
+/// Grid tiles that can be represented as a single bit
+pub trait BitTile: Sized {
+    /// Convert tile to `bool`
+    fn tile_to_bool(self) -> bool;
+
+    /// Convert `bool` to tile
+    fn bool_to_tile(input: bool) -> Self;
+}
+
+impl BitTile for bool {
+    #[inline]
+    fn tile_to_bool(self) -> bool {
+        self
+    }
+
+    #[inline]
+    fn bool_to_tile(input: bool) -> Self {
+        input
+    }
+}
+
+// TODO: SVG tile

@@ -21,7 +21,7 @@ type Tile = bool;
 
 /// A Domineering position on a rectengular grid.
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Domineering<G = SmallBitGrid> {
+pub struct Domineering<G = SmallBitGrid<Tile>> {
     grid: G,
 }
 
@@ -213,7 +213,7 @@ where
         Self::new(grid)
     }
 
-    fn bfs(&self, visited: &mut SmallBitGrid, x: u8, y: u8) -> Self {
+    fn bfs(&self, visited: &mut G, x: u8, y: u8) -> Self {
         let mut grid = Self::new(G::filled(self.grid.width(), self.grid.height(), true).unwrap());
 
         let mut q: VecDeque<(u8, u8)> =
@@ -402,7 +402,7 @@ where
     /// );
     /// ```
     fn decompositions(&self) -> Vec<Self> {
-        let mut visited = SmallBitGrid::empty(self.grid.width(), self.grid.height()).unwrap();
+        let mut visited: G = G::filled(self.grid.width(), self.grid.height(), false).unwrap();
         let mut ds = Vec::new();
 
         for y in 0..self.grid.height() {

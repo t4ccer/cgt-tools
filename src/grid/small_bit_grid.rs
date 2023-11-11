@@ -1,35 +1,42 @@
 //! Grid with up to 64 tiles holding a single bit of information.
 
-use crate::grid::{FiniteGrid, Grid};
-use std::{fmt::Display, str::FromStr};
+use crate::grid::{BitTile, CharTile, FiniteGrid, Grid};
+use std::{fmt::Display, marker::PhantomData, str::FromStr};
 
 /// Internal representation of a grid
 type GridBits = u64;
 
 /// A grid with up to 64 tiles holding a single bit of information.
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct SmallBitGrid {
+pub struct SmallBitGrid<T> {
     width: u8,
     height: u8,
     grid: GridBits,
+    _ty: PhantomData<T>,
 }
 
-impl Grid for SmallBitGrid {
-    type Item = bool;
+impl<T> Grid for SmallBitGrid<T>
+where
+    T: BitTile,
+{
+    type Item = T;
 
     fn get(&self, x: u8, y: u8) -> Self::Item {
         let n = self.width as GridBits * y as GridBits + x as GridBits;
-        (self.grid >> n) & 1 == 1
+        BitTile::bool_to_tile((self.grid >> n) & 1 == 1)
     }
 
     fn set(&mut self, x: u8, y: u8, value: Self::Item) {
-        let val = value as GridBits;
+        let val = value.tile_to_bool() as GridBits;
         let n = self.width as GridBits * y as GridBits + x as GridBits;
         self.grid = (self.grid & !(1 << n)) | (val << n);
     }
 }
 
-impl FiniteGrid for SmallBitGrid {
+impl<T> FiniteGrid for SmallBitGrid<T>
+where
+    T: BitTile,
+{
     fn width(&self) -> u8 {
         self.width
     }
@@ -38,13 +45,18 @@ impl FiniteGrid for SmallBitGrid {
         self.height
     }
 
-    fn filled(width: u8, height: u8, value: bool) -> Option<Self> {
+    fn filled(width: u8, height: u8, value: T) -> Option<Self> {
         Self::check_dimensions(width, height)?;
 
         Some(Self {
             width,
             height,
-            grid: if value { GridBits::MAX } else { 0 },
+            grid: if value.tile_to_bool() {
+                GridBits::MAX
+            } else {
+                0
+            },
+            _ty: PhantomData,
         })
     }
 
@@ -54,17 +66,24 @@ impl FiniteGrid for SmallBitGrid {
             width: 0,
             height: 0,
             grid: 0,
+            _ty: PhantomData,
         }
     }
 }
 
-impl Display for SmallBitGrid {
+impl<T> Display for SmallBitGrid<T>
+where
+    T: BitTile + CharTile,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.display(f, '|')
     }
 }
 
-impl SmallBitGrid {
+impl<T> SmallBitGrid<T>
+where
+    T: BitTile,
+{
     /// Check if dimensions are small enough to fit in the fixed-size bit representation.
     const fn check_dimensions(width: u8, height: u8) -> Option<()> {
         if (width as usize * height as usize) > 8 * std::mem::size_of::<GridBits>() {
@@ -92,6 +111,7 @@ impl SmallBitGrid {
             width,
             height,
             grid: 0,
+            _ty: PhantomData,
         })
     }
 
@@ -119,6 +139,7 @@ impl SmallBitGrid {
             width,
             height,
             grid: grid_id,
+            _ty: PhantomData,
         })
     }
 
@@ -157,8 +178,11 @@ impl SmallBitGrid {
 
     /// Flip grid vertically
     #[must_use]
-    pub fn vertical_flip(&self) -> Self {
-        let mut result = *self;
+    pub fn vertical_flip(&self) -> Self
+    where
+        Self: Clone,
+    {
+        let mut result: Self = self.clone();
         for y in 0..self.height() {
             for x in 0..self.width() {
                 result.set(result.width() - x - 1, y, self.get(x, y));
@@ -169,8 +193,11 @@ impl SmallBitGrid {
 
     /// Flip grid horizontally
     #[must_use]
-    pub fn horizontal_flip(&self) -> Self {
-        let mut result = *self;
+    pub fn horizontal_flip(&self) -> Self
+    where
+        Self: Clone,
+    {
+        let mut result: Self = self.clone();
         for y in 0..self.height() {
             for x in 0..self.width() {
                 result.set(x, result.height() - y - 1, self.get(x, y));
@@ -180,47 +207,15 @@ impl SmallBitGrid {
     }
 }
 
-impl FromStr for SmallBitGrid {
+impl<T> FromStr for SmallBitGrid<T>
+where
+    T: BitTile + CharTile + Default,
+{
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Self::parse(s).ok_or(())
     }
-}
-
-#[test]
-fn set_works() {
-    let mut grid = SmallBitGrid::parse(".#.|##.").unwrap();
-    grid.set(2, 1, true);
-    grid.set(0, 0, true);
-    grid.set(1, 0, false);
-    assert_eq!(&format!("{}", grid), "#..|###",);
-}
-
-/// Convert bits in a number to an array but in reverse order.
-pub fn bits_to_arr(num: GridBits) -> [bool; 64] {
-    let mut grid = [false; 64];
-
-    #[allow(clippy::needless_range_loop)]
-    for grid_idx in 0..64 {
-        grid[grid_idx] = ((num >> grid_idx) & 1) == 1;
-    }
-    grid
-}
-
-#[test]
-fn bits_to_arr_works() {
-    assert_eq!(
-        bits_to_arr(0b1011001),
-        [
-            true, false, false, true, true, false, true, false, false, false, false, false, false,
-            false, false, false, false, false, false, false, false, false, false, false, false,
-            false, false, false, false, false, false, false, false, false, false, false, false,
-            false, false, false, false, false, false, false, false, false, false, false, false,
-            false, false, false, false, false, false, false, false, false, false, false, false,
-            false, false, false
-        ]
-    );
 }
 
 /// Reverse of [`bits_to_arr`]
@@ -240,92 +235,132 @@ pub fn arr_to_bits(grid: &[bool]) -> GridBits {
     res
 }
 
-#[test]
-fn bits_to_arr_to_bits_roundtrip() {
-    let inp = 3874328;
-    assert_eq!(inp, arr_to_bits(&bits_to_arr(inp)),);
+/// Convert bits in a number to an array but in reverse order.
+pub fn bits_to_arr(num: GridBits) -> [bool; 64] {
+    let mut grid = [false; 64];
+
+    #[allow(clippy::needless_range_loop)]
+    for grid_idx in 0..64 {
+        grid[grid_idx] = ((num >> grid_idx) & 1) == 1;
+    }
+    grid
 }
 
-#[test]
-fn parse_grid() {
-    let width = 3;
-    let height = 3;
-    assert_eq!(
-        SmallBitGrid::parse("..#|.#.|##.").unwrap(),
-        SmallBitGrid::from_arr(
-            width,
-            height,
-            &[false, false, true, false, true, false, true, true, false]
-        )
-        .unwrap()
-    );
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-#[should_panic]
-#[test]
-fn parse_invalid_char() {
-    SmallBitGrid::from_str("...#|..X#|.#..").unwrap();
-}
+    #[test]
+    fn set_works() {
+        let mut grid = SmallBitGrid::parse(".#.|##.").unwrap();
+        grid.set(2, 1, true);
+        grid.set(0, 0, true);
+        grid.set(1, 0, false);
+        assert_eq!(&format!("{}", grid), "#..|###",);
+    }
 
-#[should_panic]
-#[test]
-fn parse_non_rectangular() {
-    SmallBitGrid::from_str("...#|..#|.#..").unwrap();
-}
+    #[test]
+    fn bits_to_arr_works() {
+        assert_eq!(
+            bits_to_arr(0b1011001),
+            [
+                true, false, false, true, true, false, true, false, false, false, false, false,
+                false, false, false, false, false, false, false, false, false, false, false, false,
+                false, false, false, false, false, false, false, false, false, false, false, false,
+                false, false, false, false, false, false, false, false, false, false, false, false,
+                false, false, false, false, false, false, false, false, false, false, false, false,
+                false, false, false, false
+            ]
+        );
+    }
 
-#[should_panic]
-#[test]
-fn parse_non_rectangular_last() {
-    SmallBitGrid::from_str("...#|..#.|.#.").unwrap();
-}
+    #[test]
+    fn bits_to_arr_to_bits_roundtrip() {
+        let inp = 3874328;
+        assert_eq!(inp, arr_to_bits(&bits_to_arr(inp)),);
+    }
 
-#[test]
-fn rotation_works() {
-    let position = SmallBitGrid::from_str(
-        "##..|\
+    #[test]
+    fn parse_grid() {
+        let width = 3;
+        let height = 3;
+        assert_eq!(
+            SmallBitGrid::<bool>::parse("..#|.#.|##.").unwrap(),
+            SmallBitGrid::from_arr(
+                width,
+                height,
+                &[false, false, true, false, true, false, true, true, false]
+            )
+            .unwrap()
+        );
+    }
+
+    #[should_panic]
+    #[test]
+    fn parse_invalid_char() {
+        SmallBitGrid::<bool>::from_str("...#|..X#|.#..").unwrap();
+    }
+
+    #[should_panic]
+    #[test]
+    fn parse_non_rectangular() {
+        SmallBitGrid::<bool>::from_str("...#|..#|.#..").unwrap();
+    }
+
+    #[should_panic]
+    #[test]
+    fn parse_non_rectangular_last() {
+        SmallBitGrid::<bool>::from_str("...#|..#.|.#.").unwrap();
+    }
+
+    #[test]
+    fn rotation_works() {
+        let position = SmallBitGrid::<bool>::from_str(
+            "##..|\
 	 ....|\
 	 #..#",
-    )
-    .unwrap()
-    .rotate();
+        )
+        .unwrap()
+        .rotate();
 
-    assert_eq!(
-        &format!("{position}"),
-        "#.#|\
+        assert_eq!(
+            &format!("{position}"),
+            "#.#|\
 	 ..#|\
 	 ...|\
 	 #.."
-    );
+        );
 
-    let position = position.rotate();
-    assert_eq!(
-        &format!("{position}"),
-        "#..#|\
+        let position = position.rotate();
+        assert_eq!(
+            &format!("{position}"),
+            "#..#|\
 	 ....|\
 	 ..##"
-    );
-}
+        );
+    }
 
-#[test]
-fn flip_works() {
-    let position = SmallBitGrid::parse(
-        "##..|\
+    #[test]
+    fn flip_works() {
+        let position = SmallBitGrid::<bool>::parse(
+            "##..|\
 	 ....|\
 	 #..#",
-    )
-    .unwrap();
+        )
+        .unwrap();
 
-    assert_eq!(
-        &format!("{}", position.vertical_flip()),
-        "..##|\
+        assert_eq!(
+            &format!("{}", position.vertical_flip()),
+            "..##|\
 	 ....|\
 	 #..#",
-    );
+        );
 
-    assert_eq!(
-        &format!("{}", position.horizontal_flip()),
-        "#..#|\
+        assert_eq!(
+            &format!("{}", position.horizontal_flip()),
+            "#..#|\
 	 ....|\
 	 ##..",
-    );
+        );
+    }
 }

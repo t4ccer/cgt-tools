@@ -1,15 +1,17 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parenthesized, parse_macro_input, Data, DeriveInput, Ident, LitChar, Variant};
+use syn::{parenthesized, parse_macro_input, Data, DeriveInput, Ident, LitBool, LitChar, Variant};
 
 const TILE_ATTR: &'static str = "tile";
 const TILE_ATTR_DEFAULT: &'static str = "default";
 const TILE_ATTR_CHAR: &'static str = "char";
+const TILE_ATTR_BOOL: &'static str = "bool";
 
 struct TileAttr {
     ident: Ident,
     is_default: bool,
     tile_char: Option<char>,
+    tile_bool: Option<bool>,
 }
 
 fn to_tile_attr(variant: Variant) -> TileAttr {
@@ -17,6 +19,7 @@ fn to_tile_attr(variant: Variant) -> TileAttr {
         ident: variant.ident,
         is_default: false,
         tile_char: None,
+        tile_bool: None,
     };
 
     for attr in &variant.attrs {
@@ -46,9 +49,20 @@ fn to_tile_attr(variant: Variant) -> TileAttr {
                 return Ok(());
             }
 
-            Err(meta.error(format!("Invalid attribute: {:?}", meta.path)))
+            if meta.path.is_ident(TILE_ATTR_BOOL) {
+                let content;
+                parenthesized!(content in meta.input);
+                let lit: LitBool = content.parse()?;
+                tile.tile_bool = Some(lit.value());
+                return Ok(());
+            }
+
+            Err(meta.error(format!(
+                "Invalid attribute: '{}'",
+                meta.path.get_ident().unwrap().to_string()
+            )))
         })
-        .expect("foo");
+        .unwrap_or_else(|err| panic!("{}", err));
     }
 
     tile
@@ -133,33 +147,94 @@ pub(crate) fn derive(input: TokenStream) -> TokenStream {
 
         // don't generate CharTile implementation
         if without_char == tiles.len() {
-            return quote!().into();
-        }
+            None
+        } else {
+            Some(quote! {
+            #[automatically_derived]
+            impl #cgt_crate::grid::CharTile for #tile_enum_name {
+                #[inline]
+                fn tile_to_char(self) -> char {
+                    match self {
+                        #(#tile_to_chars),*
+                    }
+                }
 
-        quote! {
-        #[automatically_derived]
-        impl #cgt_crate::grid::CharTile for #tile_enum_name {
-            #[inline]
-            fn tile_to_char(self) -> char {
-                match self {
-                    #(#tile_to_chars),*
+                #[inline]
+                fn char_to_tile(input: char) -> Option<Self> {
+                    match input {
+                        #(#char_to_tiles),*
+                        ,_ => ::core::option::Option::None,
+                    }
                 }
             }
+            })
+        }
+    };
 
-            #[inline]
-            fn char_to_tile(input: char) -> Option<Self> {
-                match input {
-                    #(#char_to_tiles),*
-                    ,_ => ::core::option::Option::None,
+    let impl_char_bool = {
+        let mut with_bool = 0;
+        let mut case_true = None;
+        let mut case_false = None;
+
+        tiles.iter().for_each(|tile| {
+            let constr = &tile.ident;
+
+            if let Some(b) = tile.tile_bool {
+                with_bool += 1;
+
+                if b {
+                    match case_true {
+                        Some(_) => panic!("Only one tile can be 'bool(true)'"),
+                        None => case_true = Some(quote! { #tile_enum_name::#constr }),
+                    }
+                } else {
+                    match case_false {
+                        Some(_) => panic!("Only one tile can be 'bool(false)'"),
+                        None => case_false = Some(quote! { #tile_enum_name::#constr }),
+                    }
                 }
             }
-        }
+        });
+
+        if with_bool == 0 {
+            None
+        } else {
+            if with_bool != tiles.len() {
+                panic!("Either all or no tiles must have 'bool' attribute");
+            }
+
+            let case_true = case_true.unwrap();
+            let case_false = case_false.unwrap();
+
+            Some(quote! {
+                #[automatically_derived]
+                impl #cgt_crate::grid::BitTile for #tile_enum_name {
+                    #[inline]
+                    fn tile_to_bool(self) -> bool {
+                        match self {
+                            #case_true => true,
+                            #case_false => false,
+                        }
+                    }
+
+
+                    #[inline]
+                    fn bool_to_tile(input: bool) -> Self {
+                        if input {
+                            #case_true
+                        } else {
+                            #case_false
+                        }
+                    }
+                }
+            })
         }
     };
 
     quote! {
         #impl_default
         #impl_char_tile
+        #impl_char_bool
     }
     .into()
 }

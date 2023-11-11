@@ -1,7 +1,7 @@
 //! Fission game
 
 use crate::{
-    grid::{vec_grid::VecGrid, FiniteGrid, Grid},
+    grid::{small_bit_grid::SmallBitGrid, FiniteGrid, Grid},
     short::partizan::partizan_game::PartizanGame,
 };
 use cgt_derive::Tile;
@@ -11,19 +11,17 @@ use std::{fmt::Display, hash::Hash, str::FromStr};
 #[derive(Debug, Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Tile)]
 pub enum Tile {
     /// Empty tile without stones
-    #[tile(default, char('.'))]
+    #[tile(default, char('.'), bool(false))]
     Empty,
 
     /// Stone
-    #[tile(char('#'))]
+    #[tile(char('#'), bool(true))]
     Stone,
 }
 
-// TODO: Use SmallBitGrid with BitTile
-
 /// Game of Fission
 #[derive(Debug, Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Fission<G = VecGrid<Tile>> {
+pub struct Fission<G = SmallBitGrid<Tile>> {
     grid: G,
 }
 
@@ -51,7 +49,7 @@ impl<G> Fission<G>
 where
     G: Grid<Item = Tile> + FiniteGrid,
 {
-    /// Create new Ski Jumps game from a grid
+    /// Create new Fission game from a grid
     #[inline]
     pub fn new(grid: G) -> Self {
         Fission { grid }
