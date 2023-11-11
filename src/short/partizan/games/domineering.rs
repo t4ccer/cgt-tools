@@ -114,7 +114,7 @@ where
     /// use cgt::short::partizan::games::domineering::Domineering;
     /// use std::str::FromStr;
     ///
-    /// let position = Domineering::from_str("###|.#.|##.").unwrap();
+    /// let position: Domineering = Domineering::from_str("###|.#.|##.").unwrap();
     /// assert_eq!(&format!("{}", position.move_top_left()), ".#.|##.");
     /// ```
     // Panic at `Self::empty(minimized_width, minimized_height).unwrap();` is unreachable
@@ -346,7 +346,7 @@ where
     /// use crate::cgt::short::partizan::partizan_game::PartizanGame;
     /// use std::str::FromStr;
     ///
-    /// let position = Domineering::from_str("..#|.#.|##.").unwrap();
+    /// let position: Domineering = Domineering::from_str("..#|.#.|##.").unwrap();
     /// assert_eq!(
     ///     position.left_moves(),
     ///     vec![
@@ -371,7 +371,7 @@ where
     /// use cgt::short::partizan::{partizan_game::PartizanGame, games::domineering::Domineering};
     /// use std::str::FromStr;
     ///
-    /// let position = Domineering::from_str("..#|.#.|##.").unwrap();
+    /// let position: Domineering = Domineering::from_str("..#|.#.|##.").unwrap();
     /// assert_eq!(
     ///     position.right_moves(),
     ///     vec![Domineering::from_str(".#.|##.").unwrap(),]
@@ -392,7 +392,7 @@ where
     /// use cgt::short::partizan::{partizan_game::PartizanGame, games::domineering::Domineering};
     /// use std::str::FromStr;
     ///
-    /// let position = Domineering::from_str("..#|.#.|##.").unwrap();
+    /// let position: Domineering = Domineering::from_str("..#|.#.|##.").unwrap();
     /// assert_eq!(
     ///    position.decompositions(),
     ///    vec![

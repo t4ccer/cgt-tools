@@ -99,7 +99,7 @@ where
     /// ```
     /// use cgt::grid::small_bit_grid::SmallBitGrid;
     ///
-    /// assert_eq!(&format!("{}", SmallBitGrid::empty(2, 3).unwrap()), "..|..|..");
+    /// assert_eq!(&format!("{}", SmallBitGrid::<bool>::empty(2, 3).unwrap()), "..|..|..");
     /// ```
     ///
     /// # Errors
@@ -128,7 +128,7 @@ where
     /// ```
     /// use cgt::grid::small_bit_grid::SmallBitGrid;
     ///
-    /// assert_eq!(&format!("{}", SmallBitGrid::from_number(3, 2, 0b101110).unwrap()), ".##|#.#");
+    /// assert_eq!(&format!("{}", SmallBitGrid::<bool>::from_number(3, 2, 0b101110).unwrap()), ".##|#.#");
     /// ```
     ///
     /// # Errors
@@ -154,7 +154,7 @@ where
     /// ```
     /// use cgt::grid::small_bit_grid::SmallBitGrid;
     ///
-    /// SmallBitGrid::from_arr(2, 3, &[true, true, false, false, false, true]).unwrap();
+    /// SmallBitGrid::<bool>::from_arr(2, 3, &[true, true, false, false, false, true]).unwrap();
     /// ```
     ///
     /// # Errors
