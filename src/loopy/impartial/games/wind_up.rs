@@ -2,54 +2,12 @@
 //!
 //! This game has been proposed at Games-at-Dal 2023 conference by Alfie Davies.
 
-use crate::{display, numeric::nimber::Nimber};
+use crate::{
+    display,
+    loopy::impartial::vertex::{UnresolvedVertex, Vertex},
+    numeric::nimber::Nimber,
+};
 use std::{collections::HashSet, fmt::Display};
-
-/// Vertex set used during graph orbiting
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum UnresolvedVertex {
-    /// Vertex that is equal to some finite nimber.
-    Value(Nimber),
-
-    /// Vertex that can move in a finite loop, or escape to one of the nimbers.
-    Loop(Vec<Nimber>),
-
-    /// Vertex that couldn't be yet determined.
-    Unresolved,
-}
-
-// TODO: move to shared namespace
-/// Value of graph vertex - finite or infinite
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Vertex {
-    /// Vertex that is equal to some finite nimber.
-    Value(Nimber),
-
-    /// Vertex that can move in a finite loop, or escape to one of the nimbers.
-    Loop(Vec<Nimber>),
-}
-
-impl Display for Vertex {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Value(n) => write!(f, "{}", n),
-            Self::Loop(infs) => {
-                write!(f, "∞")?;
-                if !infs.is_empty() {
-                    display::parens(f, |f| display::commas(f, infs))?;
-                }
-                Ok(())
-            }
-        }
-    }
-}
-
-impl UnresolvedVertex {
-    /// Check if vertex is a finite zero
-    const fn is_zero(&self) -> bool {
-        matches!(self, Self::Value(val) if val.value() == 0)
-    }
-}
 
 /// Modular subtraction game
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -82,7 +40,7 @@ impl WindUp {
         let mut graph = vec![UnresolvedVertex::Unresolved; n as usize];
 
         // First zero is trivial - the first element is zero by the game definition
-        graph[0] = UnresolvedVertex::Value(Nimber::new(0));
+        graph[0] = UnresolvedVertex::Resolved(Vertex::Value(Nimber::new(0)));
 
         let n = n as i32;
 
@@ -117,7 +75,7 @@ impl WindUp {
                     }
                 }
 
-                graph[idx as usize] = UnresolvedVertex::Value(Nimber::new(0));
+                graph[idx as usize] = UnresolvedVertex::Resolved(Vertex::Value(Nimber::new(0)));
             }
         }
 
@@ -132,13 +90,14 @@ impl WindUp {
                 for m in &subtraction_set {
                     let v1 = &graph[(idx - *m as i32).rem_euclid(n) as usize];
                     match v1 {
-                        UnresolvedVertex::Value(g) => for_mex.push(*g),
-                        UnresolvedVertex::Unresolved | UnresolvedVertex::Loop(_) => continue 'inner,
+                        UnresolvedVertex::Resolved(Vertex::Value(g)) => for_mex.push(*g),
+                        UnresolvedVertex::Unresolved
+                        | UnresolvedVertex::Resolved(Vertex::Loop(_)) => continue 'inner,
                     };
                 }
 
                 let g = Nimber::mex(for_mex);
-                graph[idx as usize] = UnresolvedVertex::Value(g);
+                graph[idx as usize] = UnresolvedVertex::Resolved(Vertex::Value(g));
             }
         }
 
@@ -146,7 +105,10 @@ impl WindUp {
         for _ in 0..graph.len() {
             for idx in 0_i32..(graph.len() as i32) {
                 // If we're a nimber we cannot be an infinity
-                if matches!(graph[idx as usize], UnresolvedVertex::Value(_)) {
+                if matches!(
+                    graph[idx as usize],
+                    UnresolvedVertex::Resolved(Vertex::Value(_))
+                ) {
                     continue;
                 }
 
@@ -154,22 +116,21 @@ impl WindUp {
 
                 for m in &subtraction_set {
                     let v1 = &graph[(idx - *m as i32).rem_euclid(n) as usize];
-                    if let UnresolvedVertex::Value(g) = v1 {
+                    if let UnresolvedVertex::Resolved(Vertex::Value(g)) = v1 {
                         if !infinities.contains(g) {
                             infinities.push(*g);
                         }
                     }
                 }
 
-                graph[idx as usize] = UnresolvedVertex::Loop(infinities);
+                graph[idx as usize] = UnresolvedVertex::Resolved(Vertex::Loop(infinities));
             }
         }
 
         let graph: Vec<Vertex> = graph
             .into_iter()
             .map(|v| match v {
-                UnresolvedVertex::Value(n) => Vertex::Value(n),
-                UnresolvedVertex::Loop(infs) => Vertex::Loop(infs),
+                UnresolvedVertex::Resolved(v) => v,
                 UnresolvedVertex::Unresolved => unreachable!("All vertices should be resolved"),
             })
             .collect();
@@ -274,32 +235,37 @@ impl WindUp {
     }
 }
 
-#[test]
-fn sequence_reduction_graph_equivalence() {
-    // Graph and sequence are requivalent on finite games
-    let using_sequence =
-        WindUp::new_using_sequence(&[0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 2], 40, vec![6, 7]);
-    let using_graph = WindUp::new_using_graph(40, vec![6, 7]);
-    assert_eq!(using_graph, using_sequence);
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    // Initial starting sequence doesn't matter for the final result
-    // That is actually not always true, see below
-    let using_sequence1 =
-        WindUp::new_using_sequence(&[0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 2], 40, vec![6, 7]);
-    let using_sequence2 = WindUp::new_using_sequence(&[1], 40, vec![6, 7]);
-    assert_eq!(using_sequence1, using_sequence2);
+    #[test]
+    fn sequence_reduction_graph_equivalence() {
+        // Graph and sequence are requivalent on finite games
+        let using_sequence =
+            WindUp::new_using_sequence(&[0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 2], 40, vec![6, 7]);
+        let using_graph = WindUp::new_using_graph(40, vec![6, 7]);
+        assert_eq!(using_graph, using_sequence);
+
+        // Initial starting sequence doesn't matter for the final result
+        // That is actually not always true, see below
+        let using_sequence1 =
+            WindUp::new_using_sequence(&[0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 2], 40, vec![6, 7]);
+        let using_sequence2 = WindUp::new_using_sequence(&[1], 40, vec![6, 7]);
+        assert_eq!(using_sequence1, using_sequence2);
+    }
+
+    #[test]
+    fn weird_sequence() {
+        let a = 1;
+        let b = 2;
+        let n = 3;
+
+        let s1 = WindUp::new_using_sequence(&[0, 0, 0], n, vec![a, b]);
+        let s2 = WindUp::new_using_sequence(&[0, 1, 2], n, vec![a, b]);
+
+        assert_ne!(s1, s2);
+    }
+
+    // TODO: Test conjecture: P(Gr) = Gr iff WindUp(n = a+b, {a,b})
 }
-
-#[test]
-fn weird_sequence() {
-    let a = 1;
-    let b = 2;
-    let n = 3;
-
-    let s1 = WindUp::new_using_sequence(&[0, 0, 0], n, vec![a, b]);
-    let s2 = WindUp::new_using_sequence(&[0, 1, 2], n, vec![a, b]);
-
-    assert_ne!(s1, s2);
-}
-
-// TODO: Test conjecture: P(Gr) = Gr iff WindUp(n = a+b, {a,b})
