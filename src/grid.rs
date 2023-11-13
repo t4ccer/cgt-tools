@@ -149,7 +149,7 @@ fn bfs<G, T>(
     y: u8,
     is_non_blocking: fn(T) -> bool,
     blocking_tile: T,
-    directions: &[(i64, i64)],
+    directions: &[(i32, i32)],
 ) -> G
 where
     T: Copy + Default,
@@ -166,13 +166,13 @@ where
         new_grid.set(qx, qy, grid.get(qx, qy));
 
         for (dx, dy) in directions {
-            let lx = (qx as i64) + dx;
-            let ly = (qy as i64) + dy;
+            let lx = (qx as i32) + dx;
+            let ly = (qy as i32) + dy;
 
             if lx >= 0
-                && lx < (grid.width() as i64)
+                && lx < (grid.width() as i32)
                 && ly >= 0
-                && ly < (grid.height() as i64)
+                && ly < (grid.height() as i32)
                 && is_non_blocking(grid.get(lx as u8, ly as u8))
                 && is_non_blocking(visited.get(lx as u8, ly as u8))
             {
@@ -189,7 +189,7 @@ pub fn decompositions<G, T>(
     grid: &G,
     is_non_blocking: fn(T) -> bool,
     blocking_tile: T,
-    directions: &[(i64, i64)],
+    directions: &[(i32, i32)],
 ) -> Vec<G>
 where
     T: Copy + Default,

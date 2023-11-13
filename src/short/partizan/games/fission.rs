@@ -88,11 +88,11 @@ where
                     && self.grid.get(prev_x, prev_y) == Tile::Empty
                     && self.grid.get(next_x, next_y) == Tile::Empty
                 {
-                    let mut new_grid: Self = self.clone();
-                    new_grid.grid.set(x, y, Tile::Empty);
-                    new_grid.grid.set(prev_x, prev_y, Tile::Stone);
-                    new_grid.grid.set(next_x, next_y, Tile::Stone);
-                    moves.push(new_grid);
+                    let mut new_grid = self.clone().grid;
+                    new_grid.set(x, y, Tile::Empty);
+                    new_grid.set(prev_x, prev_y, Tile::Stone);
+                    new_grid.set(next_x, next_y, Tile::Stone);
+                    moves.push(Self::new(new_grid));
                 }
             }
         }
