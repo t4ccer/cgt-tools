@@ -144,7 +144,7 @@ fn temp_dif<'pos>(
     let game = position.canonical_form(transposition_table);
     let temp = game.temperature();
     let degree = position.degree();
-    temp - Rational::from(degree as i64)
+    temp.to_rational() - Rational::from(degree as i64)
 }
 
 fn cross(lhs: &Snort, rhs: &Snort) -> Snort {

@@ -1,4 +1,4 @@
-use crate::{rational::PyRational, thermograph::PyThermograph};
+use crate::{dyadic_rational_number::PyDyadicRationalNumber, thermograph::PyThermograph};
 use cgt::short::partizan::canonical_form::CanonicalForm;
 use pyo3::{prelude::*, pyclass::CompareOp};
 use std::{
@@ -54,7 +54,7 @@ impl PyCanonicalForm {
             .map_or(false, |ord| op.matches(ord))
     }
 
-    fn temperature(&self) -> PyRational {
+    fn temperature(&self) -> PyDyadicRationalNumber {
         self.inner.temperature().into()
     }
 

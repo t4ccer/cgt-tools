@@ -1,18 +1,18 @@
 //! Number in form `n/2^m`
 
+use crate::{
+    nom_utils::{impl_from_str_via_nom, lexeme},
+    numeric::rational::Rational,
+};
 use auto_ops::impl_op_ex;
-
-use crate::nom_utils::{impl_from_str_via_nom, lexeme};
 use std::{
     fmt::Display,
     ops::{Add, Sub},
 };
 
-#[cfg(test)]
-use std::str::FromStr;
-
 /// Number in form `n/2^m`
 #[derive(Debug, Hash, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DyadicRationalNumber {
     numerator: i64,
     denominator_exponent: u32,
@@ -111,6 +111,11 @@ impl DyadicRationalNumber {
         (self.denominator_exponent == 0).then_some(self.numerator)
     }
 
+    /// Round a dyadic to the nearest integer
+    pub fn round(self) -> i64 {
+        self.numerator() / self.denominator().unwrap() as i64
+    }
+
     /// Arithmetic mean of two rationals
     #[must_use]
     pub fn mean(&self, rhs: &Self) -> Self {
@@ -136,6 +141,24 @@ impl DyadicRationalNumber {
             }
             Err(_) => Ok((input, Self::from(numerator))),
         }
+    }
+
+    /// Convert rational to dyadic
+    ///
+    /// # Errors
+    /// - Rational is infinite
+    /// - Rational is not dyadic
+    pub fn from_rational(rational: Rational) -> Option<Self> {
+        let (numerator, denominator) = rational.to_fraction()?;
+        Self::new_fraction(numerator, denominator)
+    }
+
+    /// Convert dyadic to rational
+    ///
+    /// # Panics
+    /// - If denominator is too large to fit in [`Rational`]
+    pub fn to_rational(self) -> Rational {
+        Rational::new(self.numerator(), self.denominator().unwrap() as u32)
     }
 }
 
@@ -235,35 +258,6 @@ impl_op_ex!(-|lhs: &DyadicRationalNumber| -> DyadicRationalNumber {
     }
 });
 
-#[test]
-fn one_plus_half() {
-    let one = DyadicRationalNumber::new(1, 0);
-    let half = DyadicRationalNumber::new(1, 1);
-    assert_eq!(one + half, DyadicRationalNumber::new(3, 1));
-    assert_eq!(half + one, DyadicRationalNumber::new(3, 1));
-}
-
-#[test]
-fn denominator_works() {
-    assert_eq!(
-        DyadicRationalNumber {
-            numerator: 0,
-            denominator_exponent: 0
-        }
-        .denominator_exponent(),
-        0
-    );
-    assert_eq!(
-        DyadicRationalNumber {
-            numerator: 3,
-            denominator_exponent: 3
-        }
-        .denominator()
-        .unwrap(),
-        8
-    );
-}
-
 impl Display for DyadicRationalNumber {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(int) = self.to_integer() {
@@ -277,30 +271,65 @@ impl Display for DyadicRationalNumber {
     }
 }
 
-#[test]
-fn dyadic_rationals_pretty() {
-    assert_eq!(format!("{}", DyadicRationalNumber::new(3, 8)), "3/256");
-    assert_eq!(
-        format!("{}", DyadicRationalNumber::new(21, 200)),
-        "21/2^200"
-    );
-}
-
 #[cfg(test)]
-fn test_parsing_works(inp: &str) {
-    let number = DyadicRationalNumber::from_str(inp).unwrap();
-    assert_eq!(inp, &format!("{number}"));
-}
+mod tests {
+    use super::*;
+    use std::str::FromStr;
 
-#[test]
-fn parsing_works_positive() {
-    test_parsing_works("3/16");
-    test_parsing_works("42");
-    test_parsing_works("-1/2");
-}
+    #[test]
+    fn one_plus_half() {
+        let one = DyadicRationalNumber::new(1, 0);
+        let half = DyadicRationalNumber::new(1, 1);
+        assert_eq!(one + half, DyadicRationalNumber::new(3, 1));
+        assert_eq!(half + one, DyadicRationalNumber::new(3, 1));
+    }
 
-#[test]
-#[should_panic]
-fn parsing_works_negative() {
-    test_parsing_works("2/3");
+    #[test]
+    fn denominator_works() {
+        assert_eq!(
+            DyadicRationalNumber {
+                numerator: 0,
+                denominator_exponent: 0
+            }
+            .denominator_exponent(),
+            0
+        );
+        assert_eq!(
+            DyadicRationalNumber {
+                numerator: 3,
+                denominator_exponent: 3
+            }
+            .denominator()
+            .unwrap(),
+            8
+        );
+    }
+
+    #[test]
+    fn dyadic_rationals_pretty() {
+        assert_eq!(format!("{}", DyadicRationalNumber::new(3, 8)), "3/256");
+        assert_eq!(
+            format!("{}", DyadicRationalNumber::new(21, 200)),
+            "21/2^200"
+        );
+    }
+
+    #[cfg(test)]
+    fn test_parsing_works(inp: &str) {
+        let number = DyadicRationalNumber::from_str(inp).unwrap();
+        assert_eq!(inp, &format!("{number}"));
+    }
+
+    #[test]
+    fn parsing_works_positive() {
+        test_parsing_works("3/16");
+        test_parsing_works("42");
+        test_parsing_works("-1/2");
+    }
+
+    #[test]
+    #[should_panic]
+    fn parsing_works_negative() {
+        test_parsing_works("2/3");
+    }
 }

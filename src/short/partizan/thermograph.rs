@@ -3,7 +3,7 @@
 use crate::{
     display,
     drawing::svg::{self, ImmSvg, Svg},
-    numeric::rational::Rational,
+    numeric::{dyadic_rational_number::DyadicRationalNumber, rational::Rational},
     short::partizan::trajectory::Trajectory,
 };
 use ahash::{HashSet, HashSetExt};
@@ -28,15 +28,13 @@ impl Thermograph {
     }
 
     /// Get the temperature of the thermograph where both scaffolds merge into a mast
-    pub fn temperature(&self) -> Rational {
+    pub fn temperature(&self) -> DyadicRationalNumber {
         let left = self.get_left_temperature();
         let right = self.get_right_temperature();
 
-        if self.left_wall.value_at(left) > self.right_wall.value_at(right) {
-            Rational::PositiveInfinity
-        } else {
-            left.max(right)
-        }
+        assert!(self.left_wall.value_at(left) <= self.right_wall.value_at(right));
+
+        DyadicRationalNumber::from_rational(left.max(right)).unwrap()
     }
 
     fn get_left_temperature(&self) -> Rational {
@@ -52,6 +50,27 @@ impl Thermograph {
             Rational::from(-1)
         } else {
             self.right_wall.critical_points[0]
+        }
+    }
+
+    /// Get the mast value of the thermograph
+    pub fn get_mast(&self) -> Rational {
+        let temperature = self.temperature().to_rational();
+
+        if self.left_wall == Trajectory::new_constant(Rational::PositiveInfinity) {
+            if self.right_wall.slopes[0] == Rational::from(0) {
+                self.right_wall.value_at(temperature)
+            } else {
+                Rational::PositiveInfinity
+            }
+        } else if self.right_wall == Trajectory::new_constant(Rational::NegativeInfinity) {
+            if self.left_wall.slopes[0] == Rational::from(0) {
+                self.left_wall.value_at(temperature)
+            } else {
+                Rational::NegativeInfinity
+            }
+        } else {
+            self.left_wall.value_at(temperature)
         }
     }
 
@@ -475,7 +494,7 @@ impl Svg for Thermograph {
         // Chosen arbitrarily, may be customizable in the future
         let svg_width = 450;
         let svg_height = 300;
-        let mast_arrow_len = Rational::from(3);
+        let mast_arrow_len = DyadicRationalNumber::from(3);
         let axis_weight = 1;
         let thermograph_line_weight = 3;
         let padding = 32;
@@ -492,7 +511,7 @@ impl Svg for Thermograph {
             .unwrap();
 
         let thermograph_y_min = 0;
-        let thermograph_y_max = (self.temperature() + mast_arrow_len).try_round().unwrap();
+        let thermograph_y_max = (self.temperature() + mast_arrow_len).round();
 
         let x_axis_location = (svg_height as f32 * 0.9) as i32;
         let y_axis_location = rescale(
@@ -526,13 +545,14 @@ impl Svg for Thermograph {
             |w: &mut W, seen: &mut HashSet<(i64, i64)>, trajectory: &Trajectory| -> fmt::Result {
                 let mut previous = None;
 
-                let y_points = once(trajectory.mast_x_intercept() + mast_arrow_len).chain(
-                    trajectory
-                        .critical_points
-                        .iter()
-                        .copied()
-                        .chain(once(Rational::from(-1))),
-                );
+                let y_points = once(trajectory.mast_x_intercept() + mast_arrow_len.to_rational())
+                    .chain(
+                        trajectory
+                            .critical_points
+                            .iter()
+                            .copied()
+                            .chain(once(Rational::from(-1))),
+                    );
 
                 for point_y in y_points {
                     let point_x = trajectory.value_at(point_y);

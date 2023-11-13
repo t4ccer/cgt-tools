@@ -1,3 +1,11 @@
+use anyhow::{bail, Context, Result};
+use cgt::{
+    graph::undirected::Graph,
+    numeric::{dyadic_rational_number::DyadicRationalNumber, rational::Rational},
+    short::partizan::{
+        games::snort::Snort, partizan_game::PartizanGame, transposition_table::TranspositionTable,
+    },
+};
 use std::{
     io::{self, stderr, Write},
     process::{Command, Stdio},
@@ -5,26 +13,17 @@ use std::{
     time,
 };
 
-use anyhow::{bail, Context, Result};
-use cgt::{
-    graph::undirected::Graph,
-    numeric::rational::Rational,
-    short::partizan::{
-        games::snort::Snort, partizan_game::PartizanGame, transposition_table::TranspositionTable,
-    },
-};
-
 #[derive(serde::Serialize, serde::Deserialize)]
 pub enum Log {
     Generation {
         generation: usize,
         top_score: Rational,
-        temperature: Rational,
+        temperature: DyadicRationalNumber,
     },
     HighFitness {
         position: Scored,
         canonical_form: String,
-        temperature: Rational,
+        temperature: DyadicRationalNumber,
         degree: usize,
     },
 }
@@ -126,7 +125,7 @@ pub fn analyze_position(position: Snort) -> Result<()> {
     }
 
     let degree = position.degree();
-    let score = temperature - Rational::from(degree as i32);
+    let score = temperature.to_rational() - Rational::from(degree as i32);
 
     let log = Log::HighFitness {
         position: Scored { position, score },

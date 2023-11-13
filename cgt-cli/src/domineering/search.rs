@@ -1,7 +1,7 @@
 use anyhow::{bail, Context, Result};
 use cgt::{
     grid::{small_bit_grid::SmallBitGrid, FiniteGrid},
-    numeric::rational::Rational,
+    numeric::dyadic_rational_number::DyadicRationalNumber,
     short::partizan::{
         games::domineering, partizan_game::PartizanGame, transposition_table::TranspositionTable,
     },
@@ -61,7 +61,7 @@ pub struct Args {
 
     /// Do not report positions with this or below this temperature
     #[arg(long, default_value = None)]
-    temperature_threshold: Option<Rational>,
+    temperature_threshold: Option<DyadicRationalNumber>,
 
     /// Compute positions with decompositions
     #[arg(long, default_value_t = false)]
@@ -84,7 +84,7 @@ struct ProgressTracker {
     args: Args,
     iteration: AtomicU64,
     saved: AtomicU64,
-    highest_temp: Mutex<Rational>,
+    highest_temp: Mutex<DyadicRationalNumber>,
     output_buffer: Mutex<BufWriter<File>>,
 }
 
@@ -94,7 +94,7 @@ impl ProgressTracker {
             args,
             iteration: AtomicU64::new(0),
             saved: AtomicU64::new(0),
-            highest_temp: Mutex::new(Rational::NegativeInfinity),
+            highest_temp: Mutex::new(DyadicRationalNumber::from(-1)),
             output_buffer: Mutex::new(BufWriter::new(output_file)),
         }
     }
@@ -260,7 +260,7 @@ fn progress_report(progress_tracker: Arc<ProgressTracker>) {
                     .args
                     .temperature_threshold
                     .clone()
-                    .unwrap_or(Rational::from(-1))
+                    .unwrap_or(DyadicRationalNumber::from(-1))
             )
         } else {
             format!("{}", progress_tracker.highest_temp.lock().unwrap().clone())

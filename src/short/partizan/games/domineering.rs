@@ -429,7 +429,8 @@ where
 mod tests {
     use super::*;
     use crate::{
-        numeric::rational::Rational, short::partizan::transposition_table::TranspositionTable,
+        numeric::dyadic_rational_number::DyadicRationalNumber,
+        short::partizan::transposition_table::TranspositionTable,
     };
     use std::str::FromStr;
 
@@ -508,15 +509,13 @@ mod tests {
     #[test]
     #[cfg(not(miri))]
     fn finds_temperature_of_four_by_four_grid() {
-        use crate::numeric::rational::Rational;
-
         let transposition_table = TranspositionTable::new();
         let grid: Domineering = Domineering::from_str("#...|....|....|....").unwrap();
         let game_id = grid.canonical_form(&transposition_table);
         let temp = game_id.temperature();
         dbg!(transposition_table.len());
         assert_eq!(&game_id.to_string(), "{1*|-1*}");
-        assert_eq!(temp, Rational::from(1));
+        assert_eq!(temp, DyadicRationalNumber::from(1));
     }
 
     #[test]
@@ -536,7 +535,7 @@ mod tests {
         ($grid:expr, $temp:expr) => {
             let grid: Domineering = $grid.unwrap();
             let thermograph = grid.thermograph_direct();
-            let expected_temperature = Rational::from($temp);
+            let expected_temperature = DyadicRationalNumber::from($temp);
             assert_eq!(thermograph.temperature(), expected_temperature);
         };
     }

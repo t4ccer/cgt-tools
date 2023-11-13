@@ -88,6 +88,12 @@ impl Nus {
         self.up_multiple() == 0 && self.nimber() == Nimber::from(0)
     }
 
+    /// Check if the game has only integer number part
+    #[inline]
+    pub fn is_integer(self) -> bool {
+        self.is_number() && self.number().to_integer().is_some()
+    }
+
     /// Check if the game is a nimber.
     #[inline]
     pub fn is_nimber(self) -> bool {
@@ -361,6 +367,7 @@ impl Moves {
 
     /// Construct a canoical form of arbitrary moves.
     /// It is an alias of [`CanonicalForm::new_from_moves`]
+    #[inline]
     pub fn canonical_form(self) -> CanonicalForm {
         CanonicalForm::new_from_moves(self)
     }
@@ -813,8 +820,8 @@ impl CanonicalForm {
 
     /// Construct NUS with only dyadic rational
     #[inline]
-    pub const fn new_rational(rational: DyadicRationalNumber) -> Self {
-        Self::new_nus(Nus::new_number(rational))
+    pub const fn new_dyadic(dyadic: DyadicRationalNumber) -> Self {
+        Self::new_nus(Nus::new_number(dyadic))
     }
 
     /// Construct NUS with only nimber
@@ -1066,19 +1073,16 @@ impl CanonicalForm {
     }
 
     /// Calculate temperature of the game. Avoids computing a thermograph is game is a NUS
-    // TODO: Should be dyadic but not sure how to handle infinities
     #[cfg_attr(feature = "cargo-clippy", allow(clippy::missing_panics_doc))]
-    pub fn temperature(&self) -> Rational {
+    pub fn temperature(&self) -> DyadicRationalNumber {
         match self.inner {
             CanonicalFormInner::Nus(nus) => {
                 if nus.is_number() {
                     // It's a number k/2^n, so the temperature is -1/2^n
-                    // DyadicRationalNumber::new(-1, nus.number.denominator_exponent())
-                    Rational::new(-1, nus.number().denominator().unwrap() as u32)
+                    DyadicRationalNumber::new(-1, nus.number.denominator_exponent())
                 } else {
                     // It's a number plus a nonzero infinitesimal, thus the temperature is 0
-                    // DyadicRationalNumber::from(0)
-                    Rational::from(0)
+                    DyadicRationalNumber::from(0)
                 }
             }
             CanonicalFormInner::Moves(ref moves) => moves.thermograph().temperature(),
@@ -1154,6 +1158,56 @@ impl CanonicalForm {
     /// Confusion interval is the region between Left and Right stops
     pub fn confusion_interval(&self) -> (DyadicRationalNumber, DyadicRationalNumber) {
         (self.left_stop(), self.right_stop())
+    }
+
+    /// Compute the mean value of the position
+    ///
+    /// Mean value is the result of cooling a position by value greater than temperature
+    pub fn mean(&self) -> DyadicRationalNumber {
+        match self.inner {
+            CanonicalFormInner::Nus(nus) => nus.number(),
+            CanonicalFormInner::Moves(ref moves) => {
+                let mast = moves.thermograph().get_mast();
+                DyadicRationalNumber::from_rational(mast).unwrap()
+            }
+        }
+    }
+
+    /// Cool the position by `temperature`
+    ///
+    /// Position `G` cooled by `t` is `G_t = {G^L_t - t | G^R_t + t}` unless there exists a
+    /// temperature `t' < t` for which `G_t'` is infinitesimally close to a number
+    pub fn cool(&self, temperature: DyadicRationalNumber) -> Self {
+        if let Some(nus) = self.to_nus() {
+            if nus.is_integer() {
+                return self.clone();
+            }
+        }
+
+        if self.temperature() < temperature {
+            return Self::new_dyadic(self.mean());
+        }
+
+        let temperature_game = Self::new_dyadic(temperature);
+
+        let moves = self.to_moves();
+
+        let mut new_left_moves = Vec::with_capacity(moves.left.len());
+        for left_move in moves.left {
+            new_left_moves.push(left_move.cool(temperature) - &temperature_game);
+        }
+
+        let mut new_right_moves = Vec::with_capacity(moves.right.len());
+        for right_move in moves.right {
+            new_right_moves.push(right_move.cool(temperature) + &temperature_game);
+        }
+
+        let new_moves = Moves {
+            left: new_left_moves,
+            right: new_right_moves,
+        };
+
+        new_moves.canonical_form()
     }
 
     /// Parse game using `{a,b,...|c,d,...}` notation
@@ -1334,10 +1388,10 @@ mod tests {
     #[test]
     fn constructs_rationals() {
         let rational = DyadicRationalNumber::new(3, 4);
-        let three_sixteenth = CanonicalForm::new_rational(rational);
+        let three_sixteenth = CanonicalForm::new_dyadic(rational);
         assert_eq!(&three_sixteenth.to_string(), "3/16");
 
-        let duplicate = CanonicalForm::new_rational(rational);
+        let duplicate = CanonicalForm::new_dyadic(rational);
         assert_eq!(three_sixteenth, duplicate);
     }
 
@@ -1500,7 +1554,7 @@ mod tests {
             right: vec![negative_one],
         };
         let g = CanonicalForm::new_from_moves(moves);
-        assert_eq!(g.temperature(), Rational::from(1));
+        assert_eq!(g.temperature(), DyadicRationalNumber::from(1));
     }
 
     #[test]
@@ -1573,5 +1627,28 @@ mod tests {
         assert_stops!("v", "0", "0");
         assert_stops!("*", "0", "0");
         assert_stops!("^", "0", "0");
+    }
+
+    macro_rules! assert_cooled {
+        ($cf:expr, $temp:expr, $expected:expr) => {
+            let g = CanonicalForm::from_str($cf).unwrap();
+            let temp = DyadicRationalNumber::from_str($temp).unwrap();
+            let cooled = g.cool(temp);
+            assert_eq!(
+                cooled.to_string(),
+                CanonicalForm::from_str($expected).unwrap().to_string()
+            );
+        };
+    }
+
+    #[test]
+    fn cooling_works() {
+        assert_cooled!("{2|-1}", "0", "{2|-1}");
+        assert_cooled!("{2|-1}", "1/2", "{3/2|-1/2}");
+        assert_cooled!("{2|-1}", "1", "{1|0}");
+        assert_cooled!("{2|-1}", "3/2", "1/2*");
+        assert_cooled!("{2|-1}", "2", "1/2");
+        assert_cooled!("{2|-1}", "3", "1/2");
+        assert_cooled!("{2|-1}", "42", "1/2");
     }
 }
