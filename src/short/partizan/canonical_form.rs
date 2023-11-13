@@ -1081,7 +1081,7 @@ impl CanonicalForm {
                     Rational::from(0)
                 }
             }
-            CanonicalFormInner::Moves(_) => Self::thermograph(self).get_temperature(),
+            CanonicalFormInner::Moves(ref moves) => moves.thermograph().temperature(),
         }
     }
 

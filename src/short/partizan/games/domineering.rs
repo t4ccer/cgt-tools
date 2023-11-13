@@ -537,7 +537,7 @@ mod tests {
             let grid: Domineering = $grid.unwrap();
             let thermograph = grid.thermograph_direct();
             let expected_temperature = Rational::from($temp);
-            assert_eq!(thermograph.get_temperature(), expected_temperature);
+            assert_eq!(thermograph.temperature(), expected_temperature);
         };
     }
 

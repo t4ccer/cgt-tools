@@ -28,7 +28,7 @@ impl Thermograph {
     }
 
     /// Get the temperature of the thermograph where both scaffolds merge into a mast
-    pub fn get_temperature(&self) -> Rational {
+    pub fn temperature(&self) -> Rational {
         let left = self.get_left_temperature();
         let right = self.get_right_temperature();
 
@@ -492,9 +492,7 @@ impl Svg for Thermograph {
             .unwrap();
 
         let thermograph_y_min = 0;
-        let thermograph_y_max = (self.get_temperature() + mast_arrow_len)
-            .try_round()
-            .unwrap();
+        let thermograph_y_max = (self.temperature() + mast_arrow_len).try_round().unwrap();
 
         let x_axis_location = (svg_height as f32 * 0.9) as i32;
         let y_axis_location = rescale(

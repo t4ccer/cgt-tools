@@ -192,7 +192,7 @@ pub fn run(args: Args) -> Result<()> {
                 }
                 ThermographMethod::Direct => grid.thermograph_direct(),
             };
-            let temperature = thermograph.get_temperature();
+            let temperature = thermograph.temperature();
 
             // Don't save temperatures below or equal to treashold
             if let Some(temperature_threshold) = &progress_tracker.args.temperature_threshold {
