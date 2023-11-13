@@ -11,6 +11,9 @@ use crate::{
 };
 use std::hash::Hash;
 
+#[cfg(feature = "rayon")]
+use rayon::prelude::{IntoParallelIterator, ParallelIterator};
+
 /// A short partizan game
 pub trait PartizanGame: Sized + Clone + Hash + Send + Sync + Eq {
     /// List of all moves for the Left player
@@ -74,28 +77,44 @@ pub trait PartizanGame: Sized + Clone + Hash + Send + Sync + Eq {
             return cf;
         }
 
-        let mut result = CanonicalForm::new_integer(0);
-        for position in self.decompositions() {
-            match transposition_table.lookup_position(&position) {
-                Some(cached_sub_result) => result += cached_sub_result,
-                None => {
-                    let moves = Moves {
-                        left: position
-                            .left_moves()
-                            .iter()
-                            .map(|o| o.canonical_form(transposition_table))
-                            .collect(),
-                        right: position
-                            .right_moves()
-                            .iter()
-                            .map(|o| o.canonical_form(transposition_table))
-                            .collect(),
-                    };
-                    let sub_result = CanonicalForm::new_from_moves(moves);
-                    result += sub_result;
-                }
-            }
-        }
+        #[cfg(feature = "rayon")]
+        let decompositions = self.decompositions().into_par_iter();
+        #[cfg(not(feature = "rayon"))]
+        let decompositions = self.decompositions().into_iter();
+
+        let sub_results =
+            decompositions.map(
+                |position| match transposition_table.lookup_position(&position) {
+                    Some(cached_sub_result) => cached_sub_result,
+                    None => {
+                        #[cfg(feature = "rayon")]
+                        let left = position.left_moves().into_par_iter();
+                        #[cfg(not(feature = "rayon"))]
+                        let left = position.left_moves().into_iter();
+
+                        #[cfg(feature = "rayon")]
+                        let right = position.right_moves().into_par_iter();
+                        #[cfg(not(feature = "rayon"))]
+                        let right = position.right_moves().into_iter();
+
+                        let moves = Moves {
+                            left: left
+                                .map(|o| o.canonical_form(transposition_table))
+                                .collect(),
+                            right: right
+                                .map(|o| o.canonical_form(transposition_table))
+                                .collect(),
+                        };
+                        let sub_result = CanonicalForm::new_from_moves(moves);
+                        sub_result
+                    }
+                },
+            );
+
+        #[cfg(feature = "rayon")]
+        let result = sub_results.reduce(|| CanonicalForm::new_integer(0), |a, b| a + b);
+        #[cfg(not(feature = "rayon"))]
+        let result = sub_results.fold(CanonicalForm::new_integer(0), |a, b| a + b);
 
         transposition_table.insert_position(self.clone(), result.clone());
         result
