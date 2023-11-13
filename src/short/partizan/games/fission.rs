@@ -114,6 +114,7 @@ where
     }
 }
 
+#[cfg(not(tarpaulin_include))]
 impl<G> Svg for Fission<G>
 where
     G: Grid<Item = Tile> + FiniteGrid,
