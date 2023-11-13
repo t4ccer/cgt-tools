@@ -4,10 +4,9 @@
 extern crate alloc;
 use crate::{
     drawing::svg::{self, ImmSvg, Svg},
-    grid::{small_bit_grid::SmallBitGrid, FiniteGrid, Grid},
+    grid::{decompositions, move_top_left, small_bit_grid::SmallBitGrid, FiniteGrid, Grid},
     short::partizan::partizan_game::PartizanGame,
 };
-use alloc::collections::vec_deque::VecDeque;
 use cgt_derive::Tile;
 use core::{fmt, hash::Hash};
 use std::{fmt::Display, str::FromStr};
@@ -23,6 +22,13 @@ pub enum Tile {
     /// Tile occupied by domino
     #[tile(char('#'), bool(true))]
     Taken,
+}
+
+impl Tile {
+    #[inline]
+    fn is_non_blocking(self) -> bool {
+        self == Tile::Empty
+    }
 }
 
 /// A Domineering position on a rectengular grid.
@@ -114,141 +120,6 @@ where
         buf
     }
 
-    /// Remove filled rows and columns from the edges
-    ///
-    /// # Examples
-    /// ```
-    /// use cgt::short::partizan::games::domineering::Domineering;
-    /// use std::str::FromStr;
-    ///
-    /// let position: Domineering = Domineering::from_str("###|.#.|##.").unwrap();
-    /// assert_eq!(&format!("{}", position.move_top_left()), ".#.|##.");
-    /// ```
-    // Panic at `Self::empty(minimized_width, minimized_height).unwrap();` is unreachable
-    #[must_use]
-    #[cfg_attr(feature = "cargo-clippy", allow(clippy::missing_panics_doc))]
-    pub fn move_top_left(&self) -> Self {
-        let mut filled_top_rows = 0;
-        for y in 0..self.grid.height() {
-            let mut should_break = false;
-            for x in 0..self.grid.width() {
-                // If empty space then break
-                if self.grid.get(x, y) == Tile::Empty {
-                    should_break = true;
-                    break;
-                }
-            }
-            if should_break {
-                break;
-            }
-            filled_top_rows += 1;
-        }
-        let filled_top_rows = filled_top_rows;
-
-        if filled_top_rows == self.grid.height() {
-            return Self::new(G::zero_size());
-        }
-
-        let mut filled_bottom_rows = 0;
-        for y in 0..self.grid.height() {
-            let mut should_break = false;
-            for x in 0..self.grid.width() {
-                // If empty space then break
-                if self.grid.get(x, self.grid.height() - y - 1) == Tile::Empty {
-                    should_break = true;
-                    break;
-                }
-            }
-            if should_break {
-                break;
-            }
-            filled_bottom_rows += 1;
-        }
-        let filled_bottom_rows = filled_bottom_rows;
-
-        let mut filled_left_cols = 0;
-        for x in 0..self.grid.width() {
-            let mut should_break = false;
-            for y in 0..self.grid.height() {
-                // If empty space then break
-                if self.grid.get(x, y) == Tile::Empty {
-                    should_break = true;
-                    break;
-                }
-            }
-            if should_break {
-                break;
-            }
-            filled_left_cols += 1;
-        }
-        let filled_left_cols = filled_left_cols;
-
-        if filled_left_cols == self.grid.width() {
-            return Self::new(G::zero_size());
-        }
-
-        let mut filled_right_cols = 0;
-        for x in 0..self.grid.width() {
-            let mut should_break = false;
-            for y in 0..self.grid.height() {
-                // If empty space then break
-                if self.grid.get(self.grid.width() - x - 1, y) == Tile::Empty {
-                    should_break = true;
-                    break;
-                }
-            }
-            if should_break {
-                break;
-            }
-            filled_right_cols += 1;
-        }
-        let filled_right_cols = filled_right_cols;
-
-        let minimized_width = self.grid.width() - filled_left_cols - filled_right_cols;
-        let minimized_height = self.grid.height() - filled_top_rows - filled_bottom_rows;
-
-        let mut grid = G::filled(minimized_width, minimized_height, Tile::Empty).unwrap();
-        for y in filled_top_rows..(self.grid.height() - filled_bottom_rows) {
-            for x in filled_left_cols..(self.grid.width() - filled_right_cols) {
-                grid.set(
-                    x - filled_left_cols,
-                    y - filled_top_rows,
-                    self.grid.get(x, y),
-                );
-            }
-        }
-        Self::new(grid)
-    }
-
-    fn bfs(&self, visited: &mut G, x: u8, y: u8) -> Self {
-        let mut grid =
-            Self::new(G::filled(self.grid.width(), self.grid.height(), Tile::Taken).unwrap());
-
-        let mut q: VecDeque<(u8, u8)> =
-            VecDeque::with_capacity(self.grid.width() as usize * self.grid.height() as usize);
-        q.push_back((x, y));
-        while let Some((qx, qy)) = q.pop_front() {
-            visited.set(qx, qy, Tile::Taken);
-            grid.grid.set(qx, qy, Tile::Empty);
-            let directions: [(i64, i64); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
-            for (dx, dy) in directions {
-                let lx = (qx as i64) + dx;
-                let ly = (qy as i64) + dy;
-
-                if lx >= 0
-                    && lx < (self.grid.width() as i64)
-                    && ly >= 0
-                    && ly < (self.grid.height() as i64)
-                    && self.grid.get(lx as u8, ly as u8) == Tile::Empty
-                    && visited.get(lx as u8, ly as u8) == Tile::Empty
-                {
-                    q.push_back((lx as u8, ly as u8));
-                }
-            }
-        }
-        grid.move_top_left()
-    }
-
     /// Get number of empty tiles on a grid
     pub fn free_places(&self) -> usize {
         let mut res = 0;
@@ -279,7 +150,7 @@ where
                 if self.grid.get(x, y) == Tile::Empty
                     && self.grid.get(next_x, next_y) == Tile::Empty
                 {
-                    let mut new_grid: Self = self.clone();
+                    let mut new_grid = self.clone();
                     new_grid.grid.set(x, y, Tile::Taken);
                     new_grid.grid.set(next_x, next_y, Tile::Taken);
                     moves.push(new_grid.move_top_left());
@@ -289,6 +160,23 @@ where
         moves.sort_unstable();
         moves.dedup();
         moves
+    }
+
+    /// Remove filled rows and columns from the edges
+    ///
+    /// # Examples
+    /// ```
+    /// use cgt::short::partizan::games::domineering::Domineering;
+    /// use std::str::FromStr;
+    ///
+    /// let position: Domineering = Domineering::from_str("###|.#.|##.").unwrap();
+    /// assert_eq!(&format!("{}", position.move_top_left()), ".#.|##.");
+    /// ```
+    // Panic at `Self::empty(minimized_width, minimized_height).unwrap();` is unreachable
+    #[must_use]
+    #[cfg_attr(feature = "cargo-clippy", allow(clippy::missing_panics_doc))]
+    pub fn move_top_left(&self) -> Self {
+        Self::new(move_top_left(&self.grid, Tile::is_non_blocking))
     }
 }
 
@@ -412,18 +300,11 @@ where
     /// );
     /// ```
     fn decompositions(&self) -> Vec<Self> {
-        let mut visited: G = G::filled(self.grid.width(), self.grid.height(), Tile::Empty).unwrap();
-        let mut ds = Vec::new();
-
-        for y in 0..self.grid.height() {
-            for x in 0..self.grid.width() {
-                if self.grid.get(x, y) == Tile::Empty && visited.get(x, y) == Tile::Empty {
-                    ds.push(self.bfs(&mut visited, x, y));
-                }
-            }
-        }
-
-        ds
+        let directions = [(1, 0), (-1, 0), (0, 1), (0, -1)];
+        decompositions(&self.grid, Tile::is_non_blocking, Tile::Taken, &directions)
+            .into_iter()
+            .map(Self::new)
+            .collect::<Vec<_>>()
     }
 }
 
