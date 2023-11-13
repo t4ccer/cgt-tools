@@ -6,6 +6,7 @@ use crate::{display, numeric::nimber::Nimber};
 
 /// Subtraction game played on an arbitrary finite subtraction set
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Sub {
     // Invariant: sorted
     subtraction_set: Vec<u32>,
@@ -48,6 +49,7 @@ impl Sub {
 
 /// Grundy Sequence of [Sub] iterator using Grundy scale method.
 #[derive(Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct GrundySequence {
     /// The underlying subtraction game ruleset
     game: Sub,

@@ -25,6 +25,7 @@ use std::{
 
 /// A number-up-star game position that is a sum of a number, up and, nimber.
 #[derive(Debug, Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Nus {
     number: DyadicRationalNumber,
     up_multiple: i32,
@@ -320,6 +321,7 @@ impl Display for Nus {
 
 /// Left and Right moves from a given position
 #[derive(Debug, Hash, Clone, PartialEq, Eq, PartialOrd)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Moves {
     /// Left player's moves
     pub left: Vec<CanonicalForm>,
@@ -796,6 +798,7 @@ impl_from_str_via_nom!(Moves);
 /// Note that ordering is defined structurally for the sake of data structures. For proper partial
 /// ordering see instance for [`CanonicalForm`].
 #[derive(Debug, Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 enum CanonicalFormInner {
     /// Number Up Star sum
     Nus(Nus),
@@ -804,9 +807,10 @@ enum CanonicalFormInner {
     Moves(Moves),
 }
 
+/// Canonical game form
 #[repr(transparent)]
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
-/// Canonical game form
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CanonicalForm {
     inner: CanonicalFormInner,
 }

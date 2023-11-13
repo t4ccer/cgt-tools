@@ -8,6 +8,7 @@ type GridBits = u64;
 
 /// A grid with up to 64 tiles holding a single bit of information.
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SmallBitGrid<T> {
     width: u8,
     height: u8,

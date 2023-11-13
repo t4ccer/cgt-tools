@@ -14,6 +14,7 @@ use std::{fmt::Display, str::FromStr};
 
 /// Tile on a Domineering grid
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Tile)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Tile {
     /// Tile where domino can be placed
     #[tile(char('.'), bool(false), default)]
@@ -26,6 +27,7 @@ pub enum Tile {
 
 /// A Domineering position on a rectengular grid.
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Domineering<G = SmallBitGrid<Tile>> {
     grid: G,
 }

@@ -12,6 +12,7 @@ use std::fmt::Display;
 
 /// See [`pseudo_quickcheck`](self) header
 #[derive(Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PseudoQuicksort {
     sequence: Vec<u32>,
 }

@@ -4,6 +4,7 @@ use crate::grid::{FiniteGrid, Grid};
 
 /// Grid with arbitrary finite size
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct VecGrid<T> {
     width: u8,
     height: u8,

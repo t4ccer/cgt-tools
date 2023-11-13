@@ -19,6 +19,7 @@ use std::{fmt::Display, hash::Hash, str::FromStr};
 
 /// Skier type
 #[derive(Debug, Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Skier {
     /// Skier that can jump over skiers below
     Jumper,
@@ -28,6 +29,7 @@ pub enum Skier {
 
 /// Ski Jumps game grid tile
 #[derive(Debug, Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Tile {
     /// Empty tile, without skiers
     Empty,
@@ -71,6 +73,7 @@ impl CharTile for Tile {
 // NOTE: Consider caching positions of left and right skiers to avoid quadratic loops
 /// Ski Jumps game
 #[derive(Debug, Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SkiJumps<G = VecGrid<Tile>> {
     grid: G,
 }

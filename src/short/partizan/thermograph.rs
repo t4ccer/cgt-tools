@@ -12,6 +12,7 @@ use std::{cmp::Ordering, fmt::Display, iter::once};
 
 /// See [thermograph](self) header
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Thermograph {
     pub(crate) left_wall: Trajectory,
     pub(crate) right_wall: Trajectory,

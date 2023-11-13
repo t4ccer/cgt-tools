@@ -14,6 +14,7 @@ use std::{
 
 /// Tile in the game of Fission
 #[derive(Debug, Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Tile)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Tile {
     /// Empty tile without stones
     #[tile(char('.'), default)]
@@ -30,6 +31,7 @@ pub enum Tile {
 
 /// Game of Fission
 #[derive(Debug, Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Fission<G = VecGrid<Tile>> {
     grid: G,
 }

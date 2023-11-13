@@ -18,6 +18,7 @@ use std::{
 
 /// Tile on the Toads and Frogs board
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Tile)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Tile {
     /// Empty tile without any creature
     #[tile(default, char('.'))]
@@ -34,6 +35,7 @@ pub enum Tile {
 
 /// Singular row of the Toads and Frogs board
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ToadsAndFrogs {
     tiles: Vec<Tile>,
 }

@@ -8,6 +8,7 @@ use std::fmt::Display;
 /// Addition is overloaded to Nim sum.
 #[repr(transparent)]
 #[derive(Debug, Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Nimber(u32);
 
 impl Nimber {

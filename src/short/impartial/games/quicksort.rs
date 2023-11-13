@@ -12,6 +12,7 @@ use crate::{display, short::impartial::impartial_game::ImpartialGame};
 
 /// See [quickcheck](self) header
 #[derive(Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Quicksort {
     sequence: Vec<u32>,
 }

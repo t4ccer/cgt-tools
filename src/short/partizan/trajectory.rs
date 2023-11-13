@@ -8,6 +8,7 @@ use std::{cmp::Ordering, fmt::Display};
 /// A continuous piecewise linear trajectory with rational slopes and critical points.
 /// Each trajectory is defined for all rational numbers on the interval `-1 ≤ x < ∞`.
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Trajectory {
     /// A `critical point` is a point at which the trajectory changes slope, and must be strictly
     /// between `-1` and `∞`.

@@ -11,6 +11,7 @@ use std::{collections::HashSet, fmt::Display};
 
 /// Modular subtraction game
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct WindUp {
     graph: Vec<Vertex>,
     subtraction_set: Vec<u32>,
