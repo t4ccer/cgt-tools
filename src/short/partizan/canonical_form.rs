@@ -23,9 +23,6 @@ use std::{
     hash::Hash,
 };
 
-#[cfg(test)]
-use std::str::FromStr;
-
 /// A number-up-star game position that is a sum of a number, up and, nimber.
 #[derive(Debug, Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Nus {
@@ -266,57 +263,6 @@ impl Nus {
 }
 
 impl_from_str_via_nom!(Nus);
-
-#[cfg(test)]
-macro_rules! parse_nus_roundtrip {
-    ($inp: expr) => {
-        assert_eq!(
-            &format!(
-                "{}",
-                Nus::from_str($inp).expect(&format!("Could not parse: '{}'", $inp))
-            ),
-            $inp
-        );
-    };
-}
-
-#[cfg(test)]
-macro_rules! parse_nus_succeed {
-    ($inp: expr) => {
-        let res = Nus::from_str($inp);
-        if let Err(err) = res {
-            eprintln!("Parse error: {}", err);
-            panic!("Parse should succeed");
-        }
-    };
-}
-
-#[cfg(test)]
-macro_rules! parse_nus_fail {
-    ($inp: expr) => {
-        assert!(Nus::from_str($inp).is_err(), "Parse should fail");
-    };
-}
-
-#[test]
-fn parse_nus() {
-    parse_nus_fail!(""); // this shoult NOT parse to 0
-    parse_nus_fail!("42 foo");
-    parse_nus_roundtrip!("42");
-    parse_nus_roundtrip!("1/2");
-    parse_nus_roundtrip!("-8");
-    parse_nus_roundtrip!("13^");
-    parse_nus_roundtrip!("123v");
-    parse_nus_roundtrip!("13^3");
-    parse_nus_roundtrip!("123v58");
-    parse_nus_roundtrip!("13^3*");
-    parse_nus_roundtrip!("123v58*");
-    parse_nus_roundtrip!("13^3*8");
-    parse_nus_roundtrip!("123v58*34");
-    parse_nus_roundtrip!("-13^3*");
-    parse_nus_roundtrip!("-123v58*");
-    parse_nus_succeed!("  123 v   58 *  43784");
-}
 
 impl_op_ex!(+|lhs: &Nus, rhs: &Nus| -> Nus {
     Nus {
@@ -574,31 +520,30 @@ impl Moves {
         Some(result)
     }
 
+    // TODO: Rewrite it to work on mutable vec and not clone
     fn eliminate_dominated_moves(
         moves: &[CanonicalForm],
         eliminate_smaller_moves: bool,
     ) -> Vec<CanonicalForm> {
         let mut moves: Vec<Option<CanonicalForm>> = moves.iter().cloned().map(Some).collect();
 
-        for i in 0..moves.len() {
-            let move_i = match &moves[i] {
-                None => continue,
-                Some(id) => id.clone(),
-            };
-            for j in 0..i {
-                let move_j = match &moves[j] {
-                    None => continue,
-                    Some(id) => id.clone(),
-                };
+        'outer: for i in 0..moves.len() {
+            'inner: for j in 0..i {
+                let Some(move_i) = &moves[i] else {continue 'outer};
+                let Some(move_j) = &moves[j] else {continue 'inner};
 
-                if (eliminate_smaller_moves && move_i <= move_j)
-                    || (!eliminate_smaller_moves && move_j <= move_i)
-                {
+                // Split from ifs because borrow checker is sad
+                let remove_i = (eliminate_smaller_moves && move_i <= move_j)
+                    || (!eliminate_smaller_moves && move_j <= move_i);
+
+                let remove_j = (eliminate_smaller_moves && move_j <= move_i)
+                    || (!eliminate_smaller_moves && move_i <= move_j);
+
+                if remove_i {
                     moves[i] = None;
                 }
-                if (eliminate_smaller_moves && move_j <= move_i)
-                    || (!eliminate_smaller_moves && move_i <= move_j)
-                {
+
+                if remove_j {
                     moves[j] = None;
                 }
             }
@@ -1076,6 +1021,10 @@ impl CanonicalForm {
 
     /// Less than or equals comparison on two games
     pub fn leq(lhs_game: &Self, rhs_game: &Self) -> bool {
+        // NOTE: There is a possible optimization.
+        // Lessons in Play: Lemma 5.35: Let x be a number and G and H be games. If G.right_stop() > x
+        // then G > x. If RS(G) > LS(H) then G > H.
+
         if lhs_game == rhs_game {
             return true;
         }
@@ -1172,6 +1121,41 @@ impl CanonicalForm {
         }
     }
 
+    /// The number reached when Left plays first.
+    pub fn left_stop(&self) -> DyadicRationalNumber {
+        if let Some(number) = self.to_number() {
+            return number;
+        }
+
+        self.to_moves()
+            .left
+            .iter()
+            .map(|m| m.right_stop())
+            .max()
+            .expect("Not a number so must have moves")
+            .clone()
+    }
+
+    /// The number reached when Right plays first.
+    pub fn right_stop(&self) -> DyadicRationalNumber {
+        if let Some(number) = self.to_number() {
+            return number;
+        }
+
+        self.to_moves()
+            .right
+            .iter()
+            .map(|m| m.left_stop())
+            .max()
+            .expect("Not a number so must have moves")
+            .clone()
+    }
+
+    /// Confusion interval is the region between Left and Right stops
+    pub fn confusion_interval(&self) -> (DyadicRationalNumber, DyadicRationalNumber) {
+        (self.left_stop(), self.right_stop())
+    }
+
     /// Parse game using `{a,b,...|c,d,...}` notation
     #[cfg_attr(feature = "cargo-clippy", allow(clippy::missing_errors_doc))]
     pub fn parse(input: &str) -> nom::IResult<&str, Self> {
@@ -1211,6 +1195,9 @@ impl_op_ex!(-|g: &CanonicalForm| -> CanonicalForm { CanonicalForm::construct_neg
 impl_op_ex!(-|g: &CanonicalForm, h: &CanonicalForm| -> CanonicalForm {
     CanonicalForm::construct_sum(g, &CanonicalForm::construct_negative(h))
 });
+impl_op_ex!(-=|g: &mut CanonicalForm, h: &CanonicalForm| {
+    *g = CanonicalForm::construct_sum(g, &CanonicalForm::construct_negative(h))
+});
 
 impl Display for CanonicalForm {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -1221,243 +1208,61 @@ impl Display for CanonicalForm {
     }
 }
 
-#[test]
-fn constructs_integers() {
-    let eight = CanonicalForm::new_integer(8);
-    assert_eq!(&eight.to_string(), "8");
-    let eight_moves = eight.to_moves();
-    assert_eq!(&eight_moves.to_string(), "{7|}");
-    assert_eq!(
-        &eight_moves.print_deep_to_str(),
-        "{{{{{{{{{|}|}|}|}|}|}|}|}|}"
-    );
-
-    let minus_forty_two = CanonicalForm::new_integer(-42);
-    assert_eq!(&minus_forty_two.to_string(), "-42");
-}
-
-#[test]
-fn constructs_rationals() {
-    let rational = DyadicRationalNumber::new(3, 4);
-    let three_sixteenth = CanonicalForm::new_rational(rational);
-    assert_eq!(&three_sixteenth.to_string(), "3/16");
-
-    let duplicate = CanonicalForm::new_rational(rational);
-    assert_eq!(three_sixteenth, duplicate);
-}
-
-#[test]
-fn constructs_nimbers() {
-    let star = CanonicalForm::new_nus(Nus::new_nimber(Nimber::from(1)));
-    assert_eq!(&star.to_string(), "*");
-    let star_moves = star.to_moves();
-    assert_eq!(&star_moves.to_string(), "{0|0}");
-    assert_eq!(&star_moves.print_deep_to_str(), "{{|}|{|}}");
-
-    let star_three = CanonicalForm::new_nus(Nus::new_nimber(Nimber::from(3)));
-    assert_eq!(&star_three.to_string(), "*3");
-    let star_three_moves = star_three.to_moves();
-    assert_eq!(star_three_moves.to_string(), "{0, *, *2|0, *, *2}");
-
-    let one_star_two = CanonicalForm::new_nus(Nus {
-        number: DyadicRationalNumber::from(1),
-        up_multiple: 0,
-        nimber: (Nimber::from(2)),
-    });
-    assert_eq!(&one_star_two.to_string(), "1*2");
-    let one_star_two_moves = one_star_two.to_moves();
-    assert_eq!(&one_star_two_moves.to_string(), "{1, 1*|1, 1*}");
-}
-
-#[test]
-fn constructs_up() {
-    let up = CanonicalForm::new_nus(Nus {
-        number: DyadicRationalNumber::from(0),
-        up_multiple: 1,
-        nimber: Nimber::from(0),
-    });
-    assert_eq!(&up.to_string(), "^");
-
-    let up_star = CanonicalForm::new_nus(Nus {
-        number: DyadicRationalNumber::from(0),
-        up_multiple: 1,
-        nimber: Nimber::from(1),
-    });
-    assert_eq!(&up_star.to_string(), "^*");
-
-    let down = CanonicalForm::new_nus(Nus {
-        number: DyadicRationalNumber::from(0),
-        up_multiple: -3,
-        nimber: Nimber::from(0),
-    });
-    assert_eq!(&down.to_string(), "v3");
-}
-
-#[test]
-fn nimber_is_its_negative() {
-    let star = CanonicalForm::new_nimber(DyadicRationalNumber::from(0), Nimber::from(4));
-    assert_eq!(&star.to_string(), "*4");
-
-    let neg_star = star.construct_negative();
-    assert_eq!(star, neg_star);
-}
-
-#[test]
-fn gets_moves() {
-    let down_moves = CanonicalForm::new_nus(Nus::from_str("v").unwrap()).to_moves();
-    assert_eq!(down_moves.to_string(), "{*|0}");
-    assert_eq!(&down_moves.print_deep_to_str(), "{{{|}|{|}}|{|}}");
-
-    let up_moves = CanonicalForm::new_nus(Nus::from_str("^").unwrap()).to_moves();
-    assert_eq!(&up_moves.to_string(), "{0|*}");
-    assert_eq!(up_moves.print_deep_to_str(), "{{|}|{{|}|{|}}}");
-
-    let moves = Moves {
-        left: vec![CanonicalForm::new_nus(Nus::from_str("v").unwrap())],
-        right: vec![CanonicalForm::new_nus(Nus::from_str("-2").unwrap())],
-    };
-    assert_eq!(&moves.to_string(), "{v|-2}");
-    assert_eq!(&moves.print_deep_to_str(), "{{{{|}|{|}}|{|}}|{|{|{|}}}}");
-}
-
-#[test]
-fn simplifies_moves() {
-    let one = CanonicalForm::new_nus(Nus::from_str("1").unwrap());
-    let star = CanonicalForm::new_nus(Nus::from_str("*").unwrap());
-
-    let moves_l = Moves {
-        left: vec![one],
-        right: vec![star],
-    };
-    let left_id = CanonicalForm::new_from_moves(moves_l);
-    assert_eq!(&left_id.to_string(), "{1|*}");
-
-    let weird = Moves {
-        left: vec![CanonicalForm::new_nus(Nus::from_str("1v2*").unwrap())],
-        right: vec![CanonicalForm::new_nus(Nus::from_str("1").unwrap())],
-    };
-    let weird = CanonicalForm::new_from_moves(weird);
-    assert_eq!(&weird.to_string(), "1v3");
-    let weird_moves = weird.to_moves();
-    assert_eq!(&weird_moves.to_string(), "{1v2*|1}");
-    assert_eq!(&weird_moves.left[0].to_string(), "1v2*");
-    assert_eq!(&weird_moves.left[0].to_moves().to_string(), "{1v|1}");
-    assert_eq!(
-        &weird_moves.print_deep_to_str(),
-        "{{{{{{|}|}|{{|}|}}|{{|}|}}|{{|}|}}|{{|}|}}"
-    );
-
-    // Another case:
-
-    let weird_right = Moves {
-        left: vec![CanonicalForm::new_nus(Nus::from_str("^").unwrap())],
-        right: vec![CanonicalForm::new_nus(Nus::from_str("-2").unwrap())],
-    };
-    let weird_right = CanonicalForm::new_from_moves(weird_right);
-    assert_eq!(&weird_right.to_string(), "{^|-2}");
-    let weird_right_moves = weird_right.to_moves();
-    assert_eq!(&weird_right_moves.to_string(), "{^|-2}");
-    assert_eq!(
-        &weird_right_moves.print_deep_to_str(),
-        "{{{|}|{{|}|{|}}}|{|{|{|}}}}"
-    );
-
-    let weird = Moves {
-        left: vec![],
-        right: vec![weird_right],
-    };
-    assert_ne!(
-        &Moves::print_deep_to_str(&weird.canonicalize()),
-        "{|{{{|}|{{|}|{|}}}|{|{|{|}}}}}"
-    );
-    assert_eq!(&weird.canonicalize().to_string(), "{|}");
-    let weird = CanonicalForm::new_from_moves(weird);
-    let weird_moves = weird.to_moves();
-    assert_eq!(&weird_moves.to_string(), "{|}");
-    assert_eq!(&weird.to_string(), "0");
-}
-
-#[test]
-fn sum_works() {
-    let zero = CanonicalForm::new_integer(0);
-    let one = CanonicalForm::new_integer(1);
-
-    let one_zero = CanonicalForm::new_from_moves(Moves {
-        left: vec![one.clone()],
-        right: vec![zero.clone()],
-    });
-    let zero_one = CanonicalForm::new_from_moves(Moves {
-        left: vec![zero],
-        right: vec![one],
-    });
-
-    let sum = one_zero + zero_one;
-    assert_eq!(&sum.to_string(), "{3/2|1/2}");
-}
-
-#[test]
-fn temp_of_one_minus_one_is_one() {
-    let one = CanonicalForm::new_integer(1);
-    let negative_one = CanonicalForm::new_integer(-1);
-
-    let moves = Moves {
-        left: vec![one],
-        right: vec![negative_one],
-    };
-    let g = CanonicalForm::new_from_moves(moves);
-    assert_eq!(g.temperature(), Rational::from(1));
-}
-
 impl_from_str_via_nom!(CanonicalForm);
 
-#[test]
-fn parse_games() {
-    macro_rules! test_game_parse {
-        ($inp: expr, $expected: expr) => {{
-            let g = CanonicalForm::parse($inp).expect("Could not parse").1;
-            assert_eq!($expected, g.to_string());
-        }};
-    }
-
-    test_game_parse!("{|}", "0");
-    test_game_parse!("{1,2|}", "3");
-    test_game_parse!("{42|*}", "{42|*}");
-    test_game_parse!("123", "123");
-    test_game_parse!("{1/2|2}", "1");
-    test_game_parse!("{3/4|7/8}", "13/16");
-    test_game_parse!("{6/8|7/8}", "13/16");
-    test_game_parse!("{12/16|14/16}", "13/16");
-}
-
-#[test]
-fn ordering_works() {
-    macro_rules! test_ordering {
-        ($lhs:expr, $rhs:expr, $expected:expr) => {
-            assert_eq!(
-                PartialOrd::partial_cmp(
-                    &CanonicalForm::from_str($lhs).unwrap(),
-                    &CanonicalForm::from_str($rhs).unwrap()
-                ),
-                $expected
-            )
-        };
-    }
-
-    test_ordering!("0", "*", None);
-    test_ordering!("*", "*", Some(Ordering::Equal));
-    test_ordering!("*2", "*", None);
-    test_ordering!("*2", "*2", Some(Ordering::Equal));
-    test_ordering!("*", "*2", None);
-    test_ordering!("1", "2", Some(Ordering::Less));
-    test_ordering!("-1", "*", Some(Ordering::Less));
-    test_ordering!("1", "*", Some(Ordering::Greater));
-}
-
-#[cfg(all(test, not(miri)))]
+#[cfg(test)]
 mod tests {
     use super::*;
     use quickcheck::{Arbitrary, Gen, QuickCheck};
-    use std::ops::Neg;
+    use std::{ops::Neg, str::FromStr};
+
+    macro_rules! parse_nus_roundtrip {
+        ($inp: expr) => {
+            assert_eq!(
+                &format!(
+                    "{}",
+                    Nus::from_str($inp).expect(&format!("Could not parse: '{}'", $inp))
+                ),
+                $inp
+            );
+        };
+    }
+
+    macro_rules! parse_nus_succeed {
+        ($inp: expr) => {
+            let res = Nus::from_str($inp);
+            if let Err(err) = res {
+                eprintln!("Parse error: {}", err);
+                panic!("Parse should succeed");
+            }
+        };
+    }
+
+    macro_rules! parse_nus_fail {
+        ($inp: expr) => {
+            assert!(Nus::from_str($inp).is_err(), "Parse should fail");
+        };
+    }
+
+    #[test]
+    fn parse_nus() {
+        parse_nus_fail!(""); // this shoult NOT parse to 0
+        parse_nus_fail!("42 foo");
+        parse_nus_roundtrip!("42");
+        parse_nus_roundtrip!("1/2");
+        parse_nus_roundtrip!("-8");
+        parse_nus_roundtrip!("13^");
+        parse_nus_roundtrip!("123v");
+        parse_nus_roundtrip!("13^3");
+        parse_nus_roundtrip!("123v58");
+        parse_nus_roundtrip!("13^3*");
+        parse_nus_roundtrip!("123v58*");
+        parse_nus_roundtrip!("13^3*8");
+        parse_nus_roundtrip!("123v58*34");
+        parse_nus_roundtrip!("-13^3*");
+        parse_nus_roundtrip!("-123v58*");
+        parse_nus_succeed!("  123 v   58 *  43784");
+    }
 
     // TODO: Rewrite with proptest
 
@@ -1509,5 +1314,264 @@ mod tests {
         } else {
             -n
         }
+    }
+
+    #[test]
+    fn constructs_integers() {
+        let eight = CanonicalForm::new_integer(8);
+        assert_eq!(&eight.to_string(), "8");
+        let eight_moves = eight.to_moves();
+        assert_eq!(&eight_moves.to_string(), "{7|}");
+        assert_eq!(
+            &eight_moves.print_deep_to_str(),
+            "{{{{{{{{{|}|}|}|}|}|}|}|}|}"
+        );
+
+        let minus_forty_two = CanonicalForm::new_integer(-42);
+        assert_eq!(&minus_forty_two.to_string(), "-42");
+    }
+
+    #[test]
+    fn constructs_rationals() {
+        let rational = DyadicRationalNumber::new(3, 4);
+        let three_sixteenth = CanonicalForm::new_rational(rational);
+        assert_eq!(&three_sixteenth.to_string(), "3/16");
+
+        let duplicate = CanonicalForm::new_rational(rational);
+        assert_eq!(three_sixteenth, duplicate);
+    }
+
+    #[test]
+    fn constructs_nimbers() {
+        let star = CanonicalForm::new_nus(Nus::new_nimber(Nimber::from(1)));
+        assert_eq!(&star.to_string(), "*");
+        let star_moves = star.to_moves();
+        assert_eq!(&star_moves.to_string(), "{0|0}");
+        assert_eq!(&star_moves.print_deep_to_str(), "{{|}|{|}}");
+
+        let star_three = CanonicalForm::new_nus(Nus::new_nimber(Nimber::from(3)));
+        assert_eq!(&star_three.to_string(), "*3");
+        let star_three_moves = star_three.to_moves();
+        assert_eq!(star_three_moves.to_string(), "{0, *, *2|0, *, *2}");
+
+        let one_star_two = CanonicalForm::new_nus(Nus {
+            number: DyadicRationalNumber::from(1),
+            up_multiple: 0,
+            nimber: (Nimber::from(2)),
+        });
+        assert_eq!(&one_star_two.to_string(), "1*2");
+        let one_star_two_moves = one_star_two.to_moves();
+        assert_eq!(&one_star_two_moves.to_string(), "{1, 1*|1, 1*}");
+    }
+
+    #[test]
+    fn constructs_up() {
+        let up = CanonicalForm::new_nus(Nus {
+            number: DyadicRationalNumber::from(0),
+            up_multiple: 1,
+            nimber: Nimber::from(0),
+        });
+        assert_eq!(&up.to_string(), "^");
+
+        let up_star = CanonicalForm::new_nus(Nus {
+            number: DyadicRationalNumber::from(0),
+            up_multiple: 1,
+            nimber: Nimber::from(1),
+        });
+        assert_eq!(&up_star.to_string(), "^*");
+
+        let down = CanonicalForm::new_nus(Nus {
+            number: DyadicRationalNumber::from(0),
+            up_multiple: -3,
+            nimber: Nimber::from(0),
+        });
+        assert_eq!(&down.to_string(), "v3");
+    }
+
+    #[test]
+    fn nimber_is_its_negative() {
+        let star = CanonicalForm::new_nimber(DyadicRationalNumber::from(0), Nimber::from(4));
+        assert_eq!(&star.to_string(), "*4");
+
+        let neg_star = star.construct_negative();
+        assert_eq!(star, neg_star);
+    }
+
+    #[test]
+    fn gets_moves() {
+        let down_moves = CanonicalForm::new_nus(Nus::from_str("v").unwrap()).to_moves();
+        assert_eq!(down_moves.to_string(), "{*|0}");
+        assert_eq!(&down_moves.print_deep_to_str(), "{{{|}|{|}}|{|}}");
+
+        let up_moves = CanonicalForm::new_nus(Nus::from_str("^").unwrap()).to_moves();
+        assert_eq!(&up_moves.to_string(), "{0|*}");
+        assert_eq!(up_moves.print_deep_to_str(), "{{|}|{{|}|{|}}}");
+
+        let moves = Moves {
+            left: vec![CanonicalForm::new_nus(Nus::from_str("v").unwrap())],
+            right: vec![CanonicalForm::new_nus(Nus::from_str("-2").unwrap())],
+        };
+        assert_eq!(&moves.to_string(), "{v|-2}");
+        assert_eq!(&moves.print_deep_to_str(), "{{{{|}|{|}}|{|}}|{|{|{|}}}}");
+    }
+
+    #[test]
+    fn simplifies_moves() {
+        let one = CanonicalForm::new_nus(Nus::from_str("1").unwrap());
+        let star = CanonicalForm::new_nus(Nus::from_str("*").unwrap());
+
+        let moves_l = Moves {
+            left: vec![one],
+            right: vec![star],
+        };
+        let left_id = CanonicalForm::new_from_moves(moves_l);
+        assert_eq!(&left_id.to_string(), "{1|*}");
+
+        let weird = Moves {
+            left: vec![CanonicalForm::new_nus(Nus::from_str("1v2*").unwrap())],
+            right: vec![CanonicalForm::new_nus(Nus::from_str("1").unwrap())],
+        };
+        let weird = CanonicalForm::new_from_moves(weird);
+        assert_eq!(&weird.to_string(), "1v3");
+        let weird_moves = weird.to_moves();
+        assert_eq!(&weird_moves.to_string(), "{1v2*|1}");
+        assert_eq!(&weird_moves.left[0].to_string(), "1v2*");
+        assert_eq!(&weird_moves.left[0].to_moves().to_string(), "{1v|1}");
+        assert_eq!(
+            &weird_moves.print_deep_to_str(),
+            "{{{{{{|}|}|{{|}|}}|{{|}|}}|{{|}|}}|{{|}|}}"
+        );
+
+        // Another case:
+
+        let weird_right = Moves {
+            left: vec![CanonicalForm::new_nus(Nus::from_str("^").unwrap())],
+            right: vec![CanonicalForm::new_nus(Nus::from_str("-2").unwrap())],
+        };
+        let weird_right = CanonicalForm::new_from_moves(weird_right);
+        assert_eq!(&weird_right.to_string(), "{^|-2}");
+        let weird_right_moves = weird_right.to_moves();
+        assert_eq!(&weird_right_moves.to_string(), "{^|-2}");
+        assert_eq!(
+            &weird_right_moves.print_deep_to_str(),
+            "{{{|}|{{|}|{|}}}|{|{|{|}}}}"
+        );
+
+        let weird = Moves {
+            left: vec![],
+            right: vec![weird_right],
+        };
+        assert_ne!(
+            &Moves::print_deep_to_str(&weird.canonicalize()),
+            "{|{{{|}|{{|}|{|}}}|{|{|{|}}}}}"
+        );
+        assert_eq!(&weird.canonicalize().to_string(), "{|}");
+        let weird = CanonicalForm::new_from_moves(weird);
+        let weird_moves = weird.to_moves();
+        assert_eq!(&weird_moves.to_string(), "{|}");
+        assert_eq!(&weird.to_string(), "0");
+    }
+
+    #[test]
+    fn sum_works() {
+        let zero = CanonicalForm::new_integer(0);
+        let one = CanonicalForm::new_integer(1);
+
+        let one_zero = CanonicalForm::new_from_moves(Moves {
+            left: vec![one.clone()],
+            right: vec![zero.clone()],
+        });
+        let zero_one = CanonicalForm::new_from_moves(Moves {
+            left: vec![zero],
+            right: vec![one],
+        });
+
+        let sum = one_zero + zero_one;
+        assert_eq!(&sum.to_string(), "{3/2|1/2}");
+    }
+
+    #[test]
+    fn temp_of_one_minus_one_is_one() {
+        let one = CanonicalForm::new_integer(1);
+        let negative_one = CanonicalForm::new_integer(-1);
+
+        let moves = Moves {
+            left: vec![one],
+            right: vec![negative_one],
+        };
+        let g = CanonicalForm::new_from_moves(moves);
+        assert_eq!(g.temperature(), Rational::from(1));
+    }
+
+    #[test]
+    fn parse_games() {
+        macro_rules! test_game_parse {
+            ($inp: expr, $expected: expr) => {{
+                let g = CanonicalForm::parse($inp).expect("Could not parse").1;
+                assert_eq!($expected, g.to_string());
+            }};
+        }
+
+        test_game_parse!("{|}", "0");
+        test_game_parse!("{1,2|}", "3");
+        test_game_parse!("{42|*}", "{42|*}");
+        test_game_parse!("123", "123");
+        test_game_parse!("{1/2|2}", "1");
+        test_game_parse!("{3/4|7/8}", "13/16");
+        test_game_parse!("{6/8|7/8}", "13/16");
+        test_game_parse!("{12/16|14/16}", "13/16");
+    }
+
+    #[test]
+    fn ordering_works() {
+        macro_rules! test_ordering {
+            ($lhs:expr, $rhs:expr, $expected:expr) => {
+                assert_eq!(
+                    PartialOrd::partial_cmp(
+                        &CanonicalForm::from_str($lhs).unwrap(),
+                        &CanonicalForm::from_str($rhs).unwrap()
+                    ),
+                    $expected
+                )
+            };
+        }
+
+        test_ordering!("0", "*", None);
+        test_ordering!("*", "*", Some(Ordering::Equal));
+        test_ordering!("*2", "*", None);
+        test_ordering!("*2", "*2", Some(Ordering::Equal));
+        test_ordering!("*", "*2", None);
+        test_ordering!("1", "2", Some(Ordering::Less));
+        test_ordering!("-1", "*", Some(Ordering::Less));
+        test_ordering!("1", "*", Some(Ordering::Greater));
+    }
+
+    macro_rules! assert_stops {
+        ($cf:expr, $left:expr, $right:expr) => {
+            let g = CanonicalForm::from_str($cf).unwrap();
+            let (left_stop, right_stop) = g.confusion_interval();
+            assert_eq!(
+                left_stop,
+                DyadicRationalNumber::from_str($left).expect("Could not parse left stop"),
+                "Invalid left stop"
+            );
+            assert_eq!(
+                right_stop,
+                DyadicRationalNumber::from_str($right).expect("Could not parse right stop"),
+                "Invalid right stop"
+            );
+            assert!(
+                left_stop >= right_stop,
+                "Left stop shold be geq than right stop"
+            );
+        };
+    }
+
+    #[test]
+    fn stops_work() {
+        assert_stops!("{{3|2}|0}", "2", "0");
+        assert_stops!("v", "0", "0");
+        assert_stops!("*", "0", "0");
+        assert_stops!("^", "0", "0");
     }
 }

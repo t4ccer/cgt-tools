@@ -1,8 +1,7 @@
-use std::{fmt::Write, str::FromStr};
-
 use anyhow::{Context, Result};
 use cgt::short::partizan::canonical_form::CanonicalForm;
 use clap::{arg, Parser};
+use std::{fmt::Write, str::FromStr};
 
 #[derive(Parser, Debug, Clone)]
 pub struct Args {
