@@ -1214,6 +1214,39 @@ impl CanonicalForm {
         new_moves.canonical_form()
     }
 
+    /// Heat position by given `temperature`.
+    ///
+    /// Heating is the inverse of cooling, defined as `\int^t G = G` if `G` is a number, or
+    /// `\int^t G = {\int^t G^L + t | \int^t G^R - t}` otherwise
+    pub fn heat(&self, temperature: DyadicRationalNumber) -> Self {
+        if let Some(nus) = self.to_nus() {
+            if nus.is_number() {
+                return self.clone();
+            }
+        }
+
+        let temperature_game = Self::new_dyadic(temperature);
+
+        let moves = self.to_moves();
+
+        let mut new_left_moves = Vec::with_capacity(moves.left.len());
+        for left_move in moves.left {
+            new_left_moves.push(left_move.heat(temperature) + &temperature_game);
+        }
+
+        let mut new_right_moves = Vec::with_capacity(moves.right.len());
+        for right_move in moves.right {
+            new_right_moves.push(right_move.heat(temperature) - &temperature_game);
+        }
+
+        let new_moves = Moves {
+            left: new_left_moves,
+            right: new_right_moves,
+        };
+
+        new_moves.canonical_form()
+    }
+
     /// Parse game using `{a,b,...|c,d,...}` notation
     #[cfg_attr(feature = "cargo-clippy", allow(clippy::missing_errors_doc))]
     pub fn parse(input: &str) -> nom::IResult<&str, Self> {
@@ -1654,5 +1687,24 @@ mod tests {
         assert_cooled!("{2|-1}", "2", "1/2");
         assert_cooled!("{2|-1}", "3", "1/2");
         assert_cooled!("{2|-1}", "42", "1/2");
+    }
+
+    #[test]
+    fn heating_numbers() {
+        let g = CanonicalForm::new_dyadic(DyadicRationalNumber::from(42));
+        let heated = g.heat(DyadicRationalNumber::from(1));
+        assert_eq!(g, heated);
+    }
+
+    #[test]
+    fn cooling_heating_roundtrip() {
+        let g = CanonicalForm::from_str("{2|-1}").unwrap();
+        let t = DyadicRationalNumber::from_str("3/2").unwrap();
+        let cooled = g.cool(t);
+        let frozen = g.cool(t + DyadicRationalNumber::from(1));
+        let particle = &cooled - &frozen;
+        let heated = particle.heat(t);
+        assert_eq!(heated.to_string(), "{3/2|-3/2}");
+        assert_eq!(g, &frozen + &heated);
     }
 }
