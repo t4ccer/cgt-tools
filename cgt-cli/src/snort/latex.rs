@@ -99,7 +99,7 @@ pub fn run(args: Args) -> Result<()> {
                 .stdin
                 .take()
                 .context("Could not open graphviz stdin")?
-                .write_all(position.position.to_graphviz().as_bytes())
+                .write_all(position.object.to_graphviz().as_bytes())
                 .context("Could not write to graphviz stdin")?;
 
             // Await result and check for errors

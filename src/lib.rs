@@ -23,6 +23,7 @@
 )]
 
 pub mod drawing;
+pub mod genetic_algorithm;
 pub mod graph;
 pub mod grid;
 pub mod loopy;

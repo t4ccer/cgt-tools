@@ -1,6 +1,7 @@
-use crate::snort::common::{Log, Scored};
-use anyhow::Result;
+use crate::{io::FileOrStderr, snort::common::Log};
+use anyhow::{Context, Result};
 use cgt::{
+    genetic_algorithm::{Algorithm, GeneticAlgorithm, Scored},
     graph::undirected,
     numeric::rational::Rational,
     short::partizan::{
@@ -13,171 +14,178 @@ use clap::{self, Parser};
 use rand::{seq::SliceRandom, Rng};
 use std::{
     cmp::min,
-    collections::HashSet,
     fs::File,
-    io::{stderr, BufReader, BufWriter, Write},
-    path::Path,
+    io::{BufReader, BufWriter, Write},
+    num::NonZeroUsize,
 };
 
 #[derive(Parser, Debug, Clone)]
 pub struct Args {
     #[arg(long)]
-    generation_size: usize,
+    generation_size: NonZeroUsize,
 
+    /// Do not generate graphs with more that that vertices
     #[arg(long)]
     max_graph_vertices: usize,
 
     #[arg(long)]
     mutation_rate: f32,
 
+    /// Stop after running that many generations. Run forever otherwise
     #[arg(long, default_value = None)]
     generation_limit: Option<usize>,
 
-    /// Path to saved snapshot
+    /// Path to saved snapshot to be loaded
     #[arg(long, default_value = None)]
     snapshot_load_file: Option<String>,
 
+    /// Path to save snapshot file
     #[arg(long)]
     snapshot_save_file: String,
 
+    /// Path to output logs
     #[arg(long)]
-    out_file: String,
+    out_file: FileOrStderr,
 
+    /// Clean up transpositon table after that many generations
     #[arg(long, default_value_t = 50)]
     cleanup_interval: usize,
 
+    /// Save if score is above that value
     #[arg(long, default_value_t = Rational::from(0))]
     save_eq_or_above: Rational,
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
-struct Snapshot {
-    specimen: Vec<Snort>,
+struct SnortTemperatureDegreeDifference {
+    transposition_table: ParallelTranspositionTable<Snort>,
+    max_graph_vertices: usize,
+    mutation_rate: f32,
 }
 
-struct Alg {
-    args: Args,
-    specimen: Vec<Scored>,
-    all_time_best: HashSet<Scored>,
-    log_writer: BufWriter<Box<dyn Write>>,
-}
-
-fn random_position(max_graph_vertices: usize) -> Snort {
-    let mut rng = rand::thread_rng();
-    let graph_size = rng.gen_range(1..=max_graph_vertices);
-    let graph = undirected::Graph::empty(graph_size);
-    let mut position = Snort::new(graph);
-    mutate(&mut position, 1.0);
-    position
-}
-
-fn mutate(position: &mut Snort, mutation_rate: f32) {
-    let mut rng = rand::thread_rng();
-
-    // Mutate vertices
-    if position.graph.size() > 1 {
-        let mutation_roll: f32 = rng.gen();
-        if mutation_roll < mutation_rate {
-            let to_remove = rng.gen_range(0..position.graph.size());
-            position.graph.remove_vertex(to_remove);
-            position.vertices.remove(to_remove);
-        }
-    }
-    // TODO: Check for max size
-    // if position.graph.size()
-    let mutation_roll: f32 = rng.gen();
-    if mutation_roll < mutation_rate {
-        position.graph.add_vertex();
-        position
-            .vertices
-            .push(VertexKind::Single(VertexColor::Empty));
-        let another_vertex = rng.gen_range(0..position.graph.size() - 1);
-        position
-            .graph
-            .connect(position.graph.size() - 1, another_vertex, true);
-    }
-
-    // Mutate edges
-    for v in position.graph.vertices() {
-        for u in position.graph.vertices() {
-            if v == u {
-                continue;
-            }
-
+impl SnortTemperatureDegreeDifference {
+    fn mutate_with_rate(
+        &self,
+        position: &mut Snort,
+        rng: &mut rand::rngs::ThreadRng,
+        mutation_rate: f32,
+    ) {
+        // Mutate vertices
+        if position.graph.size() > 1 {
             let mutation_roll: f32 = rng.gen();
             if mutation_roll < mutation_rate {
-                position
-                    .graph
-                    .connect(v, u, !position.graph.are_adjacent(v, u));
+                let to_remove = rng.gen_range(0..position.graph.size());
+                position.graph.remove_vertex(to_remove);
+                position.vertices.remove(to_remove);
+            }
+        }
+        // TODO: Check for max size
+        // if position.graph.size()
+        let mutation_roll: f32 = rng.gen();
+        if mutation_roll < mutation_rate {
+            position.graph.add_vertex();
+            position
+                .vertices
+                .push(VertexKind::Single(VertexColor::Empty));
+            let another_vertex = rng.gen_range(0..position.graph.size() - 1);
+            position
+                .graph
+                .connect(position.graph.size() - 1, another_vertex, true);
+        }
+
+        // Mutate edges
+        for v in position.graph.vertices() {
+            for u in position.graph.vertices() {
+                if v == u {
+                    continue;
+                }
+
+                let mutation_roll: f32 = rng.gen();
+                if mutation_roll < mutation_rate {
+                    position
+                        .graph
+                        .connect(v, u, !position.graph.are_adjacent(v, u));
+                }
+            }
+        }
+
+        // Mutate colors
+        let available_colors = vec![
+            VertexColor::Empty,
+            VertexColor::TintLeft,
+            VertexColor::TintRight,
+        ];
+        for idx in 0..position.vertices.len() {
+            let mutation_roll: f32 = rng.gen();
+            if mutation_roll < mutation_rate {
+                position.vertices[idx] = VertexKind::Single(*available_colors.choose(rng).unwrap());
             }
         }
     }
+}
 
-    // Mutate colors
-    let available_colors = vec![
-        VertexColor::Empty,
-        VertexColor::TintLeft,
-        VertexColor::TintRight,
-    ];
-    for idx in 0..position.vertices.len() {
-        let mutation_roll: f32 = rng.gen();
-        if mutation_roll < mutation_rate {
-            position.vertices[idx] =
-                VertexKind::Single(*available_colors.choose(&mut rng).unwrap());
+impl Algorithm<Snort, Rational> for SnortTemperatureDegreeDifference {
+    fn mutate(&self, position: &mut Snort, rng: &mut rand::rngs::ThreadRng) {
+        self.mutate_with_rate(position, rng, self.mutation_rate);
+    }
+
+    fn cross(&self, lhs: &Snort, rhs: &Snort, _rng: &mut rand::rngs::ThreadRng) -> Snort {
+        let mut rng = rand::thread_rng();
+
+        let mut positions = [lhs, rhs];
+        positions.sort_by_key(|pos| pos.graph.size());
+        let [smaller, larger] = positions;
+
+        let new_size = rng.gen_range(1..=larger.graph.size());
+        let mut new_graph = undirected::Graph::empty(new_size);
+
+        for v in 0..(min(new_size, smaller.graph.size())) {
+            for u in 0..(min(new_size, smaller.graph.size())) {
+                new_graph.connect(v, u, smaller.graph.are_adjacent(v, u));
+            }
         }
+        for v in (min(new_size, smaller.graph.size()))..(min(new_size, larger.graph.size())) {
+            for u in (min(new_size, smaller.graph.size()))..(min(new_size, larger.graph.size())) {
+                new_graph.connect(v, u, larger.graph.are_adjacent(v, u));
+            }
+        }
+
+        let mut colors = smaller.vertices[0..(min(new_size, smaller.graph.size()))].to_vec();
+        colors.extend(
+            &larger.vertices
+                [(min(new_size, smaller.graph.size()))..(min(new_size, larger.graph.size()))],
+        );
+
+        Snort::with_colors(colors, new_graph).unwrap()
+    }
+
+    fn lowest_score(&self) -> Rational {
+        Rational::NegativeInfinity
+    }
+
+    fn score(&self, position: &Snort) -> Rational {
+        let degree_sum = position.graph.degrees().iter().sum::<usize>();
+        if position.vertices.is_empty() || degree_sum == 0 || !position.graph.is_connected() {
+            return Rational::NegativeInfinity;
+        }
+
+        let game = position.canonical_form(&self.transposition_table);
+        let temp = game.temperature();
+        let degree = position.degree();
+        temp.to_rational() - Rational::from(degree as i64)
+    }
+
+    fn random(&self, rng: &mut rand::rngs::ThreadRng) -> Snort {
+        let graph_size = rng.gen_range(1..=self.max_graph_vertices);
+        let graph = undirected::Graph::empty(graph_size);
+        let mut position = Snort::new(graph);
+        self.mutate_with_rate(&mut position, rng, 1.0);
+        position
     }
 }
 
-fn score<'pos>(
-    position: &'pos Snort,
-    transposition_table: &ParallelTranspositionTable<Snort>,
-) -> Rational {
-    let degree_sum = position.graph.degrees().iter().sum::<usize>();
-    if position.vertices.is_empty() || degree_sum == 0 || !position.graph.is_connected() {
-        return Rational::NegativeInfinity;
-    }
-
-    temp_dif(position, transposition_table)
-}
-
-fn temp_dif<'pos>(
-    position: &'pos Snort,
-    transposition_table: &ParallelTranspositionTable<Snort>,
-) -> Rational {
-    let game = position.canonical_form(transposition_table);
-    let temp = game.temperature();
-    let degree = position.degree();
-    temp.to_rational() - Rational::from(degree as i64)
-}
-
-fn cross(lhs: &Snort, rhs: &Snort) -> Snort {
-    let mut rng = rand::thread_rng();
-
-    let mut positions = [lhs, rhs];
-    positions.sort_by_key(|pos| pos.graph.size());
-    let [smaller, larger] = positions;
-
-    let new_size = rng.gen_range(1..=larger.graph.size());
-    let mut new_graph = undirected::Graph::empty(new_size);
-
-    for v in 0..(min(new_size, smaller.graph.size())) {
-        for u in 0..(min(new_size, smaller.graph.size())) {
-            new_graph.connect(v, u, smaller.graph.are_adjacent(v, u));
-        }
-    }
-    for v in (min(new_size, smaller.graph.size()))..(min(new_size, larger.graph.size())) {
-        for u in (min(new_size, smaller.graph.size()))..(min(new_size, larger.graph.size())) {
-            new_graph.connect(v, u, larger.graph.are_adjacent(v, u));
-        }
-    }
-
-    let mut colors = smaller.vertices[0..(min(new_size, smaller.graph.size()))].to_vec();
-    colors.extend(
-        &larger.vertices
-            [(min(new_size, smaller.graph.size()))..(min(new_size, larger.graph.size()))],
-    );
-
-    Snort::with_colors(colors, new_graph).unwrap()
+#[derive(serde::Serialize, serde::Deserialize)]
+struct Snapshot {
+    specimen: Vec<Scored<Snort, Rational>>,
 }
 
 fn seed_positions() -> Vec<Snort> {
@@ -186,7 +194,7 @@ fn seed_positions() -> Vec<Snort> {
     // 1--3--4--10-12
     //  /   /|\     \
     // 2   7 8 9     13
-    let g1 = undirected::Graph::from_edges(
+    let pos_1 = Snort::new(undirected::Graph::from_edges(
         14,
         &[
             (0, 3),
@@ -203,8 +211,7 @@ fn seed_positions() -> Vec<Snort> {
             (10, 12),
             (10, 13),
         ],
-    );
-    let pos1 = Snort::new(g1);
+    ));
 
     //         9
     //         |
@@ -215,7 +222,7 @@ fn seed_positions() -> Vec<Snort> {
     // 2  6   8 -13
     //        |
     //        14
-    let g2 = undirected::Graph::from_edges(
+    let pos_2 = Snort::new(undirected::Graph::from_edges(
         15,
         &[
             (0, 3),
@@ -233,169 +240,83 @@ fn seed_positions() -> Vec<Snort> {
             (8, 13),
             (8, 14),
         ],
-    );
-    let pos2 = Snort::new(g2);
-    vec![pos1, pos2]
-}
+    ));
 
-impl Alg {
-    fn new_random(args: Args) -> Self {
-        let mut specimen = Vec::with_capacity(args.generation_size);
-
-        // TODO: Add --no-seed flag to omit this
-        specimen.extend(seed_positions().into_iter().map(Scored::without_score));
-
-        for _ in specimen.len()..args.generation_size {
-            let scored = Scored {
-                position: random_position(args.max_graph_vertices),
-                score: Rational::NegativeInfinity,
-            };
-            specimen.push(scored);
-        }
-        Alg::with_specimen(args, specimen)
-    }
-
-    fn from_snapshot(args: Args, snapshot: Snapshot) -> Self {
-        let specimen = snapshot
-            .specimen
-            .into_iter()
-            .map(|position| Scored {
-                position,
-                score: Rational::NegativeInfinity,
-            })
-            .collect();
-        Alg::with_specimen(args, specimen)
-    }
-
-    fn with_specimen(args: Args, specimen: Vec<Scored>) -> Self {
-        let file = if Path::new(&args.out_file).exists() {
-            File::open(&args.out_file)
-        } else {
-            File::create(&args.out_file)
-        }
-        .unwrap();
-        let log_writer: BufWriter<Box<dyn Write>> = BufWriter::new(Box::new(file));
-
-        Alg {
-            args,
-            specimen,
-            all_time_best: HashSet::new(),
-            log_writer,
-        }
-    }
-
-    // TODO: parallel with rayon
-    fn score(&mut self, tt: &ParallelTranspositionTable<Snort>) {
-        let specimen = &mut self.specimen;
-        for spec in specimen {
-            spec.score = score(&spec.position, tt);
-            if spec.score >= self.args.save_eq_or_above {
-                if self.all_time_best.insert(spec.clone()) {
-                    let canonical_form = spec.position.canonical_form(tt);
-                    let log = Log::HighFitness {
-                        position: spec.clone(),
-                        canonical_form: canonical_form.to_string(),
-                        temperature: canonical_form.temperature(),
-                        degree: spec.position.degree(),
-                    };
-                    Alg::emit_log(&mut self.log_writer, &log);
-                }
-            }
-        }
-        self.specimen.sort_by_key(|spec| spec.score.clone());
-    }
-
-    fn highest_score(&self) -> Rational {
-        self.specimen
-            .last()
-            .expect("to have at least one score")
-            .score
-            .clone()
-    }
-
-    fn snapshot(&self) -> Snapshot {
-        Snapshot {
-            specimen: self
-                .specimen
-                .iter()
-                .map(|spec| &spec.position)
-                .cloned()
-                .collect(),
-        }
-    }
-
-    fn save_progress(&self, mut output: impl Write) {
-        writeln!(
-            output,
-            "{}",
-            serde_json::ser::to_string(&self.snapshot()).unwrap()
-        )
-        .unwrap();
-    }
-
-    fn cross(&mut self) {
-        let mut rng = rand::thread_rng();
-        let mid_point = self.args.generation_size / 2;
-        let mut new_specimen = Vec::with_capacity(self.args.generation_size);
-        let top_half = &self.specimen[mid_point..];
-        new_specimen.extend_from_slice(top_half);
-        for _ in new_specimen.len()..self.args.generation_size {
-            let lhs = self.specimen.choose(&mut rng).unwrap();
-            let rhs = self.specimen.choose(&mut rng).unwrap();
-            let mut position = cross(&lhs.position, &rhs.position);
-            mutate(&mut position, self.args.mutation_rate);
-            new_specimen.push(Scored {
-                position,
-                score: Rational::NegativeInfinity,
-            });
-        }
-        self.specimen = new_specimen;
-    }
-
-    fn emit_log(writer: &mut BufWriter<Box<dyn Write>>, log: &Log) {
-        writeln!(writer, "{}", serde_json::ser::to_string(log).unwrap()).unwrap();
-        writer.flush().unwrap();
-    }
+    vec![pos_1, pos_2]
 }
 
 pub fn run(args: Args) -> Result<()> {
     let generation_limit = args.generation_limit;
     let output_file_path = args.snapshot_save_file.clone();
 
-    let transposition_table = ParallelTranspositionTable::new();
-    let mut alg = if let Some(snapshot_file) = args.snapshot_load_file.clone() {
-        let f = BufReader::new(File::open(snapshot_file).unwrap());
-        let snapshot: Snapshot = serde_json::de::from_reader(f).unwrap();
-        Alg::from_snapshot(args, snapshot)
-    } else {
-        Alg::new_random(args)
+    let alg = SnortTemperatureDegreeDifference {
+        transposition_table: ParallelTranspositionTable::new(),
+        max_graph_vertices: args.max_graph_vertices,
+        mutation_rate: args.mutation_rate,
     };
 
-    let mut generation = 0;
+    let specimen = if let Some(snapshot_file) = args.snapshot_load_file.clone() {
+        let f = BufReader::new(File::open(snapshot_file).context("Could not open snapshot file")?);
+        let snapshot: Snapshot =
+            serde_json::de::from_reader(f).context("Could not parse snapshot file")?;
+        snapshot.specimen.into_iter().map(|s| s.object).collect()
+    } else {
+        seed_positions()
+    };
+
+    let mut alg = GeneticAlgorithm::with_specimen(specimen, args.generation_size, alg);
+
+    let mut log_writer = args.out_file.create().unwrap();
 
     loop {
-        if generation_limit.map_or(false, |limit| generation >= limit) {
+        if generation_limit.map_or(false, |limit| alg.generation() >= limit) {
             break;
         }
 
-        alg.score(&transposition_table);
+        alg.step_generation();
 
-        let mut output = BufWriter::new(File::create(&output_file_path).unwrap());
-        alg.save_progress(&mut output);
+        // TODO: Save interval
+        {
+            let mut output = BufWriter::new(
+                File::create(&output_file_path).context("Could not create/open output file")?,
+            );
+            writeln!(
+                output,
+                "{}",
+                serde_json::ser::to_string(&Snapshot {
+                    specimen: alg.specimen().to_vec()
+                })
+                .unwrap()
+            )
+            .unwrap();
+        }
 
-        let top = &alg.specimen.last().unwrap().position;
-        let top_score = alg.highest_score();
-        Alg::emit_log(
-            &mut BufWriter::new(Box::new(stderr())),
-            &Log::Generation {
-                generation,
-                top_score,
-                temperature: top.canonical_form(&transposition_table).temperature(),
-            },
-        );
-        alg.cross();
+        let best = alg.highest_score();
+        let best_cf = best
+            .object
+            .canonical_form(&alg.algorithm().transposition_table);
+        let best_temp = best_cf.temperature();
 
-        generation += 1;
+        {
+            let log = Log::Generation {
+                generation: alg.generation(),
+                top_score: best.score,
+                temperature: best_temp,
+            };
+            writeln!(log_writer, "{}", serde_json::ser::to_string(&log).unwrap()).unwrap();
+            log_writer.flush().unwrap();
+        }
+
+        {
+            let log = Log::HighFitness {
+                position: best.clone(),
+                canonical_form: best_cf.to_string(),
+                temperature: best_temp,
+                degree: best.object.degree(),
+            };
+            writeln!(log_writer, "{}", serde_json::ser::to_string(&log).unwrap()).unwrap();
+            log_writer.flush().unwrap();
+        }
     }
 
     Ok(())

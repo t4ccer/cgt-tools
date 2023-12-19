@@ -1,5 +1,6 @@
 use anyhow::{bail, Context, Result};
 use cgt::{
+    genetic_algorithm::Scored,
     graph::undirected::Graph,
     numeric::{dyadic_rational_number::DyadicRationalNumber, rational::Rational},
     short::partizan::{
@@ -22,26 +23,11 @@ pub enum Log {
         temperature: DyadicRationalNumber,
     },
     HighFitness {
-        position: Scored,
+        position: Scored<Snort, Rational>,
         canonical_form: String,
         temperature: DyadicRationalNumber,
         degree: usize,
     },
-}
-
-#[derive(Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub struct Scored {
-    pub position: Snort,
-    pub score: Rational,
-}
-
-impl Scored {
-    pub fn without_score(position: Snort) -> Self {
-        Scored {
-            position,
-            score: Rational::NegativeInfinity,
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -129,7 +115,10 @@ pub fn analyze_position(position: Snort) -> Result<()> {
     let score = temperature.to_rational() - Rational::from(degree as i32);
 
     let log = Log::HighFitness {
-        position: Scored { position, score },
+        position: Scored {
+            object: position,
+            score,
+        },
         canonical_form: canonical_form.to_string(),
         temperature,
         degree,

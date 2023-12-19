@@ -142,6 +142,7 @@ dependencies = [
  "nom",
  "num-rational",
  "quickcheck",
+ "rand",
  "rayon",
  "serde 1.0.192",
  "serde_repr",

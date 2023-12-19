@@ -5,6 +5,7 @@ mod amazons;
 mod anyhow_utils;
 mod canonical_form;
 mod domineering;
+mod io;
 mod quicksort;
 mod snort;
 mod wind_up;
