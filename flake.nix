@@ -97,6 +97,7 @@
             pkgs.${pythonToolchain}
             pkgs.${pythonToolchain}.pkgs.pip
             pkgs.sage
+            pkgs.hyperfine
           ];
         };
         formatter = pkgs.alejandra;

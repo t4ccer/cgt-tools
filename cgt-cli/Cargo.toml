@@ -20,7 +20,7 @@ rand = "0.8.5"
 itertools = "0.10.5"
 nom = "7.1.3"
 
-[target.'cfg(all(not(windows), target_env="musl"))'.dependencies]
+[target.'cfg(all(not(windows)))'.dependencies]
 jemallocator = "0.5.4"
 
 [[bin]]
