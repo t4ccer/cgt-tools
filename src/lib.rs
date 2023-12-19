@@ -27,7 +27,6 @@ pub mod graph;
 pub mod grid;
 pub mod loopy;
 pub mod numeric;
-pub mod rw_hash_map;
 pub mod short;
 
 mod display;

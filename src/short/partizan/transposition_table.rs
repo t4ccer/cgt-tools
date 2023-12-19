@@ -1,14 +1,15 @@
 //! Thread safe transposition table for game values
 
-use crate::{rw_hash_map::RwHashMap, short::partizan::canonical_form::CanonicalForm};
+use crate::short::partizan::canonical_form::CanonicalForm;
 use append_only_vec::AppendOnlyVec;
+use dashmap::DashMap;
 use std::hash::Hash;
 
 /// Transaction table (cache) of game positions and canonical forms.
 pub struct TranspositionTable<G> {
     values: AppendOnlyVec<CanonicalForm>,
-    positions: RwHashMap<G, usize, ahash::RandomState>,
-    known_values: RwHashMap<CanonicalForm, usize, ahash::RandomState>,
+    positions: DashMap<G, usize, ahash::RandomState>,
+    known_values: DashMap<CanonicalForm, usize, ahash::RandomState>,
 }
 
 impl<G> TranspositionTable<G>
@@ -27,7 +28,7 @@ where
     pub fn lookup_position(&self, position: &G) -> Option<CanonicalForm> {
         self.positions
             .get(position)
-            .map(|id| self.values[id].clone())
+            .map(|id| self.values[*id].clone())
     }
 
     /// Save position and its game value
@@ -35,7 +36,7 @@ where
     #[inline]
     pub fn insert_position(&self, position: G, value: CanonicalForm) {
         if let Some(known) = self.known_values.get(&value) {
-            self.positions.insert(position, known);
+            self.positions.insert(position, *known);
         } else {
             let inserted = self.values.push(value.clone());
             self.known_values.insert(value, inserted);
@@ -58,8 +59,8 @@ where
     fn default() -> Self {
         Self {
             values: AppendOnlyVec::new(),
-            positions: RwHashMap::default(),
-            known_values: RwHashMap::default(),
+            positions: DashMap::default(),
+            known_values: DashMap::default(),
         }
     }
 }
