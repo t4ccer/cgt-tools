@@ -3,7 +3,8 @@ use cgt::{
     graph::undirected::Graph,
     numeric::{dyadic_rational_number::DyadicRationalNumber, rational::Rational},
     short::partizan::{
-        games::snort::Snort, partizan_game::PartizanGame, transposition_table::TranspositionTable,
+        games::snort::Snort, partizan_game::PartizanGame,
+        transposition_table::ParallelTranspositionTable,
     },
 };
 use std::{
@@ -90,7 +91,7 @@ fn dump_edges(w: &mut impl Write, graph: &Graph) -> io::Result<()> {
 }
 
 pub fn analyze_position(position: Snort) -> Result<()> {
-    let transposition_table = TranspositionTable::new();
+    let transposition_table = ParallelTranspositionTable::new();
     let canonical_form = position.canonical_form(&transposition_table);
     let temperature = canonical_form.temperature();
 

@@ -397,8 +397,8 @@ fn no_moves() {
 
 #[test]
 fn correct_canonical_forms() {
-    use crate::short::partizan::transposition_table::TranspositionTable;
-    let transposition_table = TranspositionTable::new();
+    use crate::short::partizan::transposition_table::ParallelTranspositionTable;
+    let transposition_table = ParallelTranspositionTable::new();
 
     let snort = Snort::with_colors(
         vec![VertexKind::Cluster(
@@ -425,7 +425,7 @@ fn correct_canonical_forms() {
 
 #[test]
 fn correct_sensible() {
-    use crate::short::partizan::transposition_table::TranspositionTable;
+    use crate::short::partizan::transposition_table::ParallelTranspositionTable;
 
     let position = Snort::with_colors(
         vec![
@@ -435,7 +435,7 @@ fn correct_sensible() {
         Graph::empty(2),
     )
     .unwrap();
-    let transposition_table = TranspositionTable::new();
+    let transposition_table = ParallelTranspositionTable::new();
     assert_eq!(
         position.sensible_left_moves(&transposition_table),
         vec![Snort::with_colors(

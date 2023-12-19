@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use cgt::short::partizan::{
-    games::amazons::Amazons, partizan_game::PartizanGame, transposition_table::TranspositionTable,
+    games::amazons::Amazons, partizan_game::PartizanGame,
+    transposition_table::ParallelTranspositionTable,
 };
 use clap::{self, Parser};
 use std::str::FromStr;
@@ -17,7 +18,7 @@ pub fn run(args: Args) -> Result<()> {
         .context("Could not parse the position")?;
     eprintln!("Game: {}", pos);
 
-    let tt = TranspositionTable::new();
+    let tt = ParallelTranspositionTable::new();
     let cf = pos.canonical_form(&tt);
     eprintln!("Canonical Form: {}", cf);
     eprintln!("Temperature: {}", cf.temperature());

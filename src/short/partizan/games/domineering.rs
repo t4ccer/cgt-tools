@@ -314,7 +314,7 @@ mod tests {
     use super::*;
     use crate::{
         numeric::dyadic_rational_number::DyadicRationalNumber,
-        short::partizan::transposition_table::TranspositionTable,
+        short::partizan::transposition_table::ParallelTranspositionTable,
     };
     use std::str::FromStr;
 
@@ -335,7 +335,7 @@ mod tests {
 
     #[cfg(test)]
     fn test_grid_canonical_form(grid: Domineering, canonical_form: &str) {
-        let transposition_table = TranspositionTable::new();
+        let transposition_table = ParallelTranspositionTable::new();
         let game_id = grid.canonical_form(&transposition_table);
         assert_eq!(&game_id.to_string(), canonical_form);
     }
@@ -393,7 +393,7 @@ mod tests {
     #[test]
     #[cfg(not(miri))]
     fn finds_temperature_of_four_by_four_grid() {
-        let transposition_table = TranspositionTable::new();
+        let transposition_table = ParallelTranspositionTable::new();
         let grid: Domineering = Domineering::from_str("#...|....|....|....").unwrap();
         let game_id = grid.canonical_form(&transposition_table);
         let temp = game_id.temperature();

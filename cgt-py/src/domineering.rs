@@ -4,7 +4,7 @@ use cgt::{
     grid::small_bit_grid::SmallBitGrid,
     short::partizan::{
         games::domineering::Domineering, partizan_game::PartizanGame,
-        transposition_table::TranspositionTable,
+        transposition_table::ParallelTranspositionTable,
     },
 };
 use pyo3::prelude::*;
@@ -12,7 +12,7 @@ use std::str::FromStr;
 
 crate::wrap_struct!(Domineering, PyDomineering, "Domineering", Clone);
 crate::wrap_struct!(
-    TranspositionTable<Domineering>,
+    ParallelTranspositionTable<Domineering>,
     PyDomineeringTranspositionTable,
     "DomineeringTranspositionTable"
 );
@@ -50,7 +50,7 @@ impl PyDomineering {
 
     #[staticmethod]
     fn transposition_table() -> PyDomineeringTranspositionTable {
-        PyDomineeringTranspositionTable::from(TranspositionTable::new())
+        PyDomineeringTranspositionTable::from(ParallelTranspositionTable::new())
     }
 
     fn canonical_form(

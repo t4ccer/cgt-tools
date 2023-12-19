@@ -6,7 +6,7 @@ use cgt::{
     short::partizan::{
         games::snort::{Snort, VertexColor, VertexKind},
         partizan_game::PartizanGame,
-        transposition_table::TranspositionTable,
+        transposition_table::ParallelTranspositionTable,
     },
 };
 use clap::{self, Parser};
@@ -128,7 +128,10 @@ fn mutate(position: &mut Snort, mutation_rate: f32) {
     }
 }
 
-fn score<'pos>(position: &'pos Snort, transposition_table: &TranspositionTable<Snort>) -> Rational {
+fn score<'pos>(
+    position: &'pos Snort,
+    transposition_table: &ParallelTranspositionTable<Snort>,
+) -> Rational {
     let degree_sum = position.graph.degrees().iter().sum::<usize>();
     if position.vertices.is_empty() || degree_sum == 0 || !position.graph.is_connected() {
         return Rational::NegativeInfinity;
@@ -139,7 +142,7 @@ fn score<'pos>(position: &'pos Snort, transposition_table: &TranspositionTable<S
 
 fn temp_dif<'pos>(
     position: &'pos Snort,
-    transposition_table: &TranspositionTable<Snort>,
+    transposition_table: &ParallelTranspositionTable<Snort>,
 ) -> Rational {
     let game = position.canonical_form(transposition_table);
     let temp = game.temperature();
@@ -282,7 +285,7 @@ impl Alg {
     }
 
     // TODO: parallel with rayon
-    fn score(&mut self, tt: &TranspositionTable<Snort>) {
+    fn score(&mut self, tt: &ParallelTranspositionTable<Snort>) {
         let specimen = &mut self.specimen;
         for spec in specimen {
             spec.score = score(&spec.position, tt);
@@ -359,7 +362,7 @@ pub fn run(args: Args) -> Result<()> {
     let generation_limit = args.generation_limit;
     let output_file_path = args.snapshot_save_file.clone();
 
-    let transposition_table = TranspositionTable::new();
+    let transposition_table = ParallelTranspositionTable::new();
     let mut alg = if let Some(snapshot_file) = args.snapshot_load_file.clone() {
         let f = BufReader::new(File::open(snapshot_file).unwrap());
         let snapshot: Snapshot = serde_json::de::from_reader(f).unwrap();

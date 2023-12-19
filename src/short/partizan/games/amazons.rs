@@ -164,7 +164,7 @@ where
 mod tests {
     use super::*;
     use crate::short::partizan::{
-        canonical_form::CanonicalForm, transposition_table::TranspositionTable,
+        canonical_form::CanonicalForm, transposition_table::ParallelTranspositionTable,
     };
     use std::str::FromStr;
 

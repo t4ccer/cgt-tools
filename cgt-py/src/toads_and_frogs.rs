@@ -3,7 +3,7 @@ use cgt::{
     drawing::svg::Svg,
     short::partizan::{
         games::toads_and_frogs::ToadsAndFrogs, partizan_game::PartizanGame,
-        transposition_table::TranspositionTable,
+        transposition_table::ParallelTranspositionTable,
     },
 };
 use pyo3::prelude::*;
@@ -11,7 +11,7 @@ use std::str::FromStr;
 
 crate::wrap_struct!(ToadsAndFrogs, PyToadsAndFrogs, "ToadsAndFrogs", Clone);
 crate::wrap_struct!(
-    TranspositionTable<ToadsAndFrogs>,
+    ParallelTranspositionTable<ToadsAndFrogs>,
     PyToadsAndFrogsTranspositionTable,
     "ToadsAndFrogsTranspositionTable"
 );
@@ -41,7 +41,7 @@ impl PyToadsAndFrogs {
 
     #[staticmethod]
     fn transposition_table() -> PyToadsAndFrogsTranspositionTable {
-        PyToadsAndFrogsTranspositionTable::from(TranspositionTable::new())
+        PyToadsAndFrogsTranspositionTable::from(ParallelTranspositionTable::new())
     }
 
     fn canonical_form(

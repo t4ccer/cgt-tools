@@ -311,7 +311,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::short::partizan::transposition_table::TranspositionTable;
+    use crate::short::partizan::transposition_table::ParallelTranspositionTable;
     use std::str::FromStr;
 
     macro_rules! test_canonical_form {

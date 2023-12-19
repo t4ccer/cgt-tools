@@ -3,7 +3,7 @@ use cgt::{
     drawing::svg::Svg,
     short::partizan::{
         games::ski_jumps::SkiJumps, partizan_game::PartizanGame,
-        transposition_table::TranspositionTable,
+        transposition_table::ParallelTranspositionTable,
     },
 };
 use pyo3::prelude::*;
@@ -11,7 +11,7 @@ use std::str::FromStr;
 
 crate::wrap_struct!(SkiJumps, PySkiJumps, "SkiJumps", Clone);
 crate::wrap_struct!(
-    TranspositionTable<SkiJumps>,
+    ParallelTranspositionTable<SkiJumps>,
     PySkiJumpsTranspositionTable,
     "SkiJumpsTranspositionTable"
 );
@@ -41,7 +41,7 @@ impl PySkiJumps {
 
     #[staticmethod]
     fn transposition_table() -> PySkiJumpsTranspositionTable {
-        PySkiJumpsTranspositionTable::from(TranspositionTable::new())
+        PySkiJumpsTranspositionTable::from(ParallelTranspositionTable::new())
     }
 
     fn canonical_form(

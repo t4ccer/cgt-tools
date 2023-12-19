@@ -3,7 +3,9 @@ use cgt::{
     grid::{small_bit_grid::SmallBitGrid, FiniteGrid},
     numeric::dyadic_rational_number::DyadicRationalNumber,
     short::partizan::{
-        games::domineering, partizan_game::PartizanGame, transposition_table::TranspositionTable,
+        games::domineering,
+        partizan_game::PartizanGame,
+        transposition_table::{NoTranspositionTable, ParallelTranspositionTable},
     },
 };
 use clap::{Parser, ValueEnum};
@@ -78,6 +80,10 @@ pub struct Args {
     /// Method of computing the thermograph
     #[arg(long, value_enum, default_value_t = ThermographMethod::CanonicalForm)]
     thermograph_method: ThermographMethod,
+
+    /// Don't use transposition table of game positions and canonical forms
+    #[arg(long, default_value_t = false)]
+    no_transposition_table: bool,
 }
 
 struct ProgressTracker {
@@ -131,8 +137,11 @@ pub fn run(args: Args) -> Result<()> {
         );
     }
 
-    let transposition_table = TranspositionTable::new();
-    let transposition_table = &transposition_table;
+    let transposition_table = if args.no_transposition_table {
+        None
+    } else {
+        Some(ParallelTranspositionTable::new())
+    };
 
     let output_file =
         File::create(&args.output_path).with_context(|| "Could not open output file")?;
@@ -187,7 +196,13 @@ pub fn run(args: Args) -> Result<()> {
 
             let thermograph = match progress_tracker.args.thermograph_method {
                 ThermographMethod::CanonicalForm => {
-                    let canonical_form = grid.canonical_form(transposition_table);
+                    let canonical_form = {
+                        if let Some(ref transposition_table) = transposition_table {
+                            grid.canonical_form(transposition_table)
+                        } else {
+                            grid.canonical_form(&NoTranspositionTable::new())
+                        }
+                    };
                     canonical_form.thermograph()
                 }
                 ThermographMethod::Direct => grid.thermograph_direct(),

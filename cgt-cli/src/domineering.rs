@@ -2,6 +2,7 @@ use anyhow::Result;
 use clap::{self, Parser, Subcommand};
 
 mod common;
+pub mod evaluate;
 pub mod latex;
 pub mod search;
 
@@ -12,6 +13,9 @@ pub enum Command {
 
     /// Convert search report to LaTeX table
     Latex(latex::Args),
+
+    /// Evaluate single domineering position
+    Evaluate(evaluate::Args),
 }
 
 #[derive(Parser, Debug)]
@@ -24,5 +28,6 @@ pub fn run(args: Args) -> Result<()> {
     match args.command {
         Command::Search(args) => search::run(args),
         Command::Latex(args) => latex::run(args),
+        Command::Evaluate(args) => evaluate::run(args),
     }
 }
