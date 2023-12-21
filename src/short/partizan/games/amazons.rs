@@ -176,7 +176,7 @@ mod tests {
 
     macro_rules! test_canonical_form {
         ($input:expr, $output:expr) => {{
-            let tt = TranspositionTable::new();
+            let tt = ParallelTranspositionTable::new();
             let pos: Amazons = amazons!($input);
             let cf = pos.canonical_form(&tt);
             let expected = CanonicalForm::from_str($output).unwrap().to_string();

@@ -197,7 +197,7 @@ mod tests {
 
     macro_rules! test_canonical_form {
         ($input:expr, $output:expr) => {{
-            let tt = TranspositionTable::new();
+            let tt = ParallelTranspositionTable::new();
             let pos: Fission = fission!($input);
             let cf = pos.canonical_form(&tt);
             assert_eq!(cf.to_string(), $output);

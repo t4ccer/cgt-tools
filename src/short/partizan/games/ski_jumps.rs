@@ -316,7 +316,7 @@ mod tests {
 
     macro_rules! test_canonical_form {
         ($input:expr, $output:expr) => {{
-            let tt = TranspositionTable::new();
+            let tt = ParallelTranspositionTable::new();
             let pos: SkiJumps = SkiJumps::from_str($input).expect("Could not parse the game");
             let cf = pos.canonical_form(&tt);
             assert_eq!(cf.to_string(), $output)

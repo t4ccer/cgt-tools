@@ -198,7 +198,7 @@ mod tests {
 
     macro_rules! assert_canonical_form {
         ($row:expr, $cf:expr) => {
-            let tt = TranspositionTable::new();
+            let tt = ParallelTranspositionTable::new();
             let cf = row!($row).canonical_form(&tt);
             assert_eq!(cf, CanonicalForm::from_str($cf).unwrap());
         };
