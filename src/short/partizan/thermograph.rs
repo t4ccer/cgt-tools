@@ -488,131 +488,136 @@ impl Svg for Thermograph {
     where
         W: fmt::Write,
     {
-        fn rescale(x: i64, in_min: i64, in_max: i64, out_min: i64, out_max: i64) -> i64 {
-            (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
-        }
-
         // Chosen arbitrarily, may be customizable in the future
-        let svg_width = 450;
-        let svg_height = 300;
-        let mast_arrow_len = DyadicRationalNumber::from(3);
+        let svg_scale: u32 = 96;
+        let mast_arrow_len = DyadicRationalNumber::from(2);
         let axis_weight = 1;
         let thermograph_line_weight = 3;
-        let padding = 32;
 
-        let thermograph_x_min = self
-            .right_wall
-            .value_at(Rational::from(-1))
-            .try_round()
-            .unwrap();
-        let thermograph_x_max = self
-            .left_wall
-            .value_at(Rational::from(-1))
-            .try_round()
-            .unwrap();
+        let padding_x: u32 = 48;
+        let padding_y: u32 = 16;
 
-        let thermograph_y_min = 0;
-        let thermograph_y_max = (self.temperature() + mast_arrow_len).round();
+        let thermograph_x_min = self.right_wall.value_at(Rational::from(-1));
+        let thermograph_x_max = self.left_wall.value_at(Rational::from(-1));
 
-        let x_axis_location = (svg_height as f32 * 0.9) as i32;
-        let y_axis_location = rescale(
-            0,
-            thermograph_x_min,
-            thermograph_x_max,
-            svg_width as i64 - padding,
-            padding,
-        ) as i32;
+        let thermograph_y_min = -1;
+        let thermograph_y_max = (self.temperature() + mast_arrow_len).ceil();
 
-        let from_thermograph_horizontal = |value| {
-            rescale(
-                value,
-                thermograph_x_min,
-                thermograph_x_max,
-                svg_width as i64 - padding,
-                padding,
-            )
+        let thermograph_width = (thermograph_x_max.try_round().unwrap()
+            - thermograph_x_min.try_round().unwrap()) as u32;
+        let thermograph_height = (thermograph_y_max - thermograph_y_min) as u32;
+
+        let svg_width = svg_scale * thermograph_width + (2 * padding_x) as u32;
+        let svg_height = svg_scale * thermograph_height + (2 * padding_y) as u32;
+
+        let translate_thermograph_helper =
+            |value: Rational, min: Rational, total: u32, padding: u32| {
+                let svg_value: Rational = value - min;
+                let svg_value = (svg_value * Rational::from(svg_scale as i32))
+                    .try_round()
+                    .unwrap() as i32;
+                let svg_value = total as i32 - svg_value - padding as i32;
+                svg_value
+            };
+
+        let translate_thermograph_horizontal = |thermograph_x| {
+            translate_thermograph_helper(thermograph_x, thermograph_x_min, svg_width, padding_x)
         };
-        let from_thermograph_vertical = |value| {
-            rescale(
-                value,
-                thermograph_y_min,
-                thermograph_y_max,
-                x_axis_location as i64,
-                padding,
+
+        let translate_thermograph_vertical = |thermograph_y| {
+            translate_thermograph_helper(
+                thermograph_y,
+                Rational::from(thermograph_y_min),
+                svg_height,
+                padding_y,
             )
         };
 
-        let draw_scaffold =
-            |w: &mut W, seen: &mut HashSet<(i64, i64)>, trajectory: &Trajectory| -> fmt::Result {
-                let mut previous = None;
+        let draw_scaffold = |w: &mut W,
+                             labeled_points: &mut HashSet<(i32, i32)>,
+                             trajectory: &Trajectory|
+         -> fmt::Result {
+            let mut previous = None;
 
-                let y_points = once(trajectory.mast_x_intercept() + mast_arrow_len.to_rational())
-                    .chain(
-                        trajectory
-                            .critical_points
-                            .iter()
-                            .copied()
-                            .chain(once(Rational::from(-1))),
-                    );
+            let additional_points = if trajectory
+                .critical_points
+                .iter()
+                .any(|&r| r == Rational::from(0))
+            {
+                vec![Rational::from(-1)]
+            } else {
+                vec![Rational::from(0), Rational::from(-1)]
+            };
 
-                for point_y in y_points {
-                    let point_x = trajectory.value_at(point_y);
+            let y_points = once(self.temperature().to_rational() + mast_arrow_len.to_rational())
+                .chain(trajectory.critical_points.iter().copied())
+                .chain(additional_points.iter().copied());
 
-                    let image_x = from_thermograph_horizontal(point_x.try_round().unwrap());
-                    let image_y = from_thermograph_vertical(point_y.try_round().unwrap());
+            for point_y in y_points {
+                let point_x = trajectory.value_at(point_y);
 
-                    if !seen.contains(&(image_x, image_y)) {
-                        // TODO: Make it less ugly, maybe move values to axis rather than having them on
-                        // critical points
-                        let text = svg::Text {
-                            x: image_x as i32,
-                            y: image_y as i32,
+                let image_x = translate_thermograph_horizontal(point_x);
+                let image_y = translate_thermograph_vertical(point_y);
+
+                if labeled_points.insert((image_x, image_y)) {
+                    // TODO: Make it less ugly, maybe move values to axis rather than having them on
+                    // critical points
+
+                    ImmSvg::text(
+                        w,
+                        &svg::Text {
+                            x: image_x,
+                            y: image_y,
                             text: format!("({}, {})", point_x, point_y),
                             text_anchor: svg::TextAnchor::Middle,
                             ..svg::Text::default()
-                        };
-                        ImmSvg::text(w, &text)?;
-                        seen.insert((image_x, image_y));
-                    }
-
-                    if let Some((previous_x, previous_y)) = previous {
-                        ImmSvg::line(
-                            w,
-                            previous_x as i32,
-                            previous_y as i32,
-                            image_x as i32,
-                            image_y as i32,
-                            thermograph_line_weight,
-                        )?;
-                    }
-
-                    previous = Some((image_x, image_y));
+                        },
+                    )?;
                 }
-                Ok(())
-            };
+
+                if let Some((previous_x, previous_y)) = previous {
+                    ImmSvg::line(
+                        w,
+                        previous_x as i32,
+                        previous_y as i32,
+                        image_x as i32,
+                        image_y as i32,
+                        thermograph_line_weight,
+                    )?;
+                }
+
+                previous = Some((image_x, image_y));
+            }
+            Ok(())
+        };
 
         ImmSvg::new(buf, svg_width, svg_height, |buf| {
             ImmSvg::g(buf, "black", |buf| {
+                let horizontal_axis_y = translate_thermograph_vertical(Rational::from(0));
                 ImmSvg::line(
                     buf,
                     0,
-                    x_axis_location,
+                    horizontal_axis_y,
                     svg_width as i32,
-                    x_axis_location,
+                    horizontal_axis_y,
                     axis_weight,
                 )?;
+
+                let vertical_axis_x = translate_thermograph_horizontal(Rational::from(0));
                 ImmSvg::line(
                     buf,
-                    y_axis_location,
+                    vertical_axis_x,
                     0,
-                    y_axis_location,
+                    vertical_axis_x,
                     svg_height as i32,
                     axis_weight,
                 )?;
 
-                let mut seen = HashSet::new();
-                draw_scaffold(buf, &mut seen, &self.left_wall)?;
-                draw_scaffold(buf, &mut seen, &self.right_wall)
+                let mut labeled_points = HashSet::new();
+                draw_scaffold(buf, &mut labeled_points, &self.left_wall)?;
+                draw_scaffold(buf, &mut labeled_points, &self.right_wall)?;
+
+                Ok(())
             })
         })
     }

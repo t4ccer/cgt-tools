@@ -111,6 +111,14 @@ impl DyadicRationalNumber {
         (self.denominator_exponent == 0).then_some(self.numerator)
     }
 
+    /// Ceil division
+    pub fn ceil(self) -> i64 {
+        // TODO: use `div_ceil` when `int_roundings` lands in stable
+        let n = self.numerator();
+        let d = self.denominator().unwrap() as i64;
+        (n + d - 1) / d
+    }
+
     /// Round a dyadic to the nearest integer
     pub fn round(self) -> i64 {
         self.numerator() / self.denominator().unwrap() as i64
