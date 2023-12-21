@@ -14,9 +14,6 @@ use crate::{
     ski_jumps::*, thermograph::*, toads_and_frogs::*,
 };
 
-// TODO: Pretty printers
-// TODO: SVG rendering & html()
-
 #[macro_export]
 macro_rules! wrap_struct {
     ($struct:path, $py_struct:ident, $py_class:expr $(, $trait:tt)*) => {

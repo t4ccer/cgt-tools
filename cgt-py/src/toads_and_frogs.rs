@@ -31,7 +31,7 @@ impl PyToadsAndFrogs {
         format!("ToadsAndFrogs('{}')", self.inner)
     }
 
-    fn to_svg(&self) -> String {
+    fn _repr_svg_(&self) -> String {
         let mut buf = String::new();
         self.inner
             .to_svg(&mut buf)

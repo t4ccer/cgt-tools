@@ -72,6 +72,7 @@
 
           env = {
             "RUSTFLAGS" = "--cfg=web_sys_unstable_apis";
+            LD_LIBRARY_PATH = "${pkgs.stdenv.cc.cc.lib}/lib";
           };
 
           nativeBuildInputs = [
