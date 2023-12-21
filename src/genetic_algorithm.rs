@@ -5,7 +5,7 @@
 use rand::{rngs::ThreadRng, seq::SliceRandom};
 use std::num::NonZeroUsize;
 
-#[derive(Clone)]
+#[derive(Clone, Copy, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Scored<Object, Score> {
     pub object: Object,
@@ -47,7 +47,7 @@ where
 
     pub fn with_specimen(mut specimen: Vec<Object>, size: NonZeroUsize, algorithm: Alg) -> Self {
         let mut rng = rand::thread_rng();
-        let to_generate = specimen.len().checked_sub(size.get()).unwrap_or(0);
+        let to_generate = size.get().checked_sub(specimen.len()).unwrap_or(0);
         specimen.extend((0..to_generate).map(|_| algorithm.random(&mut rng)));
         let specimen = specimen
             .into_iter()
@@ -57,11 +57,13 @@ where
             })
             .collect::<Vec<_>>();
 
-        Self {
+        let mut s = Self {
             specimen,
             generation: 0,
             algorithm,
-        }
+        };
+        s.score();
+        s
     }
 
     pub fn highest_score(&self) -> &Scored<Object, Score> {

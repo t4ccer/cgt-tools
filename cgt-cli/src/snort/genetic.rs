@@ -246,9 +246,6 @@ fn seed_positions() -> Vec<Snort> {
 }
 
 pub fn run(args: Args) -> Result<()> {
-    let generation_limit = args.generation_limit;
-    let output_file_path = args.snapshot_save_file.clone();
-
     let alg = SnortTemperatureDegreeDifference {
         transposition_table: ParallelTranspositionTable::new(),
         max_graph_vertices: args.max_graph_vertices,
@@ -269,7 +266,10 @@ pub fn run(args: Args) -> Result<()> {
     let mut log_writer = args.out_file.create().unwrap();
 
     loop {
-        if generation_limit.map_or(false, |limit| alg.generation() >= limit) {
+        if args
+            .generation_limit
+            .map_or(false, |limit| alg.generation() >= limit)
+        {
             break;
         }
 
@@ -278,7 +278,8 @@ pub fn run(args: Args) -> Result<()> {
         // TODO: Save interval
         {
             let mut output = BufWriter::new(
-                File::create(&output_file_path).context("Could not create/open output file")?,
+                File::create(&args.snapshot_save_file)
+                    .context("Could not create/open output file")?,
             );
             writeln!(
                 output,

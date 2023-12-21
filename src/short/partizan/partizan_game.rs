@@ -70,7 +70,7 @@ pub trait PartizanGame: Sized + Clone + Hash + Send + Sync + Eq {
     /// Get the canonical form of the game position
     fn canonical_form<'a, TT>(&self, transposition_table: &TT) -> CanonicalForm
     where
-        TT: TranspositionTable<Self>,
+        TT: TranspositionTable<Self> + Sync,
     {
         if let Some(id) = transposition_table.lookup_position(self) {
             return id.clone();
@@ -128,7 +128,7 @@ pub trait PartizanGame: Sized + Clone + Hash + Send + Sync + Eq {
     /// List of canonical moves for the Left player
     fn sensible_left_moves<TT>(&self, transposition_table: &TT) -> Vec<Self>
     where
-        TT: TranspositionTable<Self>,
+        TT: TranspositionTable<Self> + Sync,
     {
         let canonical_form = self.canonical_form(transposition_table);
         let moves = canonical_form.to_moves();
@@ -146,7 +146,7 @@ pub trait PartizanGame: Sized + Clone + Hash + Send + Sync + Eq {
     /// List of canonical moves for the Right player
     fn sensible_right_moves<TT>(&self, transposition_table: &TT) -> Vec<Self>
     where
-        TT: TranspositionTable<Self>,
+        TT: TranspositionTable<Self> + Sync,
     {
         let canonical_form = self.canonical_form(transposition_table);
         let moves = canonical_form.to_moves();

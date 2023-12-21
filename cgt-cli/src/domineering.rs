@@ -3,6 +3,7 @@ use clap::{self, Parser, Subcommand};
 
 mod common;
 pub mod evaluate;
+pub mod genetic;
 pub mod latex;
 pub mod search;
 
@@ -16,6 +17,8 @@ pub enum Command {
 
     /// Evaluate single domineering position
     Evaluate(evaluate::Args),
+
+    Genetic(genetic::Args),
 }
 
 #[derive(Parser, Debug)]
@@ -29,5 +32,6 @@ pub fn run(args: Args) -> Result<()> {
         Command::Search(args) => search::run(args),
         Command::Latex(args) => latex::run(args),
         Command::Evaluate(args) => evaluate::run(args),
+        Command::Genetic(args) => genetic::run(args),
     }
 }
