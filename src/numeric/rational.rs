@@ -62,9 +62,8 @@ impl Rational {
     /// - Rational is infinite
     pub fn try_round(&self) -> Option<i64> {
         match self {
-            Self::NegativeInfinity => None,
             Self::Value(val) => Some(val.to_integer()),
-            Self::PositiveInfinity => None,
+            Self::PositiveInfinity | Self::NegativeInfinity => None,
         }
     }
 
@@ -72,8 +71,8 @@ impl Rational {
     ///
     /// # Errors
     /// - Rational is infinite
-    pub fn to_fraction(self) -> Option<(i64, u32)> {
-        if let Rational::Value(r) = self {
+    pub const fn to_fraction(self) -> Option<(i64, u32)> {
+        if let Self::Value(r) = self {
             Some((*r.numer(), *r.denom() as u32))
         } else {
             None

@@ -18,7 +18,9 @@
         clippy::cast_possible_truncation,
         clippy::module_name_repetitions,
         clippy::uninlined_format_args, // LSP rename cannot handle inlined variables :(
-        clippy::too_many_lines // Amazing heuristic
+        clippy::too_many_lines, // Amazing heuristic
+        clippy::needless_update,
+        clippy::cast_precision_loss
     )
 )]
 

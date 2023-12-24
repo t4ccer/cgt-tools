@@ -29,13 +29,15 @@ impl Thermograph {
     }
 
     /// Get the temperature of the thermograph where both scaffolds merge into a mast
+    #[cfg_attr(feature = "cargo-clippy", allow(clippy::missing_panics_doc))]
     pub fn temperature(&self) -> DyadicRationalNumber {
         let left = self.get_left_temperature();
         let right = self.get_right_temperature();
 
-        assert!(self.left_wall.value_at(left) <= self.right_wall.value_at(right));
+        assert!(self.left_wall.value_at(left) <= self.right_wall.value_at(right),);
 
-        DyadicRationalNumber::from_rational(left.max(right)).unwrap()
+        DyadicRationalNumber::from_rational(left.max(right))
+            .expect("unreachable: finite thermograph should give finite temperature")
     }
 
     fn get_left_temperature(&self) -> Rational {
@@ -507,8 +509,8 @@ impl Svg for Thermograph {
             - thermograph_x_min.try_round().unwrap()) as u32;
         let thermograph_height = (thermograph_y_max - thermograph_y_min) as u32;
 
-        let svg_width = svg_scale * thermograph_width + (2 * padding_x) as u32;
-        let svg_height = svg_scale * thermograph_height + (2 * padding_y) as u32;
+        let svg_width = svg_scale * thermograph_width + (2 * padding_x);
+        let svg_height = svg_scale * thermograph_height + (2 * padding_y);
 
         let translate_thermograph_helper =
             |value: Rational, min: Rational, total: u32, padding: u32| {
@@ -516,8 +518,8 @@ impl Svg for Thermograph {
                 let svg_value = (svg_value * Rational::from(svg_scale as i32))
                     .try_round()
                     .unwrap() as i32;
-                let svg_value = total as i32 - svg_value - padding as i32;
-                svg_value
+
+                total as i32 - svg_value - padding as i32
             };
 
         let translate_thermograph_horizontal = |thermograph_x| {
@@ -578,10 +580,10 @@ impl Svg for Thermograph {
                 if let Some((previous_x, previous_y)) = previous {
                     ImmSvg::line(
                         w,
-                        previous_x as i32,
-                        previous_y as i32,
-                        image_x as i32,
-                        image_y as i32,
+                        previous_x,
+                        previous_y,
+                        image_x,
+                        image_y,
                         thermograph_line_weight,
                     )?;
                 }

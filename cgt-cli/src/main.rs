@@ -10,7 +10,7 @@ mod quicksort;
 mod snort;
 mod wind_up;
 
-#[cfg(all(not(windows)))]
+#[cfg(not(windows))]
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 

@@ -31,12 +31,12 @@ pub fn run(args: Args) -> Result<()> {
 
     if let Some(ref svg_fp) = args.output_svg {
         let mut w = BufWriter::new(
-            File::create(svg_fp).expect(&format!("Could not create file '{}'", svg_fp)),
+            File::create(svg_fp).unwrap_or_else(|_| panic!("Could not create file '{}'", svg_fp)),
         );
         let mut buf = String::new();
         position.to_svg(&mut buf).expect("Could not render SVG");
-        w.write_all(&buf.as_bytes())
-            .expect(&format!("Could not write to file '{}'", svg_fp));
+        w.write_all(buf.as_bytes())
+            .unwrap_or_else(|_| panic!("Could not write to file '{}'", svg_fp));
     }
 
     let tt = ParallelTranspositionTable::new();

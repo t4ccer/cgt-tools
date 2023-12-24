@@ -61,12 +61,12 @@ macro_rules! handle_variant {
 
 pub fn run(args: Args) -> Result<()> {
     for max_value in args.start_range..=args.end_range {
-        let sorted_range = (1..=max_value).into_iter().collect::<Vec<u32>>();
+        let sorted_range = (1..=max_value).collect::<Vec<u32>>();
 
         let filter: Box<dyn Fn(Nimber) -> bool> = match args.filter {
             GameValueFilter::None => Box::new(|_| true),
             GameValueFilter::NMinusOne => Box::new(|actual| {
-                let expected = Nimber::new((max_value - 1) as u32);
+                let expected = Nimber::new(max_value - 1);
                 expected == actual
             }),
             GameValueFilter::Zero => Box::new(|actual| {

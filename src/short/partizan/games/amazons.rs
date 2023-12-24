@@ -30,8 +30,8 @@ pub enum Tile {
 
 impl Tile {
     #[inline]
-    fn is_non_blocking(self: Tile) -> bool {
-        self != Tile::Stone
+    fn is_non_blocking(self) -> bool {
+        self != Self::Stone
     }
 }
 
@@ -79,8 +79,8 @@ where
 {
     /// Create new Amazons game from a grid
     #[inline]
-    pub fn new(grid: G) -> Self {
-        Amazons { grid }
+    pub const fn new(grid: G) -> Self {
+        Self { grid }
     }
 
     fn moves_for(&self, own_amazon: Tile) -> Vec<Self>

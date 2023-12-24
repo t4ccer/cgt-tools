@@ -47,7 +47,7 @@ where
 
     pub fn with_specimen(mut specimen: Vec<Object>, size: NonZeroUsize, algorithm: Alg) -> Self {
         let mut rng = rand::thread_rng();
-        let to_generate = size.get().checked_sub(specimen.len()).unwrap_or(0);
+        let to_generate = size.get().saturating_sub(specimen.len());
         specimen.extend((0..to_generate).map(|_| algorithm.random(&mut rng)));
         let specimen = specimen
             .into_iter()
@@ -67,7 +67,7 @@ where
     }
 
     pub fn highest_score(&self) -> &Scored<Object, Score> {
-        self.specimen.last().unwrap()
+        self.specimen.last().expect("unreachable")
     }
 
     fn score(&mut self) {
@@ -76,7 +76,7 @@ where
             .for_each(|spec| spec.score = self.algorithm.score(&spec.object));
 
         self.specimen
-            .sort_unstable_by(|lhs, rhs| Ord::cmp(&lhs.score, &rhs.score))
+            .sort_unstable_by(|lhs, rhs| Ord::cmp(&lhs.score, &rhs.score));
     }
 
     fn cross(&mut self) {
@@ -106,11 +106,11 @@ where
     }
 
     /// Get number of finished (scored) generations
-    pub fn generation(&self) -> usize {
+    pub const fn generation(&self) -> usize {
         self.generation
     }
 
-    pub fn algorithm(&self) -> &Alg {
+    pub const fn algorithm(&self) -> &Alg {
         &self.algorithm
     }
 

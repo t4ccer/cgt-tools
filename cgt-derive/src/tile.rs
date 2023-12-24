@@ -2,10 +2,10 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parenthesized, parse_macro_input, Data, DeriveInput, Ident, LitBool, LitChar, Variant};
 
-const TILE_ATTR: &'static str = "tile";
-const TILE_ATTR_DEFAULT: &'static str = "default";
-const TILE_ATTR_CHAR: &'static str = "char";
-const TILE_ATTR_BOOL: &'static str = "bool";
+const TILE_ATTR: &str = "tile";
+const TILE_ATTR_DEFAULT: &str = "default";
+const TILE_ATTR_CHAR: &str = "char";
+const TILE_ATTR_BOOL: &str = "bool";
 
 struct TileAttr {
     ident: Ident,
@@ -59,7 +59,7 @@ fn to_tile_attr(variant: Variant) -> TileAttr {
 
             Err(meta.error(format!(
                 "Invalid attribute: '{}'",
-                meta.path.get_ident().unwrap().to_string()
+                meta.path.get_ident().unwrap()
             )))
         })
         .unwrap_or_else(|err| panic!("{}", err));

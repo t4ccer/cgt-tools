@@ -82,7 +82,7 @@ impl Algorithm<Domineering, DyadicRationalNumber> for DomineeringHighTemperature
     ) -> Domineering {
         let mid_point = rng.gen_range(0..(lhs.grid().height() * lhs.grid().width()));
 
-        let mut new = lhs.clone();
+        let mut new = *lhs;
         for y in 0..new.grid().height() {
             for x in 0..new.grid().width() {
                 let tile = if x * y < mid_point {

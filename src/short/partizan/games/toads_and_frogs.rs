@@ -61,7 +61,7 @@ impl FromStr for ToadsAndFrogs {
 
 impl Display for ToadsAndFrogs {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for tile in self.tiles.iter() {
+        for tile in &self.tiles {
             write!(f, "{}", tile.tile_to_char())?;
         }
 

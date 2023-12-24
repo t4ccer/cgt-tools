@@ -32,6 +32,7 @@ pub trait FiniteGrid: Grid + Sized {
     fn zero_size() -> Self;
 
     /// Default, one-line display function for grids using `|` as row separator
+    #[cfg_attr(feature = "cargo-clippy", allow(clippy::missing_errors_doc))]
     fn display(&self, w: &mut impl Write, sep: char) -> std::fmt::Result
     where
         Self::Item: CharTile,
@@ -50,7 +51,6 @@ pub trait FiniteGrid: Grid + Sized {
     /// Parse grid from string following notation from [`Self::display`]
     fn parse(input: &str) -> Option<Self>
     where
-        Self: Sized,
         Self::Item: CharTile + Default,
     {
         let row_separator = '|';
@@ -195,7 +195,8 @@ where
     T: Copy + Default,
     G: Grid<Item = T> + FiniteGrid,
 {
-    let mut visited: G = G::filled(grid.width(), grid.height(), T::default()).unwrap();
+    let mut visited: G = G::filled(grid.width(), grid.height(), T::default())
+        .expect("unreachable: grid with this size already exists");
     let mut ds = Vec::new();
 
     for y in 0..grid.height() {
@@ -208,7 +209,7 @@ where
                     y,
                     is_non_blocking,
                     blocking_tile,
-                    &directions,
+                    directions,
                 ));
             }
         }
@@ -282,7 +283,8 @@ where
     let minimized_width = grid.width() - filled_left_cols - filled_right_cols;
     let minimized_height = grid.height() - filled_top_rows - filled_bottom_rows;
 
-    let mut new_grid = G::filled(minimized_width, minimized_height, T::default()).unwrap();
+    let mut new_grid = G::filled(minimized_width, minimized_height, T::default())
+        .expect("unreachable: size is smaller than original grid");
     for y in filled_top_rows..(grid.height() - filled_bottom_rows) {
         for x in filled_left_cols..(grid.width() - filled_right_cols) {
             new_grid.set(x - filled_left_cols, y - filled_top_rows, grid.get(x, y));

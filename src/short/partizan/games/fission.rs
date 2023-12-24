@@ -62,8 +62,8 @@ where
 {
     /// Create new Fission game from a grid
     #[inline]
-    pub fn new(grid: G) -> Self {
-        Fission { grid }
+    pub const fn new(grid: G) -> Self {
+        Self { grid }
     }
 
     #[inline]

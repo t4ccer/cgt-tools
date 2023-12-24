@@ -263,7 +263,7 @@ mod tests {
     #[test]
     fn bits_to_arr_works() {
         assert_eq!(
-            bits_to_arr(0b1011001),
+            bits_to_arr(0b101_1001),
             [
                 true, false, false, true, true, false, true, false, false, false, false, false,
                 false, false, false, false, false, false, false, false, false, false, false, false,
@@ -277,7 +277,7 @@ mod tests {
 
     #[test]
     fn bits_to_arr_to_bits_roundtrip() {
-        let inp = 3874328;
+        let inp = 3_874_328;
         assert_eq!(inp, arr_to_bits(&bits_to_arr(inp)),);
     }
 

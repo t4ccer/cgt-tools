@@ -56,7 +56,7 @@
           hooks = {
             alejandra.enable = true;
             rustfmt.enable = true;
-            # clippy.enable = true; # leptos breaks offline mode
+            clippy.enable = true;
           };
           tools = {
             rustfmt = lib.mkForce rustToolchain;

@@ -320,7 +320,7 @@ impl Display for Nus {
 }
 
 /// Left and Right moves from a given position
-#[derive(Debug, Hash, Clone, PartialEq, Eq, PartialOrd)]
+#[derive(Debug, Hash, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Moves {
     /// Left player's moves
@@ -328,6 +328,12 @@ pub struct Moves {
 
     /// Right player's moves
     pub right: Vec<CanonicalForm>,
+}
+
+impl PartialOrd for Moves {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 impl Ord for Moves {
@@ -538,8 +544,12 @@ impl Moves {
 
         'outer: for i in 0..moves.len() {
             'inner: for j in 0..i {
-                let Some(move_i) = &moves[i] else {continue 'outer};
-                let Some(move_j) = &moves[j] else {continue 'inner};
+                let Some(move_i) = &moves[i] else {
+                    continue 'outer;
+                };
+                let Some(move_j) = &moves[j] else {
+                    continue 'inner;
+                };
 
                 // Split from ifs because borrow checker is sad
                 let remove_i = (eliminate_smaller_moves && move_i <= move_j)
@@ -1138,10 +1148,9 @@ impl CanonicalForm {
         self.to_moves()
             .left
             .iter()
-            .map(|m| m.right_stop())
+            .map(Self::right_stop)
             .max()
             .expect("Not a number so must have moves")
-            .clone()
     }
 
     /// The number reached when Right plays first.
@@ -1153,10 +1162,9 @@ impl CanonicalForm {
         self.to_moves()
             .right
             .iter()
-            .map(|m| m.left_stop())
+            .map(Self::left_stop)
             .max()
             .expect("Not a number so must have moves")
-            .clone()
     }
 
     /// Confusion interval is the region between Left and Right stops
@@ -1172,7 +1180,8 @@ impl CanonicalForm {
             CanonicalFormInner::Nus(nus) => nus.number(),
             CanonicalFormInner::Moves(ref moves) => {
                 let mast = moves.thermograph().get_mast();
-                DyadicRationalNumber::from_rational(mast).unwrap()
+                DyadicRationalNumber::from_rational(mast)
+                    .expect("Thermograph mast to have a finite dyadic value")
             }
         }
     }
@@ -1181,6 +1190,7 @@ impl CanonicalForm {
     ///
     /// Position `G` cooled by `t` is `G_t = {G^L_t - t | G^R_t + t}` unless there exists a
     /// temperature `t' < t` for which `G_t'` is infinitesimally close to a number
+    #[must_use]
     pub fn cool(&self, temperature: DyadicRationalNumber) -> Self {
         if let Some(nus) = self.to_nus() {
             if nus.is_integer() {
@@ -1218,6 +1228,7 @@ impl CanonicalForm {
     ///
     /// Heating is the inverse of cooling, defined as `\int^t G = G` if `G` is a number, or
     /// `\int^t G = {\int^t G^L + t | \int^t G^R - t}` otherwise
+    #[must_use]
     pub fn heat(&self, temperature: DyadicRationalNumber) -> Self {
         if let Some(nus) = self.to_nus() {
             if nus.is_number() {
@@ -1287,7 +1298,7 @@ impl_op_ex!(-|g: &CanonicalForm, h: &CanonicalForm| -> CanonicalForm {
     CanonicalForm::construct_sum(g, &CanonicalForm::construct_negative(h))
 });
 impl_op_ex!(-=|g: &mut CanonicalForm, h: &CanonicalForm| {
-    *g = CanonicalForm::construct_sum(g, &CanonicalForm::construct_negative(h))
+    *g = CanonicalForm::construct_sum(g, &CanonicalForm::construct_negative(h));
 });
 
 impl Display for CanonicalForm {
@@ -1366,7 +1377,7 @@ mod tests {
                 }};
             }
 
-            Nus {
+            Self {
                 number: arbitrary_sign(
                     DyadicRationalNumber::new(arbitrary_mod!(1000, g), arbitrary_mod!(16, g)),
                     g,

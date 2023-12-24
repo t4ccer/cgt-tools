@@ -75,15 +75,13 @@ pub fn run(args: Args) -> Result<()> {
             line.context("Could not parse JSON '{line}'")
                 .and_then(|r| DomineeringEntry::new(&r))
         })
-        .into_iter()
         .collect::<Result<Vec<_>, _>>()?;
 
     // remove rotations
     let mut input = if args.include_rotations {
         input
     } else {
-        let mut input_without_rotations =
-            input.iter().cloned().map(|e| Some(e)).collect::<Vec<_>>();
+        let mut input_without_rotations = input.iter().cloned().map(Some).collect::<Vec<_>>();
         for (idx, entry) in input.iter().enumerate() {
             let grid = *entry.grid.grid();
             let rot_90deg = grid.rotate();
@@ -98,10 +96,10 @@ pub fn run(args: Args) -> Result<()> {
                 vertical_flip,
                 horizontal_flip,
             ];
-            for idx in (idx + 1)..input_without_rotations.len() {
-                if let Some(next_entry) = &input_without_rotations[idx] {
-                    if equivalent_grids.contains(&next_entry.grid.grid()) {
-                        input_without_rotations[idx] = None;
+            for next_entry in input_without_rotations.iter_mut().skip(idx + 1) {
+                if let Some(ref next_entry_val) = next_entry {
+                    if equivalent_grids.contains(next_entry_val.grid.grid()) {
+                        *next_entry = None;
                     }
                 }
             }
@@ -125,7 +123,8 @@ pub fn run(args: Args) -> Result<()> {
     let pos_width = format!("{}cm", args.position_scale * (max_grid_width as f32));
 
     // define table
-    if args.columns <= 0 {
+    // TODO: use nonzero type
+    if args.columns == 0 {
         Err(anyhow!("Must have at least 1 column"))?;
     }
     writeln!(output, "{{")?;
@@ -149,25 +148,22 @@ pub fn run(args: Args) -> Result<()> {
     // entries
     while input.peek().is_some() {
         for idx in 0..args.columns {
-            match input.next() {
-                Some(entry) => {
-                    if idx != 0 {
-                        write!(output, "{}", "& ")?;
-                    }
-                    write!(
-                        output,
-                        "{} & ${}$ ",
-                        entry.grid.to_latex_with_scale(args.position_scale),
-                        entry.temperature
-                    )?;
+            if let Some(entry) = input.next() {
+                if idx != 0 {
+                    write!(output, "& ")?;
                 }
-                None => {}
-            }
+                write!(
+                    output,
+                    "{} & ${}$ ",
+                    entry.grid.to_latex_with_scale(args.position_scale),
+                    entry.temperature
+                )?;
+            };
         }
-        writeln!(output, "{}", r"\\")?;
+        writeln!(output, "\\\\")?;
     }
 
-    writeln!(output, "{}", r"\end{longtabu}")?;
+    writeln!(output, "\\end{{longtabu}}")?;
     writeln!(output, "}}")?;
     Ok(())
 }

@@ -27,7 +27,7 @@ pub enum Tile {
 impl Tile {
     #[inline]
     fn is_non_blocking(self) -> bool {
-        self == Tile::Empty
+        self == Self::Empty
     }
 }
 
@@ -63,12 +63,12 @@ where
     G: Grid<Item = Tile> + FiniteGrid,
 {
     /// Create a domineering position from a grid.
-    pub fn new(grid: G) -> Self {
+    pub const fn new(grid: G) -> Self {
         Self { grid }
     }
 
     /// Get underlying grid
-    pub fn grid(&self) -> &G {
+    pub const fn grid(&self) -> &G {
         &self.grid
     }
 

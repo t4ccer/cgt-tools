@@ -160,24 +160,21 @@ pub fn run(args: Args) -> Result<()> {
     let mut entries = entries.iter().peekable();
     while entries.peek().is_some() {
         for idx in 0..args.columns {
-            match entries.next() {
-                Some(entry) => {
-                    if idx != 0 {
-                        write!(output, "{}", "& ")?;
-                    }
-                    write!(
-                        output,
-                        "\\includegraphics[width={}]{{{}}} & ${}$ & ${}$ & ${}$ ",
-                        args.image_width, entry.3, entry.1, entry.2, entry.0.score
-                    )?;
+            if let Some(entry) = entries.next() {
+                if idx != 0 {
+                    write!(output, "& ")?;
                 }
-                None => {}
-            }
+                write!(
+                    output,
+                    "\\includegraphics[width={}]{{{}}} & ${}$ & ${}$ & ${}$ ",
+                    args.image_width, entry.3, entry.1, entry.2, entry.0.score
+                )?;
+            };
         }
-        writeln!(output, "{}", r"\\")?;
+        writeln!(output, "\\\\")?;
     }
 
-    writeln!(output, "{}", r"\end{longtabu}")?;
+    writeln!(output, "\\end{{longtabu}}")?;
     writeln!(output, "}}")?;
 
     Ok(())

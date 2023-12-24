@@ -73,7 +73,7 @@ impl Graph {
 
     /// Get iterator over vertices
     #[inline]
-    pub fn vertices(&self) -> Range<usize> {
+    pub const fn vertices(&self) -> Range<usize> {
         self.0.vertices()
     }
 

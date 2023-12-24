@@ -68,12 +68,12 @@ pub trait PartizanGame: Sized + Clone + Hash + Send + Sync + Eq {
     }
 
     /// Get the canonical form of the game position
-    fn canonical_form<'a, TT>(&self, transposition_table: &TT) -> CanonicalForm
+    fn canonical_form<TT>(&self, transposition_table: &TT) -> CanonicalForm
     where
         TT: TranspositionTable<Self> + Sync,
     {
         if let Some(id) = transposition_table.lookup_position(self) {
-            return id.clone();
+            return id;
         }
 
         if let Some(cf) = self.reductions() {
@@ -85,34 +85,33 @@ pub trait PartizanGame: Sized + Clone + Hash + Send + Sync + Eq {
         #[cfg(not(feature = "rayon"))]
         let decompositions = self.decompositions().into_iter();
 
-        let sub_results =
-            decompositions.map(
-                |position| match transposition_table.lookup_position(&position) {
-                    Some(cached_sub_result) => cached_sub_result,
-                    None => {
-                        #[cfg(feature = "rayon")]
-                        let left = position.left_moves().into_par_iter();
-                        #[cfg(not(feature = "rayon"))]
-                        let left = position.left_moves().into_iter();
+        let sub_results = decompositions.map(|position| {
+            transposition_table.lookup_position(&position).map_or_else(
+                || {
+                    #[cfg(feature = "rayon")]
+                    let left = position.left_moves().into_par_iter();
+                    #[cfg(not(feature = "rayon"))]
+                    let left = position.left_moves().into_iter();
 
-                        #[cfg(feature = "rayon")]
-                        let right = position.right_moves().into_par_iter();
-                        #[cfg(not(feature = "rayon"))]
-                        let right = position.right_moves().into_iter();
+                    #[cfg(feature = "rayon")]
+                    let right = position.right_moves().into_par_iter();
+                    #[cfg(not(feature = "rayon"))]
+                    let right = position.right_moves().into_iter();
 
-                        let moves = Moves {
-                            left: left
-                                .map(|o| o.canonical_form(transposition_table))
-                                .collect(),
-                            right: right
-                                .map(|o| o.canonical_form(transposition_table))
-                                .collect(),
-                        };
-                        let sub_result = CanonicalForm::new_from_moves(moves);
-                        sub_result
-                    }
+                    let moves = Moves {
+                        left: left
+                            .map(|o| o.canonical_form(transposition_table))
+                            .collect(),
+                        right: right
+                            .map(|o| o.canonical_form(transposition_table))
+                            .collect(),
+                    };
+
+                    CanonicalForm::new_from_moves(moves)
                 },
-            );
+                |cached_sub_result| cached_sub_result,
+            )
+        });
 
         #[cfg(feature = "rayon")]
         let result = sub_results.reduce(|| CanonicalForm::new_integer(0), |a, b| a + b);

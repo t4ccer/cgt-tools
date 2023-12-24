@@ -43,28 +43,28 @@ pub enum Tile {
 
 impl Default for Tile {
     fn default() -> Self {
-        Tile::Empty
+        Self::Empty
     }
 }
 
 impl CharTile for Tile {
     fn tile_to_char(self) -> char {
         match self {
-            Tile::Empty => '.',
-            Tile::Left(Skier::Jumper) => 'L',
-            Tile::Left(Skier::Slipper) => 'l',
-            Tile::Right(Skier::Jumper) => 'R',
-            Tile::Right(Skier::Slipper) => 'r',
+            Self::Empty => '.',
+            Self::Left(Skier::Jumper) => 'L',
+            Self::Left(Skier::Slipper) => 'l',
+            Self::Right(Skier::Jumper) => 'R',
+            Self::Right(Skier::Slipper) => 'r',
         }
     }
 
     fn char_to_tile(input: char) -> Option<Self> {
         match input {
-            '.' => Some(Tile::Empty),
-            'L' => Some(Tile::Left(Skier::Jumper)),
-            'l' => Some(Tile::Left(Skier::Slipper)),
-            'R' => Some(Tile::Right(Skier::Jumper)),
-            'r' => Some(Tile::Right(Skier::Slipper)),
+            '.' => Some(Self::Empty),
+            'L' => Some(Self::Left(Skier::Jumper)),
+            'l' => Some(Self::Left(Skier::Slipper)),
+            'R' => Some(Self::Right(Skier::Jumper)),
+            'r' => Some(Self::Right(Skier::Slipper)),
             _ => None,
         }
     }
@@ -104,8 +104,8 @@ where
 {
     /// Create new Ski Jumps game from a grid
     #[inline]
-    pub fn new(grid: G) -> Self {
-        SkiJumps { grid }
+    pub const fn new(grid: G) -> Self {
+        Self { grid }
     }
 
     /// Check if jumping move is possible
@@ -117,10 +117,8 @@ where
                 for dx in 0..self.grid.width() {
                     if y + 1 < self.grid.height() {
                         match (current, self.grid.get(dx, y + 1)) {
-                            (Tile::Left(Skier::Jumper), Tile::Right(_)) => {
-                                return true;
-                            }
-                            (Tile::Right(Skier::Jumper), Tile::Left(_)) => {
+                            (Tile::Left(Skier::Jumper), Tile::Right(_))
+                            | (Tile::Right(Skier::Jumper), Tile::Left(_)) => {
                                 return true;
                             }
                             _ => {}
@@ -245,7 +243,7 @@ where
                     Tile::Empty | Tile::Left(_) => {}
                     tile_to_move @ Tile::Right(skier) => {
                         // Check sliding moves
-                        for dx in (0..x + 1).rev() {
+                        for dx in (0..=x).rev() {
                             // We're iterating with 1 off to avoid using negative numbers but still
                             // catch going off grid, so the `dx - 1` hack.
 

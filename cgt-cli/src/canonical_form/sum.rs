@@ -19,7 +19,7 @@ pub fn run(args: Args) -> Result<()> {
             buf.write_str(" + ")?;
         }
 
-        let canonical_form = CanonicalForm::from_str(&input)
+        let canonical_form = CanonicalForm::from_str(input)
             .ok()
             .context(format!("Could not parse game: '{}'", &input))?;
         buf.write_str(&canonical_form.to_string())?;

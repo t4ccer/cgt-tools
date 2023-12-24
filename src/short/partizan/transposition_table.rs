@@ -36,6 +36,12 @@ where
     pub fn len(&self) -> usize {
         self.positions.len()
     }
+
+    /// Check if table stores any position
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.positions.is_empty()
+    }
 }
 
 impl<G> Default for ParallelTranspositionTable<G>
@@ -83,8 +89,8 @@ pub struct NoTranspositionTable<G>(PhantomData<G>);
 impl<G> NoTranspositionTable<G> {
     #[inline]
     #[allow(missing_docs)]
-    pub fn new() -> Self {
-        NoTranspositionTable(PhantomData)
+    pub const fn new() -> Self {
+        Self(PhantomData)
     }
 }
 

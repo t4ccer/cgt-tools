@@ -37,7 +37,7 @@ pub struct Edge {
 }
 
 impl Edge {
-    fn parse<'s>(input: &'s str) -> nom::IResult<&'s str, Edge> {
+    fn parse(input: &str) -> nom::IResult<&str, Edge> {
         let (input, from) = nom::character::complete::u32(input)?;
         let (input, _) = nom::character::complete::char('-')(input)?;
         let (input, to) = nom::character::complete::u32(input)?;
@@ -71,7 +71,7 @@ fn dump_edges(w: &mut impl Write, graph: &Graph) -> io::Result<()> {
         }
     }
 
-    write!(w, "\n")?;
+    writeln!(w)?;
 
     Ok(())
 }
@@ -96,7 +96,7 @@ pub fn analyze_position(position: Snort) -> Result<()> {
         .enumerate()
     {
         let filename = format!("snort{}-left{}.png", timestamp, idx);
-        render_snort(&m, &filename, "png", "fdp")?;
+        render_snort(m, &filename, "png", "fdp")?;
         eprintln!("Left Move {} Graph: {}", idx, filename);
         dump_edges(&mut stderr(), &m.graph)?;
     }
@@ -106,7 +106,7 @@ pub fn analyze_position(position: Snort) -> Result<()> {
         .enumerate()
     {
         let filename = format!("snort{}-right{}.png", timestamp, idx);
-        render_snort(&m, &filename, "png", "fdp")?;
+        render_snort(m, &filename, "png", "fdp")?;
         eprintln!("Right Move {} Graph: {}", idx, filename);
         dump_edges(&mut stderr(), &m.graph)?;
     }

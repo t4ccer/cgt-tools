@@ -1,5 +1,9 @@
 //! Simple SVG immediate drawing utilities
 #![allow(missing_docs)]
+#![cfg_attr(
+    feature = "cargo-clippy",
+    allow(clippy::missing_errors_doc, clippy::new_ret_no_self)
+)]
 
 use std::fmt::{self, Write};
 
@@ -30,11 +34,11 @@ pub enum TextAnchor {
 
 impl TextAnchor {
     /// Get text anchor as string
-    pub fn as_str(&self) -> &'static str {
+    pub const fn as_str(&self) -> &'static str {
         match self {
-            TextAnchor::Start => "start",
-            TextAnchor::Middle => "middle",
-            TextAnchor::End => "end",
+            Self::Start => "start",
+            Self::Middle => "middle",
+            Self::End => "end",
         }
     }
 }
@@ -53,7 +57,7 @@ pub struct Text {
 
 impl Default for Text {
     fn default() -> Self {
-        Text {
+        Self {
             x: 0,
             y: 0,
             text: String::new(),
@@ -175,24 +179,24 @@ impl ImmSvg {
         W: Write,
     {
         let offset = grid.grid_width / 2;
-        ImmSvg::g(w, "black", |w| {
-            for y in 0..(((grid.y2 - grid.y1) as u32 / grid.tile_size) + 1) {
-                ImmSvg::line(
+        Self::g(w, "black", |w| {
+            for y in 0..=((grid.y2 - grid.y1) as u32 / grid.tile_size) {
+                Self::line(
                     w,
                     grid.x1,
-                    (y as u32 * grid.tile_size + offset) as i32,
+                    (y * grid.tile_size + offset) as i32,
                     grid.x2,
-                    (y as u32 * grid.tile_size + offset) as i32,
+                    (y * grid.tile_size + offset) as i32,
                     grid.grid_width,
                 )?;
             }
 
-            for x in 0..(((grid.x2 - grid.x1) as u32 / grid.tile_size) + 1) {
-                ImmSvg::line(
+            for x in 0..=((grid.x2 - grid.x1) as u32 / grid.tile_size) {
+                Self::line(
                     w,
-                    (x as u32 * grid.tile_size + offset) as i32,
+                    (x * grid.tile_size + offset) as i32,
                     grid.y1,
-                    (x as u32 * grid.tile_size + offset) as i32,
+                    (x * grid.tile_size + offset) as i32,
                     grid.y2,
                     grid.grid_width,
                 )?;
