@@ -1,6 +1,16 @@
-# cgt-rs
+# cgt
 
-Combinatorial Game Theory (very in progress) library in Rust.
+Combinatorial Game Theory framework in Rust and Python.
+
+## Rust
+
+[Documentation](https://docs.rs/cgt/latest/cgt/)
+
+## Python
+
+Not published yet
+
+Python interface is inteded as a thin wrapper for interactive exploration using notebook software like [Jupyter](https://jupyter.org/) rather than exhaustive searches of large search spaces.
 
 ## Credits
 

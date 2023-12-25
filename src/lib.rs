@@ -1,4 +1,9 @@
 //! Combinatorial Game Theory framework.
+//!
+//! System supports short [partizan](crate::short::partizan::games) and
+//! [impartial](crate::short::impartial::games) games, displaying games as SVG images,
+//! computing canonical form of a game value and
+//! [calculations on canonical forms](crate::short::partizan::canonical_form::CanonicalForm)
 
 #![warn(missing_docs)]
 #![cfg_attr(
