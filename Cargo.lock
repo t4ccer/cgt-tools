@@ -131,12 +131,12 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "cgt"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "ahash",
  "append-only-vec",
  "auto_ops",
- "cgt-derive",
+ "cgt_derive",
  "dashmap",
  "itertools",
  "nom",
@@ -150,7 +150,7 @@ dependencies = [
 
 [[package]]
 name = "cgt-cli"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "cgt",
@@ -166,19 +166,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "cgt-derive"
-version = "0.3.0"
-dependencies = [
- "quote",
- "syn",
-]
-
-[[package]]
 name = "cgt-py"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "cgt",
  "pyo3",
+]
+
+[[package]]
+name = "cgt_derive"
+version = "0.4.0"
+dependencies = [
+ "quote",
+ "syn",
 ]
 
 [[package]]
