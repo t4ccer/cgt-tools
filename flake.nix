@@ -39,7 +39,7 @@
         rustToolchain = pkgs.rust-bin.fromRustupToolchain {
           channel = "stable";
           components = ["rust-analyzer" "rust-src" "rustfmt" "rustc" "cargo"];
-          targets = ["x86_64-unknown-linux-gnu" "x86_64-unknown-linux-musl" "wasm32-unknown-unknown"];
+          targets = ["x86_64-unknown-linux-gnu" "x86_64-unknown-linux-musl"];
         };
 
         pythonToolchain = "python311";
@@ -71,7 +71,6 @@
           '';
 
           env = {
-            "RUSTFLAGS" = "--cfg=web_sys_unstable_apis";
             LD_LIBRARY_PATH = "${pkgs.stdenv.cc.cc.lib}/lib";
           };
 
@@ -85,6 +84,7 @@
             pkgs.cargo-expand
             pkgs.cargo-nextest
             pkgs.cargo-semver-checks
+            pkgs.cargo-machete
             pkgs.fd
             pkgs.linuxKernel.packages.linux_5_15.perf
             pkgs.graphviz

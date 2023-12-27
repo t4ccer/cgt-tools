@@ -83,7 +83,6 @@ impl DyadicRationalNumber {
         self
     }
 
-    #[cfg_attr(feature = "cargo-clippy", allow(clippy::modulo_arithmetic))] // It's correct here
     /// Internal function to normalize numbers
     fn normalize(&mut self) {
         // [2*(n)]/[2*d] = n/d
