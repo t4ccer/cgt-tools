@@ -541,19 +541,8 @@ impl Svg for Thermograph {
          -> fmt::Result {
             let mut previous = None;
 
-            let additional_points = if trajectory
-                .critical_points
-                .iter()
-                .any(|&r| r == Rational::from(0))
-            {
-                vec![Rational::from(-1)]
-            } else {
-                vec![Rational::from(0), Rational::from(-1)]
-            };
-
             let y_points = once(self.temperature().to_rational() + mast_arrow_len.to_rational())
-                .chain(trajectory.critical_points.iter().copied())
-                .chain(additional_points.iter().copied());
+                .chain(trajectory.critical_points.iter().copied());
 
             for point_y in y_points {
                 let point_x = trajectory.value_at(point_y);
