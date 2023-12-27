@@ -1,5 +1,4 @@
 //! Simple SVG immediate drawing utilities
-#![allow(missing_docs)]
 #![cfg_attr(
     feature = "cargo-clippy",
     allow(clippy::missing_errors_doc, clippy::new_ret_no_self)
@@ -68,11 +67,22 @@ impl Default for Text {
 
 /// SVG circle element
 pub struct Circle {
+    /// X position of circle center
     pub cx: i32,
+
+    /// Y position of circle center
     pub cy: i32,
+
+    /// Circle radius
     pub r: u32,
+
+    /// Stroke color
     pub stroke: String,
+
+    /// Stroke width
     pub stroke_width: u32,
+
+    /// Stroke color
     pub fill: String,
 }
 
@@ -162,6 +172,7 @@ impl ImmSvg {
         )
     }
 
+    /// Create circle element
     pub fn circle<W>(w: &mut W, circle: &Circle) -> fmt::Result
     where
         W: Write,

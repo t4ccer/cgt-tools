@@ -88,7 +88,7 @@ pub struct NoTranspositionTable<G>(PhantomData<G>);
 
 impl<G> NoTranspositionTable<G> {
     #[inline]
-    #[allow(missing_docs)]
+    /// Create new dummy transposition table
     pub const fn new() -> Self {
         Self(PhantomData)
     }
