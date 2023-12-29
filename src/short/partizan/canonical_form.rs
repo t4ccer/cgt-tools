@@ -932,20 +932,6 @@ impl CanonicalForm {
     /// Safe function to construct a game from possible moves
     pub fn new_from_moves(mut moves: Moves) -> Self {
         moves.eliminate_duplicates();
-
-        let left_mex = Self::mex(&moves.left);
-        let right_mex = Self::mex(&moves.right);
-        if let (Some(left_mex), Some(right_mex)) = (left_mex, right_mex) {
-            if left_mex == right_mex {
-                let nus = Nus {
-                    number: DyadicRationalNumber::from(0),
-                    up_multiple: 0,
-                    nimber: Nimber::from(left_mex),
-                };
-                return Self::new_nus(nus);
-            }
-        }
-
         moves = moves.canonicalize();
 
         Self::construct_from_canonical_moves(moves)
@@ -962,41 +948,6 @@ impl CanonicalForm {
             CanonicalFormInner::Nus(nus) => nus.to_moves(),
             CanonicalFormInner::Moves(moves) => moves.clone(),
         }
-    }
-
-    /// Calculate mex if possible. Assumes that input is sorted
-    fn mex(moves: &[Self]) -> Option<u32> {
-        let mut i = 0;
-        let mut mex = 0;
-        loop {
-            if i >= moves.len() {
-                break;
-            }
-
-            match moves[i].inner {
-                CanonicalFormInner::Nus(nus) => {
-                    if !nus.is_nimber() {
-                        return None;
-                    }
-
-                    if nus.nimber() == Nimber::from(mex) {
-                        mex += 1;
-                    } else {
-                        break;
-                    }
-                    i += 1;
-                }
-                CanonicalFormInner::Moves(_) => return None,
-            }
-        }
-
-        for m in &moves[i..] {
-            if !m.is_nimber() {
-                return None;
-            }
-        }
-
-        Some(mex)
     }
 
     /// Check if game is a Number Up Star sum
@@ -1712,6 +1663,7 @@ mod tests {
         test_game_parse!("{6/8|7/8}", "13/16");
         test_game_parse!("{12/16|14/16}", "13/16");
         test_game_parse!("{0|2}", "1");
+        test_game_parse!("{0,*,*2|0,*,*2}", "*3");
     }
 
     #[test]
