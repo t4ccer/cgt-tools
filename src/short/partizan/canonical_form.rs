@@ -1258,6 +1258,95 @@ impl CanonicalForm {
         new_moves.canonical_form()
     }
 
+    /// A remote star of game `g` is a nimber `*N` if no position of `g` including `g` has value `N*`
+    #[must_use]
+    pub(crate) fn far_star(&self) -> Nimber {
+        if let CanonicalFormInner::Nus(ref nus) = self.inner {
+            if nus.is_nimber() {
+                return Nimber::from(nus.nimber().value() + 1);
+            }
+        };
+
+        let moves = self.to_moves();
+        moves
+            .left
+            .iter()
+            .chain(moves.right.iter())
+            .map(|g| g.far_star())
+            .max()
+            .unwrap_or(Nimber::from(1))
+    }
+
+    /// Atmoic weight of a position
+    #[must_use]
+    pub fn atomic_weight(&self) -> Self {
+        match self.inner {
+            CanonicalFormInner::Nus(nus) => Self::new_integer(nus.up_multiple() as i64),
+            CanonicalFormInner::Moves(ref moves) => {
+                let new_moves = Moves {
+                    left: moves
+                        .left
+                        .iter()
+                        .map(|left_move| left_move.atomic_weight() - Self::new_integer(2))
+                        .collect::<Vec<_>>(),
+                    right: moves
+                        .right
+                        .iter()
+                        .map(|right_move| right_move.atomic_weight() + Self::new_integer(2))
+                        .collect::<Vec<_>>(),
+                };
+                let new_game = Self::new_from_moves(new_moves.clone());
+
+                let CanonicalFormInner::Nus(new_nus) = new_game.inner else {
+                    return new_game;
+                };
+
+                if !new_nus.is_integer() {
+                    return new_game;
+                }
+
+                let far_star = Self::new_nimber(DyadicRationalNumber::from(0), self.far_star());
+
+                let less_than_far_star = self <= &far_star;
+                let greater_than_far_star = self >= &far_star;
+
+                if less_than_far_star && !greater_than_far_star {
+                    let max_least = new_moves
+                        .left
+                        .iter()
+                        .map(|left_move| {
+                            let least = left_move.right_stop().ceil();
+                            if &Self::new_integer(least) <= left_move {
+                                least + 1
+                            } else {
+                                least
+                            }
+                        })
+                        .max()
+                        .unwrap_or(0);
+                    Self::new_integer(max_least)
+                } else if !less_than_far_star && greater_than_far_star {
+                    let min_greatest = new_moves
+                        .right
+                        .iter()
+                        .map(|right_move| {
+                            let greatest = right_move.left_stop().round();
+                            if right_move <= &Self::new_integer(greatest) {
+                                greatest - 1
+                            } else {
+                                greatest
+                            }
+                        })
+                        .min()
+                        .unwrap_or(0);
+                    Self::new_integer(min_greatest)
+                } else {
+                    new_game
+                }
+            }
+        }
+    }
+
     /// Parse game using `{a,b,...|c,d,...}` notation
     #[cfg_attr(feature = "cargo-clippy", allow(clippy::missing_errors_doc))]
     pub fn parse(input: &str) -> nom::IResult<&str, Self> {
@@ -1622,6 +1711,7 @@ mod tests {
         test_game_parse!("{3/4|7/8}", "13/16");
         test_game_parse!("{6/8|7/8}", "13/16");
         test_game_parse!("{12/16|14/16}", "13/16");
+        test_game_parse!("{0|2}", "1");
     }
 
     #[test]
@@ -1717,5 +1807,27 @@ mod tests {
         let heated = particle.heat(t);
         assert_eq!(heated.to_string(), "{3/2|-3/2}");
         assert_eq!(g, &frozen + &heated);
+    }
+
+    macro_rules! assert_atomic_weight_eq {
+        ($inp:expr, $atomic:expr) => {
+            let cf = CanonicalForm::from_str($inp).unwrap();
+            let atomic = CanonicalForm::from_str($atomic).unwrap();
+            assert_eq!(cf.atomic_weight().to_string(), atomic.to_string());
+        };
+    }
+
+    #[test]
+    fn atomic_weight() {
+        assert_atomic_weight_eq!("*3", "0");
+        assert_atomic_weight_eq!("^", "1");
+        assert_atomic_weight_eq!("v", "-1");
+        assert_atomic_weight_eq!("v2", "-2");
+        assert_atomic_weight_eq!("{^2|v}", "1/2");
+        assert_atomic_weight_eq!("{^2|v2}", "*");
+        assert_atomic_weight_eq!("{^3|v3}", "{1|-1}");
+        assert_atomic_weight_eq!("{^2|*}", "1");
+        assert_atomic_weight_eq!("{^2,{^|*}|*}", "1");
+        assert_atomic_weight_eq!("{*|v2}", "-1");
     }
 }
