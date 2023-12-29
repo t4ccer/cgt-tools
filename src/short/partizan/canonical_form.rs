@@ -1530,6 +1530,21 @@ mod tests {
         assert_eq!(&down.to_string(), "v3");
     }
 
+    macro_rules! assert_negative_eq {
+        ($inp:expr, $out:expr) => {
+            let inp = CanonicalForm::from_str($inp).unwrap();
+            assert_eq!((-inp).to_string(), $out);
+        };
+    }
+
+    #[test]
+    fn negative() {
+        assert_negative_eq!("0", "0");
+        assert_negative_eq!("42", "-42");
+        assert_negative_eq!("-42", "42");
+        assert_negative_eq!("{^|*}", "{v|*}");
+    }
+
     #[test]
     fn nimber_is_its_negative() {
         let star = CanonicalForm::new_nimber(DyadicRationalNumber::from(0), Nimber::from(4));
