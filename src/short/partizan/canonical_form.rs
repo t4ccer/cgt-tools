@@ -273,17 +273,17 @@ impl_from_str_via_nom!(Nus);
 
 impl_op_ex!(+|lhs: &Nus, rhs: &Nus| -> Nus {
     Nus {
-        number: lhs.number + rhs.number,
-        up_multiple: lhs.up_multiple + rhs.up_multiple,
-        nimber: lhs.nimber + rhs.nimber,
+        number: lhs.number() + rhs.number(),
+        up_multiple: lhs.up_multiple() + rhs.up_multiple(),
+        nimber: lhs.nimber() + rhs.nimber(),
     }
 });
 
 impl_op_ex!(-|lhs: &Nus| -> Nus {
     Nus {
-        number: -lhs.number,
-        up_multiple: -lhs.up_multiple,
-        nimber: lhs.nimber, // Nimber is its own negative
+        number: -lhs.number(),
+        up_multiple: -lhs.up_multiple(),
+        nimber: lhs.nimber(), // Nimber is its own negative
     }
 });
 
@@ -1093,7 +1093,7 @@ impl CanonicalForm {
             CanonicalFormInner::Nus(nus) => {
                 if nus.is_number() {
                     // It's a number k/2^n, so the temperature is -1/2^n
-                    DyadicRationalNumber::new(-1, nus.number.denominator_exponent())
+                    DyadicRationalNumber::new(-1, nus.number().denominator_exponent())
                 } else {
                     // It's a number plus a nonzero infinitesimal, thus the temperature is 0
                     DyadicRationalNumber::from(0)
