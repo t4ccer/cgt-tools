@@ -25,7 +25,8 @@
         clippy::uninlined_format_args, // LSP rename cannot handle inlined variables :(
         clippy::too_many_lines, // Amazing heuristic
         clippy::needless_update,
-        clippy::cast_precision_loss
+        clippy::cast_precision_loss,
+        clippy::missing_panics_doc
     )
 )]
 

@@ -1211,7 +1211,8 @@ impl CanonicalForm {
 
     /// A remote star of game `g` is a nimber `*N` if no position of `g` including `g` has value `N*`
     #[must_use]
-    pub(crate) fn far_star(&self) -> Nimber {
+    #[cfg_attr(feature = "cargo-clippy", allow(clippy::or_fun_call))]
+    pub fn far_star(&self) -> Nimber {
         if let CanonicalFormInner::Nus(ref nus) = self.inner {
             if nus.is_nimber() {
                 return Nimber::from(nus.nimber().value() + 1);
@@ -1223,12 +1224,13 @@ impl CanonicalForm {
             .left
             .iter()
             .chain(moves.right.iter())
-            .map(|g| g.far_star())
+            .map(Self::far_star)
             .max()
             .unwrap_or(Nimber::from(1))
     }
 
-    /// Atmoic weight of a position
+    // FIXME: Handle cases when atomic weight does not exist
+    /// Atmoic weight of a position, sometimes called "uppitiness"
     #[must_use]
     pub fn atomic_weight(&self) -> Self {
         match self.inner {
