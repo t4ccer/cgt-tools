@@ -112,7 +112,18 @@ pub fn analyze_position(position: Snort) -> Result<()> {
     }
 
     let degree = position.degree();
+    let second_degree = position.second_degree();
     let score = temperature.to_rational() - Rational::from(degree as i32);
+
+    eprintln!("Canonical Form: {}", canonical_form);
+    eprintln!("Temperature: {}", temperature);
+    eprintln!("Degree: {}", degree);
+    eprintln!("Degree2: {}", second_degree);
+    eprintln!(
+        "Conjecture: {} <= {}",
+        temperature,
+        Rational::from(degree as i64) + (Rational::from(second_degree as i64) / Rational::from(2))
+    );
 
     let log = Log::HighFitness {
         position: Scored {
@@ -123,10 +134,6 @@ pub fn analyze_position(position: Snort) -> Result<()> {
         temperature,
         degree,
     };
-
-    eprintln!("Canonical Form: {}", canonical_form);
-    eprintln!("Temperature: {}", temperature);
-    eprintln!("Degree: {}", degree);
 
     println!("{}", serde_json::ser::to_string(&log).unwrap());
 

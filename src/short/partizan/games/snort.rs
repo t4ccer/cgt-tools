@@ -73,6 +73,14 @@ impl VertexKind {
             Self::Single(color) | Self::Cluster(color, _) => color,
         }
     }
+
+    #[inline]
+    fn degree_factor(self) -> usize {
+        match self {
+            VertexKind::Single(_) => 1,
+            VertexKind::Cluster(_, cluster_size) => cluster_size.get() as usize,
+        }
+    }
 }
 
 /// Position of a [snort](self) game
@@ -129,27 +137,59 @@ impl Snort {
         .unwrap()
     }
 
-    /// Get degree of the underlying game graph, correctly counting clusters of vertices
-    ///
-    /// Note that using [`Graph::degree`] will yield incorrect results
-    #[cfg_attr(feature = "cargo-clippy", allow(clippy::match_on_vec_items))]
-    pub fn degree(&self) -> usize {
-        let mut degrees = vec![0usize; self.graph.size()];
-        for v in self.graph.vertices() {
-            for u in self.graph.vertices() {
-                if u != v && self.graph.are_adjacent(v, u) {
-                    match self.vertices[v] {
-                        VertexKind::Single(_) => degrees[u] += 1,
-                        VertexKind::Cluster(_, cluster_size) => {
-                            degrees[u] += cluster_size.get() as usize;
-                        }
+    fn vertex_degree(&self, this_vertex: usize) -> usize {
+        let mut res = 0;
+        for one_away in self.graph.vertices() {
+            if one_away != this_vertex && self.graph.are_adjacent(this_vertex, one_away) {
+                res += self.vertices[one_away].degree_factor();
+            }
+        }
+        res
+    }
+
+    fn vertex_second_degree(&self, this_vertex: usize) -> usize {
+        let mut res = 0;
+        let mut seen = vec![false; self.graph.size()];
+
+        for one_away in self.graph.vertices() {
+            if one_away != this_vertex && self.graph.are_adjacent(this_vertex, one_away) {
+                for two_away in self.graph.vertices() {
+                    if two_away != one_away
+                        && two_away != this_vertex
+                        && self.graph.are_adjacent(one_away, two_away)
+                        && !seen[two_away]
+                    {
+                        seen[two_away] = true;
+                        res += self.vertices[two_away].degree_factor();
                     }
                 }
             }
         }
 
-        degrees
+        res
+    }
+
+    /// Get degree of the underlying game graph, correctly counting clusters of vertices
+    ///
+    /// Note that using [`Graph::degree`] will yield incorrect results
+    pub fn degree(&self) -> usize {
+        self.graph
+            .vertices()
             .into_iter()
+            .map(|v| self.vertex_degree(v))
+            .max()
+            .expect("graph to have at least 1 vertex")
+    }
+
+    /// Get second degree of the underlying game graph
+    ///
+    /// Second degree of a vertex is the number of all vertices two away from a given vertex
+    /// and just like in first degree, second degree of a graph is the maximum value among vertices
+    pub fn second_degree(&self) -> usize {
+        self.graph
+            .vertices()
+            .into_iter()
+            .map(|v| self.vertex_second_degree(v))
             .max()
             .expect("graph to have at least 1 vertex")
     }
