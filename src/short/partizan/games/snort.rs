@@ -107,13 +107,13 @@ impl Snort {
         Some(Self { vertices, graph })
     }
 
-    /// Construct new "three star" position with `n+1` leafs on edges and `n` in the center
+    /// Construct new position on caterpillar `C(n+1, n, n+1)`
     ///
-    /// # Errors
-    /// - When number of leafs would be non-positive.
-    pub fn new_three_star(n: u32) -> Option<Self> {
-        let on_edges = NonZeroU32::new(n + 1)?;
-        let in_center = NonZeroU32::new(n)?;
+    /// The caterpillar `C(n+1, n, n+1)` consists of a main path of length 3, whose central vertex
+    /// has `n` leaves added, and `n+1` leaves are added to the side vertices.
+    pub fn new_three_caterpillar(n: NonZeroU32) -> Self {
+        let on_edges = n.checked_add(1).unwrap();
+        let in_center = n;
 
         Self::with_colors(
             vec![
@@ -126,6 +126,7 @@ impl Snort {
             ],
             Graph::from_edges(6, &[(0, 1), (0, 2), (0, 4), (1, 3), (2, 5)]),
         )
+        .unwrap()
     }
 
     /// Get degree of the underlying game graph, correctly counting clusters of vertices
@@ -314,10 +315,10 @@ impl Snort {
 
 #[test]
 fn degree_works() {
-    let snort = Snort::new_three_star(8).unwrap();
+    let snort = Snort::new_three_caterpillar(NonZeroU32::new(8).unwrap());
     assert_eq!(snort.degree(), 10);
 
-    let snort = Snort::new_three_star(10).unwrap();
+    let snort = Snort::new_three_caterpillar(NonZeroU32::new(10).unwrap());
     assert_eq!(snort.degree(), 12);
 }
 

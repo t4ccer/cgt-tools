@@ -5,14 +5,16 @@ mod common;
 pub mod genetic;
 pub mod graph;
 pub mod latex;
-pub mod three_star;
+pub mod three_caterpillar;
 
 #[derive(Subcommand, Debug)]
 pub enum Command {
     Genetic(genetic::Args),
     Latex(latex::Args),
     Graph(graph::Args),
-    ThreeStar(three_star::Args),
+
+    /// Analyze position on caterpillar (n+1, n, n+1)
+    ThreeCaterpillar(three_caterpillar::Args),
 }
 
 #[derive(Parser, Debug)]
@@ -26,6 +28,6 @@ pub fn run(args: Args) -> Result<()> {
         Command::Genetic(args) => genetic::run(args),
         Command::Latex(args) => latex::run(args),
         Command::Graph(args) => graph::run(args),
-        Command::ThreeStar(args) => three_star::run(args),
+        Command::ThreeCaterpillar(args) => three_caterpillar::run(args),
     }
 }

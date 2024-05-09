@@ -123,6 +123,11 @@ pub fn analyze_position(position: Snort) -> Result<()> {
         temperature,
         degree,
     };
+
+    eprintln!("Canonical Form: {}", canonical_form);
+    eprintln!("Temperature: {}", temperature);
+    eprintln!("Degree: {}", degree);
+
     println!("{}", serde_json::ser::to_string(&log).unwrap());
 
     Ok(())
