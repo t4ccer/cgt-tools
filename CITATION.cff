@@ -1,0 +1,14 @@
+cff-version: 1.2.0
+title: Combinatorial Game Theory Library in Rust
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Tomasz
+    family-names: Maciosowski
+    orcid: 'https://orcid.org/0009-0000-7485-0786'
+repository-code: 'https://github.com/t4ccer/cgt-rs'
+keywords:
+  - combinatorial game theory
+license: AGPL-3.0-or-later
