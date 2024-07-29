@@ -1,9 +1,9 @@
 use std::{
     fs::File,
-    io::{self, stderr, stdout, Stderr, Stdout},
+    io::{self, stderr, stdin, stdout, Stderr, Stdin, Stdout},
 };
 
-macro_rules! define_file_or_std {
+macro_rules! define_output_file_or_std {
     ($name:ident, $writer:ident, $std_enum:ident, $std_impl:ident, $std_mk:ident) => {
         #[derive(Debug, Clone)]
         pub enum $name {
@@ -72,7 +72,7 @@ macro_rules! define_file_or_std {
     };
 }
 
-define_file_or_std!(
+define_output_file_or_std!(
     FileOrStderr,
     FileOrStderrWriter,
     FileOrStderr,
@@ -80,10 +80,66 @@ define_file_or_std!(
     stderr
 );
 
-define_file_or_std!(
+define_output_file_or_std!(
     FileOrStdout,
     FileOrStdoutWriter,
     FileOrStdout,
     Stdout,
     stdout
 );
+
+macro_rules! define_input_file_or_std {
+    ($name:ident, $reader:ident, $std_enum:ident, $std_impl:ident, $std_mk:ident) => {
+        #[derive(Debug, Clone)]
+        pub enum $name {
+            FilePath(String),
+            $std_enum,
+        }
+
+        impl From<String> for $name {
+            fn from(value: String) -> Self {
+                if &value == "-" {
+                    Self::$std_enum
+                } else {
+                    Self::FilePath(value)
+                }
+            }
+        }
+
+        impl $name {
+            fn create_with<'a, F>(&'a self, f: F) -> io::Result<$reader>
+            where
+                F: FnOnce(&'a str) -> io::Result<File>,
+            {
+                match self {
+                    Self::FilePath(ref fp) => Ok($reader::File(f(fp)?)),
+                    Self::$std_enum => Ok($reader::$std_enum($std_mk())),
+                }
+            }
+
+            #[allow(dead_code)]
+            pub fn open(&self) -> io::Result<$reader> {
+                self.create_with(File::open)
+            }
+        }
+
+        pub enum $reader {
+            File(File),
+            $std_enum($std_impl),
+        }
+
+        impl io::Read for $reader {
+            fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+                match self {
+                    Self::File(f) => f.read(buf),
+                    Self::$std_enum(fd) => {
+                        let mut lock = fd.lock();
+                        lock.read(buf)
+                    }
+                }
+            }
+        }
+    };
+}
+
+define_input_file_or_std!(FileOrStdin, FileOrStdinReader, FileOrStdin, Stdin, stdin);
