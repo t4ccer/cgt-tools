@@ -12,8 +12,6 @@ pub enum Command {
     Genetic(genetic::Args),
     Latex(latex::Args),
     Graph(graph::Args),
-
-    /// Analyze position on caterpillar (n+1, n, n+1)
     ThreeCaterpillar(three_caterpillar::Args),
 }
 

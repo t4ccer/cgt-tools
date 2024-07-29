@@ -15,11 +15,16 @@ use std::{
 use super::common::Log;
 
 #[derive(Parser, Debug, Clone)]
+/// Convert a log file (usually obtained from a genetic algorithm search) to a LaTeX table with images.
+///
+/// Requires `graphviz` to be installed.
 pub struct Args {
     #[arg(long)]
+    /// Input file with logs
     in_file: String,
 
     #[arg(long)]
+    /// Output file with LaTeX table
     out_file: String,
 
     /// See https://graphviz.org/docs/outputs/

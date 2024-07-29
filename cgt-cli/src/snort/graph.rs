@@ -7,15 +7,25 @@ use cgt::{
 use clap::Parser;
 
 #[derive(Parser, Debug, Clone)]
+/// Evaluate a graph of Snort position
 pub struct Args {
     #[arg(long, value_delimiter = ',')]
+    /// Comma-separated list of edges in the graph in the form `<from>-<to>` (e.g. '0-1,1-2').
+    ///
+    /// Size of the graph is determined by the maximum vertex index in the list of edges.
     edges: Vec<Edge>,
 
     #[arg(long, value_delimiter = ',')]
+    /// Comma-separated list of vertices that are tinted blue/left.
     tinted_left: Vec<u32>,
 
     #[arg(long, value_delimiter = ',')]
+    /// Comma-separated list of vertices that are tinted red/right.
     tinted_right: Vec<u32>,
+
+    #[arg(long)]
+    /// Do not generate a graphviz graph of the position and immediate children.
+    no_graphviz: bool,
 }
 
 pub fn run(args: Args) -> Result<()> {
@@ -41,7 +51,7 @@ pub fn run(args: Args) -> Result<()> {
     }
 
     let position = Snort::with_colors(vertices, graph).unwrap();
-    analyze_position(position)?;
+    analyze_position(position, !args.no_graphviz)?;
 
     Ok(())
 }

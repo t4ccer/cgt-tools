@@ -20,6 +20,7 @@ use std::{
 };
 
 #[derive(Parser, Debug, Clone)]
+/// Run genetic algorithm on Snort game to find positions with high difference between temperature and degree
 pub struct Args {
     #[arg(long)]
     generation_size: NonZeroUsize,

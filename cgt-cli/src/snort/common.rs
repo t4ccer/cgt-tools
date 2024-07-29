@@ -76,7 +76,7 @@ fn dump_edges(w: &mut impl Write, graph: &Graph) -> io::Result<()> {
     Ok(())
 }
 
-pub fn analyze_position(position: Snort) -> Result<()> {
+pub fn analyze_position(position: Snort, with_graphviz: bool) -> Result<()> {
     let transposition_table = ParallelTranspositionTable::new();
     let canonical_form = position.canonical_form(&transposition_table);
     let temperature = canonical_form.temperature();
@@ -85,19 +85,25 @@ pub fn analyze_position(position: Snort) -> Result<()> {
         .duration_since(time::SystemTime::UNIX_EPOCH)
         .context("Could not get system time")?
         .as_millis();
-    let filename = format!("snort{}.png", timestamp);
-    render_snort(&position, &filename, "png", "fdp")?;
-    render_snort(&position, "snort.png", "png", "fdp")?;
-    eprintln!("Graph: {}", filename);
+
+    if with_graphviz {
+        let filename = format!("snort{}.png", timestamp);
+        render_snort(&position, &filename, "png", "fdp")?;
+        render_snort(&position, "snort.png", "png", "fdp")?;
+        eprintln!("Graph: {}", filename);
+    }
 
     for (idx, m) in position
         .sensible_left_moves(&transposition_table)
         .iter()
         .enumerate()
     {
-        let filename = format!("snort{}-left{}.png", timestamp, idx);
-        render_snort(m, &filename, "png", "fdp")?;
-        eprintln!("Left Move {} Graph: {}", idx, filename);
+        if with_graphviz {
+            let filename = format!("snort{}-left{}.png", timestamp, idx);
+            render_snort(m, &filename, "png", "fdp")?;
+            eprintln!("Left Move {} Graph: {}", idx, filename);
+        }
+
         dump_edges(&mut stderr(), &m.graph)?;
     }
     for (idx, m) in position
@@ -105,9 +111,12 @@ pub fn analyze_position(position: Snort) -> Result<()> {
         .iter()
         .enumerate()
     {
-        let filename = format!("snort{}-right{}.png", timestamp, idx);
-        render_snort(m, &filename, "png", "fdp")?;
-        eprintln!("Right Move {} Graph: {}", idx, filename);
+        if with_graphviz {
+            let filename = format!("snort{}-right{}.png", timestamp, idx);
+            render_snort(m, &filename, "png", "fdp")?;
+            eprintln!("Right Move {} Graph: {}", idx, filename);
+        }
+
         dump_edges(&mut stderr(), &m.graph)?;
     }
 
