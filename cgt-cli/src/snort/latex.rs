@@ -1,9 +1,12 @@
+use crate::{
+    io::{FileOrStdin, FileOrStdout},
+    snort::common::Log,
+};
 use anyhow::{bail, Context, Result};
 use cgt::numeric::rational::Rational;
 use clap::Parser;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use std::{
-    fs::File,
     io::{BufReader, BufWriter, Write},
     process::{Command, Stdio},
     sync::{
@@ -12,8 +15,6 @@ use std::{
     },
 };
 
-use super::common::Log;
-
 #[derive(Parser, Debug, Clone)]
 /// Convert a log file (usually obtained from a genetic algorithm search) to a LaTeX table with images.
 ///
@@ -21,11 +22,11 @@ use super::common::Log;
 pub struct Args {
     #[arg(long)]
     /// Input file with logs
-    in_file: String,
+    in_file: FileOrStdin,
 
     #[arg(long)]
     /// Output file with LaTeX table
-    out_file: String,
+    out_file: FileOrStdout,
 
     /// See https://graphviz.org/docs/outputs/
     #[arg(long, default_value = "svg")]
@@ -53,9 +54,8 @@ pub struct Args {
 }
 
 pub fn run(args: Args) -> Result<()> {
-    let input = BufReader::new(File::open(&args.in_file).context("Could not open input file")?);
-    let mut output =
-        BufWriter::new(File::create(&args.out_file).context("Could not open output file")?);
+    let input = BufReader::new(args.in_file.open().context("Could not open input file")?);
+    let mut output = BufWriter::new(args.out_file.open().context("Could not open output file")?);
 
     let input: Result<Vec<Log>> = serde_json::de::Deserializer::from_reader(input)
         .into_iter()
