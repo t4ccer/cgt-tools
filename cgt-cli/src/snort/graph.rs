@@ -24,7 +24,7 @@ pub fn run(args: Args) -> Result<()> {
         .iter()
         .map(|edge| edge.from.max(edge.to))
         .max()
-        .unwrap();
+        .unwrap_or(0);
     let edges = args
         .edges
         .iter()
