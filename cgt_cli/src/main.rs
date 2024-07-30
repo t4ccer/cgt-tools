@@ -1,14 +1,9 @@
+use crate::commands::*;
 use anyhow::Result;
 use clap::{self, Parser, Subcommand};
 
-mod amazons;
-mod anyhow_utils;
-mod canonical_form;
-mod domineering;
+mod commands;
 mod io;
-mod quicksort;
-mod snort;
-mod wind_up;
 
 #[cfg(not(windows))]
 #[global_allocator]
