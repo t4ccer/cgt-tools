@@ -5,7 +5,6 @@ mod sum;
 
 #[derive(Subcommand, Debug)]
 pub enum Command {
-    /// Sum multiple canonical forms
     Sum(sum::Args),
 }
 

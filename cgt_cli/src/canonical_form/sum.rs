@@ -3,6 +3,7 @@ use cgt::short::partizan::canonical_form::CanonicalForm;
 use clap::{arg, Parser};
 use std::{fmt::Write, str::FromStr};
 
+/// Sum multiple canonical forms
 #[derive(Parser, Debug, Clone)]
 pub struct Args {
     /// Games to sum and compute the canonical form
