@@ -5,8 +5,11 @@ edition = "2021"
 authors = ["Tomasz Maciosowski <t4ccer@gmail.com>"]
 license = "AGPL-3.0"
 readme = "README.md"
-repository = "https://github.com/t4ccer/cgt-rs"
-description = "Library to work with Combinatorial Games"
+repository = "https://github.com/t4ccer/cgt-tools"
+description = "Combinatorial Game Theory framework"
+homepage = "https://github.com/t4ccer/cgt-tools"
+keywords = ["cgt"]
+categories = ["mathematics", "science"]
 
 [dependencies]
 anyhow = "1.0.71"
