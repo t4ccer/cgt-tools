@@ -8,7 +8,7 @@ authors:
   - given-names: Tomasz
     family-names: Maciosowski
     orcid: 'https://orcid.org/0009-0000-7485-0786'
-repository-code: 'https://github.com/t4ccer/cgt-rs'
+repository-code: 'https://github.com/t4ccer/cgt-tools'
 keywords:
   - combinatorial game theory
 license: AGPL-3.0-or-later
