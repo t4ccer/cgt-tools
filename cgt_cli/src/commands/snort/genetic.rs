@@ -1,4 +1,4 @@
-use crate::{io::FileOrStderr, snort::common::Log};
+use crate::{commands::snort::common::Log, io::FileOrStderr};
 use anyhow::{Context, Result};
 use cgt::{
     genetic_algorithm::{Algorithm, GeneticAlgorithm, Scored},

@@ -1,5 +1,5 @@
 use crate::{
-    domineering::common::DomineeringResult,
+    commands::domineering::common::DomineeringResult,
     io::{FileOrStderr, FileOrStdout},
 };
 use anyhow::{bail, Context, Result};

@@ -1,4 +1,4 @@
-use crate::snort::common::{analyze_position, Edge};
+use crate::commands::snort::common::{analyze_position, Edge};
 use anyhow::Result;
 use cgt::{
     graph::undirected::Graph,

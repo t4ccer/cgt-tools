@@ -1,6 +1,6 @@
 use crate::{
+    commands::snort::common::Log,
     io::{FileOrStdin, FileOrStdout},
-    snort::common::Log,
 };
 use anyhow::{bail, Context, Result};
 use cgt::numeric::rational::Rational;

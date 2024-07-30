@@ -1,6 +1,8 @@
-pub(crate) mod amazons;
-pub(crate) mod canonical_form;
-pub(crate) mod domineering;
-pub(crate) mod quicksort;
-pub(crate) mod snort;
-pub(crate) mod wind_up;
+crate::clap_utils::mk_subcommand! {
+    Domineering => domineering,
+    Snort => snort,
+    Quicksort => quicksort,
+    WindUp => wind_up,
+    CanonicalForm => canonical_form,
+    Amazons => amazons,
+}
