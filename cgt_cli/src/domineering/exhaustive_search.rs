@@ -25,13 +25,8 @@ enum ThermographMethod {
     Direct,
 }
 
+/// Perform exhaustive search of domineering grids of given size for high temperature positions
 #[derive(Parser, Debug)]
-#[command(author, version, about)]
-#[command(
-    help_template = "{author-with-newline} {about-section}Version: {version} \n\n\
-		     {usage-heading} {usage} \n\
-		     {all-args} {tab}"
-)]
 pub struct Args {
     /// Domineering grid width
     #[arg(long)]

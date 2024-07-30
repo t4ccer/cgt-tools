@@ -27,6 +27,7 @@ impl DomineeringEntry {
     }
 }
 
+/// Convert search report (sequence of JSON objects) to LaTeX table
 #[derive(Parser, Debug)]
 pub struct Args {
     /// Input newline-separated JSON file, usually obtained by running `search` command. Use '-' for stdin

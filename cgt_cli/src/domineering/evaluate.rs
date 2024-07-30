@@ -1,4 +1,5 @@
-use anyhow::Result;
+use crate::io::FileOrStdout;
+use anyhow::{Context, Result};
 use cgt::{
     drawing::svg::Svg,
     short::partizan::{
@@ -8,21 +9,20 @@ use cgt::{
 };
 use clap::Parser;
 use std::{
-    fs::File,
     io::{BufWriter, Write},
     str::FromStr,
 };
 
+/// Evaluate single domineering position
 #[derive(Parser, Debug)]
-#[command(author, version, about)]
 pub struct Args {
-    /// Domineering position to evaluate
+    /// Domineering position to evaluate (e.g. '..#|##.|.#.')
     #[arg(long)]
     position: String,
 
     /// SVG render output path
     #[arg(long, default_value = None)]
-    output_svg: Option<String>,
+    output_svg: Option<FileOrStdout>,
 }
 
 pub fn run(args: Args) -> Result<()> {
@@ -31,12 +31,15 @@ pub fn run(args: Args) -> Result<()> {
 
     if let Some(ref svg_fp) = args.output_svg {
         let mut w = BufWriter::new(
-            File::create(svg_fp).unwrap_or_else(|_| panic!("Could not create file '{}'", svg_fp)),
+            svg_fp
+                .open()
+                .context(format!("Could not create file '{}'", svg_fp))?,
         );
         let mut buf = String::new();
         position.to_svg(&mut buf).expect("Could not render SVG");
+        buf.push('\n');
         w.write_all(buf.as_bytes())
-            .unwrap_or_else(|_| panic!("Could not write to file '{}'", svg_fp));
+            .context(format!("Could not write to file '{}'", svg_fp))?;
     }
 
     let tt = ParallelTranspositionTable::new();

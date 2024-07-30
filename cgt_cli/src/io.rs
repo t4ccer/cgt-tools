@@ -11,6 +11,15 @@ macro_rules! define_output_file_or_std {
             $std_enum,
         }
 
+        impl ::core::fmt::Display for $name {
+            fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+                match self {
+                    Self::$std_enum => write!(f, "-"),
+                    Self::FilePath(value) => write!(f, "{value}"),
+                }
+            }
+        }
+
         impl From<String> for $name {
             fn from(value: String) -> Self {
                 if &value == "-" {
@@ -94,6 +103,15 @@ macro_rules! define_input_file_or_std {
         pub enum $name {
             FilePath(String),
             $std_enum,
+        }
+
+        impl ::core::fmt::Display for $name {
+            fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+                match self {
+                    Self::$std_enum => write!(f, "-"),
+                    Self::FilePath(value) => write!(f, "{value}"),
+                }
+            }
         }
 
         impl From<String> for $name {

@@ -17,8 +17,8 @@ use clap::Parser;
 use rand::Rng;
 use std::{collections::HashSet, io::Write, num::NonZeroUsize, str::FromStr};
 
+/// Perform genetic search of domineering grids of given size for high temperature positions
 #[derive(Parser, Debug)]
-#[command(author, version, about)]
 pub struct Args {
     #[arg(long)]
     generation_size: NonZeroUsize,

@@ -2,23 +2,17 @@ use anyhow::Result;
 use clap::{self, Parser, Subcommand};
 
 mod common;
-pub mod evaluate;
-pub mod genetic;
-pub mod latex;
-pub mod search;
+mod evaluate;
+mod exhaustive_search;
+mod genetic_search;
+mod latex_table;
 
 #[derive(Subcommand, Debug)]
 pub enum Command {
-    /// Perform exhausitve search of domineering grids of given size
-    Search(search::Args),
-
-    /// Convert search report to LaTeX table
-    Latex(latex::Args),
-
-    /// Evaluate single domineering position
+    ExhaustiveSearch(exhaustive_search::Args),
+    GeneticSearch(genetic_search::Args),
     Evaluate(evaluate::Args),
-
-    Genetic(genetic::Args),
+    LatexTable(latex_table::Args),
 }
 
 #[derive(Parser, Debug)]
@@ -29,9 +23,9 @@ pub struct Args {
 
 pub fn run(args: Args) -> Result<()> {
     match args.command {
-        Command::Search(args) => search::run(args),
-        Command::Latex(args) => latex::run(args),
+        Command::ExhaustiveSearch(args) => exhaustive_search::run(args),
+        Command::GeneticSearch(args) => genetic_search::run(args),
         Command::Evaluate(args) => evaluate::run(args),
-        Command::Genetic(args) => genetic::run(args),
+        Command::LatexTable(args) => latex_table::run(args),
     }
 }
