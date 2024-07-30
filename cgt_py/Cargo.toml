@@ -1,5 +1,5 @@
 [package]
-name = "cgt-py"
+name = "cgt_py"
 version = "0.4.1"
 edition = "2021"
 

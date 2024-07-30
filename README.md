@@ -4,7 +4,7 @@ Combinatorial Game Theory framework in Rust and Python.
 
 ## CLI utility tool
 
-Some of the library features are exposed through CLI utility tool. See [CLI README](./cgt-cli/README.md) for installation and usage instructions.
+Some of the library features are exposed through CLI utility tool. See [CLI README](./cgt_cli/README.md) for installation and usage instructions.
 
 ## Rust
 

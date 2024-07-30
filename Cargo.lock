@@ -149,7 +149,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "cgt-cli"
+name = "cgt_cli"
 version = "0.4.1"
 dependencies = [
  "anyhow",
@@ -166,19 +166,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "cgt-py"
-version = "0.4.1"
-dependencies = [
- "cgt",
- "pyo3",
-]
-
-[[package]]
 name = "cgt_derive"
 version = "0.4.1"
 dependencies = [
  "quote",
  "syn",
+]
+
+[[package]]
+name = "cgt_py"
+version = "0.4.1"
+dependencies = [
+ "cgt",
+ "pyo3",
 ]
 
 [[package]]

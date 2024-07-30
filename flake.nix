@@ -75,30 +75,28 @@
           };
 
           nativeBuildInputs = [
+            pkgs.${pythonToolchain}
+            pkgs.${pythonToolchain}.pkgs.pip
             pkgs.alejandra
+            pkgs.cargo-expand
             pkgs.cargo-flamegraph
             pkgs.cargo-leptos
+            pkgs.cargo-machete
             pkgs.cargo-modules
-            pkgs.cargo-tarpaulin
-            pkgs.cargo-udeps
-            pkgs.cargo-expand
             pkgs.cargo-nextest
             pkgs.cargo-semver-checks
-            pkgs.cargo-machete
+            pkgs.cargo-tarpaulin
+            pkgs.cargo-udeps
             pkgs.fd
-            pkgs.linuxKernel.packages.linux_5_15.perf
             pkgs.graphviz
             pkgs.heaptrack
-            pkgs.nodePackages.tailwindcss
+            pkgs.hyperfine
+            pkgs.linuxKernel.packages.linux_5_15.perf
+            pkgs.maturin
             pkgs.sage
             pkgs.texlive.combined.scheme-full
             pkgs.trunk
             rustToolchain
-            pkgs.maturin
-            pkgs.${pythonToolchain}
-            pkgs.${pythonToolchain}.pkgs.pip
-            pkgs.sage
-            pkgs.hyperfine
           ];
         };
         formatter = pkgs.alejandra;

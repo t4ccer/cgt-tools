@@ -1,5 +1,5 @@
 [package]
-name = "cgt-cli"
+name = "cgt_cli"
 version = "0.4.1"
 edition = "2021"
 authors = ["Tomasz Maciosowski <t4ccer@gmail.com>"]
@@ -25,3 +25,4 @@ jemallocator = "0.5.4"
 
 [[bin]]
 name = "cgt-cli"
+path = "src/main.rs"

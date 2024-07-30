@@ -34,8 +34,11 @@ default = []
 serde = ["dep:serde", "dep:serde_repr", "num-rational/serde"]
 rayon = ["dep:rayon"]
 
+[lib]
+path = "./cgt/lib.rs"
+
 [workspace]
-members = ["cgt-cli", "cgt-py", "cgt_derive"]
+members = ["cgt_cli", "cgt_py", "cgt_derive"]
 
 [profile.release]
 lto = true
