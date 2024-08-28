@@ -64,7 +64,7 @@ pub struct Args {
     #[arg(long, default_value_t = false)]
     include_decompositions: bool,
 
-    /// Path to write the cache
+    /// Path to write search results. Will overwrite if file exists
     #[arg(long)]
     output_path: String,
 
