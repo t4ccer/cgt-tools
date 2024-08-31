@@ -11,7 +11,7 @@ To build `cgt-cli` from source clone the repository and install [Rust toolchain]
 ```console
 $ git clone https://github.com/t4ccer/cgt-tools.git
 $ cd cgt-tools
-$ cargo build --package cgt-cli --release
+$ cargo build --package cgt_cli --release
 ```
 
 You will find the binary in `./target/release` directory created by `cargo`.
