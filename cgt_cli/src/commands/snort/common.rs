@@ -4,7 +4,7 @@ use cgt::{
     graph::undirected::Graph,
     numeric::{dyadic_rational_number::DyadicRationalNumber, rational::Rational},
     short::partizan::{
-        games::snort::Snort, partizan_game::PartizanGame,
+        canonical_form::CanonicalForm, games::snort::Snort, partizan_game::PartizanGame,
         transposition_table::ParallelTranspositionTable,
     },
 };
@@ -28,6 +28,14 @@ pub enum Log {
         temperature: DyadicRationalNumber,
         degree: usize,
     },
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct EvaluationResult {
+    pub position: Snort,
+    pub canonical_form: CanonicalForm,
+    pub temperature: DyadicRationalNumber,
+    pub degree: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -122,7 +130,6 @@ pub fn analyze_position(position: Snort, with_graphviz: bool) -> Result<()> {
 
     let degree = position.degree();
     let second_degree = position.second_degree();
-    let score = temperature.to_rational() - Rational::from(degree as i32);
 
     eprintln!("Canonical Form: {}", canonical_form);
     eprintln!("Temperature: {}", temperature);
@@ -134,17 +141,14 @@ pub fn analyze_position(position: Snort, with_graphviz: bool) -> Result<()> {
         Rational::from(degree as i64) + (Rational::from(second_degree as i64) / Rational::from(2))
     );
 
-    let log = Log::HighFitness {
-        position: Scored {
-            object: position,
-            score,
-        },
-        canonical_form: canonical_form.to_string(),
+    let result = EvaluationResult {
+        position,
+        canonical_form,
         temperature,
         degree,
     };
 
-    println!("{}", serde_json::ser::to_string(&log).unwrap());
+    println!("{}", serde_json::ser::to_string(&result).unwrap());
 
     Ok(())
 }

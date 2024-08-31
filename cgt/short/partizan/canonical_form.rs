@@ -25,7 +25,6 @@ use std::{
 
 /// A number-up-star game position that is a sum of a number, up and, nimber.
 #[derive(Debug, Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Nus {
     number: DyadicRationalNumber,
     up_multiple: i32,
@@ -321,7 +320,6 @@ impl Display for Nus {
 
 /// Left and Right moves from a given position
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Moves {
     /// Left player's moves
     pub left: Vec<CanonicalForm>,
@@ -820,7 +818,6 @@ enum CanonicalFormInner {
 /// Canonical game form
 #[repr(transparent)]
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CanonicalForm {
     inner: CanonicalFormInner,
 }

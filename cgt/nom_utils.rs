@@ -33,6 +33,28 @@ macro_rules! impl_from_str_via_nom {
                 }
             }
         }
+
+        #[cfg(feature = "serde")]
+        impl serde::Serialize for $t {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer,
+            {
+                serializer.serialize_str(&self.to_string())
+            }
+        }
+
+        #[cfg(feature = "serde")]
+        impl<'de> serde::Deserialize<'de> for $t {
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                use std::str::FromStr;
+
+                Ok($t::from_str(&String::deserialize(deserializer)?).unwrap())
+            }
+        }
     };
 }
 pub(crate) use impl_from_str_via_nom;

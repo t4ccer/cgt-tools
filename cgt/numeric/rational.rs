@@ -13,7 +13,6 @@ use std::str::FromStr;
 
 /// Infinite rational number.
 #[derive(Debug, Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Rational {
     /// Negative infnity, smaller than all other values
     NegativeInfinity,

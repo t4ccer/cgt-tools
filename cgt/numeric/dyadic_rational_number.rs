@@ -12,7 +12,6 @@ use std::{
 
 /// Number in form `n/2^m`
 #[derive(Debug, Hash, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DyadicRationalNumber {
     numerator: i64,
     denominator_exponent: u32,
