@@ -70,9 +70,9 @@
             PATH=$PATH:$(pwd)/target/release
           '';
 
-          env = {
-            LD_LIBRARY_PATH = "${pkgs.stdenv.cc.cc.lib}/lib";
-          };
+          # env = {
+          #   LD_LIBRARY_PATH = "${pkgs.stdenv.cc.cc.lib}/lib";
+          # };
 
           nativeBuildInputs = [
             pkgs.${pythonToolchain}
@@ -91,7 +91,7 @@
             pkgs.graphviz
             pkgs.heaptrack
             pkgs.hyperfine
-            pkgs.linuxKernel.packages.linux_5_15.perf
+            # pkgs.linuxKernel.packages.linux_5_15.perf
             pkgs.maturin
             pkgs.sage
             pkgs.texlive.combined.scheme-full
