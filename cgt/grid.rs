@@ -32,7 +32,7 @@ pub trait FiniteGrid: Grid + Sized {
     fn zero_size() -> Self;
 
     /// Default, one-line display function for grids using `|` as row separator
-    #[cfg_attr(feature = "cargo-clippy", allow(clippy::missing_errors_doc))]
+    #[allow(clippy::missing_errors_doc)]
     fn display(&self, w: &mut impl Write, sep: char) -> std::fmt::Result
     where
         Self::Item: CharTile,

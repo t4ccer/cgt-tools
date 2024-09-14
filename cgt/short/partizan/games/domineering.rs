@@ -174,13 +174,12 @@ where
     /// ```
     // Panic at `Self::empty(minimized_width, minimized_height).unwrap();` is unreachable
     #[must_use]
-    #[cfg_attr(feature = "cargo-clippy", allow(clippy::missing_panics_doc))]
+    #[allow(clippy::missing_panics_doc)]
     pub fn move_top_left(&self) -> Self {
         Self::new(move_top_left(&self.grid, Tile::is_non_blocking))
     }
 }
 
-#[cfg(not(tarpaulin_include))]
 impl<G> Svg for Domineering<G>
 where
     G: Grid<Item = Tile> + FiniteGrid,

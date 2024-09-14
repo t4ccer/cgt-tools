@@ -1,8 +1,5 @@
 //! Simple SVG immediate drawing utilities
-#![cfg_attr(
-    feature = "cargo-clippy",
-    allow(clippy::missing_errors_doc, clippy::new_ret_no_self)
-)]
+#![allow(clippy::missing_errors_doc, clippy::new_ret_no_self)]
 
 use std::fmt::{self, Write};
 

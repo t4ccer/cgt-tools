@@ -69,7 +69,6 @@ impl Display for ToadsAndFrogs {
     }
 }
 
-#[cfg(not(tarpaulin_include))]
 impl Svg for ToadsAndFrogs {
     fn to_svg<W>(&self, buf: &mut W) -> fmt::Result
     where

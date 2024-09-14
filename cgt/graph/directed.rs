@@ -12,10 +12,7 @@ pub struct Graph {
 }
 
 impl Display for Graph {
-    #[cfg_attr(
-        feature = "cargo-clippy",
-        allow(clippy::missing_inline_in_public_items)
-    )]
+    #[allow(clippy::missing_inline_in_public_items)]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for (idx, elem) in self.adjacency_matrix.iter().enumerate() {
             write!(f, "{}", u8::from(*elem))?;

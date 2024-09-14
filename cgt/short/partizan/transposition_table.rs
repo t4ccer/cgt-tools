@@ -62,7 +62,7 @@ impl<G> TranspositionTable<G> for ParallelTranspositionTable<G>
 where
     G: Eq + Hash,
 {
-    #[cfg_attr(feature = "cargo-clippy", allow(clippy::missing_panics_doc))]
+    #[allow(clippy::missing_panics_doc)]
     #[inline]
     fn lookup_position(&self, position: &G) -> Option<CanonicalForm> {
         self.positions
@@ -70,7 +70,7 @@ where
             .map(|id| self.values[*id].clone())
     }
 
-    #[cfg_attr(feature = "cargo-clippy", allow(clippy::missing_panics_doc))]
+    #[allow(clippy::missing_panics_doc)]
     #[inline]
     fn insert_position(&self, position: G, value: CanonicalForm) {
         if let Some(known) = self.known_values.get(&value) {

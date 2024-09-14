@@ -57,7 +57,7 @@ macro_rules! if_chain {
 pub(crate) use if_chain;
 
 #[test]
-#[cfg_attr(feature = "cargo-clippy", allow(clippy::missing_const_for_fn))]
+#[allow(clippy::missing_const_for_fn)]
 fn test_if_chain() {
     let mut _bar;
 

@@ -166,7 +166,7 @@ where
 
     /// Rotate grid 90° clockwise
     #[must_use]
-    #[cfg_attr(feature = "cargo-clippy", allow(clippy::missing_panics_doc))]
+    #[allow(clippy::missing_panics_doc)]
     pub fn rotate(&self) -> Self {
         let mut result = Self::empty(self.height(), self.width()).unwrap();
         for y in 0..self.height() {

@@ -177,10 +177,7 @@ impl Trajectory {
         self.minmax::<false>(other)
     }
 
-    #[cfg_attr(
-        feature = "cargo-clippy",
-        allow(clippy::useless_let_if_seq, clippy::cognitive_complexity)
-    )]
+    #[allow(clippy::useless_let_if_seq, clippy::cognitive_complexity)]
     fn minmax<const MAX: bool>(&self, other: &Self) -> Self {
         let max_multiplier = if MAX { -1 } else { 1 };
         // We scan down through the critical points.  We keep track of which

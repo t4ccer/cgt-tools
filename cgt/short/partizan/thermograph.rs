@@ -29,7 +29,7 @@ impl Thermograph {
     }
 
     /// Get the temperature of the thermograph where both scaffolds merge into a mast
-    #[cfg_attr(feature = "cargo-clippy", allow(clippy::missing_panics_doc))]
+    #[allow(clippy::missing_panics_doc)]
     pub fn temperature(&self) -> DyadicRationalNumber {
         let left = self.get_left_temperature();
         let right = self.get_right_temperature();
@@ -79,10 +79,7 @@ impl Thermograph {
 
     /// Calculate a thermograph given left and right scaffold. Note that scaffolds should be
     /// [tilted](Trajectory::tilt) before.
-    #[cfg_attr(
-        feature = "cargo-clippy",
-        allow(clippy::cognitive_complexity, clippy::missing_panics_doc)
-    )]
+    #[allow(clippy::cognitive_complexity, clippy::missing_panics_doc)]
     pub fn thermographic_intersection(
         left_scaffold: Trajectory,
         right_scaffold: Trajectory,

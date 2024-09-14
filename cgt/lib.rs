@@ -6,14 +6,8 @@
 //! [calculations on canonical forms](crate::short::partizan::canonical_form::CanonicalForm)
 
 #![warn(missing_docs)]
-#![cfg_attr(
-    feature = "cargo-clippy",
-    warn(
-        clippy::all,
-        clippy::nursery,
-        clippy::pedantic,
-    ),
-    allow(
+#![warn(clippy::all, clippy::nursery, clippy::pedantic)]
+#![allow(
         clippy::new_without_default,
         clippy::similar_names,
         clippy::must_use_candidate,
@@ -27,8 +21,7 @@
         clippy::needless_update,
         clippy::cast_precision_loss,
         clippy::missing_panics_doc
-    )
-)]
+    )]
 
 pub mod drawing;
 pub mod genetic_algorithm;

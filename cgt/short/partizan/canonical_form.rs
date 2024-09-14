@@ -213,7 +213,7 @@ impl Nus {
     /// Parse nus from string, using notation without pluses between number, up, and star components
     ///
     /// Pattern: `\d*([v^]\d*)?(\*\d*)`
-    #[cfg_attr(feature = "cargo-clippy", allow(clippy::missing_errors_doc))]
+    #[allow(clippy::missing_errors_doc)]
     pub fn parse(input: &str) -> nom::IResult<&str, Self> {
         let full_input = input;
         // This flag is set if we explicitly parse a number, rather than set it to zero if
@@ -380,7 +380,7 @@ impl Moves {
 
     /// Try converting moves to NUS. Returns [None] if moves do not form a NUS
     // Macro expands to loads of ifs
-    #[cfg_attr(feature = "cargo-clippy", allow(clippy::cognitive_complexity))]
+    #[allow(clippy::cognitive_complexity)]
     pub fn to_nus(&self) -> Option<Nus> {
         let mut result = Nus::new_integer(0);
 
@@ -736,7 +736,7 @@ impl Moves {
     }
 
     /// Print moves with NUS unwrapped using `{G^L | G^R}` notation
-    #[cfg_attr(feature = "cargo-clippy", allow(clippy::missing_errors_doc))]
+    #[allow(clippy::missing_errors_doc)]
     pub fn print_deep(&self, f: &mut impl Write) -> fmt::Result {
         display::braces(f, |f| {
             for (idx, l) in self.left.iter().enumerate() {
@@ -758,7 +758,7 @@ impl Moves {
 
     /// Print moves to string with NUS unwrapped using `{G^L | G^R}` notation
     // Write to `String` never panics
-    #[cfg_attr(feature = "cargo-clippy", allow(clippy::missing_panics_doc))]
+    #[allow(clippy::missing_panics_doc)]
     pub fn print_deep_to_str(&self) -> String {
         let mut buf = String::new();
         Self::print_deep(self, &mut buf).unwrap();
@@ -1035,7 +1035,7 @@ impl CanonicalForm {
     }
 
     /// Calculate temperature of the game. Avoids computing a thermograph is game is a NUS
-    #[cfg_attr(feature = "cargo-clippy", allow(clippy::missing_panics_doc))]
+    #[allow(clippy::missing_panics_doc)]
     pub fn temperature(&self) -> DyadicRationalNumber {
         match self.inner {
             CanonicalFormInner::Nus(nus) => {
@@ -1208,7 +1208,7 @@ impl CanonicalForm {
 
     /// A remote star of game `g` is a nimber `*N` if no position of `g` including `g` has value `N*`
     #[must_use]
-    #[cfg_attr(feature = "cargo-clippy", allow(clippy::or_fun_call))]
+    #[allow(clippy::or_fun_call)]
     pub fn far_star(&self) -> Nimber {
         if let CanonicalFormInner::Nus(ref nus) = self.inner {
             if nus.is_nimber() {
@@ -1298,7 +1298,7 @@ impl CanonicalForm {
     }
 
     /// Parse game using `{a,b,...|c,d,...}` notation
-    #[cfg_attr(feature = "cargo-clippy", allow(clippy::missing_errors_doc))]
+    #[allow(clippy::missing_errors_doc)]
     pub fn parse(input: &str) -> nom::IResult<&str, Self> {
         alt((
             |input| Nus::parse(input).map(|(input, nus)| (input, Self::new_nus(nus))),
