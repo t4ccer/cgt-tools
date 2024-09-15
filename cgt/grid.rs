@@ -123,6 +123,12 @@ pub trait BitTile: Sized {
 
     /// Convert `bool` to tile
     fn bool_to_tile(input: bool) -> Self;
+
+    /// Flip the tile
+    #[inline]
+    fn flip(self) -> Self {
+        Self::bool_to_tile(!self.tile_to_bool())
+    }
 }
 
 impl BitTile for bool {

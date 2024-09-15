@@ -176,6 +176,9 @@ where
     #[must_use]
     #[allow(clippy::missing_panics_doc)]
     pub fn move_top_left(&self) -> Self {
+        // TODO: We should use this to also "fill 1x1 holes" i.e. when we have grids that after running
+        // bfs has 1x1 regions we can fill them in and reduce grid then.
+
         Self::new(move_top_left(&self.grid, Tile::is_non_blocking))
     }
 }

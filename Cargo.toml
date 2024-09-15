@@ -38,7 +38,7 @@ rayon = ["dep:rayon"]
 path = "./cgt/lib.rs"
 
 [workspace]
-members = ["cgt_cli", "cgt_py", "cgt_derive"]
+members = ["cgt_cli", "cgt_py", "cgt_derive", "cgt_gui"]
 
 [profile.release]
 lto = true

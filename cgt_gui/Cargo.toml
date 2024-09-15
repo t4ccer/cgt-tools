@@ -1,0 +1,12 @@
+[package]
+name = "cgt_gui"
+version = "0.5.1"
+edition = "2021"
+
+[dependencies]
+raylib = {version = "5.0.2", features = ["wayland"]}
+cgt = { path = "../.", features = [] }
+
+[[bin]]
+name = "cgt-gui"
+path = "src/main.rs"

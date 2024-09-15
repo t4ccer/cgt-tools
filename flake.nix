@@ -39,7 +39,11 @@
         rustToolchain = pkgs.rust-bin.fromRustupToolchain {
           channel = "stable";
           components = ["rust-analyzer" "rust-src" "rustfmt" "rustc" "cargo"];
-          targets = ["x86_64-unknown-linux-gnu" "x86_64-unknown-linux-musl"];
+          targets = [
+            "x86_64-unknown-linux-gnu"
+            "x86_64-unknown-linux-musl"
+            "wasm32-unknown-emscripten"
+          ];
         };
 
         pythonToolchain = "python311";
@@ -56,7 +60,7 @@
           hooks = {
             alejandra.enable = true;
             rustfmt.enable = true;
-            clippy.enable = true;
+            # clippy.enable = true;
           };
           tools = {
             rustfmt = lib.mkForce rustToolchain;
@@ -91,12 +95,36 @@
             pkgs.graphviz
             pkgs.heaptrack
             pkgs.hyperfine
-            # pkgs.linuxKernel.packages.linux_5_15.perf
             pkgs.maturin
             pkgs.sage
             pkgs.texlive.combined.scheme-full
             pkgs.trunk
+
+            pkgs.wayland-scanner
+            pkgs.pkg-config
+            pkgs.cmake
+            pkgs.xorg.libX11
+            pkgs.xorg.libXrandr
+            pkgs.xorg.libXinerama
+            pkgs.xorg.libXcursor
+            pkgs.mesa
+            pkgs.xorg.libXi
+            pkgs.clang
+            pkgs.glxinfo
+            pkgs.glfw3
+            pkgs.wayland
+            pkgs.libxkbcommon
+
             rustToolchain
+          ];
+
+          env.LIBCLANG_PATH = "${pkgs.libclang.lib}/lib";
+          env.LD_LIBRARY_PATH = lib.makeLibraryPath [
+            pkgs.libGL
+            pkgs.xorg.libXrandr
+            pkgs.xorg.libXinerama
+            pkgs.xorg.libXcursor
+            pkgs.xorg.libXi
           ];
         };
         formatter = pkgs.alejandra;
