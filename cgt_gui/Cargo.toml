@@ -4,8 +4,12 @@ version = "0.5.1"
 edition = "2021"
 
 [dependencies]
-raylib = {version = "5.0.2", features = ["wayland"]}
-cgt = { path = "../.", features = [] }
+raylib = { version = "5.0.2" }
+cgt = { path = "../.", version = "0.5.1" }
+
+[features]
+default = ["wayland"]
+wayland = ["raylib/wayland"]
 
 [[bin]]
 name = "cgt-gui"

@@ -43,6 +43,7 @@
             "x86_64-unknown-linux-gnu"
             "x86_64-unknown-linux-musl"
             "wasm32-unknown-emscripten"
+            "x86_64-pc-windows-gnu"
           ];
         };
 
@@ -60,7 +61,6 @@
           hooks = {
             alejandra.enable = true;
             rustfmt.enable = true;
-            # clippy.enable = true;
           };
           tools = {
             rustfmt = lib.mkForce rustToolchain;
@@ -73,10 +73,6 @@
             ${config.pre-commit.installationScript}
             PATH=$PATH:$(pwd)/target/release
           '';
-
-          # env = {
-          #   LD_LIBRARY_PATH = "${pkgs.stdenv.cc.cc.lib}/lib";
-          # };
 
           nativeBuildInputs = [
             pkgs.${pythonToolchain}
@@ -100,6 +96,7 @@
             pkgs.texlive.combined.scheme-full
             pkgs.trunk
 
+            pkgs.pkgsCross.mingwW64.stdenv.cc
             pkgs.wayland-scanner
             pkgs.pkg-config
             pkgs.cmake
@@ -118,14 +115,20 @@
             rustToolchain
           ];
 
-          env.LIBCLANG_PATH = "${pkgs.libclang.lib}/lib";
-          env.LD_LIBRARY_PATH = lib.makeLibraryPath [
-            pkgs.libGL
-            pkgs.xorg.libXrandr
-            pkgs.xorg.libXinerama
-            pkgs.xorg.libXcursor
-            pkgs.xorg.libXi
-          ];
+          env = {
+            CARGO_TARGET_X86_64_PC_WINDOWS_GNU_RUSTFLAGS = "-L${pkgs.pkgsCross.mingwW64.windows.mingw_w64_pthreads}/lib";
+            CC_x86_64_pc_windows_gnu = "x86_64-w64-mingw32-gcc";
+            CXX_x86_64_pc_windows_gnu = "x86_64-w64-mingw32-g++";
+            CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER = "x86_64-w64-mingw32-gcc";
+            LIBCLANG_PATH = "${pkgs.libclang.lib}/lib";
+            LD_LIBRARY_PATH = lib.makeLibraryPath [
+              pkgs.libGL
+              pkgs.xorg.libXrandr
+              pkgs.xorg.libXinerama
+              pkgs.xorg.libXcursor
+              pkgs.xorg.libXi
+            ];
+          };
         };
         formatter = pkgs.alejandra;
       };
