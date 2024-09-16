@@ -14,11 +14,17 @@
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
     };
+    hercules-ci-effects = {
+      url = "github:hercules-ci/hercules-ci-effects";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.flake-parts.follows = "flake-parts";
+    };
   };
   outputs = inputs @ {self, ...}:
     inputs.flake-parts.lib.mkFlake {inherit inputs;} {
       imports = [
         inputs.pre-commit-hooks-nix.flakeModule
+        inputs.hercules-ci-effects.flakeModule
       ];
 
       # `nix flake show --impure` hack
@@ -26,6 +32,18 @@
         if builtins.hasAttr "currentSystem" builtins
         then [builtins.currentSystem]
         else inputs.nixpkgs.lib.systems.flakeExposed;
+
+      herculesCI.ciSystems = ["x86_64-linux"];
+      hercules-ci.github-releases.files = [
+        {
+          label = "cgt-gui-windows.exe";
+          path = "${self.outputs.packages.x86_64-linux.cgt-tools-windows}/bin/cgt-gui.exe";
+        }
+        {
+          label = "cgt-cli-windows.exe";
+          path = "${self.outputs.packages.x86_64-linux.cgt-tools-windows}/bin/cgt-cli.exe";
+        }
+      ];
 
       perSystem = {
         config,
