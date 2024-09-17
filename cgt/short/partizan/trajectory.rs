@@ -12,9 +12,13 @@ use std::{cmp::Ordering, fmt::Display};
 pub struct Trajectory {
     /// A `critical point` is a point at which the trajectory changes slope, and must be strictly
     /// between `-1` and `∞`.
-    pub(crate) critical_points: Vec<Rational>,
-    pub(crate) slopes: Vec<Rational>,
-    pub(crate) x_intercepts: Vec<Rational>,
+    pub critical_points: Vec<Rational>,
+
+    /// 0 - vertical up
+    pub slopes: Vec<Rational>,
+
+    /// x intecept for each critical point
+    pub x_intercepts: Vec<Rational>,
 }
 
 impl Trajectory {
@@ -96,7 +100,7 @@ impl Trajectory {
         self.x_intercepts[0]
     }
 
-    /// Gets the value of this trajectory at the specified height (y value).
+    /// Gets the x value of this trajectory at the specified height (y value).
     pub fn value_at(&self, r: Rational) -> Rational {
         let i = self
             .critical_points

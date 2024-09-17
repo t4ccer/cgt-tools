@@ -222,21 +222,9 @@
             pkgs.texlive.combined.scheme-full
             pkgs.trunk
 
-            pkgs.pkgsCross.mingwW64.stdenv.cc
-            pkgs.wayland-scanner
             pkgs.pkg-config
-            pkgs.cmake
-            pkgs.xorg.libX11
-            pkgs.xorg.libXrandr
-            pkgs.xorg.libXinerama
-            pkgs.xorg.libXcursor
-            pkgs.mesa
-            pkgs.xorg.libXi
-            pkgs.clang
-            pkgs.glxinfo
-            pkgs.glfw3
-            pkgs.wayland
-            pkgs.libxkbcommon
+            pkgs.freetype
+            pkgs.SDL2
 
             rustToolchain
             pkgs.wineWow64Packages.unstableFull

@@ -77,6 +77,12 @@ impl Rational {
             None
         }
     }
+
+    /// Get floating point approximation if rational is finite
+    pub fn as_f32(self) -> Option<f32> {
+        let (n, d) = self.to_fraction()?;
+        Some(n as f32 / d as f32)
+    }
 }
 
 impl From<Rational64> for Rational {
