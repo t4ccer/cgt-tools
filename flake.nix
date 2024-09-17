@@ -239,6 +239,7 @@
             pkgs.libxkbcommon
 
             rustToolchain
+            pkgs.wineWow64Packages.unstableFull
           ];
 
           inherit env;

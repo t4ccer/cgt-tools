@@ -153,12 +153,6 @@ const GUI_DARK_BLUE: Color = Color {
     b: 113,
     a: 255,
 };
-const GUI_GRAY: Color = Color {
-    r: 78,
-    g: 71,
-    b: 89,
-    a: 255,
-};
 const GUI_GREEN: Color = Color {
     r: 86,
     g: 113,
