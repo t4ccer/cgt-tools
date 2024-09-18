@@ -5,7 +5,7 @@ use cgt::{
     numeric::rational::Rational,
     short::partizan::{thermograph::Thermograph, trajectory::Trajectory},
 };
-use imgui::{DrawListMut, ImColor32};
+use imgui::{DrawListMut, ImColor32, StyleColor};
 
 use crate::{fade, lerp};
 
@@ -13,9 +13,7 @@ pub const THERMOGRAPH_SCALE: f32 = 50.0;
 pub const THERMOGRAPH_TOP_MAST_LEN: f32 = 2.0;
 pub const THERMOGRAPH_AXIS_PAD: f32 = 0.5;
 pub const THERMOGRAPH_ARROW_SIZE: f32 = 0.25;
-pub const THERMOGRAPH_TRAJECTORY_COLOR: ImColor32 = ImColor32::from_rgb(0xff, 0xff, 0xff);
 pub const THERMOGRAPH_TRAJECTORY_THICKNESS: f32 = 2.0;
-pub const THERMOGRAPH_AXIS_COLOR: ImColor32 = ImColor32::from_rgb(0xcc, 0xcc, 0xcc);
 pub const THERMOGRAPH_AXIS_THICKNESS: f32 = 1.0;
 
 pub const DOMINEERING_TILE_SIZE: f32 = 64.0;
@@ -42,6 +40,8 @@ pub fn thermograph<'ui>(
         .and_then(Rational::as_f32)
         .unwrap_or(0.0);
 
+    let axis_color = ui.style_color(StyleColor::TextDisabled);
+
     // x axis
     draw_list
         .add_line(
@@ -57,7 +57,7 @@ pub fn thermograph<'ui>(
                     + (y_top_above_x_axis + THERMOGRAPH_TOP_MAST_LEN + THERMOGRAPH_AXIS_PAD)
                         * THERMOGRAPH_SCALE,
             ],
-            THERMOGRAPH_AXIS_COLOR,
+            axis_color,
         )
         .thickness(THERMOGRAPH_AXIS_THICKNESS)
         .build();
@@ -85,7 +85,7 @@ pub fn thermograph<'ui>(
                             + THERMOGRAPH_AXIS_PAD * 2.0)
                             * THERMOGRAPH_SCALE,
                 ],
-                THERMOGRAPH_AXIS_COLOR,
+                axis_color,
             )
             .thickness(THERMOGRAPH_AXIS_THICKNESS)
             .build();
@@ -156,20 +156,14 @@ pub fn draw_trajectory<'ui>(
                 * THERMOGRAPH_SCALE,
     ];
 
+    let trajectory_color = ui.style_color(StyleColor::Text);
+
     draw_list
-        .add_line(
-            arrow_top_point,
-            arrow_left_point,
-            THERMOGRAPH_TRAJECTORY_COLOR,
-        )
+        .add_line(arrow_top_point, arrow_left_point, trajectory_color)
         .thickness(THERMOGRAPH_TRAJECTORY_THICKNESS)
         .build();
     draw_list
-        .add_line(
-            arrow_top_point,
-            arrow_right_point,
-            THERMOGRAPH_TRAJECTORY_COLOR,
-        )
+        .add_line(arrow_top_point, arrow_right_point, trajectory_color)
         .thickness(THERMOGRAPH_TRAJECTORY_THICKNESS)
         .build();
 
@@ -207,7 +201,7 @@ pub fn draw_trajectory<'ui>(
             .unwrap();
         ui.text(&scratch_string);
         draw_list
-            .add_line(prev_point, this_point, THERMOGRAPH_TRAJECTORY_COLOR)
+            .add_line(prev_point, this_point, trajectory_color)
             .thickness(THERMOGRAPH_TRAJECTORY_THICKNESS)
             .build();
 
