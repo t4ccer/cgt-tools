@@ -92,15 +92,16 @@ impl<'tt> DomineeringWindow<'tt> {
 
                 if new_width != width || new_height != height {
                     is_dirty = true;
-                    let mut new_grid =
+                    if let Some(mut new_grid) =
                         SmallBitGrid::filled(new_width, new_height, domineering::Tile::Taken)
-                            .unwrap();
-                    for y in 0..height {
-                        for x in 0..width {
-                            new_grid.set(x, y, self.game.grid().get(x, y));
+                    {
+                        for y in 0..height {
+                            for x in 0..width {
+                                new_grid.set(x, y, self.game.grid().get(x, y));
+                            }
                         }
+                        *self.game.grid_mut() = new_grid;
                     }
-                    *self.game.grid_mut() = new_grid;
                 }
 
                 if is_dirty {
