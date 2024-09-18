@@ -7,7 +7,7 @@ use cgt::{
         transposition_table::ParallelTranspositionTable,
     },
 };
-use imgui::Condition;
+use imgui::{Condition, ImColor32};
 use std::str::FromStr;
 
 mod imgui_sdl2_boilerplate;
@@ -33,6 +33,27 @@ pub struct Details {
     thermograph: Thermograph,
     temperature: DyadicRationalNumber,
     temperature_rendered: String,
+}
+
+impl Details {
+    pub fn from_canonical_form(canonical_form: CanonicalForm) -> Details {
+        let canonical_form_rendered = format!("Canonical Form: {canonical_form}");
+        let thermograph = canonical_form.thermograph();
+        let temperature = thermograph.temperature();
+        let temperature_rendered = format!("Temperature: {temperature}");
+        Details {
+            canonical_form,
+            canonical_form_rendered,
+            thermograph,
+            temperature,
+            temperature_rendered,
+        }
+    }
+}
+
+pub enum CgtWindow<'tt> {
+    Domineering(DomineeringWindow<'tt>),
+    CanonicalForm(CanonicalFormWindow),
 }
 
 pub struct DomineeringWindow<'tt> {
@@ -111,17 +132,7 @@ impl<'tt> DomineeringWindow<'tt> {
                 // TODO: Worker thread
                 if self.details.is_none() {
                     let canonical_form = self.game.canonical_form(self.transposition_table);
-                    let canonical_form_rendered = format!("Canonical Form: {canonical_form}");
-                    let thremograph = canonical_form.thermograph();
-                    let temperature = thremograph.temperature();
-                    let temperature_rendered = format!("Temperature: {temperature}");
-                    self.details = Some(Details {
-                        canonical_form,
-                        canonical_form_rendered,
-                        thermograph: thremograph,
-                        temperature,
-                        temperature_rendered,
-                    });
+                    self.details = Some(Details::from_canonical_form(canonical_form));
                 }
 
                 if let Some(details) = self.details.as_ref() {
@@ -137,17 +148,65 @@ impl<'tt> DomineeringWindow<'tt> {
     }
 }
 
+pub struct CanonicalFormWindow {
+    title: String,
+    is_open: bool,
+    details: Details,
+    value_input: String,
+    input_error: bool,
+}
+
+impl CanonicalFormWindow {
+    pub fn draw(&mut self, ui: &imgui::Ui) {
+        if !self.is_open {
+            return;
+        }
+
+        ui.window(&self.title)
+            .position([50.0, 50.0], Condition::Appearing)
+            .size([400.0, 450.0], Condition::Appearing)
+            .bring_to_front_on_focus(true)
+            .opened(&mut self.is_open)
+            .build(|| {
+                let draw_list = ui.get_window_draw_list();
+                let short_inputs = ui.push_item_width(250.0);
+                if ui.input_text("Value", &mut self.value_input).build() {
+                    match CanonicalForm::from_str(&self.value_input) {
+                        Err(_) => self.input_error = true,
+                        Ok(cf) => {
+                            self.input_error = false;
+                            self.details = Details::from_canonical_form(cf);
+                        }
+                    }
+                }
+                short_inputs.end();
+
+                if self.input_error {
+                    ui.text_colored(
+                        ImColor32::from_rgb(0xdd, 0x00, 0x00).to_rgba_f32s(),
+                        "Invalid input",
+                    );
+                }
+                ui.text_wrapped(&self.details.canonical_form_rendered);
+                ui.text(&self.details.temperature_rendered);
+                widgets::thermograph(ui, &draw_list, &self.details.thermograph);
+            });
+    }
+}
+
 fn main() {
     let mut next_id = WindowId(0);
-    let mut windows = Vec::new();
+    let mut windows = Vec::<CgtWindow>::new();
 
     let domineering_tt = ParallelTranspositionTable::new();
+
+    // #.#..|###..|.####|.###.|...##
 
     // must be a macro because borrow checker
     macro_rules! new_domineering {
         () => {{
             let d = DomineeringWindow {
-                game: Domineering::from_str("..#..|#...#|....#|##...|##.#.").unwrap(),
+                game: Domineering::from_str(".#.##|...##|#....|#...#|###..").unwrap(),
                 is_open: true,
                 title: format!("Domineering##{}", next_id.0),
                 show_thermograph: true,
@@ -155,7 +214,22 @@ fn main() {
                 transposition_table: &domineering_tt,
             };
             next_id.0 += 1;
-            windows.push(d);
+            windows.push(CgtWindow::Domineering(d));
+        }};
+    }
+
+    macro_rules! new_canonical_form {
+        () => {{
+            let cf = CanonicalForm::from_str("{-1,{2|-2}|-5}").unwrap();
+            let d = CanonicalFormWindow {
+                value_input: cf.to_string(),
+                details: Details::from_canonical_form(cf),
+                is_open: true,
+                title: format!("Canonical Form##{}", next_id.0),
+                input_error: false,
+            };
+            next_id.0 += 1;
+            windows.push(CgtWindow::CanonicalForm(d));
         }};
     }
 
@@ -172,6 +246,9 @@ fn main() {
 
         if let Some(_main_menu) = ui.begin_main_menu_bar() {
             if let Some(_new_menu) = ui.begin_menu("New") {
+                if ui.menu_item("Canonical Form") {
+                    new_canonical_form!();
+                }
                 if ui.menu_item("Domineering") {
                     new_domineering!();
                 }
@@ -185,7 +262,10 @@ fn main() {
         }
 
         for d in windows.iter_mut() {
-            d.draw(ui);
+            match d {
+                CgtWindow::Domineering(d) => d.draw(ui),
+                CgtWindow::CanonicalForm(d) => d.draw(ui),
+            }
         }
     });
 }
