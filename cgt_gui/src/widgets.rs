@@ -9,6 +9,7 @@ use imgui::{DrawListMut, ImColor32, StyleColor};
 
 use crate::{fade, lerp};
 
+pub mod canonical_form;
 pub mod domineering;
 pub mod snort;
 
