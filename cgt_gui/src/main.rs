@@ -1,4 +1,5 @@
 use cgt::{
+    graph,
     grid::{small_bit_grid::SmallBitGrid, FiniteGrid, Grid},
     numeric::dyadic_rational_number::DyadicRationalNumber,
     short::partizan::{
@@ -13,7 +14,7 @@ use cgt::{
     },
 };
 use imgui::{Condition, ImColor32, MouseButton, StyleColor};
-use std::{borrow::Cow, f32::consts::PI, marker::PhantomData, num::NonZeroU32, str::FromStr};
+use std::{borrow::Cow, f32::consts::PI, fmt::Write, marker::PhantomData, str::FromStr};
 
 mod imgui_sdl2_boilerplate;
 mod widgets;
@@ -298,6 +299,9 @@ pub struct SnortWindow<'tt> {
     node_positions: Vec<[f32; 2]>,
     editing_mode: RawOf<GraphEditingMode>,
     held_node_for_new_edge: Option<usize>,
+    details: Option<Details>,
+    show_thermograph: bool,
+    thermograph_scale: f32,
 }
 
 impl<'tt> SnortWindow<'tt> {
@@ -324,10 +328,12 @@ impl<'tt> SnortWindow<'tt> {
 
         let mut should_reposition = false;
         let mut to_remove: Option<usize> = None;
+        let mut is_dirty = false;
+        let mut label_buf = String::new();
 
         ui.window(&self.title)
             .position([50.0, 50.0], Condition::Appearing)
-            .size([600.0, 450.0], Condition::Appearing)
+            .size([750.0, 450.0], Condition::Appearing)
             .bring_to_front_on_focus(true)
             .opened(&mut self.is_open)
             .build(|| {
@@ -335,6 +341,7 @@ impl<'tt> SnortWindow<'tt> {
 
                 ui.columns(2, "columns", true);
 
+                let short_inputs = ui.push_item_width(200.0);
                 ui.combo(
                     "##Reposition Mode",
                     &mut self.reposition_option_selected.value,
@@ -350,6 +357,7 @@ impl<'tt> SnortWindow<'tt> {
                     GraphEditingMode::LABELS,
                     |i| Cow::Borrowed(i),
                 );
+                short_inputs.end();
 
                 let [pos_x, pos_y] = ui.cursor_screen_pos();
                 let off_y = ui.cursor_pos()[1];
@@ -377,19 +385,23 @@ impl<'tt> SnortWindow<'tt> {
                             GraphEditingMode::TintNodeNone => {
                                 *self.game.vertices[this_vertex_idx].color_mut() =
                                     snort::VertexColor::Empty;
+                                is_dirty = true;
                             }
                             GraphEditingMode::TintNodeBlue => {
                                 *self.game.vertices[this_vertex_idx].color_mut() =
                                     snort::VertexColor::TintLeft;
+                                is_dirty = true;
                             }
                             GraphEditingMode::TintNodeRed => {
                                 *self.game.vertices[this_vertex_idx].color_mut() =
                                     snort::VertexColor::TintRight;
+                                is_dirty = true;
                             }
                             GraphEditingMode::DeleteNode => {
                                 // We don't remove it immediately because we're just iterating over
                                 // vertices
                                 to_remove = Some(this_vertex_idx);
+                                is_dirty = true;
                             }
                             GraphEditingMode::AddEdge => { /* NOOP */ }
                             GraphEditingMode::AddNode => { /* NOOP */ }
@@ -416,6 +428,7 @@ impl<'tt> SnortWindow<'tt> {
                                     this_vertex_idx,
                                     !self.game.graph.are_adjacent(held_node, this_vertex_idx),
                                 );
+                                is_dirty = true;
                             }
                         }
                     }
@@ -454,6 +467,17 @@ impl<'tt> SnortWindow<'tt> {
                             .build();
                     }
 
+                    label_buf.clear();
+                    label_buf
+                        .write_fmt(format_args!("{}", this_vertex_idx + 1))
+                        .unwrap();
+                    let off_x = ui.calc_text_size(&label_buf)[0];
+                    draw_list.add_text(
+                        [node_pos_x - off_x * 0.5, node_pos_y + SNORT_NODE_RADIUS],
+                        node_color,
+                        &label_buf,
+                    );
+
                     for adjacent_vertex_idx in self.game.graph.adjacent_to(this_vertex_idx) {
                         if adjacent_vertex_idx < this_vertex_idx {
                             let [adjacent_pos_x, adjacent_pos_y] =
@@ -490,13 +514,49 @@ impl<'tt> SnortWindow<'tt> {
 
                     let [mouse_x, mouse_y] = ui.io().mouse_pos;
                     self.node_positions.push([mouse_x - pos_x, mouse_y - pos_y]);
+                    is_dirty = true;
                 }
 
                 ui.set_cursor_screen_pos([pos_x, max_y + SNORT_NODE_RADIUS]);
-                ui.spacing();
-                ui.text("foo");
                 ui.next_column();
-                ui.text("bar");
+
+                if let Some(to_remove) = to_remove.take() {
+                    self.game.graph.remove_vertex(to_remove);
+                    self.game.vertices.remove(to_remove);
+                    self.node_positions.remove(to_remove);
+                    is_dirty = true;
+                }
+
+                if is_dirty {
+                    self.details = None;
+                }
+
+                // TODO: Worker thread
+                if self.details.is_none() {
+                    let canonical_form = self.game.canonical_form(self.transposition_table);
+                    self.details = Some(Details::from_canonical_form(canonical_form));
+                }
+
+                if let Some(details) = self.details.as_ref() {
+                    ui.text_wrapped(&details.canonical_form_rendered);
+                    ui.text_wrapped(&details.temperature_rendered);
+
+                    ui.checkbox("Thermograph:", &mut self.show_thermograph);
+                    if self.show_thermograph {
+                        ui.align_text_to_frame_padding();
+                        ui.text("Scale: ");
+                        ui.same_line();
+                        let short_slider = ui.push_item_width(200.0);
+                        ui.slider("##1", 5.0, 100.0, &mut self.thermograph_scale);
+                        short_slider.end();
+                        widgets::thermograph(
+                            ui,
+                            &draw_list,
+                            self.thermograph_scale,
+                            &details.thermograph,
+                        );
+                    }
+                }
             });
 
         if should_reposition {
@@ -508,12 +568,6 @@ impl<'tt> SnortWindow<'tt> {
 
         if !ui.io()[MouseButton::Left] {
             self.held_node_for_new_edge = None;
-        }
-
-        if let Some(to_remove) = to_remove.take() {
-            self.game.graph.remove_vertex(to_remove);
-            self.game.vertices.remove(to_remove);
-            self.node_positions.remove(to_remove);
         }
     }
 }
@@ -562,12 +616,37 @@ fn main() {
             let mut d = SnortWindow {
                 title: format!("Snort##{}", next_id.0),
                 is_open: true,
-                game: Snort::new_three_caterpillar(NonZeroU32::new(3).unwrap()),
+                // caterpillar C(4, 3, 4)
+                game: Snort::new(graph::undirected::Graph::from_edges(
+                    14,
+                    &[
+                        // left
+                        (0, 4),
+                        (1, 4),
+                        (2, 4),
+                        (3, 4),
+                        // center
+                        (6, 5),
+                        (7, 5),
+                        (8, 5),
+                        // right
+                        (10, 9),
+                        (11, 9),
+                        (12, 9),
+                        (13, 9),
+                        // main path
+                        (4, 5),
+                        (5, 9),
+                    ],
+                )),
                 transposition_table: &snort_tt,
                 node_positions: Vec::new(),
                 reposition_option_selected: RawOf::new(RepositionMode::Circle),
                 editing_mode: RawOf::new(GraphEditingMode::DragNode),
                 held_node_for_new_edge: None,
+                details: None,
+                show_thermograph: true,
+                thermograph_scale: 20.0,
             };
             next_id.0 += 1;
             d.reposition_circle();
