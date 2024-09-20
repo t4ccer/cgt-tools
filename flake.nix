@@ -77,7 +77,8 @@
               in
                 !((!lib.cleanSourceFilter name type)
                   || (baseName == "flake.lock")
-                  || (lib.hasSuffix ".nix" baseName));
+                  || (lib.hasSuffix ".nix" baseName)
+                  || (lib.hasSuffix ".md" baseName));
             };
             cargoLock.lockFile = ./Cargo.lock;
 
