@@ -9,6 +9,8 @@ use imgui::{DrawListMut, ImColor32, StyleColor};
 
 use crate::{fade, lerp};
 
+pub mod domineering;
+
 pub const THERMOGRAPH_TOP_MAST_LEN: f32 = 1.0;
 pub const THERMOGRAPH_AXIS_PAD: f32 = 0.5;
 pub const THERMOGRAPH_ARROW_SIZE: f32 = 0.15;
