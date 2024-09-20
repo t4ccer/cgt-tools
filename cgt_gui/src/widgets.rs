@@ -275,5 +275,10 @@ where
         }
     }
 
+    ui.set_cursor_pos([
+        grid_start_pos_x,
+        grid_start_pos_y + (DOMINEERING_TILE_SIZE + DOMINEERING_TILE_GAP) * height as f32,
+    ]);
+
     is_dirty
 }

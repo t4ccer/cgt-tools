@@ -107,8 +107,6 @@ impl<'tt> DomineeringWindow<'tt> {
 
                 ui.columns(2, "Columns", true);
 
-                let [start_pos_x, start_pos_y] = ui.cursor_pos();
-
                 widgets::grid_size_selector(ui, &mut new_width, &mut new_height);
                 ui.spacing();
                 is_dirty |= widgets::bit_grid(ui, &draw_list, self.game.grid_mut());
@@ -127,7 +125,8 @@ impl<'tt> DomineeringWindow<'tt> {
                     }
                 }
 
-                ui.set_cursor_pos([start_pos_x, start_pos_y]);
+                // Section: Right of grid
+                ui.next_column();
 
                 // SAFETY: We're fine because we're not pushing any style changes
                 let pad_x = unsafe { ui.style().window_padding[0] };
@@ -143,15 +142,6 @@ impl<'tt> DomineeringWindow<'tt> {
                         ),
                     );
                 }
-
-                // Section: Right of grid
-                ui.indent_by(
-                    start_pos_x
-                        + (widgets::DOMINEERING_TILE_SIZE + widgets::DOMINEERING_TILE_GAP)
-                            * width as f32,
-                );
-
-                ui.next_column();
 
                 // TODO: Worker thread
                 if self.details.is_none() {
