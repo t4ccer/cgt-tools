@@ -27,4 +27,4 @@ $ cargo run -r -p cgt_gui
 
 Discalimer: I've tested these only using wine, I don't have Windows machine.
 
-Download zip archive from releases page, unpack and run `cgt-gui.exe`. Do not move this file from the directory with .dll files, these are required at runtime.
+Download zip archive from [releases page](https://github.com/t4ccer/cgt-tools/releases), unpack and run `cgt-gui.exe`. Do not move this file from the directory with .dll files, these are required at runtime.
