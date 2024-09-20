@@ -91,7 +91,7 @@ impl<'tt> DomineeringWindow<'tt> {
 
         ui.window(&self.title)
             .position([50.0, 50.0], Condition::Appearing)
-            .size([700.0, 575.0], Condition::Appearing)
+            .size([700.0, 450.0], Condition::Appearing)
             .bring_to_front_on_focus(true)
             .menu_bar(true)
             .opened(&mut self.is_open)
@@ -105,19 +105,13 @@ impl<'tt> DomineeringWindow<'tt> {
                     }
                 }
 
+                ui.columns(2, "Columns", true);
+
                 let [start_pos_x, start_pos_y] = ui.cursor_pos();
 
                 widgets::grid_size_selector(ui, &mut new_width, &mut new_height);
                 ui.spacing();
                 is_dirty |= widgets::bit_grid(ui, &draw_list, self.game.grid_mut());
-
-                // Section: Right of grid
-                ui.set_cursor_pos([start_pos_x, start_pos_y]);
-                ui.indent_by(
-                    start_pos_x
-                        + (widgets::DOMINEERING_TILE_SIZE + widgets::DOMINEERING_TILE_GAP)
-                            * width as f32,
-                );
 
                 if new_width != width || new_height != height {
                     is_dirty = true;
@@ -133,9 +127,31 @@ impl<'tt> DomineeringWindow<'tt> {
                     }
                 }
 
+                ui.set_cursor_pos([start_pos_x, start_pos_y]);
+
+                // SAFETY: We're fine because we're not pushing any style changes
+                let pad_x = unsafe { ui.style().window_padding[0] };
                 if is_dirty {
                     self.details = None;
+                    ui.set_column_width(
+                        0,
+                        f32::max(
+                            pad_x
+                                + (widgets::DOMINEERING_TILE_SIZE + widgets::DOMINEERING_TILE_GAP)
+                                    * new_width as f32,
+                            ui.column_width(0),
+                        ),
+                    );
                 }
+
+                // Section: Right of grid
+                ui.indent_by(
+                    start_pos_x
+                        + (widgets::DOMINEERING_TILE_SIZE + widgets::DOMINEERING_TILE_GAP)
+                            * width as f32,
+                );
+
+                ui.next_column();
 
                 // TODO: Worker thread
                 if self.details.is_none() {
