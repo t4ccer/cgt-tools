@@ -9,10 +9,9 @@ use imgui::{DrawListMut, ImColor32, StyleColor};
 
 use crate::{fade, lerp};
 
-pub const THERMOGRAPH_SCALE: f32 = 50.0;
-pub const THERMOGRAPH_TOP_MAST_LEN: f32 = 2.0;
+pub const THERMOGRAPH_TOP_MAST_LEN: f32 = 1.0;
 pub const THERMOGRAPH_AXIS_PAD: f32 = 0.5;
-pub const THERMOGRAPH_ARROW_SIZE: f32 = 0.25;
+pub const THERMOGRAPH_ARROW_SIZE: f32 = 0.15;
 pub const THERMOGRAPH_TRAJECTORY_THICKNESS: f32 = 2.0;
 pub const THERMOGRAPH_AXIS_THICKNESS: f32 = 1.0;
 
@@ -24,6 +23,7 @@ pub const DOMINEERING_FILLED_COLOR: ImColor32 = ImColor32::from_rgb(0x44, 0x44, 
 pub fn thermograph<'ui>(
     ui: &'ui imgui::Ui,
     draw_list: &'ui imgui::DrawListMut<'ui>,
+    thermograph_scale: f32,
     thermograph: &Thermograph,
 ) {
     let [pos_x, pos_y] = ui.cursor_screen_pos();
@@ -49,13 +49,13 @@ pub fn thermograph<'ui>(
                 pos_x,
                 pos_y
                     + (y_top_above_x_axis + THERMOGRAPH_TOP_MAST_LEN + THERMOGRAPH_AXIS_PAD)
-                        * THERMOGRAPH_SCALE,
+                        * thermograph_scale,
             ],
             [
-                pos_x + THERMOGRAPH_SCALE * (x_len + THERMOGRAPH_AXIS_PAD * 2.0),
+                pos_x + thermograph_scale * (x_len + THERMOGRAPH_AXIS_PAD * 2.0),
                 pos_y
                     + (y_top_above_x_axis + THERMOGRAPH_TOP_MAST_LEN + THERMOGRAPH_AXIS_PAD)
-                        * THERMOGRAPH_SCALE,
+                        * thermograph_scale,
             ],
             axis_color,
         )
@@ -73,17 +73,17 @@ pub fn thermograph<'ui>(
         draw_list
             .add_line(
                 [
-                    pos_x + (THERMOGRAPH_AXIS_PAD + y_axis_loc) * THERMOGRAPH_SCALE,
+                    pos_x + (THERMOGRAPH_AXIS_PAD + y_axis_loc) * thermograph_scale,
                     pos_y,
                 ],
                 [
-                    pos_x + (THERMOGRAPH_AXIS_PAD + y_axis_loc) * THERMOGRAPH_SCALE,
+                    pos_x + (THERMOGRAPH_AXIS_PAD + y_axis_loc) * thermograph_scale,
                     pos_y
                         + (y_top_above_x_axis
                             + 1.0 // We need to go up to -1
                             + THERMOGRAPH_TOP_MAST_LEN
                             + THERMOGRAPH_AXIS_PAD * 2.0)
-                            * THERMOGRAPH_SCALE,
+                            * thermograph_scale,
                 ],
                 axis_color,
             )
@@ -102,6 +102,7 @@ pub fn thermograph<'ui>(
         &draw_list,
         [pos_x, pos_y],
         x_offset,
+        thermograph_scale,
         &thermograph.left_wall,
     );
     draw_trajectory(
@@ -109,6 +110,7 @@ pub fn thermograph<'ui>(
         &draw_list,
         [pos_x, pos_y],
         x_offset,
+        thermograph_scale,
         &thermograph.right_wall,
     );
 }
@@ -118,6 +120,7 @@ pub fn draw_trajectory<'ui>(
     draw_list: &'ui imgui::DrawListMut<'ui>,
     [pos_x, pos_y]: [f32; 2],
     x_offset: f32,
+    thermograph_scale: f32,
     trajectory: &Trajectory,
 ) {
     let y_top_above_x_axis = trajectory
@@ -132,28 +135,28 @@ pub fn draw_trajectory<'ui>(
     let mut prev_y = y_top_above_x_axis + THERMOGRAPH_TOP_MAST_LEN;
 
     let arrow_top_point = [
-        pos_x + (THERMOGRAPH_AXIS_PAD + x_offset - prev_x) * THERMOGRAPH_SCALE,
+        pos_x + (THERMOGRAPH_AXIS_PAD + x_offset - prev_x) * thermograph_scale,
         pos_y
             + (THERMOGRAPH_AXIS_PAD + y_top_above_x_axis + THERMOGRAPH_TOP_MAST_LEN - prev_y)
-                * THERMOGRAPH_SCALE,
+                * thermograph_scale,
     ];
     let arrow_left_point = [
         pos_x
             + (THERMOGRAPH_AXIS_PAD + x_offset - prev_x - THERMOGRAPH_ARROW_SIZE)
-                * THERMOGRAPH_SCALE,
+                * thermograph_scale,
         pos_y
             + (THERMOGRAPH_AXIS_PAD + y_top_above_x_axis + THERMOGRAPH_TOP_MAST_LEN - prev_y
                 + THERMOGRAPH_ARROW_SIZE)
-                * THERMOGRAPH_SCALE,
+                * thermograph_scale,
     ];
     let arrow_right_point = [
         pos_x
             + (THERMOGRAPH_AXIS_PAD + x_offset - prev_x + THERMOGRAPH_ARROW_SIZE)
-                * THERMOGRAPH_SCALE,
+                * thermograph_scale,
         pos_y
             + (THERMOGRAPH_AXIS_PAD + y_top_above_x_axis + THERMOGRAPH_TOP_MAST_LEN - prev_y
                 + THERMOGRAPH_ARROW_SIZE)
-                * THERMOGRAPH_SCALE,
+                * thermograph_scale,
     ];
 
     let trajectory_color = ui.style_color(StyleColor::Text);
@@ -182,16 +185,16 @@ pub fn draw_trajectory<'ui>(
         let this_x = this_x_r.as_f32().unwrap();
 
         let prev_point = [
-            pos_x + (THERMOGRAPH_AXIS_PAD + x_offset - prev_x) * THERMOGRAPH_SCALE,
+            pos_x + (THERMOGRAPH_AXIS_PAD + x_offset - prev_x) * thermograph_scale,
             pos_y
                 + (THERMOGRAPH_AXIS_PAD + y_top_above_x_axis + THERMOGRAPH_TOP_MAST_LEN - prev_y)
-                    * THERMOGRAPH_SCALE,
+                    * thermograph_scale,
         ];
         let this_point = [
-            pos_x + (THERMOGRAPH_AXIS_PAD + x_offset - this_x) * THERMOGRAPH_SCALE,
+            pos_x + (THERMOGRAPH_AXIS_PAD + x_offset - this_x) * thermograph_scale,
             pos_y
                 + (THERMOGRAPH_AXIS_PAD + y_top_above_x_axis + THERMOGRAPH_TOP_MAST_LEN - this_y)
-                    * THERMOGRAPH_SCALE,
+                    * thermograph_scale,
         ];
 
         ui.set_cursor_screen_pos(this_point);

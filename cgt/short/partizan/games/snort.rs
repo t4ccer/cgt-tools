@@ -61,14 +61,16 @@ pub enum VertexKind {
 
 impl VertexKind {
     #[inline]
-    const fn color(self) -> VertexColor {
+    /// Get color of the vertex
+    pub const fn color(self) -> VertexColor {
         match self {
             Self::Single(color) | Self::Cluster(color, _) => color,
         }
     }
 
     #[inline]
-    fn color_mut(&mut self) -> &mut VertexColor {
+    /// Get mutable color of the vertex
+    pub fn color_mut(&mut self) -> &mut VertexColor {
         match self {
             Self::Single(color) | Self::Cluster(color, _) => color,
         }

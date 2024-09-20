@@ -46,12 +46,14 @@ pub fn run(title: &str, mut draw: impl FnMut(&Ui)) {
     /* create new glow and imgui contexts */
     let gl = glow_context(&window);
 
-    let bg = 0.2;
+    // background color
+    let bg = 0.6;
     unsafe { gl.clear_color(bg, bg, bg, 1.0) };
 
     /* create context */
     let mut imgui = Context::create();
     imgui.io_mut().config_flags |= ConfigFlags::DOCKING_ENABLE;
+    imgui.style_mut().use_light_colors();
 
     /* disable creation of files on disc */
     imgui.set_ini_filename(None);
