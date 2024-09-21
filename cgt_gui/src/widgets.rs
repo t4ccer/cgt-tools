@@ -28,6 +28,7 @@ pub fn thermograph<'ui>(
     ui: &'ui imgui::Ui,
     draw_list: &'ui imgui::DrawListMut<'ui>,
     thermograph_scale: f32,
+    scratch_buffer: &mut String,
     thermograph: &Thermograph,
 ) {
     let [pos_x, pos_y] = ui.cursor_screen_pos();
@@ -107,6 +108,7 @@ pub fn thermograph<'ui>(
         [pos_x, pos_y],
         x_offset,
         thermograph_scale,
+        scratch_buffer,
         &thermograph.left_wall,
     );
     draw_trajectory(
@@ -115,6 +117,7 @@ pub fn thermograph<'ui>(
         [pos_x, pos_y],
         x_offset,
         thermograph_scale,
+        scratch_buffer,
         &thermograph.right_wall,
     );
 }
@@ -125,6 +128,7 @@ pub fn draw_trajectory<'ui>(
     [pos_x, pos_y]: [f32; 2],
     x_offset: f32,
     thermograph_scale: f32,
+    scratch_buffer: &mut String,
     trajectory: &Trajectory,
 ) {
     let y_top_above_x_axis = trajectory
@@ -174,9 +178,6 @@ pub fn draw_trajectory<'ui>(
         .thickness(THERMOGRAPH_TRAJECTORY_THICKNESS)
         .build();
 
-    // To avoid allocaton per point label we have one shared scratch buffer
-    let mut scratch_string = String::new();
-
     for this_y_r in trajectory
         .critical_points
         .iter()
@@ -202,11 +203,11 @@ pub fn draw_trajectory<'ui>(
         ];
 
         ui.set_cursor_screen_pos(this_point);
-        scratch_string.clear();
-        scratch_string
+        scratch_buffer.clear();
+        scratch_buffer
             .write_fmt(format_args!("({this_x_r}, {this_y_r})"))
             .unwrap();
-        ui.text(&scratch_string);
+        ui.text(&scratch_buffer);
         draw_list
             .add_line(prev_point, this_point, trajectory_color)
             .thickness(THERMOGRAPH_TRAJECTORY_THICKNESS)

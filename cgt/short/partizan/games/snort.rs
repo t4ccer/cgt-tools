@@ -180,7 +180,7 @@ impl Snort {
             .into_iter()
             .map(|v| self.vertex_degree(v))
             .max()
-            .expect("graph to have at least 1 vertex")
+            .unwrap_or(0)
     }
 
     /// Get second degree of the underlying game graph
@@ -193,7 +193,7 @@ impl Snort {
             .into_iter()
             .map(|v| self.vertex_second_degree(v))
             .max()
-            .expect("graph to have at least 1 vertex")
+            .unwrap_or(0)
     }
 
     /// Get moves for a given player. Works only for `TintLeft` and `TintRight`.

@@ -5,7 +5,7 @@ use cgt::{
         transposition_table::ParallelTranspositionTable,
     },
 };
-use std::marker::PhantomData;
+use std::{collections::BTreeMap, marker::PhantomData};
 use widgets::canonical_form::CanonicalFormWindow;
 
 use crate::widgets::{domineering::DomineeringWindow, snort::SnortWindow};
@@ -23,10 +23,11 @@ fn lerp(start: f32, end: f32, t: f32) -> f32 {
     start + t * (end - start)
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct WindowId(pub usize);
 
 #[allow(dead_code)]
+#[derive(Clone)]
 pub struct Details {
     canonical_form: CanonicalForm,
     canonical_form_rendered: String,
@@ -51,10 +52,57 @@ impl Details {
     }
 }
 
+#[derive(Clone)]
+pub struct TitledWindow<G> {
+    pub title: String,
+    pub is_open: bool,
+    pub content: G,
+    pub scratch_buffer: String,
+}
+
+impl<G> TitledWindow<G> {
+    pub fn without_title(content: G) -> TitledWindow<G> {
+        TitledWindow {
+            title: String::new(),
+            is_open: true,
+            content,
+            scratch_buffer: String::new(),
+        }
+    }
+}
+
 pub enum CgtWindow<'tt> {
-    Domineering(DomineeringWindow<'tt>),
-    CanonicalForm(CanonicalFormWindow),
-    Snort(SnortWindow<'tt>),
+    Domineering(TitledWindow<DomineeringWindow<'tt>>),
+    CanonicalForm(TitledWindow<CanonicalFormWindow>),
+    Snort(TitledWindow<SnortWindow<'tt>>),
+}
+
+impl<'tt> From<DomineeringWindow<'tt>> for CgtWindow<'tt> {
+    fn from(value: DomineeringWindow<'tt>) -> CgtWindow<'tt> {
+        CgtWindow::Domineering(TitledWindow::without_title(value))
+    }
+}
+
+impl<'tt> From<CanonicalFormWindow> for CgtWindow<'tt> {
+    fn from(value: CanonicalFormWindow) -> CgtWindow<'tt> {
+        CgtWindow::CanonicalForm(TitledWindow::without_title(value))
+    }
+}
+
+impl<'tt> From<SnortWindow<'tt>> for CgtWindow<'tt> {
+    fn from(value: SnortWindow<'tt>) -> CgtWindow<'tt> {
+        CgtWindow::Snort(TitledWindow::without_title(value))
+    }
+}
+
+impl CgtWindow<'_> {
+    pub fn set_title(&mut self, id: WindowId) {
+        match self {
+            CgtWindow::Domineering(d) => d.title = format!("Domineering##{}", id.0),
+            CgtWindow::CanonicalForm(d) => d.title = format!("Canonical Form##{}", id.0),
+            CgtWindow::Snort(d) => d.title = format!("Snort##{}", id.0),
+        }
+    }
 }
 
 pub trait IsEnum {
@@ -115,7 +163,9 @@ pub(crate) use imgui_enum;
 
 fn main() {
     let mut next_id = WindowId(0);
-    let mut windows = Vec::<CgtWindow>::new();
+    let mut windows_to_remove = Vec::<WindowId>::new();
+    let mut windows_to_add = Vec::<CgtWindow>::new();
+    let mut windows: BTreeMap<WindowId, CgtWindow> = BTreeMap::new();
 
     let domineering_tt = ParallelTranspositionTable::new();
     let snort_tt = ParallelTranspositionTable::new();
@@ -123,31 +173,37 @@ fn main() {
     // must be a macro because borrow checker
     macro_rules! new_domineering {
         () => {{
-            let d = DomineeringWindow::new(next_id, &domineering_tt);
+            let d = DomineeringWindow::new(&domineering_tt);
+            let mut d = CgtWindow::Domineering(TitledWindow::without_title(d));
+            d.set_title(next_id);
+            windows.insert(next_id, d);
             next_id.0 += 1;
-            windows.push(CgtWindow::Domineering(d));
         }};
     }
 
     macro_rules! new_canonical_form {
         () => {{
-            let d = CanonicalFormWindow::new(next_id);
+            let d = CanonicalFormWindow::new();
+            let mut d = CgtWindow::CanonicalForm(TitledWindow::without_title(d));
+            d.set_title(next_id);
+            windows.insert(next_id, d);
             next_id.0 += 1;
-            windows.push(CgtWindow::CanonicalForm(d));
         }};
     }
 
     macro_rules! new_snort {
         () => {{
-            let mut d = SnortWindow::new(next_id, &snort_tt);
-            next_id.0 += 1;
+            let mut d = SnortWindow::new(&snort_tt);
             d.reposition_circle();
-            windows.push(CgtWindow::Snort(d));
+            let mut d = CgtWindow::Snort(TitledWindow::without_title(d));
+            d.set_title(next_id);
+            windows.insert(next_id, d);
+            next_id.0 += 1;
         }};
     }
 
-    // new_domineering!();
-    new_snort!();
+    new_domineering!();
+    // new_snort!();
 
     let mut show_debug = false;
 
@@ -175,12 +231,31 @@ fn main() {
             }
         }
 
-        for d in windows.iter_mut() {
-            match d {
-                CgtWindow::Domineering(d) => d.draw(ui),
-                CgtWindow::CanonicalForm(d) => d.draw(ui),
-                CgtWindow::Snort(d) => d.draw(ui),
+        for (&wid, d) in windows.iter_mut() {
+            macro_rules! handle_window {
+                ($d:expr) => {{
+                    $d.draw(ui, &mut windows_to_add);
+                    if !$d.is_open {
+                        windows_to_remove.push(wid);
+                    }
+                }};
             }
+
+            match d {
+                CgtWindow::Domineering(d) => handle_window!(d),
+                CgtWindow::CanonicalForm(d) => handle_window!(d),
+                CgtWindow::Snort(d) => handle_window!(d),
+            }
+        }
+
+        for to_remove in windows_to_remove.drain(..) {
+            windows.remove(&to_remove);
+        }
+
+        for mut to_add in windows_to_add.drain(..) {
+            to_add.set_title(next_id);
+            windows.insert(next_id, to_add);
+            next_id.0 += 1;
         }
     });
 }
