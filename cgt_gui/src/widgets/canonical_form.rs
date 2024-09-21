@@ -9,6 +9,7 @@ pub struct CanonicalFormWindow {
     details: Details,
     value_input: String,
     input_error: bool,
+    thermograph_scale: f32,
 }
 
 impl CanonicalFormWindow {
@@ -22,6 +23,7 @@ impl CanonicalFormWindow {
             value_input: details.canonical_form.to_string(),
             details,
             input_error: false,
+            thermograph_scale: 50.0,
         }
     }
 }
@@ -63,7 +65,6 @@ impl TitledWindow<CanonicalFormWindow> {
                         }
                     }
                 }
-                short_inputs.end();
 
                 if self.content.input_error {
                     ui.text_colored(
@@ -73,10 +74,20 @@ impl TitledWindow<CanonicalFormWindow> {
                 }
                 ui.text_wrapped(&self.content.details.canonical_form_rendered);
                 ui.text(&self.content.details.temperature_rendered);
+
+                ui.slider(
+                    "Thermograph Scale",
+                    20.0,
+                    150.0,
+                    &mut self.content.thermograph_scale,
+                );
+
+                short_inputs.end();
+
                 widgets::thermograph(
                     ui,
                     &draw_list,
-                    50.0,
+                    self.content.thermograph_scale,
                     &mut self.scratch_buffer,
                     &self.content.details.thermograph,
                 );
