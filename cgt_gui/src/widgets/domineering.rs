@@ -1,48 +1,41 @@
 use cgt::{
     grid::{small_bit_grid::SmallBitGrid, FiniteGrid, Grid},
-    short::partizan::{
-        games::domineering::Domineering, partizan_game::PartizanGame,
-        transposition_table::ParallelTranspositionTable,
-    },
+    short::partizan::games::domineering::Domineering,
 };
 use imgui::Condition;
 use std::str::FromStr;
 
 use crate::{
+    impl_game_window, impl_titled_window,
     widgets::{self, canonical_form::CanonicalFormWindow},
-    CgtWindow, Details, TitledWindow,
+    Context, Details, EvalTask, IsCgtWindow, Task, TitledWindow, UpdateKind,
 };
 
-#[derive(Clone)]
-pub struct DomineeringWindow<'tt> {
+#[derive(Debug, Clone)]
+pub struct DomineeringWindow {
     game: Domineering,
     show_thermograph: bool,
     thermograph_scale: f32,
-    details: Option<Details>,
-    transposition_table: &'tt ParallelTranspositionTable<Domineering>,
+    pub details: Option<Details>,
 }
 
-impl<'tt> DomineeringWindow<'tt> {
-    pub fn new(
-        domineering_tt: &'tt ParallelTranspositionTable<Domineering>,
-    ) -> DomineeringWindow<'tt> {
+impl DomineeringWindow {
+    pub fn new() -> DomineeringWindow {
         DomineeringWindow {
             game: Domineering::from_str(".#.##|...##|#....|#...#|###..").unwrap(),
             show_thermograph: true,
             details: None,
             thermograph_scale: 50.0,
-            transposition_table: &domineering_tt,
         }
     }
 }
 
-impl<'tt> TitledWindow<DomineeringWindow<'tt>> {
-    pub fn draw(&mut self, ui: &imgui::Ui, new_windows: &mut Vec<CgtWindow<'tt>>) {
-        use cgt::short::partizan::games::domineering;
+impl IsCgtWindow for TitledWindow<DomineeringWindow> {
+    impl_titled_window!("Domineering");
+    impl_game_window!(EvalDomineering);
 
-        if !self.is_open {
-            return;
-        }
+    fn draw(&mut self, ui: &imgui::Ui, ctx: &mut Context) {
+        use cgt::short::partizan::games::domineering;
 
         let width = self.content.game.grid().width();
         let height = self.content.game.grid().height();
@@ -65,12 +58,14 @@ impl<'tt> TitledWindow<DomineeringWindow<'tt>> {
                     if let Some(_new_menu) = ui.begin_menu("New") {
                         if ui.menu_item("Duplicate") {
                             let w = self.content.clone();
-                            new_windows.push(CgtWindow::from(w));
+                            ctx.new_windows
+                                .push(Box::new(TitledWindow::without_title(w)));
                         };
                         if ui.menu_item("Canonical Form") {
                             if let Some(details) = self.content.details.clone() {
                                 let w = CanonicalFormWindow::with_details(details);
-                                new_windows.push(CgtWindow::from(w));
+                                ctx.new_windows
+                                    .push(Box::new(TitledWindow::without_title(w)));
                             }
                         }
                     }
@@ -99,30 +94,6 @@ impl<'tt> TitledWindow<DomineeringWindow<'tt>> {
                 // Section: Right of grid
                 ui.next_column();
 
-                // SAFETY: We're fine because we're not pushing any style changes
-                let pad_x = unsafe { ui.style().window_padding[0] };
-                if is_dirty {
-                    self.content.details = None;
-                    ui.set_column_width(
-                        0,
-                        f32::max(
-                            pad_x
-                                + (widgets::DOMINEERING_TILE_SIZE + widgets::DOMINEERING_TILE_GAP)
-                                    * new_width as f32,
-                            ui.column_width(0),
-                        ),
-                    );
-                }
-
-                // TODO: Worker thread
-                if self.content.details.is_none() {
-                    let canonical_form = self
-                        .content
-                        .game
-                        .canonical_form(self.content.transposition_table);
-                    self.content.details = Some(Details::from_canonical_form(canonical_form));
-                }
-
                 if let Some(details) = self.content.details.as_ref() {
                     ui.text_wrapped(&details.canonical_form_rendered);
                     ui.text_wrapped(&details.temperature_rendered);
@@ -143,6 +114,27 @@ impl<'tt> TitledWindow<DomineeringWindow<'tt>> {
                             &details.thermograph,
                         );
                     }
+                } else {
+                    ui.text("Evaluating...");
+                }
+
+                // SAFETY: We're fine because we're not pushing any style changes
+                let pad_x = unsafe { ui.style().window_padding[0] };
+                if is_dirty {
+                    self.content.details = None;
+                    ui.set_column_width(
+                        0,
+                        f32::max(
+                            pad_x
+                                + (widgets::DOMINEERING_TILE_SIZE + widgets::DOMINEERING_TILE_GAP)
+                                    * new_width as f32,
+                            ui.column_width(0),
+                        ),
+                    );
+                    ctx.schedule_task(Task::EvalDomineering(EvalTask {
+                        window: self.window_id,
+                        game: self.content.game.clone(),
+                    }));
                 }
             });
     }

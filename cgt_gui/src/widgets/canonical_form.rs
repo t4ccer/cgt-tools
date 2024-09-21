@@ -2,9 +2,9 @@ use cgt::short::partizan::canonical_form::CanonicalForm;
 use imgui::{Condition, ImColor32};
 use std::str::FromStr;
 
-use crate::{widgets, CgtWindow, Details, TitledWindow};
+use crate::{impl_titled_window, widgets, Context, Details, IsCgtWindow, TitledWindow, UpdateKind};
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct CanonicalFormWindow {
     details: Details,
     value_input: String,
@@ -28,12 +28,12 @@ impl CanonicalFormWindow {
     }
 }
 
-impl TitledWindow<CanonicalFormWindow> {
-    pub fn draw(&mut self, ui: &imgui::Ui, new_windows: &mut Vec<CgtWindow>) {
-        if !self.is_open {
-            return;
-        }
+impl IsCgtWindow for TitledWindow<CanonicalFormWindow> {
+    impl_titled_window!("Canonical Form");
 
+    fn init(&self, _ctx: &Context) {}
+
+    fn draw(&mut self, ui: &imgui::Ui, ctx: &mut Context) {
         ui.window(&self.title)
             .position(ui.io().mouse_pos, Condition::Appearing)
             .size([400.0, 450.0], Condition::Appearing)
@@ -47,7 +47,8 @@ impl TitledWindow<CanonicalFormWindow> {
                     if let Some(_new_menu) = ui.begin_menu("New") {
                         if ui.menu_item("Duplicate") {
                             let w = self.content.clone();
-                            new_windows.push(CgtWindow::from(w));
+                            ctx.new_windows
+                                .push(Box::new(TitledWindow::without_title(w)));
                         };
                     }
                 }
@@ -93,4 +94,6 @@ impl TitledWindow<CanonicalFormWindow> {
                 );
             });
     }
+
+    fn update(&mut self, _update: UpdateKind) {}
 }

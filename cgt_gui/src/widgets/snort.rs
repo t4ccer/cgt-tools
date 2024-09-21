@@ -1,18 +1,14 @@
 use cgt::{
     graph,
-    short::partizan::{
-        games::snort::{self, Snort},
-        partizan_game::PartizanGame,
-        transposition_table::ParallelTranspositionTable,
-    },
+    short::partizan::games::snort::{self, Snort},
 };
 use imgui::{Condition, ImColor32, MouseButton, StyleColor};
 use std::{borrow::Cow, f32::consts::PI, fmt::Write};
 
 use crate::{
-    imgui_enum,
+    imgui_enum, impl_game_window, impl_titled_window,
     widgets::{self, canonical_form::CanonicalFormWindow},
-    CgtWindow, Details, IsEnum, RawOf, TitledWindow,
+    Context, Details, EvalTask, IsCgtWindow, IsEnum, RawOf, Task, TitledWindow, UpdateKind,
 };
 
 const SNORT_NODE_RADIUS: f32 = 16.0;
@@ -36,21 +32,20 @@ imgui_enum! {
     }
 }
 
-#[derive(Clone)]
-pub struct SnortWindow<'tt> {
+#[derive(Debug, Clone)]
+pub struct SnortWindow {
     game: Snort,
     reposition_option_selected: RawOf<RepositionMode>,
-    transposition_table: &'tt ParallelTranspositionTable<Snort>,
     node_positions: Vec<[f32; 2]>,
     editing_mode: RawOf<GraphEditingMode>,
     new_edge_starting_node: Option<usize>,
-    details: Option<Details>,
+    pub details: Option<Details>,
     show_thermograph: bool,
     thermograph_scale: f32,
 }
 
-impl<'tt> SnortWindow<'tt> {
-    pub fn new(snort_tt: &'tt ParallelTranspositionTable<Snort>) -> SnortWindow<'tt> {
+impl SnortWindow {
+    pub fn new() -> SnortWindow {
         SnortWindow {
             // caterpillar C(4, 3, 4)
             game: Snort::new(graph::undirected::Graph::from_edges(
@@ -75,7 +70,6 @@ impl<'tt> SnortWindow<'tt> {
                     (5, 9),
                 ],
             )),
-            transposition_table: &snort_tt,
             node_positions: Vec::new(),
             reposition_option_selected: RawOf::new(RepositionMode::Circle),
             editing_mode: RawOf::new(GraphEditingMode::DragNode),
@@ -104,12 +98,11 @@ impl<'tt> SnortWindow<'tt> {
     }
 }
 
-impl<'tt> TitledWindow<SnortWindow<'tt>> {
-    pub fn draw(&mut self, ui: &imgui::Ui, new_windows: &mut Vec<CgtWindow<'tt>>) {
-        if !self.is_open {
-            return;
-        }
+impl IsCgtWindow for TitledWindow<SnortWindow> {
+    impl_titled_window!("Snort");
+    impl_game_window!(EvalSnort);
 
+    fn draw(&mut self, ui: &imgui::Ui, ctx: &mut Context) {
         let mut should_reposition = false;
         let mut to_remove: Option<usize> = None;
         let mut is_dirty = false;
@@ -127,12 +120,14 @@ impl<'tt> TitledWindow<SnortWindow<'tt>> {
                     if let Some(_new_menu) = ui.begin_menu("New") {
                         if ui.menu_item("Duplicate") {
                             let w = self.content.clone();
-                            new_windows.push(CgtWindow::from(w));
+                            ctx.new_windows
+                                .push(Box::new(TitledWindow::without_title(w)));
                         };
                         if ui.menu_item("Canonical Form") {
                             if let Some(details) = self.content.details.clone() {
                                 let w = CanonicalFormWindow::with_details(details);
-                                new_windows.push(CgtWindow::from(w));
+                                ctx.new_windows
+                                    .push(Box::new(TitledWindow::without_title(w)));
                             }
                         }
                     }
@@ -345,19 +340,6 @@ impl<'tt> TitledWindow<SnortWindow<'tt>> {
                     is_dirty = true;
                 }
 
-                if is_dirty {
-                    self.content.details = None;
-                }
-
-                // TODO: Worker thread
-                if self.content.details.is_none() {
-                    let canonical_form = self
-                        .content
-                        .game
-                        .canonical_form(self.content.transposition_table);
-                    self.content.details = Some(Details::from_canonical_form(canonical_form));
-                }
-
                 self.scratch_buffer.clear();
                 self.scratch_buffer
                     .write_fmt(format_args!("Degree: {}", self.content.game.degree()))
@@ -389,6 +371,16 @@ impl<'tt> TitledWindow<SnortWindow<'tt>> {
                             &details.thermograph,
                         );
                     }
+                } else {
+                    ui.text("Evaluating...");
+                }
+
+                if is_dirty {
+                    self.content.details = None;
+                    ctx.schedule_task(Task::EvalSnort(EvalTask {
+                        window: self.window_id,
+                        game: self.content.game.clone(),
+                    }));
                 }
             });
 
