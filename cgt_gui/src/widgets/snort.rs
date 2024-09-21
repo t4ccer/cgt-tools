@@ -46,6 +46,7 @@ pub struct SnortWindow<'tt> {
     details: Option<Details>,
     show_thermograph: bool,
     thermograph_scale: f32,
+    label_buf: String,
 }
 
 impl<'tt> SnortWindow<'tt> {
@@ -84,6 +85,7 @@ impl<'tt> SnortWindow<'tt> {
             details: None,
             show_thermograph: true,
             thermograph_scale: 20.0,
+            label_buf: String::new(),
         }
     }
 
@@ -112,7 +114,6 @@ impl<'tt> SnortWindow<'tt> {
         let mut should_reposition = false;
         let mut to_remove: Option<usize> = None;
         let mut is_dirty = false;
-        let mut label_buf = String::new();
 
         ui.window(&self.title)
             .position([50.0, 50.0], Condition::Appearing)
@@ -143,7 +144,7 @@ impl<'tt> SnortWindow<'tt> {
                 short_inputs.end();
 
                 let [pos_x, pos_y] = ui.cursor_screen_pos();
-                let off_y = ui.cursor_pos()[1];
+                let control_panel_height = ui.cursor_pos()[1];
 
                 let mut max_y = f32::NEG_INFINITY;
                 let node_color = ui.style_color(StyleColor::Text);
@@ -250,15 +251,15 @@ impl<'tt> SnortWindow<'tt> {
                             .build();
                     }
 
-                    label_buf.clear();
-                    label_buf
+                    self.label_buf.clear();
+                    self.label_buf
                         .write_fmt(format_args!("{}", this_vertex_idx + 1))
                         .unwrap();
-                    let off_x = ui.calc_text_size(&label_buf)[0];
+                    let off_x = ui.calc_text_size(&self.label_buf)[0];
                     draw_list.add_text(
                         [node_pos_x - off_x * 0.5, node_pos_y + SNORT_NODE_RADIUS],
                         node_color,
-                        &label_buf,
+                        &self.label_buf,
                     );
 
                     for adjacent_vertex_idx in self.game.graph.adjacent_to(this_vertex_idx) {
@@ -286,8 +287,11 @@ impl<'tt> SnortWindow<'tt> {
                 ui.set_cursor_screen_pos([pos_x, pos_y]);
                 if matches!(self.editing_mode.as_enum(), GraphEditingMode::AddNode)
                     && ui.invisible_button(
-                        "Graph background",
-                        [ui.current_column_width(), ui.window_size()[1] - off_y],
+                        "Add node",
+                        [
+                            ui.current_column_width(),
+                            ui.window_size()[1] - control_panel_height,
+                        ],
                     )
                 {
                     self.game.graph.add_vertex();
@@ -330,7 +334,12 @@ impl<'tt> SnortWindow<'tt> {
                         ui.text("Scale: ");
                         ui.same_line();
                         let short_slider = ui.push_item_width(200.0);
-                        ui.slider("##1", 5.0, 100.0, &mut self.thermograph_scale);
+                        ui.slider(
+                            "##Thermograph scale",
+                            5.0,
+                            100.0,
+                            &mut self.thermograph_scale,
+                        );
                         short_slider.end();
                         widgets::thermograph(
                             ui,
