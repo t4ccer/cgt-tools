@@ -124,8 +124,8 @@
             pkgs.runCommand "cgt-tools-x86_64-windows.zip" {
               nativeBuildInputs = [pkgs.zip];
             } ''
-              cp -vLr ${self'.packages.cgt-tools-x86_64-windows}/bin/ ./cgt-tools-x86_64-windows
-              cp ${./LICENSE} ./cgt-tools-x86_64-windows/LICENSE
+              cp --no-preserve=all -vLr ${self'.packages.cgt-tools-x86_64-windows}/bin/ ./cgt-tools-x86_64-windows
+              cp --no-preserve=all ${./LICENSE} ./cgt-tools-x86_64-windows/LICENSE
               zip -r cgt-tools-x86_64-windows.zip cgt-tools-x86_64-windows
               mv cgt-tools-x86_64-windows.zip $out
             '';
