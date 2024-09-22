@@ -19,9 +19,11 @@ imgui_enum! {
         TintNodeBlue, 1, "Tint vertex blue (left)",
         TintNodeRed, 2, "Tint vertex red (right)",
         TintNodeNone, 3, "Untint vertex",
-        DeleteNode, 4, "Remove vertex",
-        AddEdge, 5, "Add/Remove edge",
+        MoveLeft, 4, "Blue move (left)",
+        MoveRight, 5, "Red move (right)",
         AddNode, 6, "Add vertex",
+        DeleteNode, 7, "Remove vertex",
+        AddEdge, 8, "Add/Remove edge",
     }
 }
 
@@ -42,6 +44,7 @@ pub struct SnortWindow {
     pub details: Option<Details>,
     show_thermograph: bool,
     thermograph_scale: f32,
+    alternating_moves: bool,
 }
 
 impl SnortWindow {
@@ -77,6 +80,7 @@ impl SnortWindow {
             details: None,
             show_thermograph: true,
             thermograph_scale: 20.0,
+            alternating_moves: true,
         }
     }
 
@@ -104,12 +108,11 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
 
     fn draw(&mut self, ui: &imgui::Ui, ctx: &mut Context) {
         let mut should_reposition = false;
-        let mut to_remove: Option<usize> = None;
         let mut is_dirty = false;
 
         ui.window(&self.title)
             .position(ui.io().mouse_pos, Condition::Appearing)
-            .size([750.0, 450.0], Condition::Appearing)
+            .size([800.0, 450.0], Condition::Appearing)
             .bring_to_front_on_focus(true)
             .menu_bar(true)
             .opened(&mut self.is_open)
@@ -153,6 +156,14 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                 );
                 short_inputs.end();
 
+                if matches!(
+                    self.content.editing_mode.as_enum(),
+                    GraphEditingMode::MoveLeft | GraphEditingMode::MoveRight
+                ) {
+                    ui.same_line();
+                    ui.checkbox("Alternating", &mut self.content.alternating_moves);
+                }
+
                 let [pos_x, pos_y] = ui.cursor_screen_pos();
                 let control_panel_height = ui.cursor_pos()[1];
 
@@ -194,11 +205,70 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                             GraphEditingMode::DeleteNode => {
                                 // We don't remove it immediately because we're just iterating over
                                 // vertices
-                                to_remove = Some(this_vertex_idx);
+                                *self.content.game.vertices[this_vertex_idx].color_mut() =
+                                    snort::VertexColor::Taken;
                                 is_dirty = true;
                             }
                             GraphEditingMode::AddEdge => { /* NOOP */ }
                             GraphEditingMode::AddNode => { /* NOOP */ }
+                            GraphEditingMode::MoveLeft => {
+                                if matches!(
+                                    self.content.game.vertices[this_vertex_idx].color(),
+                                    snort::VertexColor::TintLeft | snort::VertexColor::Empty
+                                ) {
+                                    for adjacent in
+                                        self.content.game.graph.adjacent_to(this_vertex_idx)
+                                    {
+                                        if matches!(
+                                            self.content.game.vertices[adjacent].color(),
+                                            snort::VertexColor::Taken
+                                                | snort::VertexColor::TintRight
+                                        ) {
+                                            *self.content.game.vertices[adjacent].color_mut() =
+                                                snort::VertexColor::Taken;
+                                        } else {
+                                            *self.content.game.vertices[adjacent].color_mut() =
+                                                snort::VertexColor::TintLeft;
+                                        }
+                                    }
+                                    *self.content.game.vertices[this_vertex_idx].color_mut() =
+                                        snort::VertexColor::Taken;
+                                    if self.content.alternating_moves {
+                                        self.content.editing_mode =
+                                            RawOf::new(GraphEditingMode::MoveRight);
+                                    }
+                                    is_dirty = true;
+                                }
+                            }
+                            GraphEditingMode::MoveRight => {
+                                if matches!(
+                                    self.content.game.vertices[this_vertex_idx].color(),
+                                    snort::VertexColor::TintRight | snort::VertexColor::Empty
+                                ) {
+                                    for adjacent in
+                                        self.content.game.graph.adjacent_to(this_vertex_idx)
+                                    {
+                                        if matches!(
+                                            self.content.game.vertices[adjacent].color(),
+                                            snort::VertexColor::Taken
+                                                | snort::VertexColor::TintLeft
+                                        ) {
+                                            *self.content.game.vertices[adjacent].color_mut() =
+                                                snort::VertexColor::Taken;
+                                        } else {
+                                            *self.content.game.vertices[adjacent].color_mut() =
+                                                snort::VertexColor::TintRight;
+                                        }
+                                    }
+                                    *self.content.game.vertices[this_vertex_idx].color_mut() =
+                                        snort::VertexColor::Taken;
+                                    if self.content.alternating_moves {
+                                        self.content.editing_mode =
+                                            RawOf::new(GraphEditingMode::MoveLeft);
+                                    }
+                                    is_dirty = true;
+                                }
+                            }
                         }
                     };
 
@@ -333,11 +403,18 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                 ui.set_cursor_screen_pos([pos_x, max_y + SNORT_NODE_RADIUS]);
                 ui.next_column();
 
-                if let Some(to_remove) = to_remove.take() {
-                    self.content.game.graph.remove_vertex(to_remove);
-                    self.content.game.vertices.remove(to_remove);
-                    self.content.node_positions.remove(to_remove);
-                    is_dirty = true;
+                'outer: loop {
+                    for (to_remove, color) in self.content.game.vertices.iter().copied().enumerate()
+                    {
+                        if color.color() == snort::VertexColor::Taken {
+                            self.content.game.graph.remove_vertex(to_remove);
+                            self.content.game.vertices.remove(to_remove);
+                            self.content.node_positions.remove(to_remove);
+                            is_dirty = true;
+                            continue 'outer;
+                        }
+                    }
+                    break;
                 }
 
                 self.scratch_buffer.clear();
