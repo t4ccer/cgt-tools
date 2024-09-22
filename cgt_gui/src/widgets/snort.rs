@@ -91,7 +91,7 @@ impl SnortWindow {
         let packing_circle_radius = SNORT_NODE_RADIUS * (self.game.graph.size() as f32 + 4.0) * 0.5;
         self.node_positions.clear();
         self.node_positions.reserve(self.game.graph.size());
-        for i in 0..n {
+        for i in self.game.graph.vertices() {
             let angle = (2.0 * PI * i as f32) / n as f32;
             let node_pos = [
                 (packing_circle_radius - SNORT_NODE_RADIUS) * f32::cos(angle)
@@ -177,7 +177,7 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
 
                 let mut max_y = f32::NEG_INFINITY;
                 let node_color = ui.style_color(StyleColor::Text);
-                for this_vertex_idx in 0..self.content.game.graph.size() {
+                for this_vertex_idx in self.content.game.graph.vertices() {
                     let [absolute_node_pos_x, absolute_node_pos_y] =
                         self.content.node_positions[this_vertex_idx];
                     let _node_id = ui.push_id_usize(this_vertex_idx as usize);

@@ -28,11 +28,11 @@ pub struct Args {
     /// Output file with LaTeX table
     out_file: FileOrStdout,
 
-    /// See https://graphviz.org/docs/outputs/
+    /// See <https://graphviz.org/docs/outputs/>
     #[arg(long, default_value = "svg")]
     image_format: String,
 
-    /// See https://graphviz.org/docs/layouts/
+    /// See <https://graphviz.org/docs/layouts/>
     #[arg(long, default_value = "fdp")]
     graphviz_engine: String,
 

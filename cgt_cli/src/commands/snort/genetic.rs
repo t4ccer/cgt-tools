@@ -164,7 +164,7 @@ impl Algorithm<Snort, Rational> for SnortTemperatureDegreeDifference {
     }
 
     fn score(&self, position: &Snort) -> Rational {
-        let degree_sum = position.graph.degrees().iter().sum::<usize>();
+        let degree_sum = position.graph.degrees().sum::<usize>();
         if position.vertices.is_empty() || degree_sum == 0 || !position.graph.is_connected() {
             return Rational::NegativeInfinity;
         }

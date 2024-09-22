@@ -1,9 +1,9 @@
 //! Undirected graph
 
 use core::ops::Range;
-use std::{collections::VecDeque, fmt::Display};
+use std::{collections::VecDeque, fmt::Display, iter::FusedIterator};
 
-use super::directed;
+use super::directed::{self, AdjacentIter};
 
 /// Undirected graph
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -67,7 +67,7 @@ impl Graph {
 
     /// Get vertices adjacent to `vertex`.
     #[inline]
-    pub fn adjacent_to(&self, vertex: usize) -> Vec<usize> {
+    pub fn adjacent_to(&self, vertex: usize) -> AdjacentIter {
         self.0.adjacent_to(vertex)
     }
 
@@ -91,26 +91,17 @@ impl Graph {
 
     /// Get degrees of all vertices in the graph
     #[inline]
-    pub fn degrees(&self) -> Vec<usize> {
-        let mut degrees = vec![0; self.size()];
-        for v in self.vertices() {
-            for u in self.vertices() {
-                if u != v && self.are_adjacent(v, u) {
-                    degrees[v] += 1;
-                }
-            }
+    pub fn degrees(&self) -> DegreeIter {
+        DegreeIter {
+            idx: 0,
+            graph: self,
         }
-        degrees
     }
 
     /// Get graph degree (highest vertex degree)
     #[inline]
     pub fn degree(&self) -> usize {
-        *self
-            .degrees()
-            .iter()
-            .max()
-            .expect("graph to have at least 1 vertex")
+        self.degrees().max().unwrap_or(0)
     }
 
     /// Check if graph is connected
@@ -138,6 +129,33 @@ impl Graph {
         seen.iter().all(|b| *b)
     }
 }
+
+/// Iterator over degrees of vertices in a graph. Obtained with [`Graph::degrees`]
+#[derive(Debug)]
+pub struct DegreeIter<'graph> {
+    idx: usize,
+    graph: &'graph Graph,
+}
+
+impl<'graph> Iterator for DegreeIter<'graph> {
+    type Item = usize;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.idx >= self.graph.size() {
+            return None;
+        }
+
+        let res = self
+            .graph
+            .vertices()
+            .filter(|&u| u != self.idx && self.graph.are_adjacent(self.idx, u))
+            .count();
+        self.idx += 1;
+        Some(res)
+    }
+}
+
+impl<'graph> FusedIterator for DegreeIter<'graph> {}
 
 /// ```text
 /// 1 - 3 - 2
@@ -174,8 +192,15 @@ fn set_adjacency_matrix() {
 #[test]
 fn test_adjacency() {
     let m = test_matrix();
-    assert_eq!(m.adjacent_to(0), vec![1, 3]);
-    assert_eq!(m.adjacent_to(1), vec![0, 3]);
-    assert_eq!(m.adjacent_to(2), vec![3]);
-    assert_eq!(m.adjacent_to(3), vec![0, 1, 2]);
+    assert_eq!(m.adjacent_to(0).collect::<Vec<_>>(), vec![1, 3]);
+    assert_eq!(m.adjacent_to(1).collect::<Vec<_>>(), vec![0, 3]);
+    assert_eq!(m.adjacent_to(2).collect::<Vec<_>>(), vec![3]);
+    assert_eq!(m.adjacent_to(3).collect::<Vec<_>>(), vec![0, 1, 2]);
+}
+
+#[test]
+fn test_degrees() {
+    let m = test_matrix();
+    assert_eq!(m.degrees().collect::<Vec<_>>(), vec![2, 2, 1, 3]);
+    assert_eq!(m.degree(), 3);
 }

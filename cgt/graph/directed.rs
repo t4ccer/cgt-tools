@@ -1,7 +1,7 @@
 //! Directed graph
 
 use core::ops::Range;
-use std::fmt::Display;
+use std::{fmt::Display, iter::FusedIterator};
 
 /// Directed graph
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -75,14 +75,12 @@ impl Graph {
 
     /// Get vertices adjacent to `out_vertex`.
     #[inline]
-    pub fn adjacent_to(&self, out_vertex: usize) -> Vec<usize> {
-        let mut res = Vec::with_capacity(self.size);
-        for idx in 0..self.size {
-            if self.are_adjacent(out_vertex, idx) {
-                res.push(idx);
-            }
+    pub fn adjacent_to(&self, out_vertex: usize) -> AdjacentIter {
+        AdjacentIter {
+            vertex: out_vertex,
+            idx: 0,
+            graph: self,
         }
-        res
     }
 
     /// Get iterator over vertices
@@ -126,6 +124,34 @@ impl Graph {
         *self = new_graph;
     }
 }
+
+/// Iterator of adjacent vertices. Obtained by calling [`Graph::adjacent_to`]
+#[derive(Debug)]
+pub struct AdjacentIter<'graph> {
+    vertex: usize,
+    idx: usize,
+    graph: &'graph Graph,
+}
+
+impl<'graph> Iterator for AdjacentIter<'graph> {
+    type Item = usize;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            if self.idx >= self.graph.size {
+                return None;
+            }
+            if self.graph.are_adjacent(self.vertex, self.idx) {
+                let res = Some(self.idx);
+                self.idx += 1;
+                return res;
+            }
+            self.idx += 1;
+        }
+    }
+}
+
+impl<'graph> FusedIterator for AdjacentIter<'graph> {}
 
 #[test]
 fn adds_new_vertex() {
@@ -194,8 +220,8 @@ fn set_adjacency_matrix() {
 #[test]
 fn test_adjacency() {
     let m = test_matrix();
-    assert_eq!(m.adjacent_to(0), vec![]);
-    assert_eq!(m.adjacent_to(1), vec![0, 3]);
-    assert_eq!(m.adjacent_to(2), vec![]);
-    assert_eq!(m.adjacent_to(3), vec![0, 2]);
+    assert_eq!(m.adjacent_to(0).collect::<Vec<_>>(), vec![]);
+    assert_eq!(m.adjacent_to(1).collect::<Vec<_>>(), vec![0, 3]);
+    assert_eq!(m.adjacent_to(2).collect::<Vec<_>>(), vec![]);
+    assert_eq!(m.adjacent_to(3).collect::<Vec<_>>(), vec![0, 2]);
 }
