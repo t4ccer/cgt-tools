@@ -32,7 +32,7 @@ impl DomineeringWindow {
 
 impl IsCgtWindow for TitledWindow<DomineeringWindow> {
     impl_titled_window!("Domineering");
-    impl_game_window!(EvalDomineering);
+    impl_game_window!(EvalDomineering, DomineeringDetails);
 
     fn draw(&mut self, ui: &imgui::Ui, ctx: &mut Context) {
         use cgt::short::partizan::games::domineering;
@@ -94,29 +94,7 @@ impl IsCgtWindow for TitledWindow<DomineeringWindow> {
                 // Section: Right of grid
                 ui.next_column();
 
-                if let Some(details) = self.content.details.as_ref() {
-                    ui.text_wrapped(&details.canonical_form_rendered);
-                    ui.text_wrapped(&details.temperature_rendered);
-
-                    ui.checkbox("Thermograph:", &mut self.content.show_thermograph);
-                    if self.content.show_thermograph {
-                        ui.align_text_to_frame_padding();
-                        ui.text("Scale: ");
-                        ui.same_line();
-                        let short_slider = ui.push_item_width(200.0);
-                        ui.slider("##1", 20.0, 150.0, &mut self.content.thermograph_scale);
-                        short_slider.end();
-                        widgets::thermograph(
-                            ui,
-                            &draw_list,
-                            self.content.thermograph_scale,
-                            &mut self.scratch_buffer,
-                            &details.thermograph,
-                        );
-                    }
-                } else {
-                    ui.text("Evaluating...");
-                }
+                widgets::game_details!(self, ui, draw_list);
 
                 // SAFETY: We're fine because we're not pushing any style changes
                 let pad_x = unsafe { ui.style().window_padding[0] };

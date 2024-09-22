@@ -7,8 +7,6 @@ use cgt::{
 };
 use imgui::{DrawListMut, ImColor32, StyleColor};
 
-use crate::{fade, lerp};
-
 pub mod canonical_form;
 pub mod domineering;
 pub mod snort;
@@ -23,6 +21,16 @@ pub const DOMINEERING_TILE_SIZE: f32 = 64.0;
 pub const DOMINEERING_TILE_GAP: f32 = 4.0;
 pub const DOMINEERING_EMPTY_COLOR: ImColor32 = ImColor32::from_rgb(0xcc, 0xcc, 0xcc);
 pub const DOMINEERING_FILLED_COLOR: ImColor32 = ImColor32::from_rgb(0x44, 0x44, 0x44);
+
+fn fade(mut color: [f32; 4], alpha: f32) -> [f32; 4] {
+    let alpha = alpha.clamp(0.0, 1.0);
+    color[3] *= alpha;
+    color
+}
+
+fn lerp(start: f32, end: f32, t: f32) -> f32 {
+    start + t * (end - start)
+}
 
 pub fn thermograph<'ui>(
     ui: &'ui imgui::Ui,
@@ -287,3 +295,38 @@ where
 
     is_dirty
 }
+
+macro_rules! game_details {
+    ($self:expr, $ui:expr, $draw_list:expr) => {{
+        if let Some(details) = $self.content.details.as_ref() {
+            $ui.text_wrapped(&details.canonical_form_rendered);
+            $ui.text_wrapped(&details.temperature_rendered);
+
+            $ui.checkbox("Thermograph:", &mut $self.content.show_thermograph);
+            if $self.content.show_thermograph {
+                $ui.align_text_to_frame_padding();
+                $ui.text("Scale: ");
+                $ui.same_line();
+                let short_slider = $ui.push_item_width(200.0);
+                $ui.slider(
+                    "##Thermograph scale",
+                    5.0,
+                    100.0,
+                    &mut $self.content.thermograph_scale,
+                );
+                short_slider.end();
+                $crate::widgets::thermograph(
+                    $ui,
+                    &$draw_list,
+                    $self.content.thermograph_scale,
+                    &mut $self.scratch_buffer,
+                    &details.thermograph,
+                );
+            }
+        } else {
+            $ui.text("Evaluating...");
+        }
+    }};
+}
+
+pub(crate) use game_details;

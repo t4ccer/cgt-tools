@@ -16,16 +16,6 @@ use crate::widgets::{domineering::DomineeringWindow, snort::SnortWindow};
 mod imgui_sdl2_boilerplate;
 mod widgets;
 
-fn fade(mut color: [f32; 4], alpha: f32) -> [f32; 4] {
-    let alpha = alpha.clamp(0.0, 1.0);
-    color[3] *= alpha;
-    color
-}
-
-fn lerp(start: f32, end: f32, t: f32) -> f32 {
-    start + t * (end - start)
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct WindowId(pub usize);
 
@@ -100,7 +90,7 @@ macro_rules! impl_titled_window {
 pub(crate) use impl_titled_window;
 
 macro_rules! impl_game_window {
-    ($task_kind:ident) => {
+    ($task_kind:ident, $update_kind:ident) => {
         fn init(&self, ctx: &Context) {
             ctx.schedule_task($crate::Task::$task_kind($crate::EvalTask {
                 window: self.window_id,
@@ -110,7 +100,12 @@ macro_rules! impl_game_window {
 
         fn update(&mut self, update: $crate::UpdateKind) {
             match update {
-                UpdateKind::Details(details) => self.content.details = Some(details),
+                UpdateKind::$update_kind(game, details) => {
+                    if self.content.game == game {
+                        self.content.details = Some(details);
+                    }
+                }
+                _ => { /* NOOP */ }
             }
         }
     };
@@ -207,7 +202,8 @@ impl Context {
 }
 
 pub enum UpdateKind {
-    Details(Details),
+    DomineeringDetails(Domineering, Details),
+    SnortDetails(Snort, Details),
 }
 
 pub struct Update {
@@ -231,7 +227,7 @@ fn scheduler(ctx: SchedulerContext) {
                 ctx.updates
                     .send(Update {
                         window: task.window,
-                        kind: UpdateKind::Details(details),
+                        kind: UpdateKind::DomineeringDetails(task.game, details),
                     })
                     .unwrap();
             }
@@ -241,7 +237,7 @@ fn scheduler(ctx: SchedulerContext) {
                 ctx.updates
                     .send(Update {
                         window: task.window,
-                        kind: UpdateKind::Details(details),
+                        kind: UpdateKind::SnortDetails(task.game, details),
                     })
                     .unwrap();
             }
@@ -262,101 +258,99 @@ fn main() {
         snort_tt: ParallelTranspositionTable::new(),
     };
 
-    thread::scope(|scope| {
-        scope.spawn(move || scheduler(scheduler_ctx));
+    thread::spawn(move || scheduler(scheduler_ctx));
 
-        let mut next_id = WindowId(0);
-        let mut ctx = Context::new(task_sender);
-        let mut windows: BTreeMap<WindowId, Box<dyn IsCgtWindow>> = BTreeMap::new();
+    let mut next_id = WindowId(0);
+    let mut ctx = Context::new(task_sender);
+    let mut windows: BTreeMap<WindowId, Box<dyn IsCgtWindow>> = BTreeMap::new();
 
-        // must be macros because borrow checker
-        macro_rules! new_window {
-            ($d:expr) => {{
-                $d.set_title(next_id);
-                $d.init(&ctx);
-                windows.insert(next_id, Box::new($d));
-                next_id.0 += 1;
-            }};
+    // must be macros because borrow checker
+    macro_rules! new_window {
+        ($d:expr) => {{
+            $d.set_title(next_id);
+            $d.init(&ctx);
+            windows.insert(next_id, Box::new($d));
+            next_id.0 += 1;
+        }};
+    }
+
+    macro_rules! new_domineering {
+        () => {{
+            let mut d = TitledWindow::without_title(DomineeringWindow::new());
+            new_window!(d);
+        }};
+    }
+
+    macro_rules! new_canonical_form {
+        () => {{
+            let mut d = TitledWindow::without_title(CanonicalFormWindow::new());
+            new_window!(d);
+        }};
+    }
+
+    macro_rules! new_snort {
+        () => {{
+            let mut d = SnortWindow::new();
+            d.reposition_circle();
+            let mut d = TitledWindow::without_title(d);
+            d.set_title(next_id);
+            new_window!(d);
+        }};
+    }
+
+    // new_domineering!();
+    new_snort!();
+
+    let mut show_demo = false;
+
+    imgui_sdl2_boilerplate::run("cgt-gui", |ui| {
+        ui.dockspace_over_main_viewport();
+
+        if show_demo {
+            ui.show_demo_window(&mut show_demo);
         }
 
-        macro_rules! new_domineering {
-            () => {{
-                let mut d = TitledWindow::without_title(DomineeringWindow::new());
-                new_window!(d);
-            }};
+        if let Some(_main_menu) = ui.begin_main_menu_bar() {
+            if let Some(_new_menu) = ui.begin_menu("New") {
+                if ui.menu_item("Canonical Form") {
+                    new_canonical_form!();
+                }
+                if ui.menu_item("Domineering") {
+                    new_domineering!();
+                }
+                if ui.menu_item("Snort") {
+                    new_snort!();
+                }
+            }
+            if ui.menu_item("Debug") {
+                show_demo = true;
+            }
         }
 
-        macro_rules! new_canonical_form {
-            () => {{
-                let mut d = TitledWindow::without_title(CanonicalFormWindow::new());
-                new_window!(d);
-            }};
+        for (&wid, d) in windows.iter_mut() {
+            d.draw(ui, &mut ctx);
+            if !d.is_open() {
+                ctx.removed_windows.push(wid);
+            }
         }
 
-        macro_rules! new_snort {
-            () => {{
-                let mut d = SnortWindow::new();
-                d.reposition_circle();
-                let mut d = TitledWindow::without_title(d);
-                d.set_title(next_id);
-                new_window!(d);
-            }};
+        for to_remove in ctx.removed_windows.drain(..) {
+            windows.remove(&to_remove);
         }
 
-        new_domineering!();
-        // new_snort!();
+        for mut d in ctx.new_windows.drain(..) {
+            // NOTE: We don't call init() here because windows created by other windows should
+            // be already initialized. Creating windows from top menu bar creates them directly
+            // also, borrow checker complains a lot
+            d.set_title(next_id);
+            windows.insert(next_id, d);
+            next_id.0 += 1;
+        }
 
-        let mut show_demo = false;
-
-        imgui_sdl2_boilerplate::run("cgt-gui", |ui| {
-            ui.dockspace_over_main_viewport();
-
-            if show_demo {
-                ui.show_demo_window(&mut show_demo);
+        while let Ok(update) = update_receiver.try_recv() {
+            if let Some(window) = windows.get_mut(&update.window) {
+                window.update(update.kind);
             }
-
-            if let Some(_main_menu) = ui.begin_main_menu_bar() {
-                if let Some(_new_menu) = ui.begin_menu("New") {
-                    if ui.menu_item("Canonical Form") {
-                        new_canonical_form!();
-                    }
-                    if ui.menu_item("Domineering") {
-                        new_domineering!();
-                    }
-                    if ui.menu_item("Snort") {
-                        new_snort!();
-                    }
-                }
-                if ui.menu_item("Debug") {
-                    show_demo = true;
-                }
-            }
-
-            for (&wid, d) in windows.iter_mut() {
-                d.draw(ui, &mut ctx);
-                if !d.is_open() {
-                    ctx.removed_windows.push(wid);
-                }
-            }
-
-            for to_remove in ctx.removed_windows.drain(..) {
-                windows.remove(&to_remove);
-            }
-
-            for mut d in ctx.new_windows.drain(..) {
-                // NOTE: We don't call init() here because windows created by other windows should
-                // be already initialized. Creating windows from top menu bar creates them directly
-                // also, borrow checker complains a lot
-                d.set_title(next_id);
-                windows.insert(next_id, d);
-                next_id.0 += 1;
-            }
-
-            while let Ok(update) = update_receiver.try_recv() {
-                if let Some(window) = windows.get_mut(&update.window) {
-                    window.update(update.kind);
-                }
-            }
-        });
+        }
     });
 }

@@ -45,6 +45,7 @@ pub struct SnortWindow {
     show_thermograph: bool,
     thermograph_scale: f32,
     alternating_moves: bool,
+    edge_creates_vertex: bool,
 }
 
 impl SnortWindow {
@@ -81,6 +82,7 @@ impl SnortWindow {
             show_thermograph: true,
             thermograph_scale: 20.0,
             alternating_moves: true,
+            edge_creates_vertex: true,
         }
     }
 
@@ -104,7 +106,7 @@ impl SnortWindow {
 
 impl IsCgtWindow for TitledWindow<SnortWindow> {
     impl_titled_window!("Snort");
-    impl_game_window!(EvalSnort);
+    impl_game_window!(EvalSnort, SnortDetails);
 
     fn draw(&mut self, ui: &imgui::Ui, ctx: &mut Context) {
         let mut should_reposition = false;
@@ -162,6 +164,12 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                 ) {
                     ui.same_line();
                     ui.checkbox("Alternating", &mut self.content.alternating_moves);
+                } else if matches!(
+                    self.content.editing_mode.as_enum(),
+                    GraphEditingMode::AddEdge
+                ) {
+                    ui.same_line();
+                    ui.checkbox("Add vertex", &mut self.content.edge_creates_vertex);
                 }
 
                 let [pos_x, pos_y] = ui.cursor_screen_pos();
@@ -417,40 +425,34 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                     break;
                 }
 
+                if !ui.io()[MouseButton::Left] {
+                    if let Some(edge_start) = self.content.new_edge_starting_node.take() {
+                        if self.content.edge_creates_vertex {
+                            self.content.game.graph.add_vertex();
+                            self.content
+                                .game
+                                .vertices
+                                .push(snort::VertexKind::Single(snort::VertexColor::Empty));
+
+                            let [mouse_x, mouse_y] = ui.io().mouse_pos;
+                            self.content.node_positions.push([
+                                f32::max(SNORT_NODE_RADIUS, mouse_x - pos_x),
+                                f32::max(SNORT_NODE_RADIUS, mouse_y - pos_y),
+                            ]);
+                            let edge_end = self.content.game.graph.size() - 1;
+                            self.content.game.graph.connect(edge_start, edge_end, true);
+                            is_dirty = true;
+                        }
+                    }
+                }
+
                 self.scratch_buffer.clear();
                 self.scratch_buffer
                     .write_fmt(format_args!("Degree: {}", self.content.game.degree()))
                     .unwrap();
                 ui.text(&self.scratch_buffer);
 
-                if let Some(details) = self.content.details.as_ref() {
-                    ui.text_wrapped(&details.canonical_form_rendered);
-                    ui.text_wrapped(&details.temperature_rendered);
-
-                    ui.checkbox("Thermograph:", &mut self.content.show_thermograph);
-                    if self.content.show_thermograph {
-                        ui.align_text_to_frame_padding();
-                        ui.text("Scale: ");
-                        ui.same_line();
-                        let short_slider = ui.push_item_width(200.0);
-                        ui.slider(
-                            "##Thermograph scale",
-                            5.0,
-                            100.0,
-                            &mut self.content.thermograph_scale,
-                        );
-                        short_slider.end();
-                        widgets::thermograph(
-                            ui,
-                            &draw_list,
-                            self.content.thermograph_scale,
-                            &mut self.scratch_buffer,
-                            &details.thermograph,
-                        );
-                    }
-                } else {
-                    ui.text("Evaluating...");
-                }
+                widgets::game_details!(self, ui, draw_list);
 
                 if is_dirty {
                     self.content.details = None;
@@ -466,10 +468,6 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                 RepositionMode::Circle => self.content.reposition_circle(),
                 RepositionMode::FDP => { /* TODO */ }
             }
-        }
-
-        if !ui.io()[MouseButton::Left] {
-            self.content.new_edge_starting_node = None;
         }
     }
 }
