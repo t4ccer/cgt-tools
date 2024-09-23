@@ -327,6 +327,7 @@ dependencies = [
  "cgt_derive",
  "dashmap",
  "itertools",
+ "mint",
  "nom",
  "num-rational",
  "quickcheck",

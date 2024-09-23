@@ -1,5 +1,6 @@
 use cgt::{
-    graph::{adjacency_matrix::undirected::UndirectedGraph, Graph, Vertex},
+    graph::{adjacency_matrix::undirected::UndirectedGraph, layout::SpringEmbedder, Graph, Vertex},
+    numeric::v2f::V2f,
     short::partizan::games::snort::{self, Snort},
 };
 use imgui::{Condition, ImColor32, MouseButton, StyleColor};
@@ -29,8 +30,8 @@ imgui_enum! {
 
 imgui_enum! {
     RepositionMode {
-        Circle, 0, "Circle",
-        FDP, 1, "FDP (Not Implemented Yet)",
+        SpringEmbedder, 0, "Spring Embedder",
+        Circle, 1, "Circle",
     }
 }
 
@@ -38,7 +39,7 @@ imgui_enum! {
 pub struct SnortWindow {
     game: Snort,
     reposition_option_selected: RawOf<RepositionMode>,
-    node_positions: Vec<[f32; 2]>,
+    node_positions: Vec<V2f>,
     editing_mode: RawOf<GraphEditingMode>,
     new_edge_starting_node: Option<Vertex>,
     details: Option<Details>,
@@ -75,7 +76,7 @@ impl SnortWindow {
                 ],
             )),
             node_positions: Vec::new(),
-            reposition_option_selected: RawOf::new(RepositionMode::Circle),
+            reposition_option_selected: RawOf::new(RepositionMode::SpringEmbedder),
             editing_mode: RawOf::new(GraphEditingMode::DragNode),
             new_edge_starting_node: None,
             details: None,
@@ -93,13 +94,43 @@ impl SnortWindow {
         self.node_positions.reserve(self.game.graph.size());
         for i in self.game.graph.vertices() {
             let angle = (2.0 * PI * i.index as f32) / n as f32;
-            let node_pos = [
-                (packing_circle_radius - SNORT_NODE_RADIUS) * f32::cos(angle)
+            let node_pos = V2f {
+                x: (packing_circle_radius - SNORT_NODE_RADIUS) * f32::cos(angle)
                     + packing_circle_radius,
-                (packing_circle_radius - SNORT_NODE_RADIUS) * f32::sin(angle)
+                y: (packing_circle_radius - SNORT_NODE_RADIUS) * f32::sin(angle)
                     + packing_circle_radius,
-            ];
+            };
             self.node_positions.push(node_pos);
+        }
+    }
+
+    pub fn reposition(&mut self, graph_panel_size: V2f) {
+        match self.reposition_option_selected.as_enum() {
+            RepositionMode::Circle => {
+                self.reposition_circle();
+            }
+            RepositionMode::SpringEmbedder => {
+                // Use circle as initial positions
+                self.reposition_circle();
+                let spring_embedder = SpringEmbedder {
+                    cooling_rate: 0.995,
+                    c_attractive: 1.0,
+                    c_repulsive: 3.0,
+                    ideal_spring_length: 50.0,
+                    iterations: 128,
+                    bounds: Some((
+                        V2f {
+                            x: SNORT_NODE_RADIUS,
+                            y: SNORT_NODE_RADIUS,
+                        },
+                        V2f {
+                            x: graph_panel_size.x - SNORT_NODE_RADIUS * 2.0,
+                            y: graph_panel_size.y - SNORT_NODE_RADIUS * 2.0,
+                        },
+                    )),
+                };
+                spring_embedder.layout(&self.game.graph, &mut self.node_positions);
+            }
         }
     }
 }
@@ -111,6 +142,8 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
     fn draw(&mut self, ui: &imgui::Ui, ctx: &mut Context) {
         let mut should_reposition = false;
         let mut is_dirty = false;
+
+        let mut graph_panel_size = V2f { x: 0.0, y: 0.0 };
 
         ui.window(&self.title)
             .position(ui.io().mouse_pos, Condition::Appearing)
@@ -178,11 +211,10 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                 let mut max_y = f32::NEG_INFINITY;
                 let node_color = ui.style_color(StyleColor::Text);
                 for this_vertex_idx in self.content.game.graph.vertices() {
-                    let [absolute_node_pos_x, absolute_node_pos_y] =
-                        self.content.node_positions[this_vertex_idx.index];
+                    let absolute_node_pos = self.content.node_positions[this_vertex_idx.index];
                     let _node_id = ui.push_id_usize(this_vertex_idx.index);
                     let node_pos @ [node_pos_x, node_pos_y] =
-                        [pos_x + absolute_node_pos_x, pos_y + absolute_node_pos_y];
+                        [pos_x + absolute_node_pos.x, pos_y + absolute_node_pos.y];
                     max_y = max_y.max(node_pos_y);
                     let button_pos @ [button_pos_x, button_pos_y] = [
                         node_pos_x - SNORT_NODE_RADIUS,
@@ -319,10 +351,10 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                         )
                     {
                         let [mouse_delta_x, mouse_delta_y] = ui.io().mouse_delta;
-                        self.content.node_positions[this_vertex_idx.index] = [
-                            f32::max(SNORT_NODE_RADIUS, absolute_node_pos_x + mouse_delta_x),
-                            f32::max(SNORT_NODE_RADIUS, absolute_node_pos_y + mouse_delta_y),
-                        ];
+                        self.content.node_positions[this_vertex_idx.index] = V2f {
+                            x: f32::max(SNORT_NODE_RADIUS, absolute_node_pos.x + mouse_delta_x),
+                            y: f32::max(SNORT_NODE_RADIUS, absolute_node_pos.y + mouse_delta_y),
+                        };
                     }
 
                     let (node_fill_color, should_fill) =
@@ -363,9 +395,9 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                     for adjacent_vertex_idx in self.content.game.graph.adjacent_to(this_vertex_idx)
                     {
                         if adjacent_vertex_idx < this_vertex_idx {
-                            let [adjacent_pos_x, adjacent_pos_y] =
+                            let adjacent_pos =
                                 self.content.node_positions[adjacent_vertex_idx.index];
-                            let adjacent_pos = [pos_x + adjacent_pos_x, pos_y + adjacent_pos_y];
+                            let adjacent_pos = [pos_x + adjacent_pos.x, pos_y + adjacent_pos.y];
                             draw_list
                                 .add_line(node_pos, adjacent_pos, node_color)
                                 .thickness(1.0)
@@ -375,9 +407,8 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                 }
 
                 if let Some(starting_node) = self.content.new_edge_starting_node {
-                    let [held_node_pos_x, held_node_pos_y] =
-                        self.content.node_positions[starting_node.index];
-                    let held_node_pos = [pos_x + held_node_pos_x, pos_y + held_node_pos_y];
+                    let held_node_pos = self.content.node_positions[starting_node.index];
+                    let held_node_pos = [pos_x + held_node_pos.x, pos_y + held_node_pos.y];
                     draw_list
                         .add_line(held_node_pos, ui.io().mouse_pos, ImColor32::BLACK)
                         .thickness(2.0)
@@ -385,16 +416,15 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                 }
 
                 ui.set_cursor_screen_pos([pos_x, pos_y]);
+                graph_panel_size = V2f {
+                    x: ui.current_column_width(),
+                    y: ui.window_size()[1] - control_panel_height,
+                };
                 if matches!(
                     self.content.editing_mode.as_enum(),
                     GraphEditingMode::AddNode
-                ) && ui.invisible_button(
-                    "Add node",
-                    [
-                        ui.current_column_width(),
-                        ui.window_size()[1] - control_panel_height,
-                    ],
-                ) {
+                ) && ui.invisible_button("Add node", graph_panel_size)
+                {
                     self.content.game.graph.add_vertex();
                     self.content
                         .game
@@ -403,9 +433,10 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                         .push(snort::VertexKind::Single(snort::VertexColor::Empty));
 
                     let [mouse_x, mouse_y] = ui.io().mouse_pos;
-                    self.content
-                        .node_positions
-                        .push([mouse_x - pos_x, mouse_y - pos_y]);
+                    self.content.node_positions.push(V2f {
+                        x: mouse_x - pos_x,
+                        y: mouse_y - pos_y,
+                    });
                     is_dirty = true;
                 }
 
@@ -441,10 +472,10 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                                 .push(snort::VertexKind::Single(snort::VertexColor::Empty));
 
                             let [mouse_x, mouse_y] = ui.io().mouse_pos;
-                            self.content.node_positions.push([
-                                f32::max(SNORT_NODE_RADIUS, mouse_x - pos_x),
-                                f32::max(SNORT_NODE_RADIUS, mouse_y - pos_y),
-                            ]);
+                            self.content.node_positions.push(V2f {
+                                x: f32::max(SNORT_NODE_RADIUS, mouse_x - pos_x),
+                                y: f32::max(SNORT_NODE_RADIUS, mouse_y - pos_y),
+                            });
                             let edge_end = Vertex {
                                 index: self.content.game.graph.size() - 1,
                             };
@@ -472,10 +503,7 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
             });
 
         if should_reposition {
-            match self.content.reposition_option_selected.as_enum() {
-                RepositionMode::Circle => self.content.reposition_circle(),
-                RepositionMode::FDP => { /* TODO */ }
-            }
+            self.content.reposition(graph_panel_size);
         }
     }
 }

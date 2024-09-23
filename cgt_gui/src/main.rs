@@ -1,5 +1,5 @@
 use cgt::{
-    numeric::dyadic_rational_number::DyadicRationalNumber,
+    numeric::{dyadic_rational_number::DyadicRationalNumber, v2f::V2f},
     short::partizan::{
         canonical_form::CanonicalForm,
         games::{domineering::Domineering, snort::Snort},
@@ -291,7 +291,7 @@ fn main() {
     macro_rules! new_snort {
         () => {{
             let mut d = SnortWindow::new();
-            d.reposition_circle();
+            d.reposition(V2f { x: 350.0, y: 400.0 });
             let mut d = TitledWindow::without_title(d);
             d.set_title(next_id);
             new_window!(d);
