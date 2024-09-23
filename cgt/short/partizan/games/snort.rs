@@ -7,7 +7,7 @@ use crate::{
     numeric::{dyadic_rational_number::DyadicRationalNumber, nimber::Nimber},
     short::partizan::{canonical_form::CanonicalForm, partizan_game::PartizanGame},
 };
-use std::{collections::VecDeque, fmt::Write, num::NonZeroU32};
+use std::{collections::VecDeque, fmt::Write, hash::Hash, num::NonZeroU32};
 
 /// Color of Snort vertex. Note that we are taking tinting apporach rather than direct tracking
 /// of adjacent colors.
@@ -88,17 +88,20 @@ impl VertexKind {
 /// Position of a [snort](self) game
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct Snort {
+pub struct Snort<G = UndirectedGraph> {
     /// Vertices colors of the game graph
     pub vertices: Vec<VertexKind>,
 
     /// Get graph of the game. This includes only edges
-    pub graph: UndirectedGraph,
+    pub graph: G,
 }
 
-impl Snort {
+impl<G> Snort<G>
+where
+    G: Graph + Clone,
+{
     /// Create new Snort position with all vertices empty.
-    pub fn new(graph: UndirectedGraph) -> Self {
+    pub fn new(graph: G) -> Self {
         Self {
             vertices: vec![VertexKind::Single(VertexColor::Empty); graph.size()],
             graph,
@@ -109,7 +112,7 @@ impl Snort {
     /// Create a Snort position with initial colors. It's up to the user to ensure that no conflicting
     /// colors are connected in the graph.
     /// Returns `None` if `vertices` and `graph` have conflicting sizes.
-    pub fn with_colors(vertices: Vec<VertexKind>, graph: UndirectedGraph) -> Option<Self> {
+    pub fn with_colors(vertices: Vec<VertexKind>, graph: G) -> Option<Self> {
         if vertices.len() != graph.size() {
             return None;
         }
@@ -134,7 +137,7 @@ impl Snort {
                 VertexKind::Cluster(VertexColor::Empty, in_center),
                 VertexKind::Cluster(VertexColor::Empty, on_edges),
             ],
-            UndirectedGraph::from_edges(6, &[(0, 1), (0, 2), (0, 4), (1, 3), (2, 5)]),
+            G::from_edges(6, &[(0, 1), (0, 2), (0, 4), (1, 3), (2, 5)]),
         )
         .unwrap()
     }
@@ -289,7 +292,7 @@ impl Snort {
             }
         }
 
-        let mut new_graph = UndirectedGraph::empty(vertices_to_take.len());
+        let mut new_graph = G::empty(vertices_to_take.len());
         for (new_v, old_v) in vertices_to_take.iter().enumerate() {
             for old_u in self.graph.adjacent_to(*old_v) {
                 if let Some(new_u) = vertices_to_take.iter().position(|x| *x == old_u) {
@@ -357,14 +360,17 @@ impl Snort {
 
 #[test]
 fn degree_works() {
-    let snort = Snort::new_three_caterpillar(NonZeroU32::new(8).unwrap());
+    let snort: Snort<UndirectedGraph> = Snort::new_three_caterpillar(NonZeroU32::new(8).unwrap());
     assert_eq!(snort.degree(), 10);
 
-    let snort = Snort::new_three_caterpillar(NonZeroU32::new(10).unwrap());
+    let snort: Snort<UndirectedGraph> = Snort::new_three_caterpillar(NonZeroU32::new(10).unwrap());
     assert_eq!(snort.degree(), 12);
 }
 
-impl PartizanGame for Snort {
+impl<G> PartizanGame for Snort<G>
+where
+    G: Graph + Clone + Hash + Eq + Send + Sync,
+{
     fn left_moves(&self) -> Vec<Self> {
         self.moves_for::<{ VertexColor::TintLeft as u8 }>()
     }
@@ -378,15 +384,15 @@ impl PartizanGame for Snort {
     /// # Examples
     ///
     /// ```
-    /// use cgt::graph::Graph;
+    /// use cgt::graph::{Graph, undirected::UndirectedGraph};
     /// use cgt::short::partizan::games::snort::Snort;
     /// use cgt::short::partizan::partizan_game::PartizanGame;
     ///
     /// assert_eq!(
-    ///     Snort::new(Graph::from_edges(5, &[(0, 1), (0, 2), (1, 2), (3, 4)])).decompositions(),
+    ///     Snort::new(UndirectedGraph::from_edges(5, &[(0, 1), (0, 2), (1, 2), (3, 4)])).decompositions(),
     ///     vec![
-    ///         Snort::new(Graph::from_edges(3, &[(0, 1), (0, 2), (1, 2)])),
-    ///         Snort::new(Graph::from_edges(2, &[(0, 1)]))
+    ///         Snort::new(UndirectedGraph::from_edges(3, &[(0, 1), (0, 2), (1, 2)])),
+    ///         Snort::new(UndirectedGraph::from_edges(2, &[(0, 1)]))
     ///     ]
     /// );
     /// ```
