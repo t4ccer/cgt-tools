@@ -12,44 +12,63 @@ pub struct Vertex {
     pub index: usize,
 }
 
-#[allow(missing_docs)]
+/// Graph
 pub trait Graph: Sized {
+    /// Iterator over vertices
     type VertexIter: Iterator<Item = Vertex> + Clone;
 
+    /// Iterator over adjacent veritcies adjacent to a given vertex
     type AdjacentIter<'g>: Iterator<Item = Vertex>
     where
         Self: 'g;
+
+    /// Iterator over vertex degrees
     type DegreeIter<'g>: Iterator<Item = usize>
     where
         Self: 'g;
+
+    /// Iterator over edges
     type EdgesIter<'g>: Iterator<Item = (Vertex, Vertex)>
     where
         Self: 'g;
 
+    /// Create an empty graph without any edges between vertices
     fn empty(size: usize) -> Self;
 
     /// Get number of vertices in the graph.
     fn size(&self) -> usize;
 
+    /// Get iterator over vertices
     fn vertices(&self) -> Self::VertexIter;
 
+    /// Add a new disconnected vertex at the "end" of the graph
     fn add_vertex(&mut self) -> Vertex;
 
+    /// Remove a given vertex from the graph, remove all its edges
     fn remove_vertex(&mut self, vertex_to_remove: Vertex);
 
+    /// Add or remove edge between vertices
     fn connect(&mut self, lhs_vertex: Vertex, rhs_vertex: Vertex, connect: bool);
 
+    /// Get iterator over vertices adjacent to given vertex
     fn adjacent_to<'g>(&'g self, vertex: Vertex) -> Self::AdjacentIter<'g>;
 
+    /// Check if two vertices are adjacent
     fn are_adjacent(&self, lhs_vertex: Vertex, rhs_vertex: Vertex) -> bool {
         self.adjacent_to(lhs_vertex)
             .any(|adjacent| adjacent == rhs_vertex)
     }
 
+    /// Get iterator over edges
     fn edges<'g>(&'g self) -> Self::EdgesIter<'g>;
 
+    /// Get iterator over vertex degrees, in order
     fn degrees<'g>(&'g self) -> Self::DegreeIter<'g>;
 
+    /// Create nw graph from "flat" adjacency matrix.
+    ///
+    /// # Errors
+    /// - if `matrix.len() != size^2`
     #[inline]
     fn from_flat_matrix(size: usize, matrix: &[bool]) -> Option<Self> {
         if matrix.len() != size * size {
@@ -66,6 +85,7 @@ pub trait Graph: Sized {
         Some(g)
     }
 
+    /// Create nw graph from adjacency matrix.
     #[inline]
     fn from_matrix(size: usize, matrix: &[&[bool]]) -> Option<Self> {
         let vec: Vec<bool> = matrix.iter().map(|r| r.iter()).flatten().copied().collect();
