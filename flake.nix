@@ -63,10 +63,7 @@
 
         hostPkgs = pkgs;
 
-        mkCgtTools = {
-          pkgs,
-          SDL2 ? pkgs.SDL2,
-        }:
+        mkCgtTools = {pkgs}:
           pkgs.rustPlatform.buildRustPackage {
             name = "cgt-tools";
 
@@ -84,13 +81,8 @@
 
             cargoBuildFlags = ["-p cgt_gui -p cgt_cli"];
 
-            nativeBuildInputs = [
-              hostPkgs.pkg-config
-            ];
-
             buildInputs = [
-              pkgs.freetype
-              SDL2
+              pkgs.SDL2
             ];
 
             doCheck = false;
@@ -164,7 +156,6 @@
             pkgs.trunk
 
             pkgs.pkg-config
-            pkgs.freetype
             pkgs.SDL2
 
             rustToolchain
