@@ -1,7 +1,7 @@
 use anyhow::{bail, Context, Result};
 use cgt::{
     genetic_algorithm::Scored,
-    graph::undirected::UndirectedGraph,
+    graph::{undirected::UndirectedGraph, Graph},
     numeric::{dyadic_rational_number::DyadicRationalNumber, rational::Rational},
     short::partizan::{
         canonical_form::CanonicalForm, games::snort::Snort, partizan_game::PartizanGame,

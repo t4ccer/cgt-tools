@@ -3,7 +3,7 @@
 //! vertices in their own color.
 
 use crate::{
-    graph::undirected::UndirectedGraph,
+    graph::{undirected::UndirectedGraph, Graph},
     numeric::{dyadic_rational_number::DyadicRationalNumber, nimber::Nimber},
     short::partizan::{canonical_form::CanonicalForm, partizan_game::PartizanGame},
 };
@@ -378,7 +378,7 @@ impl PartizanGame for Snort {
     /// # Examples
     ///
     /// ```
-    /// use cgt::graph::undirected::Graph;
+    /// use cgt::graph::Graph;
     /// use cgt::short::partizan::games::snort::Snort;
     /// use cgt::short::partizan::partizan_game::PartizanGame;
     ///

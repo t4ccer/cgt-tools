@@ -3,6 +3,8 @@
 use core::ops::Range;
 use std::{fmt::Display, iter::FusedIterator};
 
+use super::Graph;
+
 /// Directed graph
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -25,83 +27,38 @@ impl Display for DirectedGraph {
     }
 }
 
-impl DirectedGraph {
-    /// Create an empty graph without any edges between vertices
+impl Graph for DirectedGraph {
+    type VertexIter = Range<usize>;
+
+    type AdjacentIter<'g> = AdjacentIter<'g>;
+
+    type DegreeIter<'g> = DegreeIter<'g>;
+
+    type EdgesIter<'g> = EdgesIter<'g>;
+
     #[inline]
-    pub fn empty(size: usize) -> Self {
+    fn empty(size: usize) -> Self
+    where
+        Self: Sized,
+    {
         Self {
             size,
             adjacency_matrix: vec![false; size * size],
         }
     }
 
-    /// Create a graph from flattened adjecency matrix. Must be correct length
     #[inline]
-    pub fn from_vec(size: usize, vec: Vec<bool>) -> Option<Self> {
-        if vec.len() != size * size {
-            return None;
-        }
-
-        Some(Self {
-            size,
-            adjacency_matrix: vec,
-        })
-    }
-
-    /// Create a graph from adjecency matrix. Must be correct length
-    #[inline]
-    pub fn from_matrix(size: usize, matrix: &[Vec<bool>]) -> Option<Self> {
-        let vec: Vec<bool> = matrix.iter().flatten().copied().collect();
-        Self::from_vec(size, vec)
-    }
-
-    /// Get number of vertices in the graph.
-    #[inline]
-    pub const fn size(&self) -> usize {
+    fn size(&self) -> usize {
         self.size
     }
 
-    /// Check if two vertices are adjacent.
-    #[inline]
-    pub fn are_adjacent(&self, out_vertex: usize, in_vertex: usize) -> bool {
-        self.adjacency_matrix[self.size * in_vertex + out_vertex]
-    }
-
-    /// Connect two vertices with an edge.
-    #[inline]
-    pub fn connect(&mut self, out_vertex: usize, in_vertex: usize, connect: bool) {
-        self.adjacency_matrix[self.size * in_vertex + out_vertex] = connect;
-    }
-
-    /// Get vertices adjacent to `out_vertex`.
-    #[inline]
-    pub fn adjacent_to(&self, out_vertex: usize) -> AdjacentIter {
-        AdjacentIter {
-            vertex: out_vertex,
-            idx: 0,
-            graph: self,
-        }
-    }
-
-    /// Get edges of the graph
-    #[inline]
-    pub fn edges(&self) -> EdgesIter {
-        EdgesIter {
-            u: 0,
-            v: 0,
-            graph: self,
-        }
-    }
-
-    /// Get iterator over vertices
-    #[inline]
-    pub const fn vertices(&self) -> Range<usize> {
+    fn vertices<'g>(&'g self) -> Self::VertexIter {
         0..self.size()
     }
 
-    /// Add a new disconnected vertex at the end of the graph
     #[inline]
-    pub fn add_vertex(&mut self) {
+    fn add_vertex(&mut self) -> usize {
+        let new_vertex = self.size();
         let mut new_graph = Self::empty(self.size() + 1);
         for in_v in self.vertices() {
             for out_v in self.vertices() {
@@ -109,11 +66,10 @@ impl DirectedGraph {
             }
         }
         *self = new_graph;
+        new_vertex
     }
 
-    /// Remove a given vertex from the graph, remove all its edges
-    #[inline]
-    pub fn remove_vertex(&mut self, vertex_to_remove: usize) {
+    fn remove_vertex(&mut self, vertex_to_remove: usize) {
         debug_assert!(self.size() > 0, "Graph has no vertices");
         let mut new_graph = Self::empty(self.size() - 1);
 
@@ -132,6 +88,49 @@ impl DirectedGraph {
         }
 
         *self = new_graph;
+    }
+
+    fn connect(&mut self, lhs_vertex: usize, rhs_vertex: usize, connect: bool) {
+        self.adjacency_matrix[self.size * lhs_vertex + rhs_vertex] = connect;
+    }
+
+    fn adjacent_to<'g>(&'g self, vertex: usize) -> Self::AdjacentIter<'g> {
+        AdjacentIter {
+            vertex,
+            idx: 0,
+            graph: self,
+        }
+    }
+
+    fn are_adjacent(&self, lhs_vertex: usize, rhs_vertex: usize) -> bool {
+        self.adjacency_matrix[self.size * lhs_vertex + rhs_vertex]
+    }
+
+    #[inline]
+    fn from_flat_matrix(size: usize, vec: &[bool]) -> Option<Self> {
+        if vec.len() != size * size {
+            return None;
+        }
+
+        Some(Self {
+            size,
+            adjacency_matrix: vec.to_vec(),
+        })
+    }
+
+    fn edges<'g>(&'g self) -> Self::EdgesIter<'g> {
+        EdgesIter {
+            u: 0,
+            v: 0,
+            graph: self,
+        }
+    }
+
+    fn degrees<'g>(&'g self) -> Self::DegreeIter<'g> {
+        DegreeIter {
+            idx: 0,
+            graph: self,
+        }
     }
 }
 
@@ -196,34 +195,59 @@ impl<'graph> Iterator for AdjacentIter<'graph> {
 
 impl<'graph> FusedIterator for AdjacentIter<'graph> {}
 
+/// Iterator over degrees of vertices in a graph. Obtained with [`Graph::degrees`]
+#[derive(Debug)]
+pub struct DegreeIter<'graph> {
+    idx: usize,
+    graph: &'graph DirectedGraph,
+}
+
+impl<'graph> Iterator for DegreeIter<'graph> {
+    type Item = usize;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.idx >= self.graph.size() {
+            return None;
+        }
+
+        let res = self
+            .graph
+            .vertices()
+            .filter(|&u| u != self.idx && self.graph.are_adjacent(self.idx, u))
+            .count();
+        self.idx += 1;
+        Some(res)
+    }
+}
+
 #[test]
 fn adds_new_vertex() {
     let mut g = test_matrix();
     assert_eq!(
         &format!("{g}"),
-        "0101\n\
-	 0000\n\
-	 0001\n\
-	 0100\n"
+        "0000\n\
+         1001\n\
+         0000\n\
+         1010\n"
     );
 
     // adds one empty row and column to previous matrix
     g.add_vertex();
     assert_eq!(
         &format!("{g}"),
-        "01010\n\
-	 00000\n\
-	 00010\n\
-	 01000\n\
+        "00000\n\
+         10010\n\
+         00000\n\
+         10100\n\
          00000\n"
     );
 
     g.remove_vertex(1);
     assert_eq!(
         &format!("{g}"),
-        "0010\n\
-	 0010\n\
-	 0000\n\
+        "0000\n\
+         0000\n\
+         1100\n\
          0000\n"
     );
 }
@@ -249,11 +273,13 @@ fn set_adjacency_matrix() {
     let m = test_matrix();
     assert_eq!(
         m,
-        DirectedGraph::from_vec(
+        DirectedGraph::from_flat_matrix(
             4,
-            vec![
-                false, true, false, true, false, false, false, false, false, false, false, true,
-                false, true, false, false
+            &[
+                false, false, false, false, //
+                true, false, false, true, //
+                false, false, false, false, //
+                true, false, true, false, //
             ]
         )
         .unwrap()

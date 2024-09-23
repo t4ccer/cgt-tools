@@ -1,9 +1,12 @@
 //! Undirected graph
 
 use core::ops::Range;
-use std::{collections::VecDeque, fmt::Display, iter::FusedIterator};
+use std::{fmt::Display, iter::FusedIterator};
 
-use super::directed::{self, AdjacentIter};
+use super::{
+    directed::{self, AdjacentIter},
+    Graph,
+};
 
 /// Undirected graph
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -17,38 +20,49 @@ impl Display for UndirectedGraph {
     }
 }
 
-impl UndirectedGraph {
-    /// Create an empty graph without any edges between vertices
-    #[inline]
-    pub fn empty(size: usize) -> Self {
+impl Graph for UndirectedGraph {
+    type VertexIter = Range<usize>;
+
+    type AdjacentIter<'g> = AdjacentIter<'g>;
+
+    type DegreeIter<'g> = DegreeIter<'g>;
+
+    type EdgesIter<'g> = EdgesIter<'g>;
+
+    fn empty(size: usize) -> Self {
         Self(directed::DirectedGraph::empty(size))
     }
 
-    /// Create a graph from flattened adjecency matrix. Must be correct length
-    #[inline]
-    pub fn from_vec(size: usize, vec: Vec<bool>) -> Option<Self> {
-        Some(Self(directed::DirectedGraph::from_vec(size, vec)?))
+    fn size(&self) -> usize {
+        self.0.size()
     }
 
-    /// Create a graph from adjecency matrix. Must be correct length
-    #[inline]
-    pub fn from_matrix(size: usize, matrix: &[Vec<bool>]) -> Option<Self> {
-        Some(Self(directed::DirectedGraph::from_matrix(size, matrix)?))
+    fn vertices(&self) -> Self::VertexIter {
+        self.0.vertices()
     }
 
-    /// Create a graph from list of edges
-    #[inline]
-    pub fn from_edges(size: usize, edges: &[(usize, usize)]) -> Self {
-        let mut graph = Self::empty(size);
-        for (v, u) in edges {
-            graph.connect(*v, *u, true);
-        }
-        graph
+    fn add_vertex(&mut self) -> usize {
+        self.0.add_vertex()
     }
 
-    /// Get edges of the graph
-    #[inline]
-    pub fn edges(&self) -> EdgesIter {
+    fn remove_vertex(&mut self, vertex_to_remove: usize) {
+        self.0.remove_vertex(vertex_to_remove)
+    }
+
+    fn connect(&mut self, lhs_vertex: usize, rhs_vertex: usize, connect: bool) {
+        self.0.connect(lhs_vertex, rhs_vertex, connect);
+        self.0.connect(rhs_vertex, lhs_vertex, connect);
+    }
+
+    fn adjacent_to<'g>(&'g self, vertex: usize) -> Self::AdjacentIter<'g> {
+        self.0.adjacent_to(vertex)
+    }
+
+    fn are_adjacent(&self, lhs_vertex: usize, rhs_vertex: usize) -> bool {
+        self.0.are_adjacent(lhs_vertex, rhs_vertex)
+    }
+
+    fn edges<'g>(&'g self) -> Self::EdgesIter<'g> {
         EdgesIter {
             u: 0,
             v: 0,
@@ -56,87 +70,23 @@ impl UndirectedGraph {
         }
     }
 
-    /// Get number of vertices in the graph.
-    #[inline]
-    pub const fn size(&self) -> usize {
-        self.0.size()
-    }
-
-    /// Check if two vertices are adjacent.
-    #[inline]
-    pub fn are_adjacent(&self, lhs_vertex: usize, rhs_vertex: usize) -> bool {
-        self.0.are_adjacent(lhs_vertex, rhs_vertex)
-    }
-
-    /// Connect two vertices with an edge.
-    #[inline]
-    pub fn connect(&mut self, lhs_vertex: usize, rhs_vertex: usize, connect: bool) {
-        self.0.connect(lhs_vertex, rhs_vertex, connect);
-        self.0.connect(rhs_vertex, lhs_vertex, connect);
-    }
-
-    /// Get vertices adjacent to `vertex`.
-    #[inline]
-    pub fn adjacent_to(&self, vertex: usize) -> AdjacentIter {
-        self.0.adjacent_to(vertex)
-    }
-
-    /// Get iterator over vertices
-    #[inline]
-    pub const fn vertices(&self) -> Range<usize> {
-        self.0.vertices()
-    }
-
-    /// Add a new disconnected vertex at the end of the graph
-    #[inline]
-    pub fn add_vertex(&mut self) {
-        self.0.add_vertex();
-    }
-
-    /// Remove a given vertex from the graph, remove all its edges
-    #[inline]
-    pub fn remove_vertex(&mut self, vertex_to_remove: usize) {
-        self.0.remove_vertex(vertex_to_remove);
-    }
-
-    /// Get degrees of all vertices in the graph
-    #[inline]
-    pub fn degrees(&self) -> DegreeIter {
+    fn degrees<'g>(&'g self) -> Self::DegreeIter<'g> {
         DegreeIter {
             idx: 0,
             graph: self,
         }
     }
 
-    /// Get graph degree (highest vertex degree)
+    /// Create a graph from flattened adjecency matrix. Must be correct length
     #[inline]
-    pub fn degree(&self) -> usize {
-        self.degrees().max().unwrap_or(0)
+    fn from_flat_matrix(size: usize, vec: &[bool]) -> Option<Self> {
+        Some(Self(directed::DirectedGraph::from_flat_matrix(size, vec)?))
     }
 
-    /// Check if graph is connected
+    /// Create a graph from adjecency matrix. Must be correct length
     #[inline]
-    pub fn is_connected(&self) -> bool {
-        if self.size() == 0 {
-            return true;
-        }
-
-        let mut seen = vec![false; self.size()];
-        let mut queue: VecDeque<usize> = VecDeque::with_capacity(self.size());
-
-        seen[0] = true;
-        queue.push_back(0);
-
-        while let Some(v) = queue.pop_front() {
-            for u in self.vertices() {
-                if self.are_adjacent(v, u) && v != u && !seen[u] {
-                    seen[u] = true;
-                    queue.push_back(u);
-                }
-            }
-        }
-
-        seen.into_iter().all(|b| b)
+    fn from_matrix(size: usize, matrix: &[&[bool]]) -> Option<Self> {
+        Some(Self(directed::DirectedGraph::from_matrix(size, matrix)?))
     }
 }
 
@@ -222,9 +172,9 @@ fn set_adjacency_matrix() {
     let m = test_matrix();
     assert_eq!(
         m,
-        UndirectedGraph::from_vec(
+        UndirectedGraph::from_flat_matrix(
             4,
-            vec![
+            &[
                 false, true, false, true, true, false, false, true, false, false, false, true,
                 true, true, true, false
             ]
