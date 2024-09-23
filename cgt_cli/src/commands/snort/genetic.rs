@@ -2,7 +2,7 @@ use crate::{commands::snort::common::Log, io::FileOrStderr};
 use anyhow::{Context, Result};
 use cgt::{
     genetic_algorithm::{Algorithm, GeneticAlgorithm, Scored},
-    graph::{undirected, Graph, Vertex},
+    graph::{adjacency_matrix::undirected, Graph, Vertex},
     numeric::rational::Rational,
     short::partizan::{
         games::snort::{Snort, VertexColor, VertexKind},

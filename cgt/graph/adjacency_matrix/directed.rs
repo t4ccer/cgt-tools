@@ -2,9 +2,9 @@
 
 use std::{fmt::Display, iter::FusedIterator};
 
-use super::{Graph, Vertex};
+use crate::graph::{Graph, Vertex};
 
-/// Directed graph
+/// Directed graph, implements [`Graph`] trait
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DirectedGraph {

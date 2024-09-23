@@ -2,8 +2,7 @@
 
 use std::collections::VecDeque;
 
-pub mod directed;
-pub mod undirected;
+pub mod adjacency_matrix;
 
 /// Graph vertex. We assume that all graphs that we implement use 0-based indexing for their vertices
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

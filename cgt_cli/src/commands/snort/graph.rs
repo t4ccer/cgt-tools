@@ -1,7 +1,7 @@
 use crate::commands::snort::common::{analyze_position, Edge};
 use anyhow::Result;
 use cgt::{
-    graph::{undirected::UndirectedGraph, Graph, Vertex},
+    graph::{adjacency_matrix::undirected::UndirectedGraph, Graph, Vertex},
     short::partizan::games::snort::{Snort, VertexColor, VertexKind},
 };
 use clap::Parser;

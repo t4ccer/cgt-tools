@@ -2,12 +2,12 @@
 
 use std::{fmt::Display, iter::FusedIterator};
 
-use super::{
-    directed::{self, AdjacentIter},
+use crate::graph::{
+    adjacency_matrix::directed::{self, AdjacentIter},
     Graph, Vertex,
 };
 
-/// Undirected graph
+/// Undirected graph, implements [`Graph`] trait
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct UndirectedGraph(directed::DirectedGraph);

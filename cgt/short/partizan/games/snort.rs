@@ -3,7 +3,7 @@
 //! vertices in their own color.
 
 use crate::{
-    graph::{undirected::UndirectedGraph, Graph, Vertex},
+    graph::{adjacency_matrix::undirected::UndirectedGraph, Graph, Vertex},
     numeric::{dyadic_rational_number::DyadicRationalNumber, nimber::Nimber},
     short::partizan::{canonical_form::CanonicalForm, partizan_game::PartizanGame},
 };

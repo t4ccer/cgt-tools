@@ -1,5 +1,5 @@
 use cgt::{
-    graph::{undirected::UndirectedGraph, Graph, Vertex},
+    graph::{adjacency_matrix::undirected::UndirectedGraph, Graph, Vertex},
     short::partizan::games::snort::{self, Snort},
 };
 use imgui::{Condition, ImColor32, MouseButton, StyleColor};
