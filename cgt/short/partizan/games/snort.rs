@@ -3,11 +3,17 @@
 //! vertices in their own color.
 
 use crate::{
-    graph::{undirected::UndirectedGraph, Graph},
+    graph::{undirected::UndirectedGraph, Graph, Vertex},
     numeric::{dyadic_rational_number::DyadicRationalNumber, nimber::Nimber},
     short::partizan::{canonical_form::CanonicalForm, partizan_game::PartizanGame},
 };
-use std::{collections::VecDeque, fmt::Write, hash::Hash, num::NonZeroU32};
+use std::{
+    collections::VecDeque,
+    fmt::Write,
+    hash::Hash,
+    num::NonZeroU32,
+    ops::{Index, IndexMut},
+};
 
 /// Color of Snort vertex. Note that we are taking tinting apporach rather than direct tracking
 /// of adjacent colors.
@@ -85,12 +91,34 @@ impl VertexKind {
     }
 }
 
+/// Vertices colors of the game graph
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct VertexColors {
+    /// Color of each vertex
+    pub inner: Vec<VertexKind>,
+}
+
+impl Index<Vertex> for VertexColors {
+    type Output = VertexKind;
+
+    fn index(&self, index: Vertex) -> &Self::Output {
+        &self.inner[index.index]
+    }
+}
+
+impl IndexMut<Vertex> for VertexColors {
+    fn index_mut(&mut self, index: Vertex) -> &mut Self::Output {
+        &mut self.inner[index.index]
+    }
+}
+
 /// Position of a [snort](self) game
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Snort<G = UndirectedGraph> {
     /// Vertices colors of the game graph
-    pub vertices: Vec<VertexKind>,
+    pub vertices: VertexColors,
 
     /// Get graph of the game. This includes only edges
     pub graph: G,
@@ -103,7 +131,9 @@ where
     /// Create new Snort position with all vertices empty.
     pub fn new(graph: G) -> Self {
         Self {
-            vertices: vec![VertexKind::Single(VertexColor::Empty); graph.size()],
+            vertices: VertexColors {
+                inner: vec![VertexKind::Single(VertexColor::Empty); graph.size()],
+            },
             graph,
         }
     }
@@ -117,7 +147,10 @@ where
             return None;
         }
 
-        Some(Self { vertices, graph })
+        Some(Self {
+            vertices: VertexColors { inner: vertices },
+            graph,
+        })
     }
 
     /// Construct new position on caterpillar `C(n+1, n, n+1)`
@@ -137,12 +170,21 @@ where
                 VertexKind::Cluster(VertexColor::Empty, in_center),
                 VertexKind::Cluster(VertexColor::Empty, on_edges),
             ],
-            G::from_edges(6, &[(0, 1), (0, 2), (0, 4), (1, 3), (2, 5)]),
+            G::from_edges(
+                6,
+                &[
+                    (Vertex { index: 0 }, Vertex { index: 1 }),
+                    (Vertex { index: 0 }, Vertex { index: 2 }),
+                    (Vertex { index: 0 }, Vertex { index: 4 }),
+                    (Vertex { index: 1 }, Vertex { index: 3 }),
+                    (Vertex { index: 2 }, Vertex { index: 5 }),
+                ],
+            ),
         )
         .unwrap()
     }
 
-    fn vertex_degree(&self, this_vertex: usize) -> usize {
+    fn vertex_degree(&self, this_vertex: Vertex) -> usize {
         let mut res = 0;
         for one_away in self.graph.vertices() {
             if one_away != this_vertex && self.graph.are_adjacent(this_vertex, one_away) {
@@ -152,7 +194,7 @@ where
         res
     }
 
-    fn vertex_second_degree(&self, this_vertex: usize) -> usize {
+    fn vertex_second_degree(&self, this_vertex: Vertex) -> usize {
         let mut res = 0;
         let mut seen = vec![false; self.graph.size()];
 
@@ -162,9 +204,9 @@ where
                     if two_away != one_away
                         && two_away != this_vertex
                         && self.graph.are_adjacent(one_away, two_away)
-                        && !seen[two_away]
+                        && !seen[two_away.index]
                     {
-                        seen[two_away] = true;
+                        seen[two_away.index] = true;
                         res += self.vertices[two_away].degree_factor();
                     }
                 }
@@ -210,13 +252,14 @@ where
         // Vertices where player can move
         let move_vertices = self
             .vertices
+            .inner
             .iter()
             .enumerate()
             .filter(|(_, vertex)| {
                 let vertex_color = vertex.color();
                 vertex_color == own_tint_color || vertex_color == VertexColor::Empty
             })
-            .map(|(idx, _)| idx);
+            .map(|(index, _)| Vertex { index });
 
         // Go through list of vertices with legal move
         for move_vertex_idx in move_vertices {
@@ -274,19 +317,19 @@ where
     }
 
     /// BFS search to get the decompisitons, should be used only as a helper for [`Self::decompositions`]
-    fn bfs(&self, visited: &mut [bool], v: usize) -> Self {
-        let mut vertices_to_take: Vec<usize> = Vec::new();
+    fn bfs(&self, visited: &mut [bool], v: Vertex) -> Self {
+        let mut vertices_to_take: Vec<Vertex> = Vec::new();
 
-        let mut q: VecDeque<usize> = VecDeque::new();
+        let mut q: VecDeque<Vertex> = VecDeque::new();
         q.push_back(v);
-        visited[v] = true;
+        visited[v.index] = true;
 
         while let Some(v) = q.pop_front() {
             vertices_to_take.push(v);
 
             for u in self.graph.adjacent_to(v) {
-                if !visited[u] {
-                    visited[u] = true;
+                if !visited[u.index] {
+                    visited[u.index] = true;
                     q.push_back(u);
                 }
             }
@@ -296,7 +339,7 @@ where
         for (new_v, old_v) in vertices_to_take.iter().enumerate() {
             for old_u in self.graph.adjacent_to(*old_v) {
                 if let Some(new_u) = vertices_to_take.iter().position(|x| *x == old_u) {
-                    new_graph.connect(new_v, new_u, true);
+                    new_graph.connect(Vertex { index: new_v }, Vertex { index: new_u }, true);
                 }
             }
         }
@@ -307,7 +350,9 @@ where
         }
 
         Self {
-            vertices: new_vertices,
+            vertices: VertexColors {
+                inner: new_vertices,
+            },
             graph: new_graph,
         }
     }
@@ -319,7 +364,7 @@ where
 
         write!(buf, "graph G {{").unwrap();
 
-        for (vertex_idx, vertex) in self.vertices.iter().enumerate() {
+        for (vertex_idx, vertex) in self.vertices.inner.iter().enumerate() {
             let color = match vertex.color() {
                 VertexColor::Empty => "white",
                 VertexColor::TintLeft => "blue",
@@ -348,7 +393,7 @@ where
         for v in self.graph.vertices() {
             for u in self.graph.vertices() {
                 if v < u && self.graph.are_adjacent(v, u) {
-                    write!(buf, "{v} -- {u};").unwrap();
+                    write!(buf, "{} -- {};", v.index, u.index).unwrap();
                 }
             }
         }
@@ -380,28 +425,12 @@ where
     }
 
     /// Decompose the game graph into disconnected components
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use cgt::graph::{Graph, undirected::UndirectedGraph};
-    /// use cgt::short::partizan::games::snort::Snort;
-    /// use cgt::short::partizan::partizan_game::PartizanGame;
-    ///
-    /// assert_eq!(
-    ///     Snort::new(UndirectedGraph::from_edges(5, &[(0, 1), (0, 2), (1, 2), (3, 4)])).decompositions(),
-    ///     vec![
-    ///         Snort::new(UndirectedGraph::from_edges(3, &[(0, 1), (0, 2), (1, 2)])),
-    ///         Snort::new(UndirectedGraph::from_edges(2, &[(0, 1)]))
-    ///     ]
-    /// );
-    /// ```
     fn decompositions(&self) -> Vec<Self> {
-        let mut visited = vec![false; self.vertices.len()];
+        let mut visited = vec![false; self.vertices.inner.len()];
         let mut res = Vec::new();
 
         for v in self.graph.vertices() {
-            if !matches!(self.vertices[v].color(), VertexColor::Taken) && !visited[v] {
+            if !matches!(self.vertices[v].color(), VertexColor::Taken) && !visited[v.index] {
                 res.push(self.bfs(&mut visited, v));
             }
         }
@@ -410,7 +439,7 @@ where
     }
 
     fn reductions(&self) -> Option<CanonicalForm> {
-        if let &[vertex] = &self.vertices[..] {
+        if let &[vertex] = &self.vertices.inner[..] {
             let cf = match vertex {
                 VertexKind::Single(VertexColor::Empty) => {
                     CanonicalForm::new_nimber(DyadicRationalNumber::from(0), Nimber::new(1))

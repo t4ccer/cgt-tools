@@ -73,7 +73,7 @@ fn dump_edges(w: &mut impl Write, graph: &UndirectedGraph) -> io::Result<()> {
                 if !first {
                     write!(w, ",")?;
                 }
-                write!(w, "{}-{}", v, u)?;
+                write!(w, "{}-{}", v.index, u.index)?;
                 first = false;
             }
         }

@@ -2,7 +2,7 @@ use crate::{commands::snort::common::Log, io::FileOrStderr};
 use anyhow::{Context, Result};
 use cgt::{
     genetic_algorithm::{Algorithm, GeneticAlgorithm, Scored},
-    graph::{undirected, Graph},
+    graph::{undirected, Graph, Vertex},
     numeric::rational::Rational,
     short::partizan::{
         games::snort::{Snort, VertexColor, VertexKind},
@@ -74,9 +74,11 @@ impl SnortTemperatureDegreeDifference {
         if position.graph.size() > 1 {
             let mutation_roll: f32 = rng.gen();
             if mutation_roll < mutation_rate {
-                let to_remove = rng.gen_range(0..position.graph.size());
+                let to_remove = Vertex {
+                    index: rng.gen_range(0..position.graph.size()),
+                };
                 position.graph.remove_vertex(to_remove);
-                position.vertices.remove(to_remove);
+                position.vertices.inner.remove(to_remove.index);
             }
         }
         // TODO: Check for max size
@@ -86,11 +88,18 @@ impl SnortTemperatureDegreeDifference {
             position.graph.add_vertex();
             position
                 .vertices
+                .inner
                 .push(VertexKind::Single(VertexColor::Empty));
-            let another_vertex = rng.gen_range(0..position.graph.size() - 1);
-            position
-                .graph
-                .connect(position.graph.size() - 1, another_vertex, true);
+            let another_vertex = Vertex {
+                index: rng.gen_range(0..position.graph.size() - 1),
+            };
+            position.graph.connect(
+                Vertex {
+                    index: position.graph.size() - 1,
+                },
+                another_vertex,
+                true,
+            );
         }
 
         // Mutate edges
@@ -115,10 +124,11 @@ impl SnortTemperatureDegreeDifference {
             VertexColor::TintLeft,
             VertexColor::TintRight,
         ];
-        for idx in 0..position.vertices.len() {
+        for index in 0..position.vertices.inner.len() {
             let mutation_roll: f32 = rng.gen();
             if mutation_roll < mutation_rate {
-                position.vertices[idx] = VertexKind::Single(*available_colors.choose(rng).unwrap());
+                position.vertices[Vertex { index }] =
+                    VertexKind::Single(*available_colors.choose(rng).unwrap());
             }
         }
     }
@@ -141,18 +151,22 @@ impl Algorithm<Snort, Rational> for SnortTemperatureDegreeDifference {
 
         for v in 0..(min(new_size, smaller.graph.size())) {
             for u in 0..(min(new_size, smaller.graph.size())) {
+                let v = Vertex { index: v };
+                let u = Vertex { index: u };
                 new_graph.connect(v, u, smaller.graph.are_adjacent(v, u));
             }
         }
         for v in (min(new_size, smaller.graph.size()))..(min(new_size, larger.graph.size())) {
             for u in (min(new_size, smaller.graph.size()))..(min(new_size, larger.graph.size())) {
+                let v = Vertex { index: v };
+                let u = Vertex { index: u };
                 new_graph.connect(v, u, larger.graph.are_adjacent(v, u));
             }
         }
 
-        let mut colors = smaller.vertices[0..(min(new_size, smaller.graph.size()))].to_vec();
+        let mut colors = smaller.vertices.inner[0..(min(new_size, smaller.graph.size()))].to_vec();
         colors.extend(
-            &larger.vertices
+            &larger.vertices.inner
                 [(min(new_size, smaller.graph.size()))..(min(new_size, larger.graph.size()))],
         );
 
@@ -165,7 +179,7 @@ impl Algorithm<Snort, Rational> for SnortTemperatureDegreeDifference {
 
     fn score(&self, position: &Snort) -> Rational {
         let degree_sum = position.graph.degrees().sum::<usize>();
-        if position.vertices.is_empty() || degree_sum == 0 || !position.graph.is_connected() {
+        if position.vertices.inner.is_empty() || degree_sum == 0 || !position.graph.is_connected() {
             return Rational::NegativeInfinity;
         }
 
@@ -198,19 +212,19 @@ fn seed_positions() -> Vec<Snort> {
     let pos_1 = Snort::new(undirected::UndirectedGraph::from_edges(
         14,
         &[
-            (0, 3),
-            (1, 3),
-            (2, 3),
-            (3, 4),
-            (4, 5),
-            (4, 6),
-            (4, 7),
-            (4, 8),
-            (4, 9),
-            (4, 10),
-            (10, 11),
-            (10, 12),
-            (10, 13),
+            (Vertex { index: 0 }, Vertex { index: 3 }),
+            (Vertex { index: 1 }, Vertex { index: 3 }),
+            (Vertex { index: 2 }, Vertex { index: 3 }),
+            (Vertex { index: 3 }, Vertex { index: 4 }),
+            (Vertex { index: 4 }, Vertex { index: 5 }),
+            (Vertex { index: 4 }, Vertex { index: 6 }),
+            (Vertex { index: 4 }, Vertex { index: 7 }),
+            (Vertex { index: 4 }, Vertex { index: 8 }),
+            (Vertex { index: 4 }, Vertex { index: 9 }),
+            (Vertex { index: 4 }, Vertex { index: 10 }),
+            (Vertex { index: 10 }, Vertex { index: 11 }),
+            (Vertex { index: 10 }, Vertex { index: 12 }),
+            (Vertex { index: 10 }, Vertex { index: 13 }),
         ],
     ));
 
@@ -226,20 +240,20 @@ fn seed_positions() -> Vec<Snort> {
     let pos_2 = Snort::new(undirected::UndirectedGraph::from_edges(
         15,
         &[
-            (0, 3),
-            (1, 3),
-            (2, 3),
-            (3, 4),
-            (4, 5),
-            (4, 6),
-            (4, 7),
-            (4, 8),
-            (7, 9),
-            (7, 10),
-            (7, 11),
-            (8, 12),
-            (8, 13),
-            (8, 14),
+            (Vertex { index: 0 }, Vertex { index: 3 }),
+            (Vertex { index: 1 }, Vertex { index: 3 }),
+            (Vertex { index: 2 }, Vertex { index: 3 }),
+            (Vertex { index: 3 }, Vertex { index: 4 }),
+            (Vertex { index: 4 }, Vertex { index: 5 }),
+            (Vertex { index: 4 }, Vertex { index: 6 }),
+            (Vertex { index: 4 }, Vertex { index: 7 }),
+            (Vertex { index: 4 }, Vertex { index: 8 }),
+            (Vertex { index: 7 }, Vertex { index: 9 }),
+            (Vertex { index: 7 }, Vertex { index: 10 }),
+            (Vertex { index: 7 }, Vertex { index: 11 }),
+            (Vertex { index: 8 }, Vertex { index: 12 }),
+            (Vertex { index: 8 }, Vertex { index: 13 }),
+            (Vertex { index: 8 }, Vertex { index: 14 }),
         ],
     ));
 

@@ -1,7 +1,7 @@
 use crate::commands::snort::common::{analyze_position, Edge};
 use anyhow::Result;
 use cgt::{
-    graph::{undirected::UndirectedGraph, Graph},
+    graph::{undirected::UndirectedGraph, Graph, Vertex},
     short::partizan::games::snort::{Snort, VertexColor, VertexKind},
 };
 use clap::Parser;
@@ -38,7 +38,16 @@ pub fn run(args: Args) -> Result<()> {
     let edges = args
         .edges
         .iter()
-        .map(|edge| (edge.from as usize, edge.to as usize))
+        .map(|edge| {
+            (
+                Vertex {
+                    index: edge.from as usize,
+                },
+                Vertex {
+                    index: edge.to as usize,
+                },
+            )
+        })
         .collect::<Vec<_>>();
     let graph = UndirectedGraph::from_edges((graph_size + 1) as usize, &edges);
 

@@ -1,5 +1,5 @@
 use cgt::{
-    graph::{undirected::UndirectedGraph, Graph},
+    graph::{undirected::UndirectedGraph, Graph, Vertex},
     short::partizan::games::snort::{self, Snort},
 };
 use imgui::{Condition, ImColor32, MouseButton, StyleColor};
@@ -40,8 +40,8 @@ pub struct SnortWindow {
     reposition_option_selected: RawOf<RepositionMode>,
     node_positions: Vec<[f32; 2]>,
     editing_mode: RawOf<GraphEditingMode>,
-    new_edge_starting_node: Option<usize>,
-    pub details: Option<Details>,
+    new_edge_starting_node: Option<Vertex>,
+    details: Option<Details>,
     show_thermograph: bool,
     thermograph_scale: f32,
     alternating_moves: bool,
@@ -56,22 +56,22 @@ impl SnortWindow {
                 14,
                 &[
                     // left
-                    (0, 4),
-                    (1, 4),
-                    (2, 4),
-                    (3, 4),
+                    (Vertex { index: 0 }, Vertex { index: 4 }),
+                    (Vertex { index: 1 }, Vertex { index: 4 }),
+                    (Vertex { index: 2 }, Vertex { index: 4 }),
+                    (Vertex { index: 3 }, Vertex { index: 4 }),
                     // center
-                    (6, 5),
-                    (7, 5),
-                    (8, 5),
+                    (Vertex { index: 6 }, Vertex { index: 5 }),
+                    (Vertex { index: 7 }, Vertex { index: 5 }),
+                    (Vertex { index: 8 }, Vertex { index: 5 }),
                     // right
-                    (10, 9),
-                    (11, 9),
-                    (12, 9),
-                    (13, 9),
+                    (Vertex { index: 10 }, Vertex { index: 9 }),
+                    (Vertex { index: 11 }, Vertex { index: 9 }),
+                    (Vertex { index: 12 }, Vertex { index: 9 }),
+                    (Vertex { index: 13 }, Vertex { index: 9 }),
                     // main path
-                    (4, 5),
-                    (5, 9),
+                    (Vertex { index: 4 }, Vertex { index: 5 }),
+                    (Vertex { index: 5 }, Vertex { index: 9 }),
                 ],
             )),
             node_positions: Vec::new(),
@@ -92,7 +92,7 @@ impl SnortWindow {
         self.node_positions.clear();
         self.node_positions.reserve(self.game.graph.size());
         for i in self.game.graph.vertices() {
-            let angle = (2.0 * PI * i as f32) / n as f32;
+            let angle = (2.0 * PI * i.index as f32) / n as f32;
             let node_pos = [
                 (packing_circle_radius - SNORT_NODE_RADIUS) * f32::cos(angle)
                     + packing_circle_radius,
@@ -179,8 +179,8 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                 let node_color = ui.style_color(StyleColor::Text);
                 for this_vertex_idx in self.content.game.graph.vertices() {
                     let [absolute_node_pos_x, absolute_node_pos_y] =
-                        self.content.node_positions[this_vertex_idx];
-                    let _node_id = ui.push_id_usize(this_vertex_idx as usize);
+                        self.content.node_positions[this_vertex_idx.index];
+                    let _node_id = ui.push_id_usize(this_vertex_idx.index);
                     let node_pos @ [node_pos_x, node_pos_y] =
                         [pos_x + absolute_node_pos_x, pos_y + absolute_node_pos_y];
                     max_y = max_y.max(node_pos_y);
@@ -319,7 +319,7 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                         )
                     {
                         let [mouse_delta_x, mouse_delta_y] = ui.io().mouse_delta;
-                        self.content.node_positions[this_vertex_idx] = [
+                        self.content.node_positions[this_vertex_idx.index] = [
                             f32::max(SNORT_NODE_RADIUS, absolute_node_pos_x + mouse_delta_x),
                             f32::max(SNORT_NODE_RADIUS, absolute_node_pos_y + mouse_delta_y),
                         ];
@@ -351,7 +351,7 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
 
                     self.scratch_buffer.clear();
                     self.scratch_buffer
-                        .write_fmt(format_args!("{}", this_vertex_idx + 1))
+                        .write_fmt(format_args!("{}", this_vertex_idx.index + 1))
                         .unwrap();
                     let off_x = ui.calc_text_size(&self.scratch_buffer)[0];
                     draw_list.add_text(
@@ -364,7 +364,7 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                     {
                         if adjacent_vertex_idx < this_vertex_idx {
                             let [adjacent_pos_x, adjacent_pos_y] =
-                                self.content.node_positions[adjacent_vertex_idx];
+                                self.content.node_positions[adjacent_vertex_idx.index];
                             let adjacent_pos = [pos_x + adjacent_pos_x, pos_y + adjacent_pos_y];
                             draw_list
                                 .add_line(node_pos, adjacent_pos, node_color)
@@ -376,7 +376,7 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
 
                 if let Some(starting_node) = self.content.new_edge_starting_node {
                     let [held_node_pos_x, held_node_pos_y] =
-                        self.content.node_positions[starting_node];
+                        self.content.node_positions[starting_node.index];
                     let held_node_pos = [pos_x + held_node_pos_x, pos_y + held_node_pos_y];
                     draw_list
                         .add_line(held_node_pos, ui.io().mouse_pos, ImColor32::BLACK)
@@ -399,6 +399,7 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                     self.content
                         .game
                         .vertices
+                        .inner
                         .push(snort::VertexKind::Single(snort::VertexColor::Empty));
 
                     let [mouse_x, mouse_y] = ui.io().mouse_pos;
@@ -412,11 +413,15 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                 ui.next_column();
 
                 'outer: loop {
-                    for (to_remove, color) in self.content.game.vertices.iter().copied().enumerate()
+                    for (to_remove, color) in
+                        self.content.game.vertices.inner.iter().copied().enumerate()
                     {
                         if color.color() == snort::VertexColor::Taken {
-                            self.content.game.graph.remove_vertex(to_remove);
-                            self.content.game.vertices.remove(to_remove);
+                            self.content
+                                .game
+                                .graph
+                                .remove_vertex(Vertex { index: to_remove });
+                            self.content.game.vertices.inner.remove(to_remove);
                             self.content.node_positions.remove(to_remove);
                             is_dirty = true;
                             continue 'outer;
@@ -432,6 +437,7 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                             self.content
                                 .game
                                 .vertices
+                                .inner
                                 .push(snort::VertexKind::Single(snort::VertexColor::Empty));
 
                             let [mouse_x, mouse_y] = ui.io().mouse_pos;
@@ -439,7 +445,9 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                                 f32::max(SNORT_NODE_RADIUS, mouse_x - pos_x),
                                 f32::max(SNORT_NODE_RADIUS, mouse_y - pos_y),
                             ]);
-                            let edge_end = self.content.game.graph.size() - 1;
+                            let edge_end = Vertex {
+                                index: self.content.game.graph.size() - 1,
+                            };
                             self.content.game.graph.connect(edge_start, edge_end, true);
                             is_dirty = true;
                         }
