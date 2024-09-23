@@ -3,7 +3,7 @@
 //! vertices in their own color.
 
 use crate::{
-    graph::undirected::Graph,
+    graph::undirected::UndirectedGraph,
     numeric::{dyadic_rational_number::DyadicRationalNumber, nimber::Nimber},
     short::partizan::{canonical_form::CanonicalForm, partizan_game::PartizanGame},
 };
@@ -93,12 +93,12 @@ pub struct Snort {
     pub vertices: Vec<VertexKind>,
 
     /// Get graph of the game. This includes only edges
-    pub graph: Graph,
+    pub graph: UndirectedGraph,
 }
 
 impl Snort {
     /// Create new Snort position with all vertices empty.
-    pub fn new(graph: Graph) -> Self {
+    pub fn new(graph: UndirectedGraph) -> Self {
         Self {
             vertices: vec![VertexKind::Single(VertexColor::Empty); graph.size()],
             graph,
@@ -109,7 +109,7 @@ impl Snort {
     /// Create a Snort position with initial colors. It's up to the user to ensure that no conflicting
     /// colors are connected in the graph.
     /// Returns `None` if `vertices` and `graph` have conflicting sizes.
-    pub fn with_colors(vertices: Vec<VertexKind>, graph: Graph) -> Option<Self> {
+    pub fn with_colors(vertices: Vec<VertexKind>, graph: UndirectedGraph) -> Option<Self> {
         if vertices.len() != graph.size() {
             return None;
         }
@@ -134,7 +134,7 @@ impl Snort {
                 VertexKind::Cluster(VertexColor::Empty, in_center),
                 VertexKind::Cluster(VertexColor::Empty, on_edges),
             ],
-            Graph::from_edges(6, &[(0, 1), (0, 2), (0, 4), (1, 3), (2, 5)]),
+            UndirectedGraph::from_edges(6, &[(0, 1), (0, 2), (0, 4), (1, 3), (2, 5)]),
         )
         .unwrap()
     }
@@ -289,7 +289,7 @@ impl Snort {
             }
         }
 
-        let mut new_graph = Graph::empty(vertices_to_take.len());
+        let mut new_graph = UndirectedGraph::empty(vertices_to_take.len());
         for (new_v, old_v) in vertices_to_take.iter().enumerate() {
             for old_u in self.graph.adjacent_to(*old_v) {
                 if let Some(new_u) = vertices_to_take.iter().position(|x| *x == old_u) {
@@ -433,7 +433,7 @@ impl PartizanGame for Snort {
 
 #[test]
 fn no_moves() {
-    let position = Snort::new(Graph::empty(0));
+    let position = Snort::new(UndirectedGraph::empty(0));
     assert_eq!(position.left_moves(), vec![]);
     assert_eq!(position.right_moves(), vec![]);
 }
@@ -448,7 +448,7 @@ fn correct_canonical_forms() {
             VertexColor::Empty,
             NonZeroU32::new(10).unwrap(),
         )],
-        Graph::empty(1),
+        UndirectedGraph::empty(1),
     )
     .unwrap();
     let canonical_form = snort.canonical_form(&transposition_table);
@@ -459,7 +459,7 @@ fn correct_canonical_forms() {
             VertexColor::Empty,
             NonZeroU32::new(11).unwrap(),
         )],
-        Graph::empty(1),
+        UndirectedGraph::empty(1),
     )
     .unwrap();
     let canonical_form = snort.canonical_form(&transposition_table);
@@ -475,7 +475,7 @@ fn correct_sensible() {
             VertexKind::Single(VertexColor::Empty),
             VertexKind::Single(VertexColor::TintLeft),
         ],
-        Graph::empty(2),
+        UndirectedGraph::empty(2),
     )
     .unwrap();
     let transposition_table = ParallelTranspositionTable::new();
@@ -486,7 +486,7 @@ fn correct_sensible() {
                 VertexKind::Single(VertexColor::Taken),
                 VertexKind::Single(VertexColor::TintLeft)
             ],
-            Graph::empty(2),
+            UndirectedGraph::empty(2),
         )
         .unwrap()]
     );

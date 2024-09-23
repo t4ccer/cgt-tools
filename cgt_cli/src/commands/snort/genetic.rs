@@ -137,7 +137,7 @@ impl Algorithm<Snort, Rational> for SnortTemperatureDegreeDifference {
         let [smaller, larger] = positions;
 
         let new_size = rng.gen_range(1..=larger.graph.size());
-        let mut new_graph = undirected::Graph::empty(new_size);
+        let mut new_graph = undirected::UndirectedGraph::empty(new_size);
 
         for v in 0..(min(new_size, smaller.graph.size())) {
             for u in 0..(min(new_size, smaller.graph.size())) {
@@ -177,7 +177,7 @@ impl Algorithm<Snort, Rational> for SnortTemperatureDegreeDifference {
 
     fn random(&self, rng: &mut rand::rngs::ThreadRng) -> Snort {
         let graph_size = rng.gen_range(1..=self.max_graph_vertices);
-        let graph = undirected::Graph::empty(graph_size);
+        let graph = undirected::UndirectedGraph::empty(graph_size);
         let mut position = Snort::new(graph);
         self.mutate_with_rate(&mut position, rng, 1.0);
         position
@@ -195,7 +195,7 @@ fn seed_positions() -> Vec<Snort> {
     // 1--3--4--10-12
     //  /   /|\     \
     // 2   7 8 9     13
-    let pos_1 = Snort::new(undirected::Graph::from_edges(
+    let pos_1 = Snort::new(undirected::UndirectedGraph::from_edges(
         14,
         &[
             (0, 3),
@@ -223,7 +223,7 @@ fn seed_positions() -> Vec<Snort> {
     // 2  6   8 -13
     //        |
     //        14
-    let pos_2 = Snort::new(undirected::Graph::from_edges(
+    let pos_2 = Snort::new(undirected::UndirectedGraph::from_edges(
         15,
         &[
             (0, 3),

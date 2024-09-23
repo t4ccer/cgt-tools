@@ -6,12 +6,12 @@ use std::{fmt::Display, iter::FusedIterator};
 /// Directed graph
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct Graph {
+pub struct DirectedGraph {
     size: usize,
     adjacency_matrix: Vec<bool>,
 }
 
-impl Display for Graph {
+impl Display for DirectedGraph {
     #[allow(clippy::missing_inline_in_public_items)]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for (idx, elem) in self.adjacency_matrix.iter().enumerate() {
@@ -25,7 +25,7 @@ impl Display for Graph {
     }
 }
 
-impl Graph {
+impl DirectedGraph {
     /// Create an empty graph without any edges between vertices
     #[inline]
     pub fn empty(size: usize) -> Self {
@@ -83,6 +83,16 @@ impl Graph {
         }
     }
 
+    /// Get edges of the graph
+    #[inline]
+    pub fn edges(&self) -> EdgesIter {
+        EdgesIter {
+            u: 0,
+            v: 0,
+            graph: self,
+        }
+    }
+
     /// Get iterator over vertices
     #[inline]
     pub const fn vertices(&self) -> Range<usize> {
@@ -125,12 +135,45 @@ impl Graph {
     }
 }
 
+/// Iterator over graph edges, constructed with [`Graph::edges`].
+pub struct EdgesIter<'graph> {
+    u: usize,
+    v: usize,
+    graph: &'graph DirectedGraph,
+}
+
+impl<'graph> Iterator for EdgesIter<'graph> {
+    type Item = (usize, usize);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            if self.u >= self.graph.size() {
+                self.u = 0;
+                self.v += 1;
+            }
+
+            if self.v >= self.graph.size() {
+                return None;
+            }
+
+            if self.graph.are_adjacent(self.u, self.v) {
+                let res = Some((self.u, self.v));
+                self.u += 1;
+                return res;
+            }
+            self.u += 1;
+        }
+    }
+}
+
+impl<'graph> FusedIterator for EdgesIter<'graph> {}
+
 /// Iterator of adjacent vertices. Obtained by calling [`Graph::adjacent_to`]
 #[derive(Debug)]
 pub struct AdjacentIter<'graph> {
     vertex: usize,
     idx: usize,
-    graph: &'graph Graph,
+    graph: &'graph DirectedGraph,
 }
 
 impl<'graph> Iterator for AdjacentIter<'graph> {
@@ -192,8 +235,8 @@ fn adds_new_vertex() {
 ///    > 0
 /// ```
 #[cfg(test)]
-fn test_matrix() -> Graph {
-    let mut m = Graph::empty(4);
+fn test_matrix() -> DirectedGraph {
+    let mut m = DirectedGraph::empty(4);
     m.connect(3, 0, true);
     m.connect(3, 2, true);
     m.connect(1, 3, true);
@@ -206,7 +249,7 @@ fn set_adjacency_matrix() {
     let m = test_matrix();
     assert_eq!(
         m,
-        Graph::from_vec(
+        DirectedGraph::from_vec(
             4,
             vec![
                 false, true, false, true, false, false, false, false, false, false, false, true,
@@ -224,4 +267,13 @@ fn test_adjacency() {
     assert_eq!(m.adjacent_to(1).collect::<Vec<_>>(), vec![0, 3]);
     assert_eq!(m.adjacent_to(2).collect::<Vec<_>>(), vec![]);
     assert_eq!(m.adjacent_to(3).collect::<Vec<_>>(), vec![0, 2]);
+}
+
+#[test]
+fn test_edges() {
+    let m = test_matrix();
+    assert_eq!(
+        m.edges().collect::<Vec<_>>(),
+        vec![(1, 0), (3, 0), (3, 2), (1, 3)]
+    );
 }

@@ -52,7 +52,7 @@ impl SnortWindow {
     pub fn new() -> SnortWindow {
         SnortWindow {
             // caterpillar C(4, 3, 4)
-            game: Snort::new(graph::undirected::Graph::from_edges(
+            game: Snort::new(graph::undirected::UndirectedGraph::from_edges(
                 14,
                 &[
                     // left
