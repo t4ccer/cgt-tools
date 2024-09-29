@@ -102,9 +102,9 @@ where
                         buf,
                         "\\fill[fill=gray] ({},{}) rectangle ({},{}); ",
                         x,
-                        y,
+                        self.grid.height() - y - 1,
                         x + 1,
-                        y + 1,
+                        self.grid.height() - y,
                     )
                     .unwrap();
                 }
