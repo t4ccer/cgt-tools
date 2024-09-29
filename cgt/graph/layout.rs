@@ -38,7 +38,12 @@ impl SpringEmbedder {
                         let u = positions[u.index];
                         let v = positions[v.index];
 
-                        (self.c_repulsive / V2f::distance_squared(u, v)) * V2f::direction(u, v)
+                        let mut d = V2f::distance_squared(u, v);
+                        if d == 0.0 {
+                            d = 1.0;
+                        }
+
+                        (self.c_repulsive / d) * V2f::direction(u, v)
                     };
                 }
             }

@@ -40,6 +40,10 @@ impl V2f {
 
     pub fn normalized(self) -> V2f {
         let l = self.length();
+        if l == 0.0 {
+            return self;
+        }
+
         V2f {
             x: self.x / l,
             y: self.y / l,

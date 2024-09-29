@@ -115,8 +115,8 @@ impl SnortWindow {
                 let spring_embedder = SpringEmbedder {
                     cooling_rate: 0.995,
                     c_attractive: 1.0,
-                    c_repulsive: 3.0,
-                    ideal_spring_length: 50.0,
+                    c_repulsive: 20.0,
+                    ideal_spring_length: 35.0,
                     iterations: 128,
                     bounds: Some((
                         V2f {
@@ -124,8 +124,14 @@ impl SnortWindow {
                             y: SNORT_NODE_RADIUS,
                         },
                         V2f {
-                            x: graph_panel_size.x - SNORT_NODE_RADIUS * 2.0,
-                            y: graph_panel_size.y - SNORT_NODE_RADIUS * 2.0,
+                            x: f32::max(
+                                SNORT_NODE_RADIUS,
+                                graph_panel_size.x - SNORT_NODE_RADIUS * 2.0,
+                            ),
+                            y: f32::max(
+                                SNORT_NODE_RADIUS,
+                                graph_panel_size.y - SNORT_NODE_RADIUS * 2.0,
+                            ),
                         },
                     )),
                 };
