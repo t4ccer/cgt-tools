@@ -69,6 +69,12 @@ impl IsCgtWindow for TitledWindow<DomineeringWindow> {
                             }
                         }
                     }
+
+                    if let Some(_new_menu) = ui.begin_menu("Save") {
+                        if ui.menu_item("Dump Tikz") {
+                            println!("{}", self.content.game.to_latex());
+                        };
+                    }
                 }
 
                 ui.columns(2, "Columns", true);
