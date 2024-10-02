@@ -3,7 +3,7 @@
 //! vertices in their own color.
 
 use crate::{
-    graph::{adjacency_matrix::undirected::UndirectedGraph, Graph, Vertex},
+    graph::{adjacency_matrix::undirected::UndirectedGraph, Graph, VertexIndex},
     numeric::{dyadic_rational_number::DyadicRationalNumber, nimber::Nimber},
     short::partizan::{canonical_form::CanonicalForm, partizan_game::PartizanGame},
 };
@@ -99,16 +99,16 @@ pub struct VertexColors {
     pub inner: Vec<VertexKind>,
 }
 
-impl Index<Vertex> for VertexColors {
+impl Index<VertexIndex> for VertexColors {
     type Output = VertexKind;
 
-    fn index(&self, index: Vertex) -> &Self::Output {
+    fn index(&self, index: VertexIndex) -> &Self::Output {
         &self.inner[index.index]
     }
 }
 
-impl IndexMut<Vertex> for VertexColors {
-    fn index_mut(&mut self, index: Vertex) -> &mut Self::Output {
+impl IndexMut<VertexIndex> for VertexColors {
+    fn index_mut(&mut self, index: VertexIndex) -> &mut Self::Output {
         &mut self.inner[index.index]
     }
 }
@@ -173,18 +173,18 @@ where
             G::from_edges(
                 6,
                 &[
-                    (Vertex { index: 0 }, Vertex { index: 1 }),
-                    (Vertex { index: 0 }, Vertex { index: 2 }),
-                    (Vertex { index: 0 }, Vertex { index: 4 }),
-                    (Vertex { index: 1 }, Vertex { index: 3 }),
-                    (Vertex { index: 2 }, Vertex { index: 5 }),
+                    (VertexIndex { index: 0 }, VertexIndex { index: 1 }),
+                    (VertexIndex { index: 0 }, VertexIndex { index: 2 }),
+                    (VertexIndex { index: 0 }, VertexIndex { index: 4 }),
+                    (VertexIndex { index: 1 }, VertexIndex { index: 3 }),
+                    (VertexIndex { index: 2 }, VertexIndex { index: 5 }),
                 ],
             ),
         )
         .unwrap()
     }
 
-    fn vertex_degree(&self, this_vertex: Vertex) -> usize {
+    fn vertex_degree(&self, this_vertex: VertexIndex) -> usize {
         let mut res = 0;
         for one_away in self.graph.vertices() {
             if one_away != this_vertex && self.graph.are_adjacent(this_vertex, one_away) {
@@ -194,7 +194,7 @@ where
         res
     }
 
-    fn vertex_second_degree(&self, this_vertex: Vertex) -> usize {
+    fn vertex_second_degree(&self, this_vertex: VertexIndex) -> usize {
         let mut res = 0;
         let mut seen = vec![false; self.graph.size()];
 
@@ -259,7 +259,7 @@ where
                 let vertex_color = vertex.color();
                 vertex_color == own_tint_color || vertex_color == VertexColor::Empty
             })
-            .map(|(index, _)| Vertex { index });
+            .map(|(index, _)| VertexIndex { index });
 
         // Go through list of vertices with legal move
         for move_vertex_idx in move_vertices {
@@ -317,10 +317,10 @@ where
     }
 
     /// BFS search to get the decompisitons, should be used only as a helper for [`Self::decompositions`]
-    fn bfs(&self, visited: &mut [bool], v: Vertex) -> Self {
-        let mut vertices_to_take: Vec<Vertex> = Vec::new();
+    fn bfs(&self, visited: &mut [bool], v: VertexIndex) -> Self {
+        let mut vertices_to_take: Vec<VertexIndex> = Vec::new();
 
-        let mut q: VecDeque<Vertex> = VecDeque::new();
+        let mut q: VecDeque<VertexIndex> = VecDeque::new();
         q.push_back(v);
         visited[v.index] = true;
 
@@ -339,7 +339,11 @@ where
         for (new_v, old_v) in vertices_to_take.iter().enumerate() {
             for old_u in self.graph.adjacent_to(*old_v) {
                 if let Some(new_u) = vertices_to_take.iter().position(|x| *x == old_u) {
-                    new_graph.connect(Vertex { index: new_v }, Vertex { index: new_u }, true);
+                    new_graph.connect(
+                        VertexIndex { index: new_v },
+                        VertexIndex { index: new_u },
+                        true,
+                    );
                 }
             }
         }

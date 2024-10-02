@@ -7,7 +7,7 @@ pub mod layout;
 
 /// Graph vertex. We assume that all graphs that we implement use 0-based indexing for their vertices
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Vertex {
+pub struct VertexIndex {
     /// 0-based index of a vertex in the graph
     pub index: usize,
 }
@@ -15,10 +15,10 @@ pub struct Vertex {
 /// Graph
 pub trait Graph: Sized {
     /// Iterator over vertices
-    type VertexIter: Iterator<Item = Vertex> + Clone;
+    type VertexIter: Iterator<Item = VertexIndex> + Clone;
 
     /// Iterator over adjacent veritcies adjacent to a given vertex
-    type AdjacentIter<'g>: Iterator<Item = Vertex>
+    type AdjacentIter<'g>: Iterator<Item = VertexIndex>
     where
         Self: 'g;
 
@@ -28,7 +28,7 @@ pub trait Graph: Sized {
         Self: 'g;
 
     /// Iterator over edges
-    type EdgesIter<'g>: Iterator<Item = (Vertex, Vertex)>
+    type EdgesIter<'g>: Iterator<Item = (VertexIndex, VertexIndex)>
     where
         Self: 'g;
 
@@ -42,19 +42,19 @@ pub trait Graph: Sized {
     fn vertices(&self) -> Self::VertexIter;
 
     /// Add a new disconnected vertex at the "end" of the graph
-    fn add_vertex(&mut self) -> Vertex;
+    fn add_vertex(&mut self) -> VertexIndex;
 
     /// Remove a given vertex from the graph, remove all its edges
-    fn remove_vertex(&mut self, vertex_to_remove: Vertex);
+    fn remove_vertex(&mut self, vertex_to_remove: VertexIndex);
 
     /// Add or remove edge between vertices
-    fn connect(&mut self, lhs_vertex: Vertex, rhs_vertex: Vertex, connect: bool);
+    fn connect(&mut self, lhs_vertex: VertexIndex, rhs_vertex: VertexIndex, connect: bool);
 
     /// Get iterator over vertices adjacent to given vertex
-    fn adjacent_to<'g>(&'g self, vertex: Vertex) -> Self::AdjacentIter<'g>;
+    fn adjacent_to<'g>(&'g self, vertex: VertexIndex) -> Self::AdjacentIter<'g>;
 
     /// Check if two vertices are adjacent
-    fn are_adjacent(&self, lhs_vertex: Vertex, rhs_vertex: Vertex) -> bool {
+    fn are_adjacent(&self, lhs_vertex: VertexIndex, rhs_vertex: VertexIndex) -> bool {
         self.adjacent_to(lhs_vertex)
             .any(|adjacent| adjacent == rhs_vertex)
     }
@@ -106,10 +106,10 @@ pub trait Graph: Sized {
         }
 
         let mut seen = vec![false; self.size()];
-        let mut queue: VecDeque<Vertex> = VecDeque::with_capacity(self.size());
+        let mut queue: VecDeque<VertexIndex> = VecDeque::with_capacity(self.size());
 
         seen[0] = true;
-        queue.push_back(Vertex { index: 0 });
+        queue.push_back(VertexIndex { index: 0 });
 
         while let Some(v) = queue.pop_front() {
             for u in self.vertices() {
@@ -125,7 +125,7 @@ pub trait Graph: Sized {
 
     /// Create a graph from list of edges
     #[inline]
-    fn from_edges(size: usize, edges: &[(Vertex, Vertex)]) -> Self {
+    fn from_edges(size: usize, edges: &[(VertexIndex, VertexIndex)]) -> Self {
         let mut graph = Self::empty(size);
         for (v, u) in edges {
             graph.connect(*v, *u, true);

@@ -1,7 +1,7 @@
 use crate::commands::snort::common::{analyze_position, Edge};
 use anyhow::Result;
 use cgt::{
-    graph::{adjacency_matrix::undirected::UndirectedGraph, Graph, Vertex},
+    graph::{adjacency_matrix::undirected::UndirectedGraph, Graph, VertexIndex},
     short::partizan::games::snort::{Snort, VertexColor, VertexKind},
 };
 use clap::Parser;
@@ -40,10 +40,10 @@ pub fn run(args: Args) -> Result<()> {
         .iter()
         .map(|edge| {
             (
-                Vertex {
+                VertexIndex {
                     index: edge.from as usize,
                 },
-                Vertex {
+                VertexIndex {
                     index: edge.to as usize,
                 },
             )

@@ -4,7 +4,7 @@ use std::{fmt::Display, iter::FusedIterator};
 
 use crate::graph::{
     adjacency_matrix::directed::{self, AdjacentIter},
-    Graph, Vertex,
+    Graph, VertexIndex,
 };
 
 /// Undirected graph, implements [`Graph`] trait
@@ -20,7 +20,7 @@ impl Display for UndirectedGraph {
 }
 
 impl Graph for UndirectedGraph {
-    type VertexIter = std::iter::Map<std::ops::Range<usize>, fn(usize) -> Vertex>;
+    type VertexIter = std::iter::Map<std::ops::Range<usize>, fn(usize) -> VertexIndex>;
 
     type AdjacentIter<'g> = AdjacentIter<'g>;
 
@@ -40,38 +40,38 @@ impl Graph for UndirectedGraph {
         self.0.vertices()
     }
 
-    fn add_vertex(&mut self) -> Vertex {
+    fn add_vertex(&mut self) -> VertexIndex {
         self.0.add_vertex()
     }
 
-    fn remove_vertex(&mut self, vertex_to_remove: Vertex) {
+    fn remove_vertex(&mut self, vertex_to_remove: VertexIndex) {
         self.0.remove_vertex(vertex_to_remove)
     }
 
-    fn connect(&mut self, lhs_vertex: Vertex, rhs_vertex: Vertex, connect: bool) {
+    fn connect(&mut self, lhs_vertex: VertexIndex, rhs_vertex: VertexIndex, connect: bool) {
         self.0.connect(lhs_vertex, rhs_vertex, connect);
         self.0.connect(rhs_vertex, lhs_vertex, connect);
     }
 
-    fn adjacent_to<'g>(&'g self, vertex: Vertex) -> Self::AdjacentIter<'g> {
+    fn adjacent_to<'g>(&'g self, vertex: VertexIndex) -> Self::AdjacentIter<'g> {
         self.0.adjacent_to(vertex)
     }
 
-    fn are_adjacent(&self, lhs_vertex: Vertex, rhs_vertex: Vertex) -> bool {
+    fn are_adjacent(&self, lhs_vertex: VertexIndex, rhs_vertex: VertexIndex) -> bool {
         self.0.are_adjacent(lhs_vertex, rhs_vertex)
     }
 
     fn edges<'g>(&'g self) -> Self::EdgesIter<'g> {
         EdgesIter {
-            u: Vertex { index: 0 },
-            v: Vertex { index: 0 },
+            u: VertexIndex { index: 0 },
+            v: VertexIndex { index: 0 },
             graph: self,
         }
     }
 
     fn degrees<'g>(&'g self) -> Self::DegreeIter<'g> {
         DegreeIter {
-            idx: Vertex { index: 0 },
+            idx: VertexIndex { index: 0 },
             graph: self,
         }
     }
@@ -91,13 +91,13 @@ impl Graph for UndirectedGraph {
 
 /// Iterator over graph edges, constructed with [`Graph::edges`].
 pub struct EdgesIter<'graph> {
-    u: Vertex,
-    v: Vertex,
+    u: VertexIndex,
+    v: VertexIndex,
     graph: &'graph UndirectedGraph,
 }
 
 impl<'graph> Iterator for EdgesIter<'graph> {
-    type Item = (Vertex, Vertex);
+    type Item = (VertexIndex, VertexIndex);
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
@@ -126,7 +126,7 @@ impl<'graph> FusedIterator for EdgesIter<'graph> {}
 /// Iterator over degrees of vertices in a graph. Obtained with [`Graph::degrees`]
 #[derive(Debug)]
 pub struct DegreeIter<'graph> {
-    idx: Vertex,
+    idx: VertexIndex,
     graph: &'graph UndirectedGraph,
 }
 
@@ -159,10 +159,10 @@ impl<'graph> FusedIterator for DegreeIter<'graph> {}
 #[cfg(test)]
 fn test_matrix() -> UndirectedGraph {
     let mut m = UndirectedGraph::empty(4);
-    m.connect(Vertex { index: 3 }, Vertex { index: 0 }, true);
-    m.connect(Vertex { index: 3 }, Vertex { index: 2 }, true);
-    m.connect(Vertex { index: 1 }, Vertex { index: 3 }, true);
-    m.connect(Vertex { index: 1 }, Vertex { index: 0 }, true);
+    m.connect(VertexIndex { index: 3 }, VertexIndex { index: 0 }, true);
+    m.connect(VertexIndex { index: 3 }, VertexIndex { index: 2 }, true);
+    m.connect(VertexIndex { index: 1 }, VertexIndex { index: 3 }, true);
+    m.connect(VertexIndex { index: 1 }, VertexIndex { index: 0 }, true);
     m
 }
 
@@ -186,23 +186,23 @@ fn set_adjacency_matrix() {
 fn adjacency() {
     let m = test_matrix();
     assert_eq!(
-        m.adjacent_to(Vertex { index: 0 }).collect::<Vec<_>>(),
-        vec![Vertex { index: 1 }, Vertex { index: 3 }]
+        m.adjacent_to(VertexIndex { index: 0 }).collect::<Vec<_>>(),
+        vec![VertexIndex { index: 1 }, VertexIndex { index: 3 }]
     );
     assert_eq!(
-        m.adjacent_to(Vertex { index: 1 }).collect::<Vec<_>>(),
-        vec![Vertex { index: 0 }, Vertex { index: 3 }]
+        m.adjacent_to(VertexIndex { index: 1 }).collect::<Vec<_>>(),
+        vec![VertexIndex { index: 0 }, VertexIndex { index: 3 }]
     );
     assert_eq!(
-        m.adjacent_to(Vertex { index: 2 }).collect::<Vec<_>>(),
-        vec![Vertex { index: 3 }]
+        m.adjacent_to(VertexIndex { index: 2 }).collect::<Vec<_>>(),
+        vec![VertexIndex { index: 3 }]
     );
     assert_eq!(
-        m.adjacent_to(Vertex { index: 3 }).collect::<Vec<_>>(),
+        m.adjacent_to(VertexIndex { index: 3 }).collect::<Vec<_>>(),
         vec![
-            Vertex { index: 0 },
-            Vertex { index: 1 },
-            Vertex { index: 2 }
+            VertexIndex { index: 0 },
+            VertexIndex { index: 1 },
+            VertexIndex { index: 2 }
         ]
     );
 }
@@ -220,10 +220,10 @@ fn edges() {
     assert_eq!(
         m.edges().collect::<Vec<_>>(),
         vec![
-            (Vertex { index: 0 }, Vertex { index: 1 }),
-            (Vertex { index: 0 }, Vertex { index: 3 }),
-            (Vertex { index: 1 }, Vertex { index: 3 }),
-            (Vertex { index: 2 }, Vertex { index: 3 })
+            (VertexIndex { index: 0 }, VertexIndex { index: 1 }),
+            (VertexIndex { index: 0 }, VertexIndex { index: 3 }),
+            (VertexIndex { index: 1 }, VertexIndex { index: 3 }),
+            (VertexIndex { index: 2 }, VertexIndex { index: 3 })
         ]
     );
 }

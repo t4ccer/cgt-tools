@@ -2,7 +2,7 @@ use crate::{commands::snort::common::Log, io::FileOrStderr};
 use anyhow::{Context, Result};
 use cgt::{
     genetic_algorithm::{Algorithm, GeneticAlgorithm, Scored},
-    graph::{adjacency_matrix::undirected, Graph, Vertex},
+    graph::{adjacency_matrix::undirected, Graph, VertexIndex},
     numeric::rational::Rational,
     short::partizan::{
         games::snort::{Snort, VertexColor, VertexKind},
@@ -74,7 +74,7 @@ impl SnortTemperatureDegreeDifference {
         if position.graph.size() > 1 {
             let mutation_roll: f32 = rng.gen();
             if mutation_roll < mutation_rate {
-                let to_remove = Vertex {
+                let to_remove = VertexIndex {
                     index: rng.gen_range(0..position.graph.size()),
                 };
                 position.graph.remove_vertex(to_remove);
@@ -90,11 +90,11 @@ impl SnortTemperatureDegreeDifference {
                 .vertices
                 .inner
                 .push(VertexKind::Single(VertexColor::Empty));
-            let another_vertex = Vertex {
+            let another_vertex = VertexIndex {
                 index: rng.gen_range(0..position.graph.size() - 1),
             };
             position.graph.connect(
-                Vertex {
+                VertexIndex {
                     index: position.graph.size() - 1,
                 },
                 another_vertex,
@@ -127,7 +127,7 @@ impl SnortTemperatureDegreeDifference {
         for index in 0..position.vertices.inner.len() {
             let mutation_roll: f32 = rng.gen();
             if mutation_roll < mutation_rate {
-                position.vertices[Vertex { index }] =
+                position.vertices[VertexIndex { index }] =
                     VertexKind::Single(*available_colors.choose(rng).unwrap());
             }
         }
@@ -151,15 +151,15 @@ impl Algorithm<Snort, Rational> for SnortTemperatureDegreeDifference {
 
         for v in 0..(min(new_size, smaller.graph.size())) {
             for u in 0..(min(new_size, smaller.graph.size())) {
-                let v = Vertex { index: v };
-                let u = Vertex { index: u };
+                let v = VertexIndex { index: v };
+                let u = VertexIndex { index: u };
                 new_graph.connect(v, u, smaller.graph.are_adjacent(v, u));
             }
         }
         for v in (min(new_size, smaller.graph.size()))..(min(new_size, larger.graph.size())) {
             for u in (min(new_size, smaller.graph.size()))..(min(new_size, larger.graph.size())) {
-                let v = Vertex { index: v };
-                let u = Vertex { index: u };
+                let v = VertexIndex { index: v };
+                let u = VertexIndex { index: u };
                 new_graph.connect(v, u, larger.graph.are_adjacent(v, u));
             }
         }
@@ -212,19 +212,19 @@ fn seed_positions() -> Vec<Snort> {
     let pos_1 = Snort::new(undirected::UndirectedGraph::from_edges(
         14,
         &[
-            (Vertex { index: 0 }, Vertex { index: 3 }),
-            (Vertex { index: 1 }, Vertex { index: 3 }),
-            (Vertex { index: 2 }, Vertex { index: 3 }),
-            (Vertex { index: 3 }, Vertex { index: 4 }),
-            (Vertex { index: 4 }, Vertex { index: 5 }),
-            (Vertex { index: 4 }, Vertex { index: 6 }),
-            (Vertex { index: 4 }, Vertex { index: 7 }),
-            (Vertex { index: 4 }, Vertex { index: 8 }),
-            (Vertex { index: 4 }, Vertex { index: 9 }),
-            (Vertex { index: 4 }, Vertex { index: 10 }),
-            (Vertex { index: 10 }, Vertex { index: 11 }),
-            (Vertex { index: 10 }, Vertex { index: 12 }),
-            (Vertex { index: 10 }, Vertex { index: 13 }),
+            (VertexIndex { index: 0 }, VertexIndex { index: 3 }),
+            (VertexIndex { index: 1 }, VertexIndex { index: 3 }),
+            (VertexIndex { index: 2 }, VertexIndex { index: 3 }),
+            (VertexIndex { index: 3 }, VertexIndex { index: 4 }),
+            (VertexIndex { index: 4 }, VertexIndex { index: 5 }),
+            (VertexIndex { index: 4 }, VertexIndex { index: 6 }),
+            (VertexIndex { index: 4 }, VertexIndex { index: 7 }),
+            (VertexIndex { index: 4 }, VertexIndex { index: 8 }),
+            (VertexIndex { index: 4 }, VertexIndex { index: 9 }),
+            (VertexIndex { index: 4 }, VertexIndex { index: 10 }),
+            (VertexIndex { index: 10 }, VertexIndex { index: 11 }),
+            (VertexIndex { index: 10 }, VertexIndex { index: 12 }),
+            (VertexIndex { index: 10 }, VertexIndex { index: 13 }),
         ],
     ));
 
@@ -240,20 +240,20 @@ fn seed_positions() -> Vec<Snort> {
     let pos_2 = Snort::new(undirected::UndirectedGraph::from_edges(
         15,
         &[
-            (Vertex { index: 0 }, Vertex { index: 3 }),
-            (Vertex { index: 1 }, Vertex { index: 3 }),
-            (Vertex { index: 2 }, Vertex { index: 3 }),
-            (Vertex { index: 3 }, Vertex { index: 4 }),
-            (Vertex { index: 4 }, Vertex { index: 5 }),
-            (Vertex { index: 4 }, Vertex { index: 6 }),
-            (Vertex { index: 4 }, Vertex { index: 7 }),
-            (Vertex { index: 4 }, Vertex { index: 8 }),
-            (Vertex { index: 7 }, Vertex { index: 9 }),
-            (Vertex { index: 7 }, Vertex { index: 10 }),
-            (Vertex { index: 7 }, Vertex { index: 11 }),
-            (Vertex { index: 8 }, Vertex { index: 12 }),
-            (Vertex { index: 8 }, Vertex { index: 13 }),
-            (Vertex { index: 8 }, Vertex { index: 14 }),
+            (VertexIndex { index: 0 }, VertexIndex { index: 3 }),
+            (VertexIndex { index: 1 }, VertexIndex { index: 3 }),
+            (VertexIndex { index: 2 }, VertexIndex { index: 3 }),
+            (VertexIndex { index: 3 }, VertexIndex { index: 4 }),
+            (VertexIndex { index: 4 }, VertexIndex { index: 5 }),
+            (VertexIndex { index: 4 }, VertexIndex { index: 6 }),
+            (VertexIndex { index: 4 }, VertexIndex { index: 7 }),
+            (VertexIndex { index: 4 }, VertexIndex { index: 8 }),
+            (VertexIndex { index: 7 }, VertexIndex { index: 9 }),
+            (VertexIndex { index: 7 }, VertexIndex { index: 10 }),
+            (VertexIndex { index: 7 }, VertexIndex { index: 11 }),
+            (VertexIndex { index: 8 }, VertexIndex { index: 12 }),
+            (VertexIndex { index: 8 }, VertexIndex { index: 13 }),
+            (VertexIndex { index: 8 }, VertexIndex { index: 14 }),
         ],
     ));
 

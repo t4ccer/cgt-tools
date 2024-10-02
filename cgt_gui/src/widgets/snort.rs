@@ -1,5 +1,7 @@
 use cgt::{
-    graph::{adjacency_matrix::undirected::UndirectedGraph, layout::SpringEmbedder, Graph, Vertex},
+    graph::{
+        adjacency_matrix::undirected::UndirectedGraph, layout::SpringEmbedder, Graph, VertexIndex,
+    },
     numeric::v2f::V2f,
     short::partizan::games::snort::{self, Snort},
 };
@@ -42,7 +44,7 @@ pub struct SnortWindow {
     reposition_option_selected: RawOf<RepositionMode>,
     node_positions: Vec<V2f>,
     editing_mode: RawOf<GraphEditingMode>,
-    new_edge_starting_node: Option<Vertex>,
+    new_edge_starting_node: Option<VertexIndex>,
     alternating_moves: bool,
     edge_creates_vertex: bool,
     details_options: DetailOptions,
@@ -57,22 +59,22 @@ impl SnortWindow {
                 14,
                 &[
                     // left
-                    (Vertex { index: 0 }, Vertex { index: 4 }),
-                    (Vertex { index: 1 }, Vertex { index: 4 }),
-                    (Vertex { index: 2 }, Vertex { index: 4 }),
-                    (Vertex { index: 3 }, Vertex { index: 4 }),
+                    (VertexIndex { index: 0 }, VertexIndex { index: 4 }),
+                    (VertexIndex { index: 1 }, VertexIndex { index: 4 }),
+                    (VertexIndex { index: 2 }, VertexIndex { index: 4 }),
+                    (VertexIndex { index: 3 }, VertexIndex { index: 4 }),
                     // center
-                    (Vertex { index: 6 }, Vertex { index: 5 }),
-                    (Vertex { index: 7 }, Vertex { index: 5 }),
-                    (Vertex { index: 8 }, Vertex { index: 5 }),
+                    (VertexIndex { index: 6 }, VertexIndex { index: 5 }),
+                    (VertexIndex { index: 7 }, VertexIndex { index: 5 }),
+                    (VertexIndex { index: 8 }, VertexIndex { index: 5 }),
                     // right
-                    (Vertex { index: 10 }, Vertex { index: 9 }),
-                    (Vertex { index: 11 }, Vertex { index: 9 }),
-                    (Vertex { index: 12 }, Vertex { index: 9 }),
-                    (Vertex { index: 13 }, Vertex { index: 9 }),
+                    (VertexIndex { index: 10 }, VertexIndex { index: 9 }),
+                    (VertexIndex { index: 11 }, VertexIndex { index: 9 }),
+                    (VertexIndex { index: 12 }, VertexIndex { index: 9 }),
+                    (VertexIndex { index: 13 }, VertexIndex { index: 9 }),
                     // main path
-                    (Vertex { index: 4 }, Vertex { index: 5 }),
-                    (Vertex { index: 5 }, Vertex { index: 9 }),
+                    (VertexIndex { index: 4 }, VertexIndex { index: 5 }),
+                    (VertexIndex { index: 5 }, VertexIndex { index: 9 }),
                 ],
             )),
             node_positions: Vec::new(),
@@ -454,7 +456,7 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                             self.content
                                 .game
                                 .graph
-                                .remove_vertex(Vertex { index: to_remove });
+                                .remove_vertex(VertexIndex { index: to_remove });
                             self.content.game.vertices.inner.remove(to_remove);
                             self.content.node_positions.remove(to_remove);
                             is_dirty = true;
@@ -479,7 +481,7 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                                 x: f32::max(SNORT_NODE_RADIUS, mouse_x - pos_x),
                                 y: f32::max(SNORT_NODE_RADIUS, mouse_y - pos_y),
                             });
-                            let edge_end = Vertex {
+                            let edge_end = VertexIndex {
                                 index: self.content.game.graph.size() - 1,
                             };
                             self.content.game.graph.connect(edge_start, edge_end, true);
