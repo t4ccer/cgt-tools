@@ -2,14 +2,17 @@ use cgt::short::partizan::canonical_form::CanonicalForm;
 use imgui::{Condition, ImColor32};
 use std::str::FromStr;
 
-use crate::{impl_titled_window, widgets, Context, Details, IsCgtWindow, TitledWindow, UpdateKind};
+use crate::{
+    impl_titled_window, widgets, Context, DetailOptions, Details, IsCgtWindow, TitledWindow,
+    UpdateKind,
+};
 
 #[derive(Debug, Clone)]
 pub struct CanonicalFormWindow {
     details: Details,
     value_input: String,
     input_error: bool,
-    thermograph_scale: f32,
+    details_options: DetailOptions,
 }
 
 impl CanonicalFormWindow {
@@ -23,7 +26,7 @@ impl CanonicalFormWindow {
             value_input: details.canonical_form.to_string(),
             details,
             input_error: false,
-            thermograph_scale: 50.0,
+            details_options: DetailOptions::new(),
         }
     }
 }
@@ -53,7 +56,6 @@ impl IsCgtWindow for TitledWindow<CanonicalFormWindow> {
                     }
                 }
 
-                let short_inputs = ui.push_item_width(250.0);
                 if ui
                     .input_text("Value", &mut self.content.value_input)
                     .build()
@@ -73,25 +75,8 @@ impl IsCgtWindow for TitledWindow<CanonicalFormWindow> {
                         "Invalid input",
                     );
                 }
-                ui.text_wrapped(&self.content.details.canonical_form_rendered);
-                ui.text(&self.content.details.temperature_rendered);
 
-                ui.slider(
-                    "Thermograph Scale",
-                    20.0,
-                    150.0,
-                    &mut self.content.thermograph_scale,
-                );
-
-                short_inputs.end();
-
-                widgets::thermograph(
-                    ui,
-                    &draw_list,
-                    self.content.thermograph_scale,
-                    &mut self.scratch_buffer,
-                    &self.content.details.thermograph,
-                );
+                widgets::game_details!(self, ui, draw_list);
             });
     }
 

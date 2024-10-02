@@ -8,14 +8,13 @@ use std::str::FromStr;
 use crate::{
     impl_game_window, impl_titled_window,
     widgets::{self, canonical_form::CanonicalFormWindow},
-    Context, Details, EvalTask, IsCgtWindow, Task, TitledWindow, UpdateKind,
+    Context, DetailOptions, Details, EvalTask, IsCgtWindow, Task, TitledWindow, UpdateKind,
 };
 
 #[derive(Debug, Clone)]
 pub struct DomineeringWindow {
     game: Domineering,
-    show_thermograph: bool,
-    thermograph_scale: f32,
+    details_options: DetailOptions,
     pub details: Option<Details>,
 }
 
@@ -23,9 +22,8 @@ impl DomineeringWindow {
     pub fn new() -> DomineeringWindow {
         DomineeringWindow {
             game: Domineering::from_str(".#.##|...##|#....|#...#|###..").unwrap(),
-            show_thermograph: true,
+            details_options: DetailOptions::new(),
             details: None,
-            thermograph_scale: 50.0,
         }
     }
 }

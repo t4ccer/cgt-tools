@@ -9,7 +9,8 @@ use std::{borrow::Cow, f32::consts::PI, fmt::Write};
 use crate::{
     imgui_enum, impl_game_window, impl_titled_window,
     widgets::{self, canonical_form::CanonicalFormWindow},
-    Context, Details, EvalTask, IsCgtWindow, IsEnum, RawOf, Task, TitledWindow, UpdateKind,
+    Context, DetailOptions, Details, EvalTask, IsCgtWindow, IsEnum, RawOf, Task, TitledWindow,
+    UpdateKind,
 };
 
 const SNORT_NODE_RADIUS: f32 = 16.0;
@@ -42,11 +43,10 @@ pub struct SnortWindow {
     node_positions: Vec<V2f>,
     editing_mode: RawOf<GraphEditingMode>,
     new_edge_starting_node: Option<Vertex>,
-    details: Option<Details>,
-    show_thermograph: bool,
-    thermograph_scale: f32,
     alternating_moves: bool,
     edge_creates_vertex: bool,
+    details_options: DetailOptions,
+    details: Option<Details>,
 }
 
 impl SnortWindow {
@@ -79,11 +79,10 @@ impl SnortWindow {
             reposition_option_selected: RawOf::new(RepositionMode::SpringEmbedder),
             editing_mode: RawOf::new(GraphEditingMode::DragNode),
             new_edge_starting_node: None,
-            details: None,
-            show_thermograph: true,
-            thermograph_scale: 20.0,
             alternating_moves: true,
             edge_creates_vertex: true,
+            details_options: DetailOptions::new(),
+            details: None,
         }
     }
 

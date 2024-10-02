@@ -2,7 +2,7 @@ use std::fmt::Write;
 
 use cgt::{
     grid::{BitTile, FiniteGrid, Grid},
-    numeric::rational::Rational,
+    numeric::{rational::Rational, v2f::V2f},
     short::partizan::{thermograph::Thermograph, trajectory::Trajectory},
 };
 use imgui::{DrawListMut, ImColor32, StyleColor};
@@ -30,6 +30,24 @@ fn fade(mut color: [f32; 4], alpha: f32) -> [f32; 4] {
 
 fn lerp(start: f32, end: f32, t: f32) -> f32 {
     start + t * (end - start)
+}
+
+fn thermograph_size(thermograph: &Thermograph) -> V2f {
+    let left_x = thermograph.left_wall.value_at(Rational::from(-1));
+    let right_x = thermograph.right_wall.value_at(Rational::from(-1));
+    let x_len = (left_x - right_x).as_f32().unwrap();
+    let y_top_above_x_axis = thermograph
+        .left_wall
+        .critical_points
+        .first()
+        .copied()
+        .and_then(Rational::as_f32)
+        .unwrap_or(0.0);
+
+    V2f {
+        x: x_len + THERMOGRAPH_AXIS_PAD * 2.0,
+        y: y_top_above_x_axis + 1.0 + THERMOGRAPH_TOP_MAST_LEN + THERMOGRAPH_AXIS_PAD * 2.0, // +1.0 to go up to -1 below y axis,
+    }
 }
 
 pub fn thermograph<'ui>(
@@ -302,23 +320,46 @@ macro_rules! game_details {
             $ui.text_wrapped(&details.canonical_form_rendered);
             $ui.text_wrapped(&details.temperature_rendered);
 
-            $ui.checkbox("Thermograph:", &mut $self.content.show_thermograph);
-            if $self.content.show_thermograph {
-                $ui.align_text_to_frame_padding();
-                $ui.text("Scale: ");
-                $ui.same_line();
-                let short_slider = $ui.push_item_width(200.0);
-                $ui.slider(
-                    "##Thermograph scale",
-                    5.0,
-                    100.0,
-                    &mut $self.content.thermograph_scale,
+            $ui.checkbox(
+                "Thermograph:",
+                &mut $self.content.details_options.show_thermograph,
+            );
+            if $self.content.details_options.show_thermograph {
+                $ui.checkbox(
+                    "Scale to fit",
+                    &mut $self.content.details_options.thermograph_fit,
                 );
-                short_slider.end();
+
+                // FIXME: After unchecking scale-to-fit checkbox the thermograph will be
+                // slightly to tall because we took pos_y without scrollbar.
+                if $self.content.details_options.thermograph_fit {
+                    let thermograph_size = $crate::widgets::thermograph_size(&details.thermograph);
+                    // FIXME: Fetch these constants from the theme settings
+                    let w = $ui.current_column_width() - 64.0;
+                    let pos_y = $ui.cursor_pos()[1];
+                    let h = $ui.window_size()[1] - pos_y - 16.0;
+                    let scale_w = w / thermograph_size.x;
+                    let scale_h = h / thermograph_size.y;
+
+                    $self.content.details_options.thermograph_scale = f32::min(scale_w, scale_h);
+                } else {
+                    $ui.align_text_to_frame_padding();
+                    $ui.text("Scale: ");
+                    $ui.same_line();
+                    let short_slider = $ui.push_item_width(200.0);
+                    $ui.slider(
+                        "##Thermograph scale",
+                        5.0,
+                        100.0,
+                        &mut $self.content.details_options.thermograph_scale,
+                    );
+                    short_slider.end();
+                }
+
                 $crate::widgets::thermograph(
                     $ui,
                     &$draw_list,
-                    $self.content.thermograph_scale,
+                    $self.content.details_options.thermograph_scale,
                     &mut $self.scratch_buffer,
                     &details.thermograph,
                 );

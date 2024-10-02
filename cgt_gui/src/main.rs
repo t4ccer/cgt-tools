@@ -30,6 +30,30 @@ pub struct Details {
 }
 
 impl Details {
+    // HACK: Very bugly hack to let us reuse drawing macro even when details are not optional
+    pub fn as_ref(&self) -> Option<&Details> {
+        Some(self)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct DetailOptions {
+    pub show_thermograph: bool,
+    pub thermograph_fit: bool,
+    pub thermograph_scale: f32,
+}
+
+impl DetailOptions {
+    pub fn new() -> DetailOptions {
+        DetailOptions {
+            show_thermograph: true,
+            thermograph_fit: true,
+            thermograph_scale: 50.0,
+        }
+    }
+}
+
+impl Details {
     pub fn from_canonical_form(canonical_form: CanonicalForm) -> Details {
         let canonical_form_rendered = format!("Canonical Form: {canonical_form}");
         let thermograph = canonical_form.thermograph();
