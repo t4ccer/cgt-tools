@@ -109,14 +109,12 @@ impl SnortWindow {
                 self.reposition_circle();
             }
             RepositionMode::SpringEmbedder => {
-                // Use circle as initial positions
-                self.reposition_circle();
                 let spring_embedder = SpringEmbedder {
-                    cooling_rate: 0.995,
+                    cooling_rate: 0.999,
                     c_attractive: 1.0,
-                    c_repulsive: 20.0,
-                    ideal_spring_length: 35.0,
-                    iterations: 128,
+                    c_repulsive: 250.0,
+                    ideal_spring_length: 40.0,
+                    iterations: 1024,
                     bounds: Some((
                         V2f {
                             x: SNORT_NODE_RADIUS,

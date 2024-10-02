@@ -27,23 +27,28 @@ impl SpringEmbedder {
                     if u == v {
                         continue;
                     }
+
+                    let u_pos = positions[u.index];
+                    let v_pos = positions[v.index];
+
                     forces[u.index] += if graph.are_adjacent(u, v) {
-                        let u = positions[u.index];
-                        let v = positions[v.index];
-
                         self.c_attractive
-                            * f32::log10(V2f::distance(v, u) / self.ideal_spring_length)
-                            * V2f::direction(u, v)
+                            * f32::log10(V2f::distance(v_pos, u_pos) / self.ideal_spring_length)
+                            * V2f::direction(u_pos, v_pos)
                     } else {
-                        let u = positions[u.index];
-                        let v = positions[v.index];
-
-                        let mut d = V2f::distance_squared(u, v);
+                        let d = V2f::distance_squared(u_pos, v_pos);
                         if d == 0.0 {
-                            d = 1.0;
+                            // same position, usually happens only when region bound is tiny
+                            // and position gets clamped so to avoid dividing by zero we add
+                            // maximum repulsive force that will push nodes to opposite edges of
+                            // the bounded region
+                            V2f {
+                                x: f32::MAX * (u < v) as u8 as f32,
+                                y: 0.0,
+                            }
+                        } else {
+                            (self.c_repulsive / d) * V2f::direction(v_pos, u_pos)
                         }
-
-                        (self.c_repulsive / d) * V2f::direction(u, v)
                     };
                 }
             }
