@@ -1,20 +1,20 @@
 # cgt
 
-Combinatorial Game Theory framework in Rust and Python.
+Combinatorial Game Theory framework and toolkit  in Rust and Python.
 
-## CLI GUI
+## CGT GUI
 
 Experimental graphical interface. See [README](./cgt_gui/README.md).
 
-## CLI utility tool
+## CGT CLI utils
 
 Some of the library features are exposed through CLI utility tool. See [CLI README](./cgt_cli/README.md) for installation and usage instructions.
 
-## Rust
+## Rust Library
 
 [Documentation](https://docs.rs/cgt/latest/cgt/)
 
-## Python
+## Python Library
 
 Not published yet
 
