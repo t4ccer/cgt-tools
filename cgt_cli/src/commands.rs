@@ -5,4 +5,5 @@ crate::clap_utils::mk_subcommand! {
     WindUp => wind_up,
     CanonicalForm => canonical_form,
     Amazons => amazons,
+    Misere => misere,
 }

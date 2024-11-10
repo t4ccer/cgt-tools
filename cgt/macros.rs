@@ -82,3 +82,86 @@ fn test_if_chain() {
         };
     };
 }
+
+macro_rules! _impl_bin_op {
+    ($type:ident, $body:expr, $trait:ident, $fn:ident) => {
+        impl ::std::ops::$trait<$type> for $type {
+            type Output = $type;
+            fn $fn(self, rhs: $type) -> $type {
+                (|lhs, rhs| $body(lhs, rhs))(&self, &rhs)
+            }
+        }
+
+        impl ::std::ops::$trait<&$type> for $type {
+            type Output = $type;
+            fn $fn(self, rhs: &$type) -> $type {
+                (|lhs, rhs| $body(lhs, rhs))(&self, rhs)
+            }
+        }
+
+        impl ::std::ops::$trait<$type> for &$type {
+            type Output = $type;
+            fn $fn(self, rhs: $type) -> $type {
+                (|lhs, rhs| $body(lhs, rhs))(self, &rhs)
+            }
+        }
+
+        impl ::std::ops::$trait<&$type> for &$type {
+            type Output = $type;
+            fn $fn(self, rhs: &$type) -> $type {
+                (|lhs, rhs| $body(lhs, rhs))(self, &rhs)
+            }
+        }
+    };
+}
+pub(crate) use _impl_bin_op;
+
+macro_rules! _impl_un_op {
+    ($type:ident, $body:expr, $trait:ident, $fn:ident) => {
+        impl ::std::ops::$trait for $type {
+            type Output = $type;
+            fn $fn(self) -> $type {
+                (|lhs| $body(lhs))(&self)
+            }
+        }
+
+        impl ::std::ops::$trait for &$type {
+            type Output = $type;
+            fn $fn(self) -> $type {
+                (|lhs| $body(lhs))(self)
+            }
+        }
+    };
+}
+pub(crate) use _impl_un_op;
+
+macro_rules! _impl_assign_op {
+    ($type:ident, $body:expr, $trait:ident, $fn:ident) => {
+        impl ::std::ops::$trait for $type {
+            fn $fn(&mut self, rhs: $type) {
+                (|lhs, rhs| $body(lhs, rhs))(self, &rhs)
+            }
+        }
+    };
+}
+pub(crate) use _impl_assign_op;
+
+macro_rules! impl_boilerplate_trait {
+    (Add, $type:ident, $body:expr) => {
+        $crate::macros::_impl_bin_op!($type, $body, Add, add);
+    };
+    (AddAssign, $type:ident, $body:expr) => {
+        $crate::macros::_impl_assign_op!($type, $body, AddAssign, add_assign);
+    };
+    (Sub, $type:ident, $body:expr) => {
+        $crate::macros::_impl_bin_op!($type, $body, Sub, sub);
+    };
+    (SubAssign, $type:ident, $body:expr) => {
+        $crate::macros::_impl_assign_op!($type, $body, SubAssign, sub_assign);
+    };
+    (Neg, $type:ident, $body:expr) => {
+        $crate::macros::_impl_un_op!($type, $body, Neg, neg);
+    };
+}
+
+pub(crate) use impl_boilerplate_trait;

@@ -28,6 +28,7 @@ pub mod genetic_algorithm;
 pub mod graph;
 pub mod grid;
 pub mod loopy;
+pub mod misere;
 pub mod numeric;
 pub mod short;
 

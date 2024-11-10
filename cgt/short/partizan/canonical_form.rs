@@ -2,15 +2,11 @@
 
 use crate::{
     display,
-    macros::if_chain,
+    macros::{if_chain, impl_boilerplate_trait},
     nom_utils::{impl_from_str_via_nom, lexeme},
-    numeric::dyadic_rational_number::DyadicRationalNumber,
-    numeric::nimber::Nimber,
-    numeric::rational::Rational,
-    short::partizan::thermograph::Thermograph,
-    short::partizan::trajectory::Trajectory,
+    numeric::{dyadic_rational_number::DyadicRationalNumber, nimber::Nimber, rational::Rational},
+    short::partizan::{thermograph::Thermograph, trajectory::Trajectory},
 };
-use auto_ops::impl_op_ex;
 use nom::{
     branch::alt,
     character::complete::{char, one_of, u32},
@@ -270,21 +266,29 @@ impl Nus {
 
 impl_from_str_via_nom!(Nus);
 
-impl_op_ex!(+|lhs: &Nus, rhs: &Nus| -> Nus {
+impl_boilerplate_trait! {Add, Nus, |lhs: &Nus, rhs: &Nus| {
     Nus {
         number: lhs.number() + rhs.number(),
         up_multiple: lhs.up_multiple() + rhs.up_multiple(),
         nimber: lhs.nimber() + rhs.nimber(),
     }
-});
+}}
 
-impl_op_ex!(-|lhs: &Nus| -> Nus {
+impl_boilerplate_trait! {Sub, Nus, |lhs: &Nus, rhs: &Nus| {
+    Nus {
+        number: lhs.number() - rhs.number(),
+        up_multiple: lhs.up_multiple() - rhs.up_multiple(),
+        nimber: lhs.nimber() - rhs.nimber(),
+    }
+}}
+
+impl_boilerplate_trait! {Neg, Nus, |lhs: &Nus| {
     Nus {
         number: -lhs.number(),
         up_multiple: -lhs.up_multiple(),
         nimber: lhs.nimber(), // Nimber is its own negative
     }
-});
+}}
 
 impl Display for Nus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -1330,15 +1334,25 @@ impl PartialOrd for CanonicalForm {
     }
 }
 
-impl_op_ex!(+|g: &CanonicalForm, h: &CanonicalForm| -> CanonicalForm { CanonicalForm::construct_sum(g, h) });
-impl_op_ex!(+=|g: &mut CanonicalForm, h: &CanonicalForm| { *g = CanonicalForm::construct_sum(g, h) });
-impl_op_ex!(-|g: &CanonicalForm| -> CanonicalForm { CanonicalForm::construct_negative(g) });
-impl_op_ex!(-|g: &CanonicalForm, h: &CanonicalForm| -> CanonicalForm {
+impl_boilerplate_trait! {Add, CanonicalForm, |g: &CanonicalForm, h: &CanonicalForm| {
+    CanonicalForm::construct_sum(g, h)
+}}
+
+impl_boilerplate_trait! {Sub, CanonicalForm, |g: &CanonicalForm, h: &CanonicalForm| {
     CanonicalForm::construct_sum(g, &CanonicalForm::construct_negative(h))
-});
-impl_op_ex!(-=|g: &mut CanonicalForm, h: &CanonicalForm| {
+}}
+
+impl_boilerplate_trait! {Neg, CanonicalForm, |g: &CanonicalForm| {
+    CanonicalForm::construct_negative(g)
+}}
+
+impl_boilerplate_trait! {AddAssign, CanonicalForm, |g: &mut CanonicalForm, h: &CanonicalForm| {
+    *g = CanonicalForm::construct_sum(g, h);
+}}
+
+impl_boilerplate_trait! {SubAssign, CanonicalForm, |g: &mut CanonicalForm, h: &CanonicalForm| {
     *g = CanonicalForm::construct_sum(g, &CanonicalForm::construct_negative(h));
-});
+}}
 
 impl Display for CanonicalForm {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
