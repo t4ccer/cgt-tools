@@ -5,14 +5,13 @@ use cgt::{
     numeric::v2f::V2f,
     short::partizan::games::snort::{self, Snort},
 };
-use imgui::{Condition, ImColor32, MouseButton, StyleColor};
-use std::{borrow::Cow, f32::consts::PI, fmt::Write};
+use imgui::{ComboBoxFlags, Condition, ImColor32, MouseButton, StyleColor};
+use std::{f32::consts::PI, fmt::Write};
 
 use crate::{
     imgui_enum, impl_game_window, impl_titled_window,
     widgets::{self, canonical_form::CanonicalFormWindow},
-    Context, DetailOptions, Details, EvalTask, IsCgtWindow, IsEnum, RawOf, Task, TitledWindow,
-    UpdateKind,
+    Context, DetailOptions, Details, EvalTask, IsCgtWindow, RawOf, Task, TitledWindow, UpdateKind,
 };
 
 const SNORT_NODE_RADIUS: f32 = 16.0;
@@ -179,21 +178,17 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                 ui.columns(2, "columns", true);
 
                 let short_inputs = ui.push_item_width(200.0);
-                ui.combo(
+                self.content.reposition_option_selected.combo(
+                    ui,
                     "##Reposition Mode",
-                    &mut self.content.reposition_option_selected.value,
-                    RepositionMode::LABELS,
-                    |i| Cow::Borrowed(i),
+                    ComboBoxFlags::empty(),
                 );
                 ui.same_line();
                 should_reposition = ui.button("Reposition");
 
-                ui.combo(
-                    "Edit Mode",
-                    &mut self.content.editing_mode.value,
-                    GraphEditingMode::LABELS,
-                    |i| Cow::Borrowed(i),
-                );
+                self.content
+                    .editing_mode
+                    .combo(ui, "Edit Mode", ComboBoxFlags::HEIGHT_LARGE);
                 short_inputs.end();
 
                 if matches!(

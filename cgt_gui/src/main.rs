@@ -8,6 +8,7 @@ use cgt::{
         transposition_table::ParallelTranspositionTable,
     },
 };
+use imgui::ComboBoxFlags;
 use std::{collections::BTreeMap, marker::PhantomData, sync::mpsc, thread};
 use widgets::canonical_form::CanonicalFormWindow;
 
@@ -137,18 +138,36 @@ macro_rules! impl_game_window {
 
 pub(crate) use impl_game_window;
 
-pub trait IsEnum {
+pub trait IsEnum: Sized
+where
+    Self: 'static,
+{
     const LABELS: &'static [&'static str];
+    const VARIANTS: &'static [Self];
 
     fn to_usize(self) -> usize;
     fn from_usize(raw: usize) -> Self;
+    fn label(self) -> &'static str {
+        Self::LABELS[self.to_usize()]
+    }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug)]
 pub struct RawOf<T> {
     pub value: usize,
     _ty: PhantomData<T>,
 }
+
+impl<T> Clone for RawOf<T> {
+    fn clone(&self) -> Self {
+        Self {
+            value: self.value,
+            _ty: PhantomData,
+        }
+    }
+}
+
+impl<T> Copy for RawOf<T> {}
 
 impl<T> RawOf<T>
 where
@@ -164,6 +183,22 @@ where
     pub fn as_enum(self) -> T {
         T::from_usize(self.value)
     }
+
+    pub fn combo(&mut self, ui: &imgui::Ui, label: impl AsRef<str>, flags: ComboBoxFlags) {
+        let preview = self.as_enum().label();
+        if let Some(_combo) = ui.begin_combo_with_flags(label, preview, flags) {
+            for (mode_idx, mode) in T::LABELS.iter().enumerate() {
+                let is_selected = self.value == mode_idx;
+                if is_selected {
+                    ui.set_item_default_focus();
+                }
+                let clicked = ui.selectable_config(mode).selected(is_selected).build();
+                if clicked {
+                    self.value = mode_idx;
+                }
+            }
+        }
+    }
 }
 
 macro_rules! imgui_enum {
@@ -176,6 +211,7 @@ macro_rules! imgui_enum {
 
         impl $crate::IsEnum for $name {
             const LABELS: &'static [&'static str] = &[$($pretty,)*];
+            const VARIANTS: &'static [$name] = &[$($name::$variant ,)*];
 
             fn to_usize(self) -> usize {
                 self as usize
