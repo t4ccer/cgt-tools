@@ -50,6 +50,12 @@ fn thermograph_size(thermograph: &Thermograph) -> V2f {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum ScafoldPlayer {
+    Left,
+    Right,
+}
+
 pub fn thermograph<'ui>(
     ui: &'ui imgui::Ui,
     draw_list: &'ui imgui::DrawListMut<'ui>,
@@ -136,6 +142,7 @@ pub fn thermograph<'ui>(
         thermograph_scale,
         scratch_buffer,
         &thermograph.left_wall,
+        ScafoldPlayer::Left,
     );
     draw_trajectory(
         ui,
@@ -145,10 +152,11 @@ pub fn thermograph<'ui>(
         thermograph_scale,
         scratch_buffer,
         &thermograph.right_wall,
+        ScafoldPlayer::Right,
     );
 }
 
-pub fn draw_trajectory<'ui>(
+fn draw_trajectory<'ui>(
     ui: &'ui imgui::Ui,
     draw_list: &'ui imgui::DrawListMut<'ui>,
     [pos_x, pos_y]: [f32; 2],
@@ -156,6 +164,7 @@ pub fn draw_trajectory<'ui>(
     thermograph_scale: f32,
     scratch_buffer: &mut String,
     trajectory: &Trajectory,
+    side: ScafoldPlayer,
 ) {
     let y_top_above_x_axis = trajectory
         .critical_points
@@ -204,11 +213,12 @@ pub fn draw_trajectory<'ui>(
         .thickness(THERMOGRAPH_TRAJECTORY_THICKNESS)
         .build();
 
-    for this_y_r in trajectory
+    for (point_idx, this_y_r) in trajectory
         .critical_points
         .iter()
         .copied()
         .chain(std::iter::once(Rational::from(-1)))
+        .enumerate()
     {
         let this_x_r = trajectory.value_at(this_y_r);
 
@@ -228,12 +238,23 @@ pub fn draw_trajectory<'ui>(
                     * thermograph_scale,
         ];
 
-        ui.set_cursor_screen_pos(this_point);
-        scratch_buffer.clear();
-        scratch_buffer
-            .write_fmt(format_args!("({this_x_r}, {this_y_r})"))
-            .unwrap();
-        ui.text(&scratch_buffer);
+        // Skip highest point when drawing left side - point is the same as that is the
+        // intersection but label is in different place as we offset right label to the left
+        // to fit within thermograph bounds
+        if point_idx > 0 || matches!(side, ScafoldPlayer::Right) {
+            scratch_buffer.clear();
+            scratch_buffer
+                .write_fmt(format_args!("({this_x_r}, {this_y_r})"))
+                .unwrap();
+            if matches!(side, ScafoldPlayer::Right) {
+                let [point_label_width, _] = ui.calc_text_size(&scratch_buffer);
+                ui.set_cursor_screen_pos([this_point[0] - point_label_width, this_point[1]]);
+            } else {
+                ui.set_cursor_screen_pos(this_point);
+            }
+            ui.text(&scratch_buffer);
+        }
+
         draw_list
             .add_line(prev_point, this_point, trajectory_color)
             .thickness(THERMOGRAPH_TRAJECTORY_THICKNESS)
@@ -325,24 +346,30 @@ macro_rules! game_details {
                 &mut $self.content.details_options.show_thermograph,
             );
             if $self.content.details_options.show_thermograph {
-                $ui.checkbox(
+                let clicked = $ui.checkbox(
                     "Scale to fit",
                     &mut $self.content.details_options.thermograph_fit,
                 );
 
-                // FIXME: After unchecking scale-to-fit checkbox the thermograph will be
-                // slightly to tall because we took pos_y without scrollbar.
-                if $self.content.details_options.thermograph_fit {
+                if $self.content.details_options.thermograph_fit || clicked {
                     let thermograph_size = $crate::widgets::thermograph_size(&details.thermograph);
-                    // FIXME: Fetch these constants from the theme settings
-                    let w = $ui.current_column_width() - 64.0;
+                    let [_, text_height] = $ui.calc_text_size("1234567890()");
+                    let available_w = $ui.current_column_width();
                     let pos_y = $ui.cursor_pos()[1];
-                    let h = $ui.window_size()[1] - pos_y - 16.0;
-                    let scale_w = w / thermograph_size.x;
-                    let scale_h = h / thermograph_size.y;
+                    let mut available_h = $ui.window_size()[1] - pos_y - text_height;
+
+                    // Slider is about to appear so we need to shrink available height
+                    if !$self.content.details_options.thermograph_fit {
+                        let style = unsafe { $ui.style() };
+                        available_h -= style.scrollbar_size + style.item_spacing[1] * 2.0;
+                    }
+
+                    let scale_w = available_w / thermograph_size.x;
+                    let scale_h = available_h / thermograph_size.y;
 
                     $self.content.details_options.thermograph_scale = f32::min(scale_w, scale_h);
                 } else {
+                    // NOTE: When adding widgets here, account for extra height above
                     $ui.align_text_to_frame_padding();
                     $ui.text("Scale: ");
                     $ui.same_line();
