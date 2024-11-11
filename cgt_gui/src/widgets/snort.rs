@@ -421,9 +421,10 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                 }
 
                 ui.set_cursor_screen_pos([pos_x, pos_y]);
+                let style = unsafe { ui.style() };
                 graph_panel_size = V2f {
                     x: ui.current_column_width(),
-                    y: ui.window_size()[1] - control_panel_height,
+                    y: ui.window_size()[1] - control_panel_height - style.item_spacing[1] * 2.0,
                 };
                 if matches!(
                     self.content.editing_mode.as_enum(),
