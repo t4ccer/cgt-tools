@@ -18,22 +18,22 @@ const SNORT_NODE_RADIUS: f32 = 16.0;
 
 imgui_enum! {
     GraphEditingMode {
-        DragNode, 0, "Drag vertex",
-        TintNodeBlue, 1, "Tint vertex blue (left)",
-        TintNodeRed, 2, "Tint vertex red (right)",
-        TintNodeNone, 3, "Untint vertex",
-        MoveLeft, 4, "Blue move (left)",
-        MoveRight, 5, "Red move (right)",
-        AddNode, 6, "Add vertex",
-        DeleteNode, 7, "Remove vertex",
-        AddEdge, 8, "Add/Remove edge",
+        DragNode, "Drag vertex",
+        TintNodeBlue, "Tint vertex blue (left)",
+        TintNodeRed, "Tint vertex red (right)",
+        TintNodeNone, "Untint vertex",
+        MoveLeft, "Blue move (left)",
+        MoveRight, "Red move (right)",
+        AddNode, "Add vertex",
+        DeleteNode, "Remove vertex",
+        AddEdge, "Add/Remove edge",
     }
 }
 
 imgui_enum! {
     RepositionMode {
-        SpringEmbedder, 0, "Spring Embedder",
-        Circle, 1, "Circle",
+        SpringEmbedder, "Spring Embedder",
+        Circle, "Circle",
     }
 }
 

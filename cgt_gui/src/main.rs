@@ -202,13 +202,14 @@ where
 }
 
 macro_rules! imgui_enum {
-    ($name:ident { $($variant:ident, $raw:expr, $pretty:expr,)*}) => {
+    ($name:ident { $($variant:ident, $pretty:expr,)*}) => {
         #[derive(Debug, Clone, Copy)]
         #[repr(usize)]
         pub enum $name {
             $($variant,)*
         }
 
+        #[automatically_derived]
         impl $crate::IsEnum for $name {
             const LABELS: &'static [&'static str] = &[$($pretty,)*];
             const VARIANTS: &'static [$name] = &[$($name::$variant ,)*];
@@ -217,10 +218,11 @@ macro_rules! imgui_enum {
                 self as usize
             }
 
+
             fn from_usize(raw: usize) -> $name {
                 match raw {
-                    $($raw => $name::$variant,)*
-                    _ => panic!("Invalid value: {raw}")
+                    $(x if x == $name::$variant as usize => $name::$variant,)*
+                    _ => panic!("Invalid value for {}: {}", stringify!($name), raw),
                 }
             }
         }
