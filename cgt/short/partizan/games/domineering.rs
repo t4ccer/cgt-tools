@@ -410,7 +410,7 @@ mod tests {
         let latex = position.to_latex();
         assert_eq!(
             &latex,
-            r#"\begin{tikzpicture}[scale=1] \fill[fill=gray] (0,0) rectangle (1,1); \fill[fill=gray] (1,0) rectangle (2,1); \fill[fill=gray] (0,2) rectangle (1,3); \fill[fill=gray] (2,3) rectangle (3,4); \fill[fill=gray] (3,3) rectangle (4,4); \draw[step=1cm,black] (0,0) grid (4, 4); \end{tikzpicture}"#
+            r#"\begin{tikzpicture}[scale=1] \fill[fill=gray] (0,3) rectangle (1,4); \fill[fill=gray] (1,3) rectangle (2,4); \fill[fill=gray] (0,1) rectangle (1,2); \fill[fill=gray] (2,0) rectangle (3,1); \fill[fill=gray] (3,0) rectangle (4,1); \draw[step=1cm,black] (0,0) grid (4, 4); \end{tikzpicture}"#
         );
     }
 
