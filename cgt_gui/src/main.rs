@@ -1,8 +1,12 @@
 use cgt::{
+    graph::adjacency_matrix::undirected::UndirectedGraph,
     numeric::{dyadic_rational_number::DyadicRationalNumber, v2f::V2f},
     short::partizan::{
         canonical_form::CanonicalForm,
-        games::{domineering::Domineering, snort::Snort},
+        games::{
+            domineering::Domineering,
+            snort::{self, Snort},
+        },
         partizan_game::PartizanGame,
         thermograph::Thermograph,
         transposition_table::ParallelTranspositionTable,
@@ -240,7 +244,7 @@ pub struct EvalTask<D> {
 #[derive(Debug)]
 pub enum Task {
     EvalDomineering(EvalTask<Domineering>),
-    EvalSnort(EvalTask<Snort>),
+    EvalSnort(EvalTask<Snort<snort::VertexKind, UndirectedGraph<snort::VertexKind>>>),
 }
 
 pub struct Context {
@@ -265,7 +269,10 @@ impl Context {
 
 pub enum UpdateKind {
     DomineeringDetails(Domineering, Details),
-    SnortDetails(Snort, Details),
+    SnortDetails(
+        Snort<snort::VertexKind, UndirectedGraph<snort::VertexKind>>,
+        Details,
+    ),
 }
 
 pub struct Update {
@@ -277,7 +284,8 @@ pub struct SchedulerContext {
     tasks: mpsc::Receiver<Task>,
     updates: mpsc::Sender<Update>,
     domineering_tt: ParallelTranspositionTable<Domineering>,
-    snort_tt: ParallelTranspositionTable<Snort>,
+    snort_tt:
+        ParallelTranspositionTable<Snort<snort::VertexKind, UndirectedGraph<snort::VertexKind>>>,
 }
 
 fn scheduler(ctx: SchedulerContext) {

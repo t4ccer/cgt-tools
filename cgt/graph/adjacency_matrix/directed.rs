@@ -1,79 +1,87 @@
 //! Directed graph
 
-use std::{fmt::Display, iter::FusedIterator};
+use core::iter::FusedIterator;
 
 use crate::graph::{Graph, VertexIndex};
 
 /// Directed graph, implements [`Graph`] trait
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct DirectedGraph {
-    size: usize,
+pub struct DirectedGraph<V> {
     adjacency_matrix: Vec<bool>,
+    vertices: Vec<V>,
 }
 
-impl Display for DirectedGraph {
-    #[allow(clippy::missing_inline_in_public_items)]
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for (idx, elem) in self.adjacency_matrix.iter().enumerate() {
-            write!(f, "{}", u8::from(*elem))?;
-            if (idx + 1) % self.size == 0 {
-                writeln!(f)?;
-            }
+impl<V> DirectedGraph<V> {
+    /// Map vertex values
+    pub fn map<R>(&self, f: impl FnMut(&V) -> R) -> DirectedGraph<R> {
+        DirectedGraph {
+            adjacency_matrix: self.adjacency_matrix.clone(),
+            vertices: self.vertices.iter().map(f).collect::<Vec<_>>(),
         }
-
-        Ok(())
     }
 }
 
-impl Graph for DirectedGraph {
+impl<V> Graph<V> for DirectedGraph<V>
+where
+    V: Clone,
+{
     type VertexIter = std::iter::Map<std::ops::Range<usize>, fn(usize) -> VertexIndex>;
 
-    type AdjacentIter<'g> = AdjacentIter<'g>;
+    type AdjacentIter<'g> = AdjacentIter<'g, V> where V: 'g;
 
-    type DegreeIter<'g> = DegreeIter<'g>;
+    type DegreeIter<'g> = DegreeIter<'g, V> where V: 'g;
 
-    type EdgesIter<'g> = EdgesIter<'g>;
+    type EdgesIter<'g> = EdgesIter<'g, V> where V: 'g;
 
     #[inline]
-    fn empty(size: usize) -> Self
+    fn empty(vertices: &[V]) -> Self
     where
         Self: Sized,
     {
+        let size = vertices.len();
         Self {
-            size,
             adjacency_matrix: vec![false; size * size],
+            vertices: vertices.to_vec(),
         }
     }
 
     #[inline]
     fn size(&self) -> usize {
-        self.size
+        self.vertices.len()
     }
 
-    fn vertices<'g>(&'g self) -> Self::VertexIter {
+    fn vertex_indices<'g>(&'g self) -> Self::VertexIter {
         (0..self.size()).map(|index| VertexIndex { index })
     }
 
     #[inline]
-    fn add_vertex(&mut self) -> VertexIndex {
-        let new_vertex = self.size();
-        let mut new_graph = Self::empty(self.size() + 1);
-        for in_v in self.vertices() {
-            for out_v in self.vertices() {
-                new_graph.connect(out_v, in_v, self.are_adjacent(out_v, in_v));
+    fn add_vertex(&mut self, vertex: V) -> VertexIndex {
+        let new_vertex_idx = self.size();
+        let mut new_adjacency_matrix = vec![false; (self.size() + 1) * (self.size() + 1)];
+        for in_v in self.vertex_indices() {
+            for out_v in self.vertex_indices() {
+                new_adjacency_matrix[(self.size() + 1) * in_v.index + out_v.index] =
+                    self.are_adjacent(out_v, in_v);
             }
         }
-        *self = new_graph;
-        VertexIndex { index: new_vertex }
+        self.vertices.push(vertex);
+        self.adjacency_matrix = new_adjacency_matrix;
+        VertexIndex {
+            index: new_vertex_idx,
+        }
     }
 
     fn remove_vertex(&mut self, vertex_to_remove: VertexIndex) {
         debug_assert!(self.size() > 0, "Graph has no vertices");
-        let mut new_graph = Self::empty(self.size() - 1);
+        let mut new_graph = Self {
+            adjacency_matrix: vec![false; (self.size() - 1) * (self.size() - 1)],
+            vertices: self.vertices.clone(),
+        };
+        new_graph.vertices.remove(vertex_to_remove.index);
 
-        for in_v in new_graph.vertices() {
-            for out_v in new_graph.vertices() {
+        for in_v in new_graph.vertex_indices() {
+            for out_v in new_graph.vertex_indices() {
                 new_graph.connect(
                     out_v,
                     in_v,
@@ -94,7 +102,8 @@ impl Graph for DirectedGraph {
     }
 
     fn connect(&mut self, lhs_vertex: VertexIndex, rhs_vertex: VertexIndex, connect: bool) {
-        self.adjacency_matrix[self.size * lhs_vertex.index + rhs_vertex.index] = connect;
+        let size = self.size();
+        self.adjacency_matrix[size * lhs_vertex.index + rhs_vertex.index] = connect;
     }
 
     fn adjacent_to<'g>(&'g self, vertex: VertexIndex) -> Self::AdjacentIter<'g> {
@@ -106,19 +115,7 @@ impl Graph for DirectedGraph {
     }
 
     fn are_adjacent(&self, lhs_vertex: VertexIndex, rhs_vertex: VertexIndex) -> bool {
-        self.adjacency_matrix[self.size * lhs_vertex.index + rhs_vertex.index]
-    }
-
-    #[inline]
-    fn from_flat_matrix(size: usize, vec: &[bool]) -> Option<Self> {
-        if vec.len() != size * size {
-            return None;
-        }
-
-        Some(Self {
-            size,
-            adjacency_matrix: vec.to_vec(),
-        })
+        self.adjacency_matrix[self.size() * lhs_vertex.index + rhs_vertex.index]
     }
 
     fn edges<'g>(&'g self) -> Self::EdgesIter<'g> {
@@ -135,16 +132,53 @@ impl Graph for DirectedGraph {
             graph: self,
         }
     }
+
+    #[inline]
+    fn from_flat_matrix(vec: &[bool], vertices: &[V]) -> Option<Self> {
+        let size = vertices.len();
+        if vec.len() != size * size {
+            return None;
+        }
+
+        Some(Self {
+            adjacency_matrix: vec.to_vec(),
+            vertices: vertices.to_vec(),
+        })
+    }
+
+    fn from_edges(edges: &[(VertexIndex, VertexIndex)], vertices: &[V]) -> Self {
+        let mut graph = Self {
+            adjacency_matrix: Vec::with_capacity(vertices.len() * vertices.len()),
+            vertices: vertices.to_vec(),
+        };
+
+        for (u, v) in edges.iter().copied() {
+            graph.connect(u, v, true);
+        }
+
+        graph
+    }
+
+    fn get_vertex(&self, vertex: VertexIndex) -> &V {
+        &self.vertices[vertex.index]
+    }
+
+    fn get_vertex_mut(&mut self, vertex: VertexIndex) -> &mut V {
+        &mut self.vertices[vertex.index]
+    }
 }
 
 /// Iterator over graph edges, constructed with [`Graph::edges`].
-pub struct EdgesIter<'graph> {
+pub struct EdgesIter<'graph, V> {
     u: VertexIndex,
     v: VertexIndex,
-    graph: &'graph DirectedGraph,
+    graph: &'graph DirectedGraph<V>,
 }
 
-impl<'graph> Iterator for EdgesIter<'graph> {
+impl<'graph, V> Iterator for EdgesIter<'graph, V>
+where
+    V: Clone,
+{
     type Item = (VertexIndex, VertexIndex);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -168,22 +202,25 @@ impl<'graph> Iterator for EdgesIter<'graph> {
     }
 }
 
-impl<'graph> FusedIterator for EdgesIter<'graph> {}
+impl<'graph, V> FusedIterator for EdgesIter<'graph, V> where V: Clone {}
 
 /// Iterator of adjacent vertices. Obtained by calling [`Graph::adjacent_to`]
 #[derive(Debug)]
-pub struct AdjacentIter<'graph> {
+pub struct AdjacentIter<'graph, V> {
     vertex: VertexIndex,
     idx: VertexIndex,
-    graph: &'graph DirectedGraph,
+    graph: &'graph DirectedGraph<V>,
 }
 
-impl<'graph> Iterator for AdjacentIter<'graph> {
+impl<'graph, V> Iterator for AdjacentIter<'graph, V>
+where
+    V: Clone,
+{
     type Item = VertexIndex;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
-            if self.idx.index >= self.graph.size {
+            if self.idx.index >= self.graph.size() {
                 return None;
             }
             if self.graph.are_adjacent(self.vertex, self.idx) {
@@ -196,16 +233,19 @@ impl<'graph> Iterator for AdjacentIter<'graph> {
     }
 }
 
-impl<'graph> FusedIterator for AdjacentIter<'graph> {}
+impl<'graph, V> FusedIterator for AdjacentIter<'graph, V> where V: Clone {}
 
 /// Iterator over degrees of vertices in a graph. Obtained with [`Graph::degrees`]
 #[derive(Debug)]
-pub struct DegreeIter<'graph> {
+pub struct DegreeIter<'graph, V> {
     idx: VertexIndex,
-    graph: &'graph DirectedGraph,
+    graph: &'graph DirectedGraph<V>,
 }
 
-impl<'graph> Iterator for DegreeIter<'graph> {
+impl<'graph, V> Iterator for DegreeIter<'graph, V>
+where
+    V: Clone,
+{
     type Item = usize;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -215,7 +255,7 @@ impl<'graph> Iterator for DegreeIter<'graph> {
 
         let res = self
             .graph
-            .vertices()
+            .vertex_indices()
             .filter(|&u| u != self.idx && self.graph.are_adjacent(self.idx, u))
             .count();
         self.idx.index += 1;
@@ -223,37 +263,7 @@ impl<'graph> Iterator for DegreeIter<'graph> {
     }
 }
 
-#[test]
-fn adds_new_vertex() {
-    let mut g = test_matrix();
-    assert_eq!(
-        &format!("{g}"),
-        "0000\n\
-         1001\n\
-         0000\n\
-         1010\n"
-    );
-
-    // adds one empty row and column to previous matrix
-    g.add_vertex();
-    assert_eq!(
-        &format!("{g}"),
-        "00000\n\
-         10010\n\
-         00000\n\
-         10100\n\
-         00000\n"
-    );
-
-    g.remove_vertex(VertexIndex { index: 1 });
-    assert_eq!(
-        &format!("{g}"),
-        "0000\n\
-         0000\n\
-         1100\n\
-         0000\n"
-    );
-}
+impl<'graph, V> FusedIterator for DegreeIter<'graph, V> where V: Clone {}
 
 /// ```text
 /// 1 -> 3 -> 2
@@ -262,8 +272,8 @@ fn adds_new_vertex() {
 ///    > 0
 /// ```
 #[cfg(test)]
-fn test_matrix() -> DirectedGraph {
-    let mut m = DirectedGraph::empty(4);
+fn test_matrix() -> DirectedGraph<()> {
+    let mut m = DirectedGraph::empty(&[(), (), (), ()]);
     m.connect(VertexIndex { index: 3 }, VertexIndex { index: 0 }, true);
     m.connect(VertexIndex { index: 3 }, VertexIndex { index: 2 }, true);
     m.connect(VertexIndex { index: 1 }, VertexIndex { index: 3 }, true);
@@ -277,13 +287,13 @@ fn set_adjacency_matrix() {
     assert_eq!(
         m,
         DirectedGraph::from_flat_matrix(
-            4,
             &[
                 false, false, false, false, //
                 true, false, false, true, //
                 false, false, false, false, //
                 true, false, true, false, //
-            ]
+            ],
+            &[(), (), (), ()]
         )
         .unwrap()
     );

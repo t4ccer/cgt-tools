@@ -27,6 +27,7 @@ pub mod drawing;
 pub mod genetic_algorithm;
 pub mod graph;
 pub mod grid;
+pub mod has;
 pub mod loopy;
 pub mod numeric;
 pub mod short;

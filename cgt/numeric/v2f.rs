@@ -18,6 +18,8 @@ impl From<V2f> for mint::Vector2<f32> {
 }
 
 impl V2f {
+    pub const ZERO: V2f = V2f { x: 0.0, y: 0.0 };
+
     pub fn distance_squared(u: V2f, v: V2f) -> f32 {
         (v.x - u.x) * (v.x - u.x) + (v.y - u.y) * (v.y - u.y)
     }

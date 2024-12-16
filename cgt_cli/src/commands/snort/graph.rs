@@ -49,17 +49,17 @@ pub fn run(args: Args) -> Result<()> {
             )
         })
         .collect::<Vec<_>>();
-    let graph = UndirectedGraph::from_edges((graph_size + 1) as usize, &edges);
 
-    let mut vertices = vec![VertexKind::Single(VertexColor::Empty); graph.size()];
+    let mut vertices = vec![VertexKind::Single(VertexColor::Empty); graph_size as usize + 1];
     for v in args.tinted_left {
         vertices[v as usize] = VertexKind::Single(VertexColor::TintLeft);
     }
     for v in args.tinted_right {
         vertices[v as usize] = VertexKind::Single(VertexColor::TintRight);
     }
+    let graph = UndirectedGraph::from_edges(&edges, &vertices);
 
-    let position = Snort::with_colors(vertices, graph).unwrap();
+    let position = Snort::new(graph);
     analyze_position(position, !args.no_graphviz)?;
 
     Ok(())

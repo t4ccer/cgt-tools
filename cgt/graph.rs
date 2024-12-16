@@ -13,7 +13,7 @@ pub struct VertexIndex {
 }
 
 /// Graph
-pub trait Graph: Sized {
+pub trait Graph<V>: Sized {
     /// Iterator over vertices
     type VertexIter: Iterator<Item = VertexIndex> + Clone;
 
@@ -33,16 +33,16 @@ pub trait Graph: Sized {
         Self: 'g;
 
     /// Create an empty graph without any edges between vertices
-    fn empty(size: usize) -> Self;
+    fn empty(vertices: &[V]) -> Self;
 
     /// Get number of vertices in the graph.
     fn size(&self) -> usize;
 
     /// Get iterator over vertices
-    fn vertices(&self) -> Self::VertexIter;
+    fn vertex_indices(&self) -> Self::VertexIter;
 
     /// Add a new disconnected vertex at the "end" of the graph
-    fn add_vertex(&mut self) -> VertexIndex;
+    fn add_vertex(&mut self, vertex: V) -> VertexIndex;
 
     /// Remove a given vertex from the graph, remove all its edges
     fn remove_vertex(&mut self, vertex_to_remove: VertexIndex);
@@ -69,27 +69,13 @@ pub trait Graph: Sized {
     ///
     /// # Errors
     /// - if `matrix.len() != size^2`
-    #[inline]
-    fn from_flat_matrix(size: usize, matrix: &[bool]) -> Option<Self> {
-        if matrix.len() != size * size {
-            return None;
-        }
-
-        let mut g = Self::empty(size);
-        for u in g.vertices() {
-            for v in g.vertices() {
-                g.connect(u, v, matrix[size * u.index + v.index]);
-            }
-        }
-
-        Some(g)
-    }
+    fn from_flat_matrix(matrix: &[bool], vertices: &[V]) -> Option<Self>;
 
     /// Create nw graph from adjacency matrix.
     #[inline]
-    fn from_matrix(size: usize, matrix: &[&[bool]]) -> Option<Self> {
+    fn from_matrix(matrix: &[&[bool]], vertices: &[V]) -> Option<Self> {
         let vec: Vec<bool> = matrix.iter().map(|r| r.iter()).flatten().copied().collect();
-        Self::from_flat_matrix(size, &vec)
+        Self::from_flat_matrix(&vec, vertices)
     }
 
     /// Get graph degree (highest vertex degree)
@@ -112,7 +98,7 @@ pub trait Graph: Sized {
         queue.push_back(VertexIndex { index: 0 });
 
         while let Some(v) = queue.pop_front() {
-            for u in self.vertices() {
+            for u in self.vertex_indices() {
                 if self.are_adjacent(v, u) && v != u && !seen[u.index] {
                     seen[u.index] = true;
                     queue.push_back(u);
@@ -124,12 +110,11 @@ pub trait Graph: Sized {
     }
 
     /// Create a graph from list of edges
-    #[inline]
-    fn from_edges(size: usize, edges: &[(VertexIndex, VertexIndex)]) -> Self {
-        let mut graph = Self::empty(size);
-        for (v, u) in edges {
-            graph.connect(*v, *u, true);
-        }
-        graph
-    }
+    fn from_edges(edges: &[(VertexIndex, VertexIndex)], vertices: &[V]) -> Self;
+
+    /// Get vertex
+    fn get_vertex(&self, vertex: VertexIndex) -> &V;
+
+    /// Get vertex mutably
+    fn get_vertex_mut(&mut self, vertex: VertexIndex) -> &mut V;
 }

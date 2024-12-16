@@ -4,7 +4,9 @@ use cgt::{
     graph::{adjacency_matrix::undirected::UndirectedGraph, Graph},
     numeric::{dyadic_rational_number::DyadicRationalNumber, rational::Rational},
     short::partizan::{
-        canonical_form::CanonicalForm, games::snort::Snort, partizan_game::PartizanGame,
+        canonical_form::CanonicalForm,
+        games::snort::{Snort, VertexKind},
+        partizan_game::PartizanGame,
         transposition_table::ParallelTranspositionTable,
     },
 };
@@ -23,7 +25,7 @@ pub enum Log {
         temperature: DyadicRationalNumber,
     },
     HighFitness {
-        position: Scored<Snort, Rational>,
+        position: Scored<Snort<VertexKind, UndirectedGraph<VertexKind>>, Rational>,
         canonical_form: String,
         temperature: DyadicRationalNumber,
         degree: usize,
@@ -32,7 +34,7 @@ pub enum Log {
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct EvaluationResult {
-    pub position: Snort,
+    pub position: Snort<VertexKind, UndirectedGraph<VertexKind>>,
     pub canonical_form: CanonicalForm,
     pub temperature: DyadicRationalNumber,
     pub degree: usize,
@@ -64,11 +66,11 @@ impl FromStr for Edge {
     }
 }
 
-fn dump_edges(w: &mut impl Write, graph: &UndirectedGraph) -> io::Result<()> {
+fn dump_edges(w: &mut impl Write, graph: &UndirectedGraph<VertexKind>) -> io::Result<()> {
     let mut first = true;
 
-    for v in graph.vertices() {
-        for u in graph.vertices() {
+    for v in graph.vertex_indices() {
+        for u in graph.vertex_indices() {
             if v < u && graph.are_adjacent(v, u) {
                 if !first {
                     write!(w, ",")?;
@@ -84,7 +86,10 @@ fn dump_edges(w: &mut impl Write, graph: &UndirectedGraph) -> io::Result<()> {
     Ok(())
 }
 
-pub fn analyze_position(position: Snort, with_graphviz: bool) -> Result<()> {
+pub fn analyze_position(
+    position: Snort<VertexKind, UndirectedGraph<VertexKind>>,
+    with_graphviz: bool,
+) -> Result<()> {
     let transposition_table = ParallelTranspositionTable::new();
     let canonical_form = position.canonical_form(&transposition_table);
     let temperature = canonical_form.temperature();
@@ -153,7 +158,12 @@ pub fn analyze_position(position: Snort, with_graphviz: bool) -> Result<()> {
     Ok(())
 }
 
-fn render_snort(position: &Snort, filename: &str, format: &str, engine: &str) -> Result<()> {
+fn render_snort(
+    position: &Snort<VertexKind, UndirectedGraph<VertexKind>>,
+    filename: &str,
+    format: &str,
+    engine: &str,
+) -> Result<()> {
     let mut graphviz_proc = Command::new(engine)
         .stdin(Stdio::piped())
         .arg(format!("-T{}", format))

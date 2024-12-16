@@ -2,14 +2,15 @@ use cgt::{
     graph::{
         adjacency_matrix::undirected::UndirectedGraph, layout::SpringEmbedder, Graph, VertexIndex,
     },
+    has::Has,
     numeric::v2f::V2f,
-    short::partizan::games::snort::{self, Snort},
+    short::partizan::games::snort::{self, Snort, VertexColor, VertexKind},
 };
 use imgui::{ComboBoxFlags, Condition, ImColor32, MouseButton, StyleColor};
 use std::{f32::consts::PI, fmt::Write};
 
 use crate::{
-    imgui_enum, impl_game_window, impl_titled_window,
+    imgui_enum, impl_titled_window,
     widgets::{self, canonical_form::CanonicalFormWindow},
     Context, DetailOptions, Details, EvalTask, IsCgtWindow, RawOf, Task, TitledWindow, UpdateKind,
 };
@@ -37,11 +38,26 @@ imgui_enum! {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct PositionedVertex {
+    kind: VertexKind,
+    position: V2f,
+}
+
+impl Has<VertexKind> for PositionedVertex {
+    fn get_inner(&self) -> &VertexKind {
+        &self.kind
+    }
+
+    fn get_inner_mut(&mut self) -> &mut VertexKind {
+        &mut self.kind
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct SnortWindow {
-    game: Snort,
+    game: Snort<PositionedVertex, UndirectedGraph<PositionedVertex>>,
     reposition_option_selected: RawOf<RepositionMode>,
-    node_positions: Vec<V2f>,
     editing_mode: RawOf<GraphEditingMode>,
     new_edge_starting_node: Option<VertexIndex>,
     alternating_moves: bool,
@@ -55,7 +71,6 @@ impl SnortWindow {
         SnortWindow {
             // caterpillar C(4, 3, 4)
             game: Snort::new(UndirectedGraph::from_edges(
-                14,
                 &[
                     // left
                     (VertexIndex { index: 0 }, VertexIndex { index: 4 }),
@@ -75,8 +90,14 @@ impl SnortWindow {
                     (VertexIndex { index: 4 }, VertexIndex { index: 5 }),
                     (VertexIndex { index: 5 }, VertexIndex { index: 9 }),
                 ],
+                &vec![
+                    PositionedVertex {
+                        kind: VertexKind::Single(VertexColor::Empty),
+                        position: V2f::ZERO,
+                    };
+                    14
+                ],
             )),
-            node_positions: Vec::new(),
             reposition_option_selected: RawOf::new(RepositionMode::SpringEmbedder),
             editing_mode: RawOf::new(GraphEditingMode::DragNode),
             new_edge_starting_node: None,
@@ -90,9 +111,7 @@ impl SnortWindow {
     pub fn reposition_circle(&mut self) {
         let n = self.game.graph.size();
         let packing_circle_radius = SNORT_NODE_RADIUS * (self.game.graph.size() as f32 + 4.0) * 0.5;
-        self.node_positions.clear();
-        self.node_positions.reserve(self.game.graph.size());
-        for i in self.game.graph.vertices() {
+        for i in self.game.graph.vertex_indices() {
             let angle = (2.0 * PI * i.index as f32) / n as f32;
             let node_pos = V2f {
                 x: (packing_circle_radius - SNORT_NODE_RADIUS) * f32::cos(angle)
@@ -100,7 +119,7 @@ impl SnortWindow {
                 y: (packing_circle_radius - SNORT_NODE_RADIUS) * f32::sin(angle)
                     + packing_circle_radius,
             };
-            self.node_positions.push(node_pos);
+            self.game.graph.get_vertex_mut(i).position = node_pos;
         }
     }
 
@@ -133,7 +152,17 @@ impl SnortWindow {
                         },
                     )),
                 };
-                spring_embedder.layout(&self.game.graph, &mut self.node_positions);
+                // TODO: Make spring_embedder generic over Has<V2f>
+                let mut node_positions = self
+                    .game
+                    .graph
+                    .vertex_indices()
+                    .map(|i| self.game.graph.get_vertex(i).position)
+                    .collect::<Vec<_>>();
+                spring_embedder.layout(&self.game.graph, &mut node_positions);
+                for i in self.game.graph.vertex_indices() {
+                    self.game.graph.get_vertex_mut(i).position = node_positions[i.index];
+                }
             }
         }
     }
@@ -141,7 +170,25 @@ impl SnortWindow {
 
 impl IsCgtWindow for TitledWindow<SnortWindow> {
     impl_titled_window!("Snort");
-    impl_game_window!(EvalSnort, SnortDetails);
+
+    fn init(&self, ctx: &Context) {
+        let graph = self.content.game.graph.map(|v| v.kind);
+        ctx.schedule_task(crate::Task::EvalSnort(crate::EvalTask {
+            window: self.window_id,
+            game: Snort::new(graph),
+        }));
+    }
+    fn update(&mut self, update: crate::UpdateKind) {
+        let graph = self.content.game.graph.map(|v| v.kind);
+        match update {
+            UpdateKind::SnortDetails(game, details) => {
+                if graph == game.graph {
+                    self.content.details = Some(details);
+                }
+            }
+            _ => {}
+        }
+    }
 
     fn draw(&mut self, ui: &imgui::Ui, ctx: &mut Context) {
         let mut should_reposition = false;
@@ -210,8 +257,9 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
 
                 let mut max_y = f32::NEG_INFINITY;
                 let node_color = ui.style_color(StyleColor::Text);
-                for this_vertex_idx in self.content.game.graph.vertices() {
-                    let absolute_node_pos = self.content.node_positions[this_vertex_idx.index];
+                for this_vertex_idx in self.content.game.graph.vertex_indices() {
+                    let absolute_node_pos =
+                        self.content.game.graph.get_vertex(this_vertex_idx).position;
                     let _node_id = ui.push_id_usize(this_vertex_idx.index);
                     let node_pos @ [node_pos_x, node_pos_y] =
                         [pos_x + absolute_node_pos.x, pos_y + absolute_node_pos.y];
@@ -228,85 +276,85 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                         match self.content.editing_mode.as_enum() {
                             GraphEditingMode::DragNode => { /* NOOP */ }
                             GraphEditingMode::TintNodeNone => {
-                                *self.content.game.vertices[this_vertex_idx].color_mut() =
-                                    snort::VertexColor::Empty;
+                                *self
+                                    .content
+                                    .game
+                                    .graph
+                                    .get_vertex_mut(this_vertex_idx)
+                                    .kind
+                                    .color_mut() = snort::VertexColor::Empty;
                                 is_dirty = true;
                             }
                             GraphEditingMode::TintNodeBlue => {
-                                *self.content.game.vertices[this_vertex_idx].color_mut() =
-                                    snort::VertexColor::TintLeft;
+                                *self
+                                    .content
+                                    .game
+                                    .graph
+                                    .get_vertex_mut(this_vertex_idx)
+                                    .kind
+                                    .color_mut() = snort::VertexColor::TintLeft;
                                 is_dirty = true;
                             }
                             GraphEditingMode::TintNodeRed => {
-                                *self.content.game.vertices[this_vertex_idx].color_mut() =
-                                    snort::VertexColor::TintRight;
+                                *self
+                                    .content
+                                    .game
+                                    .graph
+                                    .get_vertex_mut(this_vertex_idx)
+                                    .kind
+                                    .color_mut() = snort::VertexColor::TintRight;
                                 is_dirty = true;
                             }
                             GraphEditingMode::DeleteNode => {
                                 // We don't remove it immediately because we're just iterating over
                                 // vertices
-                                *self.content.game.vertices[this_vertex_idx].color_mut() =
-                                    snort::VertexColor::Taken;
+                                *self
+                                    .content
+                                    .game
+                                    .graph
+                                    .get_vertex_mut(this_vertex_idx)
+                                    .kind
+                                    .color_mut() = snort::VertexColor::Taken;
                                 is_dirty = true;
                             }
                             GraphEditingMode::AddEdge => { /* NOOP */ }
                             GraphEditingMode::AddNode => { /* NOOP */ }
                             GraphEditingMode::MoveLeft => {
-                                if matches!(
-                                    self.content.game.vertices[this_vertex_idx].color(),
-                                    snort::VertexColor::TintLeft | snort::VertexColor::Empty
-                                ) {
-                                    for adjacent in
-                                        self.content.game.graph.adjacent_to(this_vertex_idx)
-                                    {
-                                        if matches!(
-                                            self.content.game.vertices[adjacent].color(),
-                                            snort::VertexColor::Taken
-                                                | snort::VertexColor::TintRight
-                                        ) {
-                                            *self.content.game.vertices[adjacent].color_mut() =
-                                                snort::VertexColor::Taken;
-                                        } else {
-                                            *self.content.game.vertices[adjacent].color_mut() =
-                                                snort::VertexColor::TintLeft;
-                                        }
-                                    }
-                                    *self.content.game.vertices[this_vertex_idx].color_mut() =
-                                        snort::VertexColor::Taken;
+                                if self
+                                    .content
+                                    .game
+                                    .available_moves_for::<{ VertexColor::TintLeft as u8 }>()
+                                    .any(|v| v == this_vertex_idx)
+                                {
+                                    self.content.game =
+                                        self.content
+                                            .game
+                                            .move_in_vertex::<{ VertexColor::TintLeft as u8 }>(
+                                                this_vertex_idx,
+                                            );
                                     if self.content.alternating_moves {
                                         self.content.editing_mode =
                                             RawOf::new(GraphEditingMode::MoveRight);
                                     }
-                                    is_dirty = true;
                                 }
                             }
                             GraphEditingMode::MoveRight => {
-                                if matches!(
-                                    self.content.game.vertices[this_vertex_idx].color(),
-                                    snort::VertexColor::TintRight | snort::VertexColor::Empty
-                                ) {
-                                    for adjacent in
-                                        self.content.game.graph.adjacent_to(this_vertex_idx)
-                                    {
-                                        if matches!(
-                                            self.content.game.vertices[adjacent].color(),
-                                            snort::VertexColor::Taken
-                                                | snort::VertexColor::TintLeft
-                                        ) {
-                                            *self.content.game.vertices[adjacent].color_mut() =
-                                                snort::VertexColor::Taken;
-                                        } else {
-                                            *self.content.game.vertices[adjacent].color_mut() =
-                                                snort::VertexColor::TintRight;
-                                        }
-                                    }
-                                    *self.content.game.vertices[this_vertex_idx].color_mut() =
-                                        snort::VertexColor::Taken;
+                                if self
+                                    .content
+                                    .game
+                                    .available_moves_for::<{ VertexColor::TintRight as u8 }>()
+                                    .any(|v| v == this_vertex_idx)
+                                {
+                                    self.content.game =
+                                        self.content
+                                            .game
+                                            .move_in_vertex::<{ VertexColor::TintRight as u8 }>(
+                                                this_vertex_idx,
+                                            );
                                     if self.content.alternating_moves {
                                         self.content.editing_mode =
                                             RawOf::new(GraphEditingMode::MoveLeft);
                                     }
-                                    is_dirty = true;
                                 }
                             }
                         }
@@ -351,25 +399,35 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                         )
                     {
                         let [mouse_delta_x, mouse_delta_y] = ui.io().mouse_delta;
-                        self.content.node_positions[this_vertex_idx.index] = V2f {
+                        self.content
+                            .game
+                            .graph
+                            .get_vertex_mut(this_vertex_idx)
+                            .position = V2f {
                             x: f32::max(SNORT_NODE_RADIUS, absolute_node_pos.x + mouse_delta_x),
                             y: f32::max(SNORT_NODE_RADIUS, absolute_node_pos.y + mouse_delta_y),
                         };
                     }
 
-                    let (node_fill_color, should_fill) =
-                        match self.content.game.vertices[this_vertex_idx].color() {
-                            snort::VertexColor::Empty => (node_color, false),
-                            snort::VertexColor::TintLeft => {
-                                (ImColor32::from_bits(0xfffb4a4e).to_rgba_f32s(), true)
-                            }
-                            snort::VertexColor::TintRight => {
-                                (ImColor32::from_bits(0xff7226f9).to_rgba_f32s(), true)
-                            }
-                            snort::VertexColor::Taken => {
-                                (ImColor32::from_bits(0xff333333).to_rgba_f32s(), true)
-                            }
-                        };
+                    let (node_fill_color, should_fill) = match self
+                        .content
+                        .game
+                        .graph
+                        .get_vertex_mut(this_vertex_idx)
+                        .kind
+                        .color()
+                    {
+                        snort::VertexColor::Empty => (node_color, false),
+                        snort::VertexColor::TintLeft => {
+                            (ImColor32::from_bits(0xfffb4a4e).to_rgba_f32s(), true)
+                        }
+                        snort::VertexColor::TintRight => {
+                            (ImColor32::from_bits(0xff7226f9).to_rgba_f32s(), true)
+                        }
+                        snort::VertexColor::Taken => {
+                            (ImColor32::from_bits(0xff333333).to_rgba_f32s(), true)
+                        }
+                    };
 
                     draw_list
                         .add_circle(node_pos, SNORT_NODE_RADIUS, node_color)
@@ -395,8 +453,13 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                     for adjacent_vertex_idx in self.content.game.graph.adjacent_to(this_vertex_idx)
                     {
                         if adjacent_vertex_idx < this_vertex_idx {
-                            let adjacent_pos =
-                                self.content.node_positions[adjacent_vertex_idx.index];
+                            let adjacent_pos = self
+                                .content
+                                .game
+                                .graph
+                                .get_vertex(adjacent_vertex_idx)
+                                .position;
+
                             let adjacent_pos = [pos_x + adjacent_pos.x, pos_y + adjacent_pos.y];
                             draw_list
                                 .add_line(node_pos, adjacent_pos, node_color)
@@ -407,7 +470,7 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                 }
 
                 if let Some(starting_node) = self.content.new_edge_starting_node {
-                    let held_node_pos = self.content.node_positions[starting_node.index];
+                    let held_node_pos = self.content.game.graph.get_vertex(starting_node).position;
                     let held_node_pos = [pos_x + held_node_pos.x, pos_y + held_node_pos.y];
                     draw_list
                         .add_line(held_node_pos, ui.io().mouse_pos, ImColor32::BLACK)
@@ -426,18 +489,15 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                     GraphEditingMode::AddNode
                 ) && ui.invisible_button("Add node", graph_panel_size)
                 {
-                    self.content.game.graph.add_vertex();
-                    self.content
-                        .game
-                        .vertices
-                        .inner
-                        .push(snort::VertexKind::Single(snort::VertexColor::Empty));
-
                     let [mouse_x, mouse_y] = ui.io().mouse_pos;
-                    self.content.node_positions.push(V2f {
-                        x: mouse_x - pos_x,
-                        y: mouse_y - pos_y,
+                    self.content.game.graph.add_vertex(PositionedVertex {
+                        kind: VertexKind::Single(VertexColor::Empty),
+                        position: V2f {
+                            x: mouse_x - pos_x,
+                            y: mouse_y - pos_y,
+                        },
                     });
+
                     is_dirty = true;
                 }
 
@@ -445,16 +505,10 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                 ui.next_column();
 
                 'outer: loop {
-                    for (to_remove, color) in
-                        self.content.game.vertices.inner.iter().copied().enumerate()
-                    {
-                        if color.color() == snort::VertexColor::Taken {
-                            self.content
-                                .game
-                                .graph
-                                .remove_vertex(VertexIndex { index: to_remove });
-                            self.content.game.vertices.inner.remove(to_remove);
-                            self.content.node_positions.remove(to_remove);
+                    for to_remove_idx in self.content.game.graph.vertex_indices() {
+                        let vertex = self.content.game.graph.get_vertex(to_remove_idx);
+                        if vertex.kind.color() == snort::VertexColor::Taken {
+                            self.content.game.graph.remove_vertex(to_remove_idx);
                             is_dirty = true;
                             continue 'outer;
                         }
@@ -465,18 +519,15 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                 if !ui.io()[MouseButton::Left] {
                     if let Some(edge_start) = self.content.new_edge_starting_node.take() {
                         if self.content.edge_creates_vertex {
-                            self.content.game.graph.add_vertex();
-                            self.content
-                                .game
-                                .vertices
-                                .inner
-                                .push(snort::VertexKind::Single(snort::VertexColor::Empty));
-
                             let [mouse_x, mouse_y] = ui.io().mouse_pos;
-                            self.content.node_positions.push(V2f {
-                                x: f32::max(SNORT_NODE_RADIUS, mouse_x - pos_x),
-                                y: f32::max(SNORT_NODE_RADIUS, mouse_y - pos_y),
+                            self.content.game.graph.add_vertex(PositionedVertex {
+                                kind: VertexKind::Single(VertexColor::Empty),
+                                position: V2f {
+                                    x: f32::max(SNORT_NODE_RADIUS, mouse_x - pos_x),
+                                    y: f32::max(SNORT_NODE_RADIUS, mouse_y - pos_y),
+                                },
                             });
+
                             let edge_end = VertexIndex {
                                 index: self.content.game.graph.size() - 1,
                             };
@@ -496,9 +547,10 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
 
                 if is_dirty {
                     self.content.details = None;
+                    let graph = self.content.game.graph.map(|v| v.kind);
                     ctx.schedule_task(Task::EvalSnort(EvalTask {
                         window: self.window_id,
-                        game: self.content.game.clone(),
+                        game: Snort::new(graph),
                     }));
                 }
             });

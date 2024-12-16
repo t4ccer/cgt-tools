@@ -40,6 +40,7 @@ path = "./cgt/lib.rs"
 
 [workspace]
 members = ["cgt_cli", "cgt_py", "cgt_derive", "cgt_gui"]
+exclude = ["vendor"]
 
 [profile.release]
 lto = true

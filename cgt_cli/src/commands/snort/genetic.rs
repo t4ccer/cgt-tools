@@ -2,7 +2,10 @@ use crate::{commands::snort::common::Log, io::FileOrStderr};
 use anyhow::{Context, Result};
 use cgt::{
     genetic_algorithm::{Algorithm, GeneticAlgorithm, Scored},
-    graph::{adjacency_matrix::undirected, Graph, VertexIndex},
+    graph::{
+        adjacency_matrix::undirected::{self, UndirectedGraph},
+        Graph, VertexIndex,
+    },
     numeric::rational::Rational,
     short::partizan::{
         games::snort::{Snort, VertexColor, VertexKind},
@@ -58,7 +61,7 @@ pub struct Args {
 }
 
 struct SnortTemperatureDegreeDifference {
-    transposition_table: ParallelTranspositionTable<Snort>,
+    transposition_table: ParallelTranspositionTable<Snort<VertexKind, UndirectedGraph<VertexKind>>>,
     max_graph_vertices: usize,
     mutation_rate: f32,
 }
@@ -66,7 +69,7 @@ struct SnortTemperatureDegreeDifference {
 impl SnortTemperatureDegreeDifference {
     fn mutate_with_rate(
         &self,
-        position: &mut Snort,
+        position: &mut Snort<VertexKind, UndirectedGraph<VertexKind>>,
         rng: &mut rand::rngs::ThreadRng,
         mutation_rate: f32,
     ) {
@@ -78,18 +81,15 @@ impl SnortTemperatureDegreeDifference {
                     index: rng.gen_range(0..position.graph.size()),
                 };
                 position.graph.remove_vertex(to_remove);
-                position.vertices.inner.remove(to_remove.index);
             }
         }
         // TODO: Check for max size
         // if position.graph.size()
         let mutation_roll: f32 = rng.gen();
         if mutation_roll < mutation_rate {
-            position.graph.add_vertex();
             position
-                .vertices
-                .inner
-                .push(VertexKind::Single(VertexColor::Empty));
+                .graph
+                .add_vertex(VertexKind::Single(VertexColor::Empty));
             let another_vertex = VertexIndex {
                 index: rng.gen_range(0..position.graph.size() - 1),
             };
@@ -103,8 +103,8 @@ impl SnortTemperatureDegreeDifference {
         }
 
         // Mutate edges
-        for v in position.graph.vertices() {
-            for u in position.graph.vertices() {
+        for v in position.graph.vertex_indices() {
+            for u in position.graph.vertex_indices() {
                 if v == u {
                     continue;
                 }
@@ -124,22 +124,33 @@ impl SnortTemperatureDegreeDifference {
             VertexColor::TintLeft,
             VertexColor::TintRight,
         ];
-        for index in 0..position.vertices.inner.len() {
+        for index in position.graph.vertex_indices() {
             let mutation_roll: f32 = rng.gen();
             if mutation_roll < mutation_rate {
-                position.vertices[VertexIndex { index }] =
+                *position.graph.get_vertex_mut(index) =
                     VertexKind::Single(*available_colors.choose(rng).unwrap());
             }
         }
     }
 }
 
-impl Algorithm<Snort, Rational> for SnortTemperatureDegreeDifference {
-    fn mutate(&self, position: &mut Snort, rng: &mut rand::rngs::ThreadRng) {
+impl Algorithm<Snort<VertexKind, UndirectedGraph<VertexKind>>, Rational>
+    for SnortTemperatureDegreeDifference
+{
+    fn mutate(
+        &self,
+        position: &mut Snort<VertexKind, UndirectedGraph<VertexKind>>,
+        rng: &mut rand::rngs::ThreadRng,
+    ) {
         self.mutate_with_rate(position, rng, self.mutation_rate);
     }
 
-    fn cross(&self, lhs: &Snort, rhs: &Snort, _rng: &mut rand::rngs::ThreadRng) -> Snort {
+    fn cross(
+        &self,
+        lhs: &Snort<VertexKind, UndirectedGraph<VertexKind>>,
+        rhs: &Snort<VertexKind, UndirectedGraph<VertexKind>>,
+        _rng: &mut rand::rngs::ThreadRng,
+    ) -> Snort<VertexKind, UndirectedGraph<VertexKind>> {
         let mut rng = rand::thread_rng();
 
         let mut positions = [lhs, rhs];
@@ -147,7 +158,11 @@ impl Algorithm<Snort, Rational> for SnortTemperatureDegreeDifference {
         let [smaller, larger] = positions;
 
         let new_size = rng.gen_range(1..=larger.graph.size());
-        let mut new_graph = undirected::UndirectedGraph::empty(new_size);
+        let mut new_graph =
+            undirected::UndirectedGraph::empty(&vec![
+                VertexKind::Single(VertexColor::Empty);
+                new_size
+            ]);
 
         for v in 0..(min(new_size, smaller.graph.size())) {
             for u in 0..(min(new_size, smaller.graph.size())) {
@@ -164,22 +179,28 @@ impl Algorithm<Snort, Rational> for SnortTemperatureDegreeDifference {
             }
         }
 
-        let mut colors = smaller.vertices.inner[0..(min(new_size, smaller.graph.size()))].to_vec();
-        colors.extend(
-            &larger.vertices.inner
-                [(min(new_size, smaller.graph.size()))..(min(new_size, larger.graph.size()))],
-        );
+        for index in 0..(min(new_size, smaller.graph.size())) {
+            let index = VertexIndex { index };
+            *new_graph.get_vertex_mut(index) = *smaller.graph.get_vertex(index);
+        }
+        for index in (min(new_size, smaller.graph.size()))..(min(new_size, larger.graph.size())) {
+            let index = VertexIndex { index };
+            *new_graph.get_vertex_mut(index) = *larger.graph.get_vertex(index);
+        }
 
-        Snort::with_colors(colors, new_graph).unwrap()
+        Snort::new(new_graph)
     }
 
     fn lowest_score(&self) -> Rational {
         Rational::NegativeInfinity
     }
 
-    fn score(&self, position: &Snort) -> Rational {
+    fn score(&self, position: &Snort<VertexKind, UndirectedGraph<VertexKind>>) -> Rational {
         let degree_sum = position.graph.degrees().sum::<usize>();
-        if position.vertices.inner.is_empty() || degree_sum == 0 || !position.graph.is_connected() {
+        if position.graph.vertex_indices().next().is_none()
+            || degree_sum == 0
+            || !position.graph.is_connected()
+        {
             return Rational::NegativeInfinity;
         }
 
@@ -189,9 +210,15 @@ impl Algorithm<Snort, Rational> for SnortTemperatureDegreeDifference {
         temp.to_rational() - Rational::from(degree as i64)
     }
 
-    fn random(&self, rng: &mut rand::rngs::ThreadRng) -> Snort {
+    fn random(
+        &self,
+        rng: &mut rand::rngs::ThreadRng,
+    ) -> Snort<VertexKind, UndirectedGraph<VertexKind>> {
         let graph_size = rng.gen_range(1..=self.max_graph_vertices);
-        let graph = undirected::UndirectedGraph::empty(graph_size);
+        let graph = undirected::UndirectedGraph::empty(&vec![
+            VertexKind::Single(VertexColor::Empty);
+            graph_size
+        ]);
         let mut position = Snort::new(graph);
         self.mutate_with_rate(&mut position, rng, 1.0);
         position
@@ -200,17 +227,16 @@ impl Algorithm<Snort, Rational> for SnortTemperatureDegreeDifference {
 
 #[derive(serde::Serialize, serde::Deserialize)]
 struct Snapshot {
-    specimen: Vec<Scored<Snort, Rational>>,
+    specimen: Vec<Scored<Snort<VertexKind, UndirectedGraph<VertexKind>>, Rational>>,
 }
 
-fn seed_positions() -> Vec<Snort> {
+fn seed_positions() -> Vec<Snort<VertexKind, UndirectedGraph<VertexKind>>> {
     // 0   5   6     11
     //  \   \ /     /
     // 1--3--4--10-12
     //  /   /|\     \
     // 2   7 8 9     13
     let pos_1 = Snort::new(undirected::UndirectedGraph::from_edges(
-        14,
         &[
             (VertexIndex { index: 0 }, VertexIndex { index: 3 }),
             (VertexIndex { index: 1 }, VertexIndex { index: 3 }),
@@ -226,6 +252,7 @@ fn seed_positions() -> Vec<Snort> {
             (VertexIndex { index: 10 }, VertexIndex { index: 12 }),
             (VertexIndex { index: 10 }, VertexIndex { index: 13 }),
         ],
+        &vec![VertexKind::Single(VertexColor::Empty); 14],
     ));
 
     //         9
@@ -238,7 +265,6 @@ fn seed_positions() -> Vec<Snort> {
     //        |
     //        14
     let pos_2 = Snort::new(undirected::UndirectedGraph::from_edges(
-        15,
         &[
             (VertexIndex { index: 0 }, VertexIndex { index: 3 }),
             (VertexIndex { index: 1 }, VertexIndex { index: 3 }),
@@ -255,6 +281,7 @@ fn seed_positions() -> Vec<Snort> {
             (VertexIndex { index: 8 }, VertexIndex { index: 13 }),
             (VertexIndex { index: 8 }, VertexIndex { index: 14 }),
         ],
+        &vec![VertexKind::Single(VertexColor::Empty); 15],
     ));
 
     vec![pos_1, pos_2]

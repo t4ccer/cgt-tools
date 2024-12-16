@@ -1,6 +1,6 @@
 //! Undirected graph
 
-use std::{fmt::Display, iter::FusedIterator};
+use core::iter::FusedIterator;
 
 use crate::graph::{
     adjacency_matrix::directed::{self, AdjacentIter},
@@ -10,38 +10,41 @@ use crate::graph::{
 /// Undirected graph, implements [`Graph`] trait
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct UndirectedGraph(directed::DirectedGraph);
+pub struct UndirectedGraph<V>(directed::DirectedGraph<V>);
 
-impl Display for UndirectedGraph {
-    #[inline]
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
+impl<V> UndirectedGraph<V> {
+    /// Map vertex values
+    pub fn map<R>(&self, f: impl FnMut(&V) -> R) -> UndirectedGraph<R> {
+        UndirectedGraph(self.0.map(f))
     }
 }
 
-impl Graph for UndirectedGraph {
+impl<V> Graph<V> for UndirectedGraph<V>
+where
+    V: Clone,
+{
     type VertexIter = std::iter::Map<std::ops::Range<usize>, fn(usize) -> VertexIndex>;
 
-    type AdjacentIter<'g> = AdjacentIter<'g>;
+    type AdjacentIter<'g> = AdjacentIter<'g, V> where V: 'g;
 
-    type DegreeIter<'g> = DegreeIter<'g>;
+    type DegreeIter<'g> = DegreeIter<'g, V> where V: 'g;
 
-    type EdgesIter<'g> = EdgesIter<'g>;
+    type EdgesIter<'g> = EdgesIter<'g, V> where V: 'g;
 
-    fn empty(size: usize) -> Self {
-        Self(directed::DirectedGraph::empty(size))
+    fn empty(vertices: &[V]) -> Self {
+        Self(directed::DirectedGraph::empty(vertices))
     }
 
     fn size(&self) -> usize {
         self.0.size()
     }
 
-    fn vertices(&self) -> Self::VertexIter {
-        self.0.vertices()
+    fn vertex_indices(&self) -> Self::VertexIter {
+        self.0.vertex_indices()
     }
 
-    fn add_vertex(&mut self) -> VertexIndex {
-        self.0.add_vertex()
+    fn add_vertex(&mut self, vertex: V) -> VertexIndex {
+        self.0.add_vertex(vertex)
     }
 
     fn remove_vertex(&mut self, vertex_to_remove: VertexIndex) {
@@ -76,27 +79,50 @@ impl Graph for UndirectedGraph {
         }
     }
 
-    /// Create a graph from flattened adjecency matrix. Must be correct length
     #[inline]
-    fn from_flat_matrix(size: usize, vec: &[bool]) -> Option<Self> {
-        Some(Self(directed::DirectedGraph::from_flat_matrix(size, vec)?))
+    fn from_flat_matrix(vec: &[bool], vertices: &[V]) -> Option<Self> {
+        Some(Self(directed::DirectedGraph::from_flat_matrix(
+            vec, vertices,
+        )?))
     }
 
-    /// Create a graph from adjecency matrix. Must be correct length
     #[inline]
-    fn from_matrix(size: usize, matrix: &[&[bool]]) -> Option<Self> {
-        Some(Self(directed::DirectedGraph::from_matrix(size, matrix)?))
+    fn from_matrix(matrix: &[&[bool]], vertices: &[V]) -> Option<Self> {
+        Some(Self(directed::DirectedGraph::from_matrix(
+            matrix, vertices,
+        )?))
+    }
+
+    fn from_edges(edges: &[(VertexIndex, VertexIndex)], vertices: &[V]) -> Self {
+        let mut graph = Self::empty(vertices);
+
+        for (u, v) in edges.iter().copied() {
+            graph.connect(u, v, true);
+        }
+
+        graph
+    }
+
+    fn get_vertex(&self, vertex: VertexIndex) -> &V {
+        self.0.get_vertex(vertex)
+    }
+
+    fn get_vertex_mut(&mut self, vertex: VertexIndex) -> &mut V {
+        self.0.get_vertex_mut(vertex)
     }
 }
 
 /// Iterator over graph edges, constructed with [`Graph::edges`].
-pub struct EdgesIter<'graph> {
+pub struct EdgesIter<'graph, V> {
     u: VertexIndex,
     v: VertexIndex,
-    graph: &'graph UndirectedGraph,
+    graph: &'graph UndirectedGraph<V>,
 }
 
-impl<'graph> Iterator for EdgesIter<'graph> {
+impl<'graph, V> Iterator for EdgesIter<'graph, V>
+where
+    V: Clone,
+{
     type Item = (VertexIndex, VertexIndex);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -121,16 +147,19 @@ impl<'graph> Iterator for EdgesIter<'graph> {
     }
 }
 
-impl<'graph> FusedIterator for EdgesIter<'graph> {}
+impl<'graph, V> FusedIterator for EdgesIter<'graph, V> where V: Clone {}
 
 /// Iterator over degrees of vertices in a graph. Obtained with [`Graph::degrees`]
 #[derive(Debug)]
-pub struct DegreeIter<'graph> {
+pub struct DegreeIter<'graph, V> {
     idx: VertexIndex,
-    graph: &'graph UndirectedGraph,
+    graph: &'graph UndirectedGraph<V>,
 }
 
-impl<'graph> Iterator for DegreeIter<'graph> {
+impl<'graph, V> Iterator for DegreeIter<'graph, V>
+where
+    V: Clone,
+{
     type Item = usize;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -140,7 +169,7 @@ impl<'graph> Iterator for DegreeIter<'graph> {
 
         let res = self
             .graph
-            .vertices()
+            .vertex_indices()
             .filter(|&u| u != self.idx && self.graph.are_adjacent(self.idx, u))
             .count();
         self.idx.index += 1;
@@ -148,7 +177,7 @@ impl<'graph> Iterator for DegreeIter<'graph> {
     }
 }
 
-impl<'graph> FusedIterator for DegreeIter<'graph> {}
+impl<'graph, V> FusedIterator for DegreeIter<'graph, V> where V: Clone {}
 
 /// ```text
 /// 1 - 3 - 2
@@ -157,8 +186,8 @@ impl<'graph> FusedIterator for DegreeIter<'graph> {}
 ///     0
 /// ```
 #[cfg(test)]
-fn test_matrix() -> UndirectedGraph {
-    let mut m = UndirectedGraph::empty(4);
+fn test_matrix() -> UndirectedGraph<()> {
+    let mut m = UndirectedGraph::empty(&[(), (), (), ()]);
     m.connect(VertexIndex { index: 3 }, VertexIndex { index: 0 }, true);
     m.connect(VertexIndex { index: 3 }, VertexIndex { index: 2 }, true);
     m.connect(VertexIndex { index: 1 }, VertexIndex { index: 3 }, true);
@@ -172,11 +201,11 @@ fn set_adjacency_matrix() {
     assert_eq!(
         m,
         UndirectedGraph::from_flat_matrix(
-            4,
             &[
                 false, true, false, true, true, false, false, true, false, false, false, true,
                 true, true, true, false
-            ]
+            ],
+            &[(), (), (), ()]
         )
         .unwrap()
     );

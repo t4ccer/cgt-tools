@@ -12,9 +12,9 @@ pub struct SpringEmbedder {
 }
 
 impl SpringEmbedder {
-    pub fn layout<G>(&self, graph: &G, positions: &mut [V2f])
+    pub fn layout<G, V>(&self, graph: &G, positions: &mut [V2f])
     where
-        G: Graph,
+        G: Graph<V>,
     {
         assert_eq!(graph.size(), positions.len());
 
@@ -22,8 +22,8 @@ impl SpringEmbedder {
         let mut cooling = 1.0;
 
         for _ in 0..self.iterations {
-            for u in graph.vertices() {
-                for v in graph.vertices() {
+            for u in graph.vertex_indices() {
+                for v in graph.vertex_indices() {
                     if u == v {
                         continue;
                     }
@@ -53,7 +53,7 @@ impl SpringEmbedder {
                 }
             }
 
-            for u in graph.vertices() {
+            for u in graph.vertex_indices() {
                 positions[u.index] += cooling * forces[u.index];
                 if let Some((lower_bound, upper_bound)) = self.bounds {
                     positions[u.index].x =
