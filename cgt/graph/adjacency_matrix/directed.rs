@@ -62,7 +62,7 @@ where
         for in_v in self.vertex_indices() {
             for out_v in self.vertex_indices() {
                 new_adjacency_matrix[(self.size() + 1) * in_v.index + out_v.index] =
-                    self.are_adjacent(out_v, in_v);
+                    self.are_adjacent(in_v, out_v);
             }
         }
         self.vertices.push(vertex);
@@ -148,7 +148,7 @@ where
 
     fn from_edges(edges: &[(VertexIndex, VertexIndex)], vertices: &[V]) -> Self {
         let mut graph = Self {
-            adjacency_matrix: Vec::with_capacity(vertices.len() * vertices.len()),
+            adjacency_matrix: vec![false; vertices.len() * vertices.len()],
             vertices: vertices.to_vec(),
         };
 

@@ -31,7 +31,8 @@ impl SpringEmbedder {
                     let u_pos = positions[u.index];
                     let v_pos = positions[v.index];
 
-                    forces[u.index] += if graph.are_adjacent(u, v) {
+                    // We add force no matter if connection is unidirectional or not
+                    forces[u.index] += if graph.are_adjacent(u, v) || graph.are_adjacent(v, u) {
                         self.c_attractive
                             * f32::log10(V2f::distance(v_pos, u_pos) / self.ideal_spring_length)
                             * V2f::direction(u_pos, v_pos)

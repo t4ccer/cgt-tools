@@ -8,6 +8,7 @@ use cgt::{
 use imgui::{DrawListMut, ImColor32, StyleColor};
 
 pub mod canonical_form;
+pub mod digraph_placement;
 pub mod domineering;
 pub mod snort;
 
@@ -21,6 +22,10 @@ pub const DOMINEERING_TILE_SIZE: f32 = 64.0;
 pub const DOMINEERING_TILE_GAP: f32 = 4.0;
 pub const DOMINEERING_EMPTY_COLOR: ImColor32 = ImColor32::from_rgb(0xcc, 0xcc, 0xcc);
 pub const DOMINEERING_FILLED_COLOR: ImColor32 = ImColor32::from_rgb(0x44, 0x44, 0x44);
+
+pub const COLOR_BLUE: ImColor32 = ImColor32::from_bits(0xfffb4a4e);
+pub const COLOR_RED: ImColor32 = ImColor32::from_bits(0xff7226f9);
+pub const COLOR_GRAY: ImColor32 = ImColor32::from_bits(0xff333333);
 
 fn fade(mut color: [f32; 4], alpha: f32) -> [f32; 4] {
     let alpha = alpha.clamp(0.0, 1.0);

@@ -1,9 +1,10 @@
 use cgt::{
-    graph::adjacency_matrix::undirected::UndirectedGraph,
+    graph::adjacency_matrix::{directed::DirectedGraph, undirected::UndirectedGraph},
     numeric::{dyadic_rational_number::DyadicRationalNumber, v2f::V2f},
     short::partizan::{
         canonical_form::CanonicalForm,
         games::{
+            digraph_placement::{self, DigraphPlacement},
             domineering::Domineering,
             snort::{self, Snort},
         },
@@ -16,7 +17,9 @@ use imgui::ComboBoxFlags;
 use std::{collections::BTreeMap, marker::PhantomData, sync::mpsc, thread};
 use widgets::canonical_form::CanonicalFormWindow;
 
-use crate::widgets::{domineering::DomineeringWindow, snort::SnortWindow};
+use crate::widgets::{
+    digraph_placement::DigraphPlacementWindow, domineering::DomineeringWindow, snort::SnortWindow,
+};
 
 mod imgui_sdl2_boilerplate;
 mod widgets;
@@ -245,6 +248,14 @@ pub struct EvalTask<D> {
 pub enum Task {
     EvalDomineering(EvalTask<Domineering>),
     EvalSnort(EvalTask<Snort<snort::VertexKind, UndirectedGraph<snort::VertexKind>>>),
+    EvalDigraphPlacement(
+        EvalTask<
+            DigraphPlacement<
+                digraph_placement::VertexColor,
+                DirectedGraph<digraph_placement::VertexColor>,
+            >,
+        >,
+    ),
 }
 
 pub struct Context {
@@ -273,6 +284,13 @@ pub enum UpdateKind {
         Snort<snort::VertexKind, UndirectedGraph<snort::VertexKind>>,
         Details,
     ),
+    DigraphPlacementDetails(
+        DigraphPlacement<
+            digraph_placement::VertexColor,
+            DirectedGraph<digraph_placement::VertexColor>,
+        >,
+        Details,
+    ),
 }
 
 pub struct Update {
@@ -286,6 +304,12 @@ pub struct SchedulerContext {
     domineering_tt: ParallelTranspositionTable<Domineering>,
     snort_tt:
         ParallelTranspositionTable<Snort<snort::VertexKind, UndirectedGraph<snort::VertexKind>>>,
+    digraph_placement_tt: ParallelTranspositionTable<
+        DigraphPlacement<
+            digraph_placement::VertexColor,
+            DirectedGraph<digraph_placement::VertexColor>,
+        >,
+    >,
 }
 
 fn scheduler(ctx: SchedulerContext) {
@@ -311,6 +335,16 @@ fn scheduler(ctx: SchedulerContext) {
                     })
                     .unwrap();
             }
+            Task::EvalDigraphPlacement(task) => {
+                let cf = task.game.canonical_form(&ctx.digraph_placement_tt);
+                let details = Details::from_canonical_form(cf);
+                ctx.updates
+                    .send(Update {
+                        window: task.window,
+                        kind: UpdateKind::DigraphPlacementDetails(task.game, details),
+                    })
+                    .unwrap();
+            }
         }
     }
 }
@@ -326,6 +360,7 @@ fn main() {
         updates: update_sender,
         domineering_tt: ParallelTranspositionTable::new(),
         snort_tt: ParallelTranspositionTable::new(),
+        digraph_placement_tt: ParallelTranspositionTable::new(),
     };
 
     thread::spawn(move || scheduler(scheduler_ctx));
@@ -369,8 +404,20 @@ fn main() {
         }};
     }
 
+    macro_rules! new_digraph_placement {
+        () => {{
+            let mut d = DigraphPlacementWindow::new();
+            d.reposition_circle();
+            d.reposition(V2f { x: 350.0, y: 400.0 });
+            let mut d = TitledWindow::without_title(d);
+            d.set_title(next_id);
+            new_window!(d);
+        }};
+    }
+
     // new_domineering!();
-    new_snort!();
+    // new_snort!();
+    new_digraph_placement!();
 
     let mut show_demo = false;
 
@@ -391,6 +438,9 @@ fn main() {
                 }
                 if ui.menu_item("Snort") {
                     new_snort!();
+                }
+                if ui.menu_item("Digraph Placement") {
+                    new_digraph_placement!();
                 }
             }
             if ui.menu_item("Debug") {

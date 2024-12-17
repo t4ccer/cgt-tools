@@ -54,6 +54,7 @@ pub trait Graph<V>: Sized {
     fn adjacent_to<'g>(&'g self, vertex: VertexIndex) -> Self::AdjacentIter<'g>;
 
     /// Check if two vertices are adjacent
+    /// (i.e. there exists an out-edge from `lhs_vertex` to `rhs_vertex`)
     fn are_adjacent(&self, lhs_vertex: VertexIndex, rhs_vertex: VertexIndex) -> bool {
         self.adjacent_to(lhs_vertex)
             .any(|adjacent| adjacent == rhs_vertex)
