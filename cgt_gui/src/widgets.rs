@@ -1,11 +1,12 @@
-use std::fmt::Write;
-
 use cgt::{
+    graph::{Graph, VertexIndex},
     grid::{BitTile, FiniteGrid, Grid},
+    has::Has,
     numeric::{rational::Rational, v2f::V2f},
     short::partizan::{thermograph::Thermograph, trajectory::Trajectory},
 };
-use imgui::{DrawListMut, ImColor32, StyleColor};
+use imgui::{DrawListMut, ImColor32, MouseButton, StyleColor, Ui};
+use std::fmt::Write;
 
 pub mod canonical_form;
 pub mod digraph_placement;
@@ -27,6 +28,9 @@ pub const COLOR_BLUE: ImColor32 = ImColor32::from_bits(0xfffb4a4e);
 pub const COLOR_RED: ImColor32 = ImColor32::from_bits(0xff7226f9);
 pub const COLOR_GRAY: ImColor32 = ImColor32::from_bits(0xff333333);
 
+const VERTEX_RADIUS: f32 = 16.0;
+const ARROW_HEAD_SIZE: f32 = 4.0;
+
 fn fade(mut color: [f32; 4], alpha: f32) -> [f32; 4] {
     let alpha = alpha.clamp(0.0, 1.0);
     color[3] *= alpha;
@@ -37,6 +41,7 @@ fn lerp(start: f32, end: f32, t: f32) -> f32 {
     start + t * (end - start)
 }
 
+// FIXME: Height is too large if Y axis is not visible
 fn thermograph_size(thermograph: &Thermograph) -> V2f {
     let left_x = thermograph.left_wall.value_at(Rational::from(-1));
     let right_x = thermograph.right_wall.value_at(Rational::from(-1));
@@ -392,3 +397,210 @@ macro_rules! game_details {
 }
 
 pub(crate) use game_details;
+
+#[derive(Debug, Clone, Copy)]
+enum GraphEditorAction {
+    None,
+    VertexClick(VertexIndex),
+    NewVertex(V2f, Option<VertexIndex>),
+}
+
+trait VertexFillColor {
+    fn fill_color(&self) -> ImColor32;
+}
+
+#[derive(Debug, Clone)]
+struct GraphEditor {
+    new_edge_starting_vertex: Option<VertexIndex>,
+    graph_panel_size: V2f,
+}
+
+impl GraphEditor {
+    fn new() -> GraphEditor {
+        GraphEditor {
+            new_edge_starting_vertex: None,
+            graph_panel_size: V2f::ZERO,
+        }
+    }
+
+    fn draw<'ui, V>(
+        &mut self,
+        ui: &'ui Ui,
+        draw_list: &'ui DrawListMut<'ui>,
+        new_edge_mode: bool,
+        new_vertex_mode: bool,
+        drag_mode: bool,
+        edge_creates_vertex: bool,
+        scratch_buffer: &mut String,
+        graph: &mut impl Graph<V>,
+    ) -> GraphEditorAction
+    where
+        V: Has<V2f> + VertexFillColor,
+    {
+        let mut action = GraphEditorAction::None;
+        let graph_region_start = V2f::from(ui.cursor_screen_pos());
+        let control_panel_height = ui.cursor_pos()[1];
+
+        let mut max_y = f32::NEG_INFINITY;
+        let vertex_border_color = ui.style_color(StyleColor::Text);
+        for this_vertex_idx in graph.vertex_indices() {
+            let absolute_vertex_pos = *graph.get_vertex(this_vertex_idx).get_inner();
+            let _vertex_id = ui.push_id_usize(this_vertex_idx.index);
+            let this_vertex_pos = graph_region_start + absolute_vertex_pos;
+            max_y = max_y.max(this_vertex_pos.y);
+            let button_pos = this_vertex_pos - VERTEX_RADIUS;
+            let button_size = V2f {
+                x: VERTEX_RADIUS * 2.0,
+                y: VERTEX_RADIUS * 2.0,
+            };
+            ui.set_cursor_screen_pos(button_pos);
+
+            if ui.invisible_button("vertex", button_size) && !new_edge_mode {
+                action = GraphEditorAction::VertexClick(this_vertex_idx);
+            };
+
+            if ui.is_item_activated() && new_edge_mode {
+                self.new_edge_starting_vertex = Some(this_vertex_idx);
+            }
+
+            let mouse_pos = V2f::from(ui.io().mouse_pos);
+            if !ui.io()[MouseButton::Left]
+                && mouse_pos.x >= button_pos.x
+                && mouse_pos.x <= (button_pos.x + button_size.x)
+                && mouse_pos.y >= button_pos.y
+                && mouse_pos.y <= (button_pos.y + button_size.y)
+            {
+                if let Some(starting_vertex) = self.new_edge_starting_vertex.take() {
+                    if starting_vertex != this_vertex_idx {
+                        graph.connect(
+                            starting_vertex,
+                            this_vertex_idx,
+                            !graph.are_adjacent(starting_vertex, this_vertex_idx),
+                        );
+                    }
+                }
+            }
+
+            if ui.is_item_active() && drag_mode {
+                let mouse_delta = V2f::from(ui.io().mouse_delta);
+                *graph.get_vertex_mut(this_vertex_idx).get_inner_mut() = V2f {
+                    x: f32::max(VERTEX_RADIUS, absolute_vertex_pos.x + mouse_delta.x),
+                    y: f32::max(VERTEX_RADIUS, absolute_vertex_pos.y + mouse_delta.y),
+                };
+            }
+
+            let vertex_fill_color: ImColor32 = graph.get_vertex(this_vertex_idx).fill_color();
+
+            draw_list
+                .add_circle(this_vertex_pos, VERTEX_RADIUS, vertex_border_color)
+                .filled(false)
+                .build();
+            draw_list
+                .add_circle(this_vertex_pos, VERTEX_RADIUS - 0.5, vertex_fill_color)
+                .filled(true)
+                .build();
+
+            scratch_buffer.clear();
+            scratch_buffer
+                .write_fmt(format_args!("{}", this_vertex_idx.index + 1))
+                .unwrap();
+            let off_x = ui.calc_text_size(&scratch_buffer)[0];
+            draw_list.add_text(
+                [
+                    this_vertex_pos.x - off_x * 0.5,
+                    this_vertex_pos.y + VERTEX_RADIUS,
+                ],
+                vertex_border_color,
+                &scratch_buffer,
+            );
+
+            for adjacent_vertex_idx in graph.adjacent_to(this_vertex_idx) {
+                let both_ways = graph.are_adjacent(adjacent_vertex_idx, this_vertex_idx);
+
+                if !both_ways || this_vertex_idx < adjacent_vertex_idx {
+                    let adjacent_relative_pos = *graph.get_vertex(adjacent_vertex_idx).get_inner();
+
+                    let adjacent_vertex_pos = graph_region_start + adjacent_relative_pos;
+                    let direction = V2f::direction(this_vertex_pos, adjacent_vertex_pos);
+                    let edge_start_pos = this_vertex_pos + direction * VERTEX_RADIUS;
+                    let edge_end_pos = adjacent_vertex_pos - direction * VERTEX_RADIUS;
+                    let distance_between_vertices = adjacent_vertex_pos - this_vertex_pos;
+
+                    if distance_between_vertices.x.abs() < 2.0 * VERTEX_RADIUS
+                        && distance_between_vertices.y.abs() < 2.0 * VERTEX_RADIUS
+                    {
+                        continue;
+                    }
+
+                    draw_list
+                        .add_line(edge_start_pos, edge_end_pos, vertex_border_color)
+                        .thickness(1.0)
+                        .build();
+
+                    // If connection is both ways then we do not draw arrow heads
+                    if !both_ways {
+                        draw_list
+                            .add_triangle(
+                                edge_end_pos,
+                                V2f {
+                                    x: edge_end_pos.x - direction.x * ARROW_HEAD_SIZE
+                                        + direction.y * ARROW_HEAD_SIZE,
+                                    y: edge_end_pos.y
+                                        - direction.y * ARROW_HEAD_SIZE
+                                        - direction.x * ARROW_HEAD_SIZE,
+                                },
+                                V2f {
+                                    x: edge_end_pos.x
+                                        - direction.x * ARROW_HEAD_SIZE
+                                        - direction.y * ARROW_HEAD_SIZE,
+                                    y: edge_end_pos.y - direction.y * ARROW_HEAD_SIZE
+                                        + direction.x * ARROW_HEAD_SIZE,
+                                },
+                                vertex_border_color,
+                            )
+                            .filled(true)
+                            .build();
+                    }
+                }
+            }
+        }
+        if let Some(starting_vertex) = self.new_edge_starting_vertex {
+            let held_vertex_relative_pos: V2f = *graph.get_vertex(starting_vertex).get_inner();
+            let held_vertex_pos = graph_region_start + held_vertex_relative_pos;
+            draw_list
+                .add_line(held_vertex_pos, ui.io().mouse_pos, vertex_border_color)
+                .thickness(2.0)
+                .build();
+        }
+
+        ui.set_cursor_screen_pos(graph_region_start);
+        let item_spacing_y = unsafe { ui.style().item_spacing[1] };
+        self.graph_panel_size = V2f {
+            x: ui.current_column_width(),
+            y: ui.window_size()[1] - control_panel_height - item_spacing_y * 2.0,
+        };
+        if new_vertex_mode && ui.invisible_button("Add vertex", self.graph_panel_size) {
+            let mouse_pos = V2f::from(ui.io().mouse_pos);
+            action = GraphEditorAction::NewVertex(mouse_pos - graph_region_start, None);
+        }
+
+        if !ui.io()[MouseButton::Left] {
+            if let Some(edge_start) = self.new_edge_starting_vertex.take() {
+                if edge_creates_vertex {
+                    let mouse_pos = V2f::from(ui.io().mouse_pos);
+                    action = GraphEditorAction::NewVertex(
+                        V2f {
+                            x: f32::max(VERTEX_RADIUS, mouse_pos.x - graph_region_start.x),
+                            y: f32::max(VERTEX_RADIUS, mouse_pos.y - graph_region_start.y),
+                        },
+                        Some(edge_start),
+                    );
+                }
+            }
+        }
+
+        ui.set_cursor_screen_pos([graph_region_start.x, max_y + VERTEX_RADIUS]);
+
+        action
+    }
+}

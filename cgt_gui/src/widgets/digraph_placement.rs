@@ -1,22 +1,22 @@
+use crate::{
+    imgui_enum, impl_titled_window,
+    widgets::{
+        self, canonical_form::CanonicalFormWindow, GraphEditor, VertexFillColor, COLOR_BLUE,
+        COLOR_RED, VERTEX_RADIUS,
+    },
+    Context, DetailOptions, Details, EvalTask, IsCgtWindow, RawOf, Task, TitledWindow, UpdateKind,
+};
 use cgt::{
     graph::{
-        adjacency_matrix::directed::DirectedGraph, layout::SpringEmbedder, Graph, VertexIndex,
+        adjacency_matrix::directed::DirectedGraph,
+        layout::{CircleEdge, SpringEmbedder},
+        Graph, VertexIndex,
     },
     has::Has,
     numeric::v2f::V2f,
     short::partizan::games::digraph_placement::{DigraphPlacement, VertexColor},
 };
-use imgui::{ComboBoxFlags, Condition, MouseButton, StyleColor};
-use std::{f32::consts::PI, fmt::Write};
-
-use crate::{
-    imgui_enum, impl_titled_window,
-    widgets::{self, canonical_form::CanonicalFormWindow, COLOR_BLUE, COLOR_RED},
-    Context, DetailOptions, Details, EvalTask, IsCgtWindow, RawOf, Task, TitledWindow, UpdateKind,
-};
-
-const VERTEX_RADIUS: f32 = 16.0;
-const ARROW_HEAD_SIZE: f32 = 4.0;
+use imgui::{ComboBoxFlags, Condition, ImColor32};
 
 imgui_enum! {
     NewVertexColor {
@@ -28,8 +28,8 @@ imgui_enum! {
 imgui_enum! {
     GraphEditingMode {
         DragVertex, "Drag vertex",
-        TintVertexBlue, "Color vertex blue (left)",
-        TintVertexRed, "Color vertex red (right)",
+        ColorVertexBlue, "Color vertex blue (left)",
+        ColorVertexRed, "Color vertex red (right)",
         MoveLeft, "Blue move (left)",
         MoveRight, "Red move (right)",
         AddVertex, "Add vertex",
@@ -61,10 +61,23 @@ impl Has<VertexColor> for PositionedVertex {
     }
 }
 
-enum Action {
-    None,
-    Remove(VertexIndex),
-    Move(VertexIndex),
+impl Has<V2f> for PositionedVertex {
+    fn get_inner(&self) -> &V2f {
+        &self.position
+    }
+
+    fn get_inner_mut(&mut self) -> &mut V2f {
+        &mut self.position
+    }
+}
+
+impl VertexFillColor for PositionedVertex {
+    fn fill_color(&self) -> ImColor32 {
+        match self.color {
+            VertexColor::Left => COLOR_BLUE,
+            VertexColor::Right => COLOR_RED,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -73,11 +86,11 @@ pub struct DigraphPlacementWindow {
     reposition_option_selected: RawOf<RepositionMode>,
     new_vertex_color: RawOf<NewVertexColor>,
     editing_mode: RawOf<GraphEditingMode>,
-    new_edge_starting_vertex: Option<VertexIndex>,
     alternating_moves: bool,
     edge_creates_vertex: bool,
     details_options: DetailOptions,
     details: Option<Details>,
+    graph_editor: GraphEditor,
 }
 
 impl DigraphPlacementWindow {
@@ -124,27 +137,20 @@ impl DigraphPlacementWindow {
             new_vertex_color: RawOf::new(NewVertexColor::Left),
             reposition_option_selected: RawOf::new(RepositionMode::SpringEmbedder),
             editing_mode: RawOf::new(GraphEditingMode::DragVertex),
-            new_edge_starting_vertex: None,
             alternating_moves: true,
             edge_creates_vertex: true,
             details_options: DetailOptions::new(),
             details: None,
+            graph_editor: GraphEditor::new(),
         }
     }
 
     pub fn reposition_circle(&mut self) {
-        let n = self.game.graph.size();
-        let packing_circle_radius = VERTEX_RADIUS * (self.game.graph.size() as f32 + 4.0) * 0.5;
-        for i in self.game.graph.vertex_indices() {
-            let angle = (2.0 * PI * i.index as f32) / n as f32;
-            let vertex_pos = V2f {
-                x: (packing_circle_radius - VERTEX_RADIUS) * f32::cos(angle)
-                    + packing_circle_radius,
-                y: (packing_circle_radius - VERTEX_RADIUS) * f32::sin(angle)
-                    + packing_circle_radius,
-            };
-            self.game.graph.get_vertex_mut(i).position = vertex_pos;
-        }
+        let circle = CircleEdge {
+            circle_radius: VERTEX_RADIUS * (self.game.graph.size() as f32 + 4.0) * 0.5,
+            vertex_radius: VERTEX_RADIUS,
+        };
+        circle.layout(&mut self.game.graph);
     }
 
     pub fn reposition(&mut self, graph_panel_size: V2f) {
@@ -170,17 +176,7 @@ impl DigraphPlacementWindow {
                         },
                     )),
                 };
-                // TODO: Make spring_embedder generic over Has<V2f>
-                let mut vertex_positions = self
-                    .game
-                    .graph
-                    .vertex_indices()
-                    .map(|i| self.game.graph.get_vertex(i).position)
-                    .collect::<Vec<_>>();
-                spring_embedder.layout(&self.game.graph, &mut vertex_positions);
-                for i in self.game.graph.vertex_indices() {
-                    self.game.graph.get_vertex_mut(i).position = vertex_positions[i.index];
-                }
+                spring_embedder.layout(&mut self.game.graph);
             }
         }
     }
@@ -211,8 +207,6 @@ impl IsCgtWindow for TitledWindow<DigraphPlacementWindow> {
     fn draw(&mut self, ui: &imgui::Ui, ctx: &mut Context) {
         let mut should_reposition = false;
         let mut is_dirty = false;
-
-        let mut graph_panel_size = V2f::ZERO;
 
         ui.window(&self.title)
             .position(ui.io().mouse_pos, Condition::Appearing)
@@ -287,297 +281,98 @@ impl IsCgtWindow for TitledWindow<DigraphPlacementWindow> {
                     ui.checkbox("Add vertex", &mut self.content.edge_creates_vertex);
                 }
 
-                let graph_region_start = V2f::from(ui.cursor_screen_pos());
-                let control_panel_height = ui.cursor_pos()[1];
-
-                let mut max_y = f32::NEG_INFINITY;
-                let vertex_border_color = ui.style_color(StyleColor::Text);
-                let mut action = Action::None;
-                for this_vertex_idx in self.content.game.graph.vertex_indices() {
-                    let absolute_vertex_pos =
-                        self.content.game.graph.get_vertex(this_vertex_idx).position;
-                    let _vertex_id = ui.push_id_usize(this_vertex_idx.index);
-                    let this_vertex_pos = graph_region_start + absolute_vertex_pos;
-                    max_y = max_y.max(this_vertex_pos.y);
-                    let button_pos = this_vertex_pos - VERTEX_RADIUS;
-                    let button_size = V2f {
-                        x: VERTEX_RADIUS * 2.0,
-                        y: VERTEX_RADIUS * 2.0,
-                    };
-                    ui.set_cursor_screen_pos(button_pos);
-
-                    if ui.invisible_button("vertex", button_size) {
+                let action = self.content.graph_editor.draw(
+                    ui,
+                    &draw_list,
+                    matches!(
+                        self.content.editing_mode.as_enum(),
+                        GraphEditingMode::AddEdge
+                    ),
+                    matches!(
+                        self.content.editing_mode.as_enum(),
+                        GraphEditingMode::AddVertex
+                    ),
+                    matches!(
+                        self.content.editing_mode.as_enum(),
+                        GraphEditingMode::DragVertex
+                    ),
+                    self.content.edge_creates_vertex,
+                    &mut self.scratch_buffer,
+                    &mut self.content.game.graph,
+                );
+                match action {
+                    widgets::GraphEditorAction::None => {}
+                    widgets::GraphEditorAction::VertexClick(clicked_vertex) => {
                         match self.content.editing_mode.as_enum() {
-                            GraphEditingMode::DragVertex => { /* NOOP */ }
-                            GraphEditingMode::TintVertexBlue => {
-                                self.content
-                                    .game
-                                    .graph
-                                    .get_vertex_mut(this_vertex_idx)
-                                    .color = VertexColor::Left;
+                            GraphEditingMode::DragVertex => {}
+                            GraphEditingMode::ColorVertexBlue => {
+                                self.content.game.graph.get_vertex_mut(clicked_vertex).color =
+                                    VertexColor::Left;
                                 is_dirty = true;
                             }
-                            GraphEditingMode::TintVertexRed => {
-                                self.content
-                                    .game
-                                    .graph
-                                    .get_vertex_mut(this_vertex_idx)
-                                    .color = VertexColor::Right;
+                            GraphEditingMode::ColorVertexRed => {
+                                self.content.game.graph.get_vertex_mut(clicked_vertex).color =
+                                    VertexColor::Right;
                                 is_dirty = true;
                             }
-                            GraphEditingMode::DeleteVertex => {
-                                // We don't remove it immediately because we're just iterating over
-                                // vertices
-                                action = Action::Remove(this_vertex_idx);
-                                is_dirty = true;
-                            }
-                            GraphEditingMode::AddEdge => { /* NOOP */ }
-                            GraphEditingMode::AddVertex => { /* NOOP */ }
                             GraphEditingMode::MoveLeft => {
-                                if self.content.game.graph.get_vertex(this_vertex_idx).color
+                                if self.content.game.graph.get_vertex(clicked_vertex).color
                                     == VertexColor::Left
                                 {
-                                    action = Action::Move(this_vertex_idx);
-                                    if self.content.alternating_moves {
-                                        self.content.editing_mode =
-                                            RawOf::new(GraphEditingMode::MoveRight);
-                                    }
+                                    self.content.game =
+                                        self.content.game.move_in_vertex(clicked_vertex);
+                                    self.content.editing_mode =
+                                        RawOf::new(GraphEditingMode::MoveRight);
                                     is_dirty = true;
                                 }
                             }
                             GraphEditingMode::MoveRight => {
-                                if self.content.game.graph.get_vertex(this_vertex_idx).color
+                                if self.content.game.graph.get_vertex(clicked_vertex).color
                                     == VertexColor::Right
                                 {
-                                    action = Action::Move(this_vertex_idx);
-                                    if self.content.alternating_moves {
-                                        self.content.editing_mode =
-                                            RawOf::new(GraphEditingMode::MoveLeft);
-                                    }
+                                    self.content.game =
+                                        self.content.game.move_in_vertex(clicked_vertex);
+                                    self.content.editing_mode =
+                                        RawOf::new(GraphEditingMode::MoveLeft);
                                     is_dirty = true;
                                 }
                             }
-                        }
-                    };
-
-                    if ui.is_item_activated()
-                        && matches!(
-                            self.content.editing_mode.as_enum(),
-                            GraphEditingMode::AddEdge
-                        )
-                    {
-                        self.content.new_edge_starting_vertex = Some(this_vertex_idx);
-                    }
-
-                    let mouse_pos = V2f::from(ui.io().mouse_pos);
-                    if !ui.io()[MouseButton::Left]
-                        && mouse_pos.x >= button_pos.x
-                        && mouse_pos.x <= (button_pos.x + button_size.x)
-                        && mouse_pos.y >= button_pos.y
-                        && mouse_pos.y <= (button_pos.y + button_size.y)
-                    {
-                        if let Some(starting_vertex) = self.content.new_edge_starting_vertex.take()
-                        {
-                            if starting_vertex != this_vertex_idx {
-                                self.content.game.graph.connect(
-                                    starting_vertex,
-                                    this_vertex_idx,
-                                    !self
-                                        .content
-                                        .game
-                                        .graph
-                                        .are_adjacent(starting_vertex, this_vertex_idx),
-                                );
+                            GraphEditingMode::AddVertex => {}
+                            GraphEditingMode::DeleteVertex => {
+                                self.content.game.graph.remove_vertex(clicked_vertex);
                                 is_dirty = true;
                             }
+                            GraphEditingMode::AddEdge => {}
                         }
                     }
-
-                    if ui.is_item_active()
-                        && matches!(
-                            self.content.editing_mode.as_enum(),
-                            GraphEditingMode::DragVertex
-                        )
-                    {
-                        let mouse_delta = V2f::from(ui.io().mouse_delta);
-                        self.content
-                            .game
-                            .graph
-                            .get_vertex_mut(this_vertex_idx)
-                            .position = V2f {
-                            x: f32::max(VERTEX_RADIUS, absolute_vertex_pos.x + mouse_delta.x),
-                            y: f32::max(VERTEX_RADIUS, absolute_vertex_pos.y + mouse_delta.y),
-                        };
-                    }
-
-                    let vertex_fill_color = match self
-                        .content
-                        .game
-                        .graph
-                        .get_vertex_mut(this_vertex_idx)
-                        .color
-                    {
-                        VertexColor::Left => COLOR_BLUE,
-                        VertexColor::Right => COLOR_RED,
-                    };
-
-                    draw_list
-                        .add_circle(this_vertex_pos, VERTEX_RADIUS, vertex_border_color)
-                        .filled(false)
-                        .build();
-                    draw_list
-                        .add_circle(this_vertex_pos, VERTEX_RADIUS - 0.5, vertex_fill_color)
-                        .filled(true)
-                        .build();
-
-                    self.scratch_buffer.clear();
-                    self.scratch_buffer
-                        .write_fmt(format_args!("{}", this_vertex_idx.index + 1))
-                        .unwrap();
-                    let off_x = ui.calc_text_size(&self.scratch_buffer)[0];
-                    draw_list.add_text(
-                        [
-                            this_vertex_pos.x - off_x * 0.5,
-                            this_vertex_pos.y + VERTEX_RADIUS,
-                        ],
-                        vertex_border_color,
-                        &self.scratch_buffer,
-                    );
-
-                    for adjacent_vertex_idx in self.content.game.graph.adjacent_to(this_vertex_idx)
-                    {
-                        let adjacent_relative_pos = self
-                            .content
-                            .game
-                            .graph
-                            .get_vertex(adjacent_vertex_idx)
-                            .position;
-
-                        let adjacent_vertex_pos = graph_region_start + adjacent_relative_pos;
-                        let direction = V2f::direction(this_vertex_pos, adjacent_vertex_pos);
-                        let edge_start_pos = this_vertex_pos + direction * VERTEX_RADIUS;
-                        let edge_end_pos = adjacent_vertex_pos - direction * VERTEX_RADIUS;
-                        let distance_between_vertices = adjacent_vertex_pos - this_vertex_pos;
-
-                        if distance_between_vertices.x.abs() < 2.0 * VERTEX_RADIUS
-                            && distance_between_vertices.y.abs() < 2.0 * VERTEX_RADIUS
-                        {
-                            continue;
-                        }
-
-                        let both_ways = self
-                            .content
-                            .game
-                            .graph
-                            .are_adjacent(adjacent_vertex_idx, this_vertex_idx);
-
-                        if !both_ways || this_vertex_idx < adjacent_vertex_idx {
-                            draw_list
-                                .add_line(edge_start_pos, edge_end_pos, vertex_border_color)
-                                .thickness(1.0)
-                                .build();
-                        }
-
-                        // If connection is both ways then we do not draw arrow heads
-                        if !both_ways {
-                            draw_list
-                                .add_triangle(
-                                    edge_end_pos,
-                                    V2f {
-                                        x: edge_end_pos.x - direction.x * ARROW_HEAD_SIZE
-                                            + direction.y * ARROW_HEAD_SIZE,
-                                        y: edge_end_pos.y
-                                            - direction.y * ARROW_HEAD_SIZE
-                                            - direction.x * ARROW_HEAD_SIZE,
-                                    },
-                                    V2f {
-                                        x: edge_end_pos.x
-                                            - direction.x * ARROW_HEAD_SIZE
-                                            - direction.y * ARROW_HEAD_SIZE,
-                                        y: edge_end_pos.y - direction.y * ARROW_HEAD_SIZE
-                                            + direction.x * ARROW_HEAD_SIZE,
-                                    },
-                                    vertex_border_color,
-                                )
-                                .filled(true)
-                                .build();
+                    widgets::GraphEditorAction::NewVertex(position, connection) => {
+                        match self.content.editing_mode.as_enum() {
+                            GraphEditingMode::AddEdge | GraphEditingMode::AddVertex => {
+                                let color = match self.content.new_vertex_color.as_enum() {
+                                    NewVertexColor::Left => VertexColor::Left,
+                                    NewVertexColor::Right => VertexColor::Right,
+                                };
+                                self.content
+                                    .game
+                                    .graph
+                                    .add_vertex(PositionedVertex { color, position });
+                                if let Some(from) = connection {
+                                    self.content.game.graph.connect(
+                                        from,
+                                        VertexIndex {
+                                            index: self.content.game.graph.size() - 1,
+                                        },
+                                        true,
+                                    );
+                                }
+                                is_dirty = true;
+                            }
+                            _ => {}
                         }
                     }
                 }
 
-                if let Some(starting_vertex) = self.content.new_edge_starting_vertex {
-                    let held_vertex_relative_pos =
-                        self.content.game.graph.get_vertex(starting_vertex).position;
-                    let held_vertex_pos = graph_region_start + held_vertex_relative_pos;
-                    draw_list
-                        .add_line(held_vertex_pos, ui.io().mouse_pos, vertex_border_color)
-                        .thickness(2.0)
-                        .build();
-                    // TODO: Draw arrow head
-                }
-
-                ui.set_cursor_screen_pos(graph_region_start);
-                let style = unsafe { ui.style() };
-                graph_panel_size = V2f {
-                    x: ui.current_column_width(),
-                    y: ui.window_size()[1] - control_panel_height - style.item_spacing[1] * 2.0,
-                };
-                if matches!(
-                    self.content.editing_mode.as_enum(),
-                    GraphEditingMode::AddVertex
-                ) && ui.invisible_button("Add vertex", graph_panel_size)
-                {
-                    let mouse_pos = V2f::from(ui.io().mouse_pos);
-                    let color = match self.content.new_vertex_color.as_enum() {
-                        NewVertexColor::Left => VertexColor::Left,
-                        NewVertexColor::Right => VertexColor::Right,
-                    };
-                    self.content.game.graph.add_vertex(PositionedVertex {
-                        color,
-                        position: mouse_pos - graph_region_start,
-                    });
-
-                    is_dirty = true;
-                }
-
-                ui.set_cursor_screen_pos([graph_region_start.x, max_y + VERTEX_RADIUS]);
                 ui.next_column();
-
-                match action {
-                    Action::None => {}
-                    Action::Remove(idx) => {
-                        self.content.game.graph.remove_vertex(idx);
-                    }
-                    Action::Move(idx) => {
-                        self.content.game = self.content.game.move_in_vertex(idx);
-                    }
-                }
-
-                if !ui.io()[MouseButton::Left] {
-                    if let Some(edge_start) = self.content.new_edge_starting_vertex.take() {
-                        if self.content.edge_creates_vertex {
-                            let mouse_pos = V2f::from(ui.io().mouse_pos);
-                            let color = match self.content.new_vertex_color.as_enum() {
-                                NewVertexColor::Left => VertexColor::Left,
-                                NewVertexColor::Right => VertexColor::Right,
-                            };
-                            self.content.game.graph.add_vertex(PositionedVertex {
-                                color,
-                                position: V2f {
-                                    x: f32::max(VERTEX_RADIUS, mouse_pos.x - graph_region_start.x),
-                                    y: f32::max(VERTEX_RADIUS, mouse_pos.y - graph_region_start.y),
-                                },
-                            });
-
-                            let edge_end = VertexIndex {
-                                index: self.content.game.graph.size() - 1,
-                            };
-                            self.content.game.graph.connect(edge_start, edge_end, true);
-                            is_dirty = true;
-                        }
-                    }
-                }
-
                 widgets::game_details!(self, ui, draw_list);
 
                 if is_dirty {
@@ -591,7 +386,8 @@ impl IsCgtWindow for TitledWindow<DigraphPlacementWindow> {
             });
 
         if should_reposition {
-            self.content.reposition(graph_panel_size);
+            self.content
+                .reposition(self.content.graph_editor.graph_panel_size);
         }
     }
 }

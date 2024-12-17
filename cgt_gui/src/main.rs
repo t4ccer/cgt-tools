@@ -1,3 +1,6 @@
+use crate::widgets::{
+    digraph_placement::DigraphPlacementWindow, domineering::DomineeringWindow, snort::SnortWindow,
+};
 use cgt::{
     graph::adjacency_matrix::{directed::DirectedGraph, undirected::UndirectedGraph},
     numeric::{dyadic_rational_number::DyadicRationalNumber, v2f::V2f},
@@ -16,10 +19,6 @@ use cgt::{
 use imgui::ComboBoxFlags;
 use std::{collections::BTreeMap, marker::PhantomData, sync::mpsc, thread};
 use widgets::canonical_form::CanonicalFormWindow;
-
-use crate::widgets::{
-    digraph_placement::DigraphPlacementWindow, domineering::DomineeringWindow, snort::SnortWindow,
-};
 
 mod imgui_sdl2_boilerplate;
 mod widgets;
