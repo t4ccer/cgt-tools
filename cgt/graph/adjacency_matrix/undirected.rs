@@ -79,6 +79,10 @@ where
         }
     }
 
+    fn vertex_degree(&self, vertex: VertexIndex) -> usize {
+        self.0.vertex_degree(vertex)
+    }
+
     #[inline]
     fn from_flat_matrix(vec: &[bool], vertices: &[V]) -> Option<Self> {
         Some(Self(directed::DirectedGraph::from_flat_matrix(

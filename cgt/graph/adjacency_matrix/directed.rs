@@ -133,6 +133,12 @@ where
         }
     }
 
+    fn vertex_degree(&self, vertex: VertexIndex) -> usize {
+        self.vertex_indices()
+            .filter(|&u| u != vertex && self.are_adjacent(vertex, u))
+            .count()
+    }
+
     #[inline]
     fn from_flat_matrix(vec: &[bool], vertices: &[V]) -> Option<Self> {
         let size = vertices.len();

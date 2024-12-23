@@ -66,6 +66,9 @@ pub trait Graph<V>: Sized {
     /// Get iterator over vertex degrees, in order
     fn degrees<'g>(&'g self) -> Self::DegreeIter<'g>;
 
+    /// Get degree of a vertex
+    fn vertex_degree(&self, vertex: VertexIndex) -> usize;
+
     /// Create nw graph from "flat" adjacency matrix.
     ///
     /// # Errors
