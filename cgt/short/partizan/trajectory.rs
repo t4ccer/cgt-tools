@@ -2,7 +2,6 @@
 //! [thermograph](crate::short::partizan::thermograph) scaffolds.
 
 use crate::{display, numeric::rational::Rational};
-use itertools::Itertools;
 use std::{cmp::Ordering, fmt::Display};
 
 /// A continuous piecewise linear trajectory with rational slopes and critical points.
@@ -56,11 +55,11 @@ impl Trajectory {
             return None;
         }
 
-        if critical_points
-            .iter()
-            .tuples()
-            .any(|(prev, next)| prev <= next)
-        {
+        if (0..(critical_points.len() - 1)).any(|i| {
+            let prev = critical_points[i];
+            let next = critical_points[i + 1];
+            prev <= next
+        }) {
             // The critical points must be strictly decreasing
             return None;
         }

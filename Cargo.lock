@@ -327,7 +327,6 @@ dependencies = [
  "auto_ops",
  "cgt_derive",
  "dashmap",
- "itertools",
  "mint",
  "nom",
  "num-rational",
