@@ -27,9 +27,6 @@ pub enum VertexColor {
 
     /// Vertex that is adjecent to right
     TintRight = 2,
-
-    /// Vertex that is either taken or connected to both colors
-    Taken = 3,
 }
 
 impl TryFrom<u8> for VertexColor {
@@ -41,7 +38,6 @@ impl TryFrom<u8> for VertexColor {
             0 => Ok(Self::Empty),
             1 => Ok(Self::TintLeft),
             2 => Ok(Self::TintRight),
-            3 => Ok(Self::Taken),
             _ => Err(()),
         }
     }
@@ -221,13 +217,17 @@ where
         let own_tint_color: VertexColor = VertexColor::try_from(COLOR).unwrap();
         let mut position: Self = self.clone();
 
+        let mut to_remove = Vec::with_capacity(self.graph.vertex_degree(move_vertex_idx) + 1);
+
         // Take vertex
         let move_vertex = position.graph.get_vertex_mut(move_vertex_idx);
         match move_vertex.get_inner_mut() {
-            VertexKind::Single(move_vertex_color) => *move_vertex_color = VertexColor::Taken,
+            VertexKind::Single(_) => {
+                to_remove.push(move_vertex_idx);
+            }
             VertexKind::Cluster(_, cluster_size) => {
-                if *cluster_size == NonZeroU32::new(1).unwrap() {
-                    *move_vertex.get_inner_mut() = VertexKind::Single(VertexColor::Taken);
+                if cluster_size.get() == 1 {
+                    to_remove.push(move_vertex_idx);
                 } else {
                     // Vertices in cluster are disconnected so nothing changes color
                     *cluster_size = NonZeroU32::new(cluster_size.get() - 1).unwrap();
@@ -260,13 +260,12 @@ where
                 } else {
                     // Otherwise the vertex is tinted in opponents color, so no one can longer
                     // move there, thus we mark is as taken and disconnect from the graph
-                    *adjacent_vertex_color = VertexColor::Taken;
-                    for v in position.graph.vertex_indices() {
-                        position.graph.connect(v, adjacent_vertex_idx, false);
-                    }
+                    to_remove.push(adjacent_vertex_idx);
                 }
             }
         }
+
+        position.graph.remove_vertices(&mut to_remove);
         position
     }
 
@@ -333,7 +332,6 @@ where
                 VertexColor::Empty => "white",
                 VertexColor::TintLeft => "blue",
                 VertexColor::TintRight => "red",
-                VertexColor::Taken => continue,
             };
             let shape = match vertex.get_inner() {
                 VertexKind::Single(_) => "circle",
@@ -398,8 +396,7 @@ where
         let mut res = Vec::new();
 
         for v in self.graph.vertex_indices() {
-            if !matches!(self.graph.get_vertex(v).color(), VertexColor::Taken) && !visited[v.index]
-            {
+            if !visited[v.index] {
                 res.push(self.bfs(&mut visited, v));
             }
         }
@@ -429,8 +426,6 @@ where
                     VertexKind::Cluster(VertexColor::TintRight, cluster_size) => {
                         CanonicalForm::new_integer(-(cluster_size.get() as i64))
                     }
-                    VertexKind::Single(VertexColor::Taken)
-                    | VertexKind::Cluster(VertexColor::Taken, _) => CanonicalForm::new_integer(0),
                 };
                 return Some(cf);
             }
@@ -472,6 +467,14 @@ fn correct_canonical_forms() {
     )]));
     let canonical_form = snort.canonical_form(&transposition_table);
     assert_eq!(canonical_form.to_string(), "*");
+
+    let snort: Snort<VertexKind, UndirectedGraph<VertexKind>> =
+        Snort::new_three_caterpillar(NonZeroU32::new(2).unwrap());
+    let canonical_form = snort.canonical_form(&transposition_table);
+    assert_eq!(
+        canonical_form.to_string(),
+        "{5, {{8|6*}|0}|-5, {0|{-6*|-8}}}"
+    );
 }
 
 #[test]
@@ -488,9 +491,8 @@ fn correct_sensible() {
     let transposition_table = ParallelTranspositionTable::new();
     assert_eq!(
         position.sensible_left_moves(&transposition_table),
-        vec![Snort::new(UndirectedGraph::empty(&[
-            VertexKind::Single(VertexColor::Taken),
-            VertexKind::Single(VertexColor::TintLeft),
-        ]))]
+        vec![Snort::new(UndirectedGraph::empty(&[VertexKind::Single(
+            VertexColor::TintLeft
+        ),]))]
     );
 }

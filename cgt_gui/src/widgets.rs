@@ -26,7 +26,6 @@ pub const DOMINEERING_FILLED_COLOR: ImColor32 = ImColor32::from_rgb(0x44, 0x44, 
 
 pub const COLOR_BLUE: ImColor32 = ImColor32::from_bits(0xfffb4a4e);
 pub const COLOR_RED: ImColor32 = ImColor32::from_bits(0xff7226f9);
-pub const COLOR_GRAY: ImColor32 = ImColor32::from_bits(0xff333333);
 
 const VERTEX_RADIUS: f32 = 16.0;
 const ARROW_HEAD_SIZE: f32 = 4.0;

@@ -2,7 +2,7 @@ use crate::{
     imgui_enum, impl_titled_window,
     widgets::{
         self, canonical_form::CanonicalFormWindow, GraphEditor, VertexFillColor, COLOR_BLUE,
-        COLOR_GRAY, COLOR_RED, VERTEX_RADIUS,
+        COLOR_RED, VERTEX_RADIUS,
     },
     Context, DetailOptions, Details, EvalTask, IsCgtWindow, RawOf, Task, TitledWindow, UpdateKind,
 };
@@ -71,7 +71,6 @@ impl VertexFillColor for PositionedVertex {
         match self.kind.color() {
             VertexColor::TintLeft => COLOR_BLUE,
             VertexColor::TintRight => COLOR_RED,
-            VertexColor::Taken => COLOR_GRAY,
             VertexColor::Empty => ImColor32::TRANSPARENT,
         }
     }
@@ -375,18 +374,6 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                             _ => {}
                         }
                     }
-                }
-
-                'outer: loop {
-                    for to_remove_idx in self.content.game.graph.vertex_indices() {
-                        let vertex = self.content.game.graph.get_vertex(to_remove_idx);
-                        if vertex.kind.color() == VertexColor::Taken {
-                            self.content.game.graph.remove_vertex(to_remove_idx);
-                            is_dirty = true;
-                            continue 'outer;
-                        }
-                    }
-                    break;
                 }
 
                 ui.next_column();
