@@ -16,5 +16,5 @@ documentation = "https://docs.rs/cgt_derive"
 proc-macro = true
 
 [dependencies]
-quote = "1.0.33"
-syn = {version = "2.0.39"}
+quote = "1.0"
+syn = "2.0"
