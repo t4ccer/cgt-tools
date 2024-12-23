@@ -1,5 +1,5 @@
 //! Snort is played on undirected graph. In each turn Left colors a vertex blue and Right colors
-//! a vertex red. Players can only choose a vertex that is adjecent to only empty vertices or to
+//! a vertex red. Players can only choose a vertex that is adjacent to only empty vertices or to
 //! vertices in their own color.
 
 use crate::{
@@ -22,10 +22,10 @@ pub enum VertexColor {
     /// Vertex without color, not connected to any taken vertices
     Empty = 0,
 
-    /// Vertex that is adjecent to left
+    /// Vertex that is adjacent to left
     TintLeft = 1,
 
-    /// Vertex that is adjecent to right
+    /// Vertex that is adjacent to right
     TintRight = 2,
 }
 
@@ -235,9 +235,9 @@ where
             }
         }
 
-        // Disconnect `move_vertex` from adjecent vertices and tint them
+        // Disconnect `move_vertex` from adjacent vertices and tint them
         for adjacent_vertex_idx in self.graph.adjacent_to(move_vertex_idx) {
-            // Disconnect move vertex from adjecent, we disconnect only single vertices
+            // Disconnect move vertex from adjacent, we disconnect only single vertices
             // because clusters are still alive. If cluster is dead it's turned into single
             // before (See: 'take vertex' above), so it still works.
             if let VertexKind::Single(_) = position.graph.get_vertex(move_vertex_idx).get_inner() {
