@@ -59,17 +59,7 @@ where
         let mut position = self.clone();
         let mut to_remove = vec![move_vertex_idx];
         to_remove.extend(self.graph.adjacent_to(move_vertex_idx));
-
-        // Vertex indices shift as we remove them so we need to sort them
-        // to remove them in correct order and adjust indices as we go
-        to_remove.sort_unstable();
-
-        for (idx, v) in to_remove.iter().cloned().enumerate() {
-            position.graph.remove_vertex(VertexIndex {
-                index: v.index - idx,
-            });
-        }
-
+        position.graph.remove_vertices(&mut to_remove);
         position
     }
 

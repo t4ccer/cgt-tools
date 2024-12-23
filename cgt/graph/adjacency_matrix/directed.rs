@@ -101,6 +101,66 @@ where
         *self = new_graph;
     }
 
+    fn remove_vertices(&mut self, vertices_to_remove: &mut [VertexIndex]) {
+        if vertices_to_remove.is_empty() {
+            return;
+        }
+
+        vertices_to_remove.sort_unstable();
+        let mut vertices = Vec::with_capacity(self.size() - vertices_to_remove.len());
+        let mut current_removed = 0;
+        for v in self.vertex_indices() {
+            if Some(v) == vertices_to_remove.get(current_removed).copied() {
+                current_removed += 1;
+            } else {
+                vertices.push(self.vertices[v.index].clone());
+            }
+        }
+
+        let mut new_graph = Self {
+            adjacency_matrix: vec![false; vertices.len() * vertices.len()],
+            vertices,
+        };
+
+        'loop_v: for v in self.vertex_indices() {
+            let mut to_skip_v = 0;
+            for to_remove in vertices_to_remove.iter() {
+                if *to_remove == v {
+                    continue 'loop_v;
+                }
+                if *to_remove > v {
+                    break;
+                }
+                to_skip_v += 1;
+            }
+
+            'loop_u: for u in self.vertex_indices() {
+                let mut to_skip_u = 0;
+                for to_remove in vertices_to_remove.iter() {
+                    if *to_remove == u {
+                        continue 'loop_u;
+                    }
+                    if *to_remove > u {
+                        break;
+                    }
+                    to_skip_u += 1;
+                }
+
+                new_graph.connect(
+                    VertexIndex {
+                        index: v.index - to_skip_v,
+                    },
+                    VertexIndex {
+                        index: u.index - to_skip_u,
+                    },
+                    self.are_adjacent(v, u),
+                );
+            }
+        }
+
+        *self = new_graph;
+    }
+
     fn connect(&mut self, lhs_vertex: VertexIndex, rhs_vertex: VertexIndex, connect: bool) {
         let size = self.size();
         self.adjacency_matrix[size * lhs_vertex.index + rhs_vertex.index] = connect;

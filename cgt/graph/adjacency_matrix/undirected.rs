@@ -51,6 +51,10 @@ where
         self.0.remove_vertex(vertex_to_remove)
     }
 
+    fn remove_vertices(&mut self, vertices_to_remove: &mut [VertexIndex]) {
+        self.0.remove_vertices(vertices_to_remove);
+    }
+
     fn connect(&mut self, lhs_vertex: VertexIndex, rhs_vertex: VertexIndex, connect: bool) {
         self.0.connect(lhs_vertex, rhs_vertex, connect);
         self.0.connect(rhs_vertex, lhs_vertex, connect);
@@ -95,6 +99,10 @@ where
         Some(Self(directed::DirectedGraph::from_matrix(
             matrix, vertices,
         )?))
+    }
+
+    fn degree(&self) -> usize {
+        self.0.degree()
     }
 
     fn from_edges(edges: &[(VertexIndex, VertexIndex)], vertices: &[V]) -> Self {

@@ -47,6 +47,18 @@ pub trait Graph<V>: Sized {
     /// Remove a given vertex from the graph, remove all its edges
     fn remove_vertex(&mut self, vertex_to_remove: VertexIndex);
 
+    /// Remove vertices from the graph and their edges
+    fn remove_vertices(&mut self, vertices_to_remove: &mut [VertexIndex]) {
+        // Vertex indices shift as we remove them so we need to sort them
+        // to remove them in correct order and adjust indices as we go
+        vertices_to_remove.sort_unstable();
+        for (idx, v) in vertices_to_remove.into_iter().enumerate() {
+            self.remove_vertex(VertexIndex {
+                index: v.index - idx,
+            });
+        }
+    }
+
     /// Add or remove edge between vertices
     fn connect(&mut self, lhs_vertex: VertexIndex, rhs_vertex: VertexIndex, connect: bool);
 
