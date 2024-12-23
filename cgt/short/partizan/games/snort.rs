@@ -372,10 +372,12 @@ fn degree_works() {
     let snort: Snort<VertexKind, UndirectedGraph<VertexKind>> =
         Snort::new_three_caterpillar(NonZeroU32::new(8).unwrap());
     assert_eq!(snort.degree(), 10);
+    assert_eq!(snort.second_degree(), 18);
 
     let snort: Snort<VertexKind, UndirectedGraph<VertexKind>> =
         Snort::new_three_caterpillar(NonZeroU32::new(10).unwrap());
     assert_eq!(snort.degree(), 12);
+    assert_eq!(snort.second_degree(), 22);
 }
 
 impl<G> PartizanGame for Snort<VertexKind, G>
