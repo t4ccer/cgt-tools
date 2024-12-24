@@ -1,6 +1,6 @@
 use cgt::{
     graph::{Graph, VertexIndex},
-    grid::{BitTile, FiniteGrid, Grid},
+    grid::{FiniteGrid, Grid},
     has::Has,
     numeric::{rational::Rational, v2f::V2f},
     short::partizan::{thermograph::Thermograph, trajectory::Trajectory},
@@ -12,6 +12,7 @@ pub mod canonical_form;
 pub mod digraph_placement;
 pub mod domineering;
 pub mod fission;
+pub mod ski_jumps;
 pub mod snort;
 
 pub const THERMOGRAPH_TOP_MAST_LEN: f32 = 1.0;
@@ -296,6 +297,7 @@ pub fn grid_size_selector(ui: &imgui::Ui, new_width: &mut u8, new_height: &mut u
     short_inputs.end();
 }
 
+#[must_use]
 pub enum GridEditorAction {
     None,
     Clicked { x: u8, y: u8 },
@@ -305,7 +307,7 @@ pub fn grid<'ui, G>(
     ui: &'ui imgui::Ui,
     draw_list: &'ui DrawListMut<'ui>,
     grid: &G,
-    draw_tile: impl Fn(V2f, G::Item, &'ui DrawListMut<'ui>),
+    draw_tile: impl Fn(V2f, (u8, u8), G::Item, &'ui DrawListMut<'ui>),
 ) -> GridEditorAction
 where
     G: Grid + FiniteGrid,
@@ -336,7 +338,7 @@ where
                 };
             }
 
-            draw_tile(pos, grid.get(grid_x, grid_y), draw_list);
+            draw_tile(pos, (grid_x, grid_y), grid.get(grid_x, grid_y), draw_list);
         }
     }
 
@@ -346,69 +348,6 @@ where
     ]);
 
     action
-}
-
-pub fn bit_grid<'ui, G>(ui: &'ui imgui::Ui, draw_list: &'ui DrawListMut<'ui>, grid: &mut G) -> bool
-where
-    G: Grid + FiniteGrid,
-    G::Item: BitTile,
-{
-    let mut is_dirty = false;
-
-    let width = grid.width();
-    let height = grid.height();
-
-    let [grid_start_pos_x, grid_start_pos_y] = ui.cursor_pos();
-
-    for grid_y in 0..height {
-        let _y_id = ui.push_id_usize(grid_y as usize);
-
-        for grid_x in 0..width {
-            let _x_id = ui.push_id_usize(grid_x as usize);
-
-            ui.set_cursor_pos([
-                grid_start_pos_x + (TILE_SIZE + TILE_SPACING) * grid_x as f32,
-                grid_start_pos_y + (TILE_SIZE + TILE_SPACING) * grid_y as f32,
-            ]);
-
-            let [pos_x, pos_y] = ui.cursor_screen_pos();
-            if ui.invisible_button("", [TILE_SIZE, TILE_SIZE]) {
-                is_dirty = true;
-                let flipped = grid.get(grid_x, grid_y).flip();
-                grid.set(grid_x, grid_y, flipped);
-            }
-
-            let color = match grid.get(grid_x, grid_y).tile_to_bool() {
-                false => TILE_COLOR_EMPTY,
-                true => TILE_COLOR_FILLED,
-            };
-            let color = color.to_rgba_f32s();
-
-            let color = if ui.is_item_active() {
-                fade(color, 0.6)
-            } else if ui.is_item_hovered() {
-                fade(color, 0.8)
-            } else {
-                color
-            };
-
-            draw_list
-                .add_rect(
-                    [pos_x, pos_y],
-                    [pos_x + TILE_SIZE, pos_y + TILE_SIZE],
-                    color,
-                )
-                .filled(true)
-                .build();
-        }
-    }
-
-    ui.set_cursor_pos([
-        grid_start_pos_x,
-        grid_start_pos_y + (TILE_SIZE + TILE_SPACING) * height as f32,
-    ]);
-
-    is_dirty
 }
 
 macro_rules! game_details {

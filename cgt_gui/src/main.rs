@@ -1,6 +1,7 @@
 use crate::widgets::{
-    digraph_placement::DigraphPlacementWindow, domineering::DomineeringWindow,
-    fission::FissionWindow, snort::SnortWindow,
+    canonical_form::CanonicalFormWindow, digraph_placement::DigraphPlacementWindow,
+    domineering::DomineeringWindow, fission::FissionWindow, ski_jumps::SkiJumpsWindow,
+    snort::SnortWindow,
 };
 use cgt::{
     graph::adjacency_matrix::{directed::DirectedGraph, undirected::UndirectedGraph},
@@ -11,6 +12,7 @@ use cgt::{
             digraph_placement::{self, DigraphPlacement},
             domineering::Domineering,
             fission::Fission,
+            ski_jumps::SkiJumps,
             snort::{self, Snort},
         },
         partizan_game::PartizanGame,
@@ -18,9 +20,8 @@ use cgt::{
         transposition_table::ParallelTranspositionTable,
     },
 };
-use imgui::ComboBoxFlags;
+use imgui::{ComboBoxFlags, FontId};
 use std::{collections::BTreeMap, marker::PhantomData, sync::mpsc, thread};
-use widgets::canonical_form::CanonicalFormWindow;
 
 mod imgui_sdl2_boilerplate;
 mod widgets;
@@ -101,9 +102,9 @@ impl<G> TitledWindow<G> {
 
 pub trait IsCgtWindow {
     fn set_title(&mut self, id: WindowId);
-    fn init(&self, ctx: &Context);
+    fn initialize(&self, ctx: &GuiContext);
     fn is_open(&self) -> bool;
-    fn draw(&mut self, ui: &imgui::Ui, ctx: &mut Context);
+    fn draw(&mut self, ui: &imgui::Ui, ctx: &mut GuiContext);
     fn update(&mut self, update: UpdateKind);
 }
 
@@ -114,7 +115,7 @@ macro_rules! impl_titled_window {
             self.window_id = id;
         }
 
-        fn is_open(&self) -> bool {
+        fn is_open(&self) -> ::core::primitive::bool {
             self.is_open
         }
     };
@@ -124,7 +125,7 @@ pub(crate) use impl_titled_window;
 
 macro_rules! impl_game_window {
     ($task_kind:ident, $update_kind:ident) => {
-        fn init(&self, ctx: &Context) {
+        fn initialize(&self, ctx: &$crate::GuiContext) {
             ctx.schedule_task($crate::Task::$task_kind($crate::EvalTask {
                 window: self.window_id,
                 game: self.content.game.clone(),
@@ -133,7 +134,7 @@ macro_rules! impl_game_window {
 
         fn update(&mut self, update: $crate::UpdateKind) {
             match update {
-                UpdateKind::$update_kind(game, details) => {
+                $crate::UpdateKind::$update_kind(game, details) => {
                     if self.content.game == game {
                         self.content.details = Some(details);
                     }
@@ -192,7 +193,8 @@ where
         T::from_usize(self.value)
     }
 
-    pub fn combo(&mut self, ui: &imgui::Ui, label: impl AsRef<str>, flags: ComboBoxFlags) {
+    pub fn combo(&mut self, ui: &imgui::Ui, label: impl AsRef<str>, flags: ComboBoxFlags) -> bool {
+        let mut changed = false;
         let preview = self.as_enum().label();
         if let Some(_combo) = ui.begin_combo_with_flags(label, preview, flags) {
             for (mode_idx, mode) in T::LABELS.iter().enumerate() {
@@ -201,11 +203,13 @@ where
                     ui.set_item_default_focus();
                 }
                 let clicked = ui.selectable_config(mode).selected(is_selected).build();
+                changed |= clicked;
                 if clicked {
                     self.value = mode_idx;
                 }
             }
         }
+        changed
     }
 }
 
@@ -249,6 +253,7 @@ pub struct EvalTask<D> {
 pub enum Task {
     EvalDomineering(EvalTask<Domineering>),
     EvalFission(EvalTask<Fission>),
+    EvalSkiJumps(EvalTask<SkiJumps>),
     EvalSnort(EvalTask<Snort<snort::VertexKind, UndirectedGraph<snort::VertexKind>>>),
     EvalDigraphPlacement(
         EvalTask<
@@ -260,17 +265,19 @@ pub enum Task {
     ),
 }
 
-pub struct Context {
+pub struct GuiContext {
     pub new_windows: Vec<Box<dyn IsCgtWindow>>,
-    pub removed_windows: Vec<WindowId>,
+    removed_windows: Vec<WindowId>,
+    large_font_id: FontId,
     tasks: mpsc::Sender<Task>,
 }
 
-impl Context {
-    pub fn new(tasks: mpsc::Sender<Task>) -> Context {
-        Context {
+impl GuiContext {
+    pub fn new(tasks: mpsc::Sender<Task>) -> GuiContext {
+        GuiContext {
             new_windows: Vec::new(),
             removed_windows: Vec::new(),
+            large_font_id: unsafe { core::mem::transmute(core::ptr::null::<imgui::Font>()) },
             tasks,
         }
     }
@@ -283,6 +290,7 @@ impl Context {
 pub enum UpdateKind {
     DomineeringDetails(Domineering, Details),
     FissionDetails(Fission, Details),
+    SkiJumpsDetails(SkiJumps, Details),
     SnortDetails(
         Snort<snort::VertexKind, UndirectedGraph<snort::VertexKind>>,
         Details,
@@ -306,6 +314,7 @@ pub struct SchedulerContext {
     updates: mpsc::Sender<Update>,
     domineering_tt: ParallelTranspositionTable<Domineering>,
     fission_tt: ParallelTranspositionTable<Fission>,
+    ski_jumps_tt: ParallelTranspositionTable<SkiJumps>,
     snort_tt:
         ParallelTranspositionTable<Snort<snort::VertexKind, UndirectedGraph<snort::VertexKind>>>,
     digraph_placement_tt: ParallelTranspositionTable<
@@ -317,47 +326,35 @@ pub struct SchedulerContext {
 }
 
 fn scheduler(ctx: SchedulerContext) {
+    macro_rules! handle_game_update {
+        ($task:expr, $details:ident, $tt:ident) => {
+            let cf = $task.game.canonical_form(&ctx.$tt);
+            let details = Details::from_canonical_form(cf);
+            ctx.updates
+                .send(Update {
+                    window: $task.window,
+                    kind: UpdateKind::$details($task.game, details),
+                })
+                .unwrap();
+        };
+    }
+
     while let Ok(task) = ctx.tasks.recv() {
         match task {
             Task::EvalDomineering(task) => {
-                let cf = task.game.canonical_form(&ctx.domineering_tt);
-                let details = Details::from_canonical_form(cf);
-                ctx.updates
-                    .send(Update {
-                        window: task.window,
-                        kind: UpdateKind::DomineeringDetails(task.game, details),
-                    })
-                    .unwrap();
+                handle_game_update!(task, DomineeringDetails, domineering_tt);
             }
             Task::EvalFission(task) => {
-                let cf = task.game.canonical_form(&ctx.fission_tt);
-                let details = Details::from_canonical_form(cf);
-                ctx.updates
-                    .send(Update {
-                        window: task.window,
-                        kind: UpdateKind::FissionDetails(task.game, details),
-                    })
-                    .unwrap();
+                handle_game_update!(task, FissionDetails, fission_tt);
+            }
+            Task::EvalSkiJumps(task) => {
+                handle_game_update!(task, SkiJumpsDetails, ski_jumps_tt);
             }
             Task::EvalSnort(task) => {
-                let cf = task.game.canonical_form(&ctx.snort_tt);
-                let details = Details::from_canonical_form(cf);
-                ctx.updates
-                    .send(Update {
-                        window: task.window,
-                        kind: UpdateKind::SnortDetails(task.game, details),
-                    })
-                    .unwrap();
+                handle_game_update!(task, SnortDetails, snort_tt);
             }
             Task::EvalDigraphPlacement(task) => {
-                let cf = task.game.canonical_form(&ctx.digraph_placement_tt);
-                let details = Details::from_canonical_form(cf);
-                ctx.updates
-                    .send(Update {
-                        window: task.window,
-                        kind: UpdateKind::DigraphPlacementDetails(task.game, details),
-                    })
-                    .unwrap();
+                handle_game_update!(task, DigraphPlacementDetails, digraph_placement_tt);
             }
         }
     }
@@ -374,6 +371,7 @@ fn main() {
         updates: update_sender,
         domineering_tt: ParallelTranspositionTable::new(),
         fission_tt: ParallelTranspositionTable::new(),
+        ski_jumps_tt: ParallelTranspositionTable::new(),
         snort_tt: ParallelTranspositionTable::new(),
         digraph_placement_tt: ParallelTranspositionTable::new(),
     };
@@ -381,14 +379,14 @@ fn main() {
     thread::spawn(move || scheduler(scheduler_ctx));
 
     let mut next_id = WindowId(0);
-    let mut ctx = Context::new(task_sender);
+    let mut gui_context = GuiContext::new(task_sender);
     let mut windows: BTreeMap<WindowId, Box<dyn IsCgtWindow>> = BTreeMap::new();
 
     // must be macros because borrow checker
     macro_rules! new_window {
         ($d:expr) => {{
             $d.set_title(next_id);
-            $d.init(&ctx);
+            $d.initialize(&gui_context);
             windows.insert(next_id, Box::new($d));
             next_id.0 += 1;
         }};
@@ -404,6 +402,13 @@ fn main() {
     macro_rules! new_fission {
         () => {{
             let mut d = TitledWindow::without_title(FissionWindow::new());
+            new_window!(d);
+        }};
+    }
+
+    macro_rules! new_ski_jumps {
+        () => {{
+            let mut d = TitledWindow::without_title(SkiJumpsWindow::new());
             new_window!(d);
         }};
     }
@@ -438,13 +443,16 @@ fn main() {
     }
 
     // new_domineering!();
-    // new_snort!();
-    new_digraph_placement!();
     // new_fission!();
+    new_ski_jumps!();
+    // new_snort!();
+    // new_digraph_placement!();
 
     let mut show_demo = false;
 
-    imgui_sdl2_boilerplate::run("cgt-gui", |ui| {
+    imgui_sdl2_boilerplate::run("cgt-gui", |large_font, ui| {
+        gui_context.large_font_id = large_font;
+
         ui.dockspace_over_main_viewport();
 
         if show_demo {
@@ -462,6 +470,9 @@ fn main() {
                 if ui.menu_item("Fission") {
                     new_fission!();
                 }
+                if ui.menu_item("Ski Jumps") {
+                    new_ski_jumps!();
+                }
                 if ui.menu_item("Snort") {
                     new_snort!();
                 }
@@ -475,18 +486,18 @@ fn main() {
         }
 
         for (&wid, d) in windows.iter_mut() {
-            d.draw(ui, &mut ctx);
+            d.draw(ui, &mut gui_context);
             if !d.is_open() {
-                ctx.removed_windows.push(wid);
+                gui_context.removed_windows.push(wid);
             }
         }
 
-        for to_remove in ctx.removed_windows.drain(..) {
+        for to_remove in gui_context.removed_windows.drain(..) {
             windows.remove(&to_remove);
         }
 
-        for mut d in ctx.new_windows.drain(..) {
-            // NOTE: We don't call init() here because windows created by other windows should
+        for mut d in gui_context.new_windows.drain(..) {
+            // NOTE: We don't call initialize() here because windows created by other windows should
             // be already initialized. Creating windows from top menu bar creates them directly
             // also, borrow checker complains a lot
             d.set_title(next_id);

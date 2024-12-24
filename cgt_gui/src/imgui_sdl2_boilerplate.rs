@@ -1,5 +1,5 @@
 use glow::HasContext;
-use imgui::{ConfigFlags, Context, Ui};
+use imgui::{ConfigFlags, Context, FontConfig, FontId, Ui};
 use imgui_glow_renderer::AutoRenderer;
 use imgui_sdl2_support::SdlPlatform;
 use sdl2::{
@@ -15,7 +15,7 @@ fn glow_context(window: &Window) -> glow::Context {
 }
 
 #[allow(dead_code)]
-pub fn run(title: &str, mut draw: impl FnMut(&Ui)) {
+pub fn run(title: &str, mut draw: impl FnMut(FontId, &Ui)) {
     /* initialize SDL and its video subsystem */
     let sdl = sdl2::init().unwrap();
     let video_subsystem = sdl.video().unwrap();
@@ -62,7 +62,20 @@ pub fn run(title: &str, mut draw: impl FnMut(&Ui)) {
     /* setup platform and renderer, and fonts to imgui */
     imgui
         .fonts()
-        .add_font(&[imgui::FontSource::DefaultFontData { config: None }]);
+        .add_font(&[imgui::FontSource::DefaultFontData {
+            config: Some(FontConfig {
+                size_pixels: 13.0,
+                ..FontConfig::default()
+            }),
+        }]);
+    let large_font = imgui
+        .fonts()
+        .add_font(&[imgui::FontSource::DefaultFontData {
+            config: Some(FontConfig {
+                size_pixels: 13.0 * 4.0,
+                ..FontConfig::default()
+            }),
+        }]);
 
     /* create platform and renderer */
     let mut platform = SdlPlatform::init(&mut imgui);
@@ -85,7 +98,7 @@ pub fn run(title: &str, mut draw: impl FnMut(&Ui)) {
         platform.prepare_frame(&mut imgui, &window, &event_pump);
 
         let ui = imgui.new_frame();
-        draw(ui);
+        draw(large_font, ui);
 
         /* render */
         let draw_data = imgui.render();

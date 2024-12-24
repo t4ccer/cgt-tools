@@ -12,7 +12,7 @@ use crate::{
         self, canonical_form::CanonicalFormWindow, interactive_color, GridEditorAction,
         TILE_COLOR_EMPTY, TILE_COLOR_FILLED, TILE_SIZE,
     },
-    Context, DetailOptions, Details, EvalTask, IsCgtWindow, RawOf, Task, TitledWindow, UpdateKind,
+    DetailOptions, Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow,
 };
 
 imgui_enum! {
@@ -50,7 +50,7 @@ impl IsCgtWindow for TitledWindow<FissionWindow> {
     impl_titled_window!("Fission");
     impl_game_window!(EvalFission, FissionDetails);
 
-    fn draw(&mut self, ui: &imgui::Ui, ctx: &mut Context) {
+    fn draw(&mut self, ui: &imgui::Ui, ctx: &mut GuiContext) {
         let width = self.content.game.grid().width();
         let height = self.content.game.grid().height();
 
@@ -107,7 +107,7 @@ impl IsCgtWindow for TitledWindow<FissionWindow> {
                     ui,
                     &draw_list,
                     self.content.game.grid(),
-                    |pos, tile, draw_list| match tile {
+                    |pos, _, tile, draw_list| match tile {
                         Tile::Empty => {
                             let color = interactive_color(TILE_COLOR_EMPTY, ui);
                             draw_list

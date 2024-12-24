@@ -4,7 +4,8 @@ use crate::{
         self, canonical_form::CanonicalFormWindow, GraphEditor, VertexFillColor, COLOR_BLUE,
         COLOR_RED, VERTEX_RADIUS,
     },
-    Context, DetailOptions, Details, EvalTask, IsCgtWindow, RawOf, Task, TitledWindow, UpdateKind,
+    DetailOptions, Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow,
+    UpdateKind,
 };
 use cgt::{
     graph::{
@@ -185,7 +186,7 @@ impl DigraphPlacementWindow {
 impl IsCgtWindow for TitledWindow<DigraphPlacementWindow> {
     impl_titled_window!("Digraph Placement");
 
-    fn init(&self, ctx: &Context) {
+    fn initialize(&self, ctx: &GuiContext) {
         let graph = self.content.game.graph.map(|v| v.color);
         ctx.schedule_task(crate::Task::EvalDigraphPlacement(crate::EvalTask {
             window: self.window_id,
@@ -204,7 +205,7 @@ impl IsCgtWindow for TitledWindow<DigraphPlacementWindow> {
         }
     }
 
-    fn draw(&mut self, ui: &imgui::Ui, ctx: &mut Context) {
+    fn draw(&mut self, ui: &imgui::Ui, ctx: &mut GuiContext) {
         let mut should_reposition = false;
         let mut is_dirty = false;
 

@@ -3,7 +3,7 @@ use imgui::{Condition, ImColor32};
 use std::str::FromStr;
 
 use crate::{
-    impl_titled_window, widgets, Context, DetailOptions, Details, IsCgtWindow, TitledWindow,
+    impl_titled_window, widgets, DetailOptions, Details, GuiContext, IsCgtWindow, TitledWindow,
     UpdateKind,
 };
 
@@ -34,9 +34,9 @@ impl CanonicalFormWindow {
 impl IsCgtWindow for TitledWindow<CanonicalFormWindow> {
     impl_titled_window!("Canonical Form");
 
-    fn init(&self, _ctx: &Context) {}
+    fn initialize(&self, _ctx: &GuiContext) {}
 
-    fn draw(&mut self, ui: &imgui::Ui, ctx: &mut Context) {
+    fn draw(&mut self, ui: &imgui::Ui, ctx: &mut GuiContext) {
         ui.window(&self.title)
             .position(ui.io().mouse_pos, Condition::Appearing)
             .size([400.0, 450.0], Condition::Appearing)
