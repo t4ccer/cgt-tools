@@ -1,4 +1,9 @@
 //! Fission game
+//!
+//! Fission is played with black stones on a square grid.
+//! On her turn, Left may select any stone, provided that tiles directly above and below are empty,
+//! remove that stone and put two stones in the empty tiles directly above and below.
+//! Similarly Right playes on sqares to the left and right instead.
 
 use crate::{
     drawing::svg::{self, ImmSvg, Svg},
@@ -25,6 +30,7 @@ pub enum Tile {
     Stone,
 
     /// Tile on which stone cannot be placed
+    /// Used to model non-rectangular grids
     #[tile(char('#'))]
     Blocked,
 }
@@ -66,6 +72,92 @@ where
         Self { grid }
     }
 
+    /// Get underlying grid
+    #[inline]
+    pub const fn grid(&self) -> &G {
+        &self.grid
+    }
+
+    /// Get underlying grid mutably
+    #[inline]
+    pub fn grid_mut(&mut self) -> &mut G {
+        &mut self.grid
+    }
+
+    #[inline]
+    fn move_in<const DIR_X: u8, const DIR_Y: u8>(&self, x: u8, y: u8) -> Self
+    where
+        G: Clone,
+    {
+        let prev_x = x - DIR_X;
+        let prev_y = y - DIR_Y;
+        let next_x = x + DIR_X;
+        let next_y = y + DIR_Y;
+
+        let mut new_grid = self.grid.clone();
+        new_grid.set(x, y, Tile::Empty);
+        new_grid.set(prev_x, prev_y, Tile::Stone);
+        new_grid.set(next_x, next_y, Tile::Stone);
+        Fission::new(new_grid)
+    }
+
+    /// Make Left move in given tile without checking if move is legal
+    #[inline]
+    pub fn move_in_left(&self, x: u8, y: u8) -> Self
+    where
+        G: Clone,
+    {
+        self.move_in::<0, 1>(x, y)
+    }
+
+    /// Make Right move in given tile without checking if move is legal
+    #[inline]
+    pub fn move_in_right(&self, x: u8, y: u8) -> Self
+    where
+        G: Clone,
+    {
+        self.move_in::<1, 0>(x, y)
+    }
+
+    #[inline]
+    fn available_moves_for<const DIR_X: u8, const DIR_Y: u8>(&self) -> Vec<(u8, u8)> {
+        let mut moves = Vec::new();
+
+        if self.grid.height() == 0 || self.grid.width() == 0 {
+            return moves;
+        }
+
+        for y in DIR_Y..(self.grid.height() - DIR_Y) {
+            for x in DIR_X..(self.grid.width() - DIR_X) {
+                let prev_x = x - DIR_X;
+                let prev_y = y - DIR_Y;
+                let next_x = x + DIR_X;
+                let next_y = y + DIR_Y;
+
+                if self.grid.get(x, y) == Tile::Stone
+                    && self.grid.get(prev_x, prev_y) == Tile::Empty
+                    && self.grid.get(next_x, next_y) == Tile::Empty
+                {
+                    moves.push((x, y));
+                }
+            }
+        }
+
+        moves
+    }
+
+    /// List available tiles (ones with stone) where Left can move
+    #[inline]
+    pub fn available_moves_left(&self) -> Vec<(u8, u8)> {
+        self.available_moves_for::<0, 1>()
+    }
+
+    /// List available tiles (ones with stone) where Right can move
+    #[inline]
+    pub fn available_moves_right(&self) -> Vec<(u8, u8)> {
+        self.available_moves_for::<1, 0>()
+    }
+
     #[inline]
     fn moves_for<const DIR_X: u8, const DIR_Y: u8>(&self) -> Vec<Self>
     where
@@ -88,11 +180,7 @@ where
                     && self.grid.get(prev_x, prev_y) == Tile::Empty
                     && self.grid.get(next_x, next_y) == Tile::Empty
                 {
-                    let mut new_grid = self.clone().grid;
-                    new_grid.set(x, y, Tile::Empty);
-                    new_grid.set(prev_x, prev_y, Tile::Stone);
-                    new_grid.set(next_x, next_y, Tile::Stone);
-                    moves.push(Self::new(new_grid));
+                    moves.push(self.move_in::<DIR_X, DIR_Y>(x, y));
                 }
             }
         }

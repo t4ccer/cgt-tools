@@ -1,5 +1,6 @@
 use crate::widgets::{
-    digraph_placement::DigraphPlacementWindow, domineering::DomineeringWindow, snort::SnortWindow,
+    digraph_placement::DigraphPlacementWindow, domineering::DomineeringWindow,
+    fission::FissionWindow, snort::SnortWindow,
 };
 use cgt::{
     graph::adjacency_matrix::{directed::DirectedGraph, undirected::UndirectedGraph},
@@ -9,6 +10,7 @@ use cgt::{
         games::{
             digraph_placement::{self, DigraphPlacement},
             domineering::Domineering,
+            fission::Fission,
             snort::{self, Snort},
         },
         partizan_game::PartizanGame,
@@ -246,6 +248,7 @@ pub struct EvalTask<D> {
 #[derive(Debug)]
 pub enum Task {
     EvalDomineering(EvalTask<Domineering>),
+    EvalFission(EvalTask<Fission>),
     EvalSnort(EvalTask<Snort<snort::VertexKind, UndirectedGraph<snort::VertexKind>>>),
     EvalDigraphPlacement(
         EvalTask<
@@ -279,6 +282,7 @@ impl Context {
 
 pub enum UpdateKind {
     DomineeringDetails(Domineering, Details),
+    FissionDetails(Fission, Details),
     SnortDetails(
         Snort<snort::VertexKind, UndirectedGraph<snort::VertexKind>>,
         Details,
@@ -301,6 +305,7 @@ pub struct SchedulerContext {
     tasks: mpsc::Receiver<Task>,
     updates: mpsc::Sender<Update>,
     domineering_tt: ParallelTranspositionTable<Domineering>,
+    fission_tt: ParallelTranspositionTable<Fission>,
     snort_tt:
         ParallelTranspositionTable<Snort<snort::VertexKind, UndirectedGraph<snort::VertexKind>>>,
     digraph_placement_tt: ParallelTranspositionTable<
@@ -321,6 +326,16 @@ fn scheduler(ctx: SchedulerContext) {
                     .send(Update {
                         window: task.window,
                         kind: UpdateKind::DomineeringDetails(task.game, details),
+                    })
+                    .unwrap();
+            }
+            Task::EvalFission(task) => {
+                let cf = task.game.canonical_form(&ctx.fission_tt);
+                let details = Details::from_canonical_form(cf);
+                ctx.updates
+                    .send(Update {
+                        window: task.window,
+                        kind: UpdateKind::FissionDetails(task.game, details),
                     })
                     .unwrap();
             }
@@ -358,6 +373,7 @@ fn main() {
         tasks: task_receiver,
         updates: update_sender,
         domineering_tt: ParallelTranspositionTable::new(),
+        fission_tt: ParallelTranspositionTable::new(),
         snort_tt: ParallelTranspositionTable::new(),
         digraph_placement_tt: ParallelTranspositionTable::new(),
     };
@@ -381,6 +397,13 @@ fn main() {
     macro_rules! new_domineering {
         () => {{
             let mut d = TitledWindow::without_title(DomineeringWindow::new());
+            new_window!(d);
+        }};
+    }
+
+    macro_rules! new_fission {
+        () => {{
+            let mut d = TitledWindow::without_title(FissionWindow::new());
             new_window!(d);
         }};
     }
@@ -417,6 +440,7 @@ fn main() {
     // new_domineering!();
     // new_snort!();
     new_digraph_placement!();
+    // new_fission!();
 
     let mut show_demo = false;
 
@@ -434,6 +458,9 @@ fn main() {
                 }
                 if ui.menu_item("Domineering") {
                     new_domineering!();
+                }
+                if ui.menu_item("Fission") {
+                    new_fission!();
                 }
                 if ui.menu_item("Snort") {
                     new_snort!();

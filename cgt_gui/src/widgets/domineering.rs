@@ -1,6 +1,6 @@
 use cgt::{
     grid::{small_bit_grid::SmallBitGrid, FiniteGrid, Grid},
-    short::partizan::games::domineering::Domineering,
+    short::partizan::games::domineering::{Domineering, Tile},
 };
 use imgui::Condition;
 use std::str::FromStr;
@@ -33,8 +33,6 @@ impl IsCgtWindow for TitledWindow<DomineeringWindow> {
     impl_game_window!(EvalDomineering, DomineeringDetails);
 
     fn draw(&mut self, ui: &imgui::Ui, ctx: &mut Context) {
-        use cgt::short::partizan::games::domineering;
-
         let width = self.content.game.grid().width();
         let height = self.content.game.grid().height();
 
@@ -84,10 +82,10 @@ impl IsCgtWindow for TitledWindow<DomineeringWindow> {
                 if new_width != width || new_height != height {
                     is_dirty = true;
                     if let Some(mut new_grid) =
-                        SmallBitGrid::filled(new_width, new_height, domineering::Tile::Taken)
+                        SmallBitGrid::filled(new_width, new_height, Tile::Empty)
                     {
-                        for y in 0..height {
-                            for x in 0..width {
+                        for y in 0..height.min(new_height) {
+                            for x in 0..width.min(new_width) {
                                 new_grid.set(x, y, self.content.game.grid().get(x, y));
                             }
                         }
@@ -107,9 +105,7 @@ impl IsCgtWindow for TitledWindow<DomineeringWindow> {
                     ui.set_column_width(
                         0,
                         f32::max(
-                            pad_x
-                                + (widgets::DOMINEERING_TILE_SIZE + widgets::DOMINEERING_TILE_GAP)
-                                    * new_width as f32,
+                            pad_x + (widgets::TILE_SIZE + widgets::TILE_SPACING) * new_width as f32,
                             ui.column_width(0),
                         ),
                     );

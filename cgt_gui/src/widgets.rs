@@ -11,6 +11,7 @@ use std::fmt::Write;
 pub mod canonical_form;
 pub mod digraph_placement;
 pub mod domineering;
+pub mod fission;
 pub mod snort;
 
 pub const THERMOGRAPH_TOP_MAST_LEN: f32 = 1.0;
@@ -19,10 +20,10 @@ pub const THERMOGRAPH_ARROW_SIZE: f32 = 0.15;
 pub const THERMOGRAPH_TRAJECTORY_THICKNESS: f32 = 2.0;
 pub const THERMOGRAPH_AXIS_THICKNESS: f32 = 1.0;
 
-pub const DOMINEERING_TILE_SIZE: f32 = 64.0;
-pub const DOMINEERING_TILE_GAP: f32 = 4.0;
-pub const DOMINEERING_EMPTY_COLOR: ImColor32 = ImColor32::from_rgb(0xcc, 0xcc, 0xcc);
-pub const DOMINEERING_FILLED_COLOR: ImColor32 = ImColor32::from_rgb(0x44, 0x44, 0x44);
+pub const TILE_SIZE: f32 = 64.0;
+pub const TILE_SPACING: f32 = 4.0;
+pub const TILE_COLOR_EMPTY: ImColor32 = ImColor32::from_rgb(0xcc, 0xcc, 0xcc);
+pub const TILE_COLOR_FILLED: ImColor32 = ImColor32::from_rgb(0x44, 0x44, 0x44);
 
 pub const COLOR_BLUE: ImColor32 = ImColor32::from_bits(0xfffb4a4e);
 pub const COLOR_RED: ImColor32 = ImColor32::from_bits(0xff7226f9);
@@ -34,6 +35,20 @@ fn fade(mut color: [f32; 4], alpha: f32) -> [f32; 4] {
     let alpha = alpha.clamp(0.0, 1.0);
     color[3] *= alpha;
     color
+}
+
+fn fade_color(color: ImColor32, alpha: f32) -> ImColor32 {
+    ImColor32::from(fade(color.to_rgba_f32s(), alpha))
+}
+
+fn interactive_color(color: ImColor32, ui: &Ui) -> ImColor32 {
+    if ui.is_item_active() {
+        fade_color(color, 0.6)
+    } else if ui.is_item_hovered() {
+        fade_color(color, 0.8)
+    } else {
+        color
+    }
 }
 
 fn lerp(start: f32, end: f32, t: f32) -> f32 {
@@ -281,6 +296,58 @@ pub fn grid_size_selector(ui: &imgui::Ui, new_width: &mut u8, new_height: &mut u
     short_inputs.end();
 }
 
+pub enum GridEditorAction {
+    None,
+    Clicked { x: u8, y: u8 },
+}
+
+pub fn grid<'ui, G>(
+    ui: &'ui imgui::Ui,
+    draw_list: &'ui DrawListMut<'ui>,
+    grid: &G,
+    draw_tile: impl Fn(V2f, G::Item, &'ui DrawListMut<'ui>),
+) -> GridEditorAction
+where
+    G: Grid + FiniteGrid,
+{
+    let mut action = GridEditorAction::None;
+
+    let width = grid.width();
+    let height = grid.height();
+
+    let [grid_start_pos_x, grid_start_pos_y] = ui.cursor_pos();
+
+    for grid_y in 0..height {
+        let _y_id = ui.push_id_usize(grid_y as usize);
+
+        for grid_x in 0..width {
+            let _x_id = ui.push_id_usize(grid_x as usize);
+
+            ui.set_cursor_pos([
+                grid_start_pos_x + (TILE_SIZE + TILE_SPACING) * grid_x as f32,
+                grid_start_pos_y + (TILE_SIZE + TILE_SPACING) * grid_y as f32,
+            ]);
+
+            let pos = V2f::from(ui.cursor_screen_pos());
+            if ui.invisible_button("", [TILE_SIZE, TILE_SIZE]) {
+                action = GridEditorAction::Clicked {
+                    x: grid_x,
+                    y: grid_y,
+                };
+            }
+
+            draw_tile(pos, grid.get(grid_x, grid_y), draw_list);
+        }
+    }
+
+    ui.set_cursor_pos([
+        grid_start_pos_x,
+        grid_start_pos_y + (TILE_SIZE + TILE_SPACING) * height as f32,
+    ]);
+
+    action
+}
+
 pub fn bit_grid<'ui, G>(ui: &'ui imgui::Ui, draw_list: &'ui DrawListMut<'ui>, grid: &mut G) -> bool
 where
     G: Grid + FiniteGrid,
@@ -300,20 +367,20 @@ where
             let _x_id = ui.push_id_usize(grid_x as usize);
 
             ui.set_cursor_pos([
-                grid_start_pos_x + (DOMINEERING_TILE_SIZE + DOMINEERING_TILE_GAP) * grid_x as f32,
-                grid_start_pos_y + (DOMINEERING_TILE_SIZE + DOMINEERING_TILE_GAP) * grid_y as f32,
+                grid_start_pos_x + (TILE_SIZE + TILE_SPACING) * grid_x as f32,
+                grid_start_pos_y + (TILE_SIZE + TILE_SPACING) * grid_y as f32,
             ]);
 
             let [pos_x, pos_y] = ui.cursor_screen_pos();
-            if ui.invisible_button("", [DOMINEERING_TILE_SIZE, DOMINEERING_TILE_SIZE]) {
+            if ui.invisible_button("", [TILE_SIZE, TILE_SIZE]) {
                 is_dirty = true;
                 let flipped = grid.get(grid_x, grid_y).flip();
                 grid.set(grid_x, grid_y, flipped);
             }
 
             let color = match grid.get(grid_x, grid_y).tile_to_bool() {
-                false => DOMINEERING_EMPTY_COLOR,
-                true => DOMINEERING_FILLED_COLOR,
+                false => TILE_COLOR_EMPTY,
+                true => TILE_COLOR_FILLED,
             };
             let color = color.to_rgba_f32s();
 
@@ -328,7 +395,7 @@ where
             draw_list
                 .add_rect(
                     [pos_x, pos_y],
-                    [pos_x + DOMINEERING_TILE_SIZE, pos_y + DOMINEERING_TILE_SIZE],
+                    [pos_x + TILE_SIZE, pos_y + TILE_SIZE],
                     color,
                 )
                 .filled(true)
@@ -338,7 +405,7 @@ where
 
     ui.set_cursor_pos([
         grid_start_pos_x,
-        grid_start_pos_y + (DOMINEERING_TILE_SIZE + DOMINEERING_TILE_GAP) * height as f32,
+        grid_start_pos_y + (TILE_SIZE + TILE_SPACING) * height as f32,
     ]);
 
     is_dirty
@@ -355,14 +422,7 @@ macro_rules! game_details {
                 let [_, text_height] = $ui.calc_text_size("1234567890()");
                 let available_w = $ui.current_column_width();
                 let pos_y = $ui.cursor_pos()[1];
-                let mut available_h = $ui.window_size()[1] - pos_y - text_height;
-
-                // Slider is about to appear so we need to shrink available height
-                if !$self.content.details_options.thermograph_fit {
-                    let style = unsafe { $ui.style() };
-                    available_h -= style.scrollbar_size + style.item_spacing[1] * 2.0;
-                }
-
+                let available_h = $ui.window_size()[1] - pos_y - text_height;
                 let scale_w = available_w / thermograph_size.x;
                 let scale_h = available_h / thermograph_size.y;
 
