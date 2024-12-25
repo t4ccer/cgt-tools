@@ -60,7 +60,9 @@
                 != null
                 && (builtins.match "^v([0-9]+).([0-9]+).([0-9]+)$" herculesArgs.config.repo.tag) != null;
             in
-              hci-effects.runIf shouldRun cargoPublish;
+              hci-effects.runIf shouldRun (cargoPublish {
+                src = ./.;
+              });
           });
         };
       };
