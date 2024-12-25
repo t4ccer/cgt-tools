@@ -8,6 +8,7 @@ use cgt::{
 use imgui::{DrawListMut, ImColor32, MouseButton, StyleColor, Ui};
 use std::fmt::Write;
 
+pub mod amazons;
 pub mod canonical_form;
 pub mod digraph_placement;
 pub mod domineering;

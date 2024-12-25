@@ -83,7 +83,20 @@ where
         Self { grid }
     }
 
-    fn moves_for(&self, own_amazon: Tile) -> Vec<Self>
+    /// Get underlying grid
+    #[inline]
+    pub const fn grid(&self) -> &G {
+        &self.grid
+    }
+
+    /// Get underlying grid mutably
+    #[inline]
+    pub fn grid_mut(&mut self) -> &mut G {
+        &mut self.grid
+    }
+
+    /// Get available moves for given player
+    pub fn moves_for(&self, own_amazon: Tile, should_move_top_left: bool) -> Vec<Self>
     where
         G: Clone + PartialEq,
     {
@@ -126,7 +139,9 @@ where
                                     }
                                     let mut new_grid = new_grid.clone();
                                     new_grid.set(new_arrow_x as u8, new_arrow_y as u8, Tile::Stone);
-                                    let new_grid = move_top_left(&new_grid, Tile::is_non_blocking);
+                                    if should_move_top_left {
+                                        new_grid = move_top_left(&new_grid, Tile::is_non_blocking);
+                                    }
                                     moves.push(Self::new(new_grid));
                                 }
                             }
@@ -145,11 +160,11 @@ where
     G: Grid<Item = Tile> + FiniteGrid + Clone + Hash + Send + Sync + Eq,
 {
     fn left_moves(&self) -> Vec<Self> {
-        self.moves_for(Tile::Left)
+        self.moves_for(Tile::Left, true)
     }
 
     fn right_moves(&self) -> Vec<Self> {
-        self.moves_for(Tile::Right)
+        self.moves_for(Tile::Right, true)
     }
 
     fn decompositions(&self) -> Vec<Self> {

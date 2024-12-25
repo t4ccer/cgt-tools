@@ -1,7 +1,7 @@
 use crate::widgets::{
-    canonical_form::CanonicalFormWindow, digraph_placement::DigraphPlacementWindow,
-    domineering::DomineeringWindow, fission::FissionWindow, ski_jumps::SkiJumpsWindow,
-    snort::SnortWindow,
+    amazons::AmazonsWindow, canonical_form::CanonicalFormWindow,
+    digraph_placement::DigraphPlacementWindow, domineering::DomineeringWindow,
+    fission::FissionWindow, ski_jumps::SkiJumpsWindow, snort::SnortWindow,
 };
 use cgt::{
     graph::adjacency_matrix::{directed::DirectedGraph, undirected::UndirectedGraph},
@@ -9,6 +9,7 @@ use cgt::{
     short::partizan::{
         canonical_form::CanonicalForm,
         games::{
+            amazons::Amazons,
             digraph_placement::{self, DigraphPlacement},
             domineering::Domineering,
             fission::Fission,
@@ -214,10 +215,10 @@ where
 }
 
 macro_rules! imgui_enum {
-    ($name:ident { $($variant:ident, $pretty:expr,)*}) => {
+    ($v:vis $name:ident { $($variant:ident, $pretty:expr,)*}) => {
         #[derive(Debug, Clone, Copy)]
         #[repr(usize)]
-        pub enum $name {
+        $v enum $name {
             $($variant,)*
         }
 
@@ -253,6 +254,7 @@ pub struct EvalTask<D> {
 pub enum Task {
     EvalDomineering(EvalTask<Domineering>),
     EvalFission(EvalTask<Fission>),
+    EvalAmazons(EvalTask<Amazons>),
     EvalSkiJumps(EvalTask<SkiJumps>),
     EvalSnort(EvalTask<Snort<snort::VertexKind, UndirectedGraph<snort::VertexKind>>>),
     EvalDigraphPlacement(
@@ -290,6 +292,7 @@ impl GuiContext {
 pub enum UpdateKind {
     DomineeringDetails(Domineering, Details),
     FissionDetails(Fission, Details),
+    AmazonsDetails(Amazons, Details),
     SkiJumpsDetails(SkiJumps, Details),
     SnortDetails(
         Snort<snort::VertexKind, UndirectedGraph<snort::VertexKind>>,
@@ -314,6 +317,7 @@ pub struct SchedulerContext {
     updates: mpsc::Sender<Update>,
     domineering_tt: ParallelTranspositionTable<Domineering>,
     fission_tt: ParallelTranspositionTable<Fission>,
+    amazons_tt: ParallelTranspositionTable<Amazons>,
     ski_jumps_tt: ParallelTranspositionTable<SkiJumps>,
     snort_tt:
         ParallelTranspositionTable<Snort<snort::VertexKind, UndirectedGraph<snort::VertexKind>>>,
@@ -347,6 +351,9 @@ fn scheduler(ctx: SchedulerContext) {
             Task::EvalFission(task) => {
                 handle_game_update!(task, FissionDetails, fission_tt);
             }
+            Task::EvalAmazons(task) => {
+                handle_game_update!(task, AmazonsDetails, amazons_tt);
+            }
             Task::EvalSkiJumps(task) => {
                 handle_game_update!(task, SkiJumpsDetails, ski_jumps_tt);
             }
@@ -371,6 +378,7 @@ fn main() {
         updates: update_sender,
         domineering_tt: ParallelTranspositionTable::new(),
         fission_tt: ParallelTranspositionTable::new(),
+        amazons_tt: ParallelTranspositionTable::new(),
         ski_jumps_tt: ParallelTranspositionTable::new(),
         snort_tt: ParallelTranspositionTable::new(),
         digraph_placement_tt: ParallelTranspositionTable::new(),
@@ -402,6 +410,13 @@ fn main() {
     macro_rules! new_fission {
         () => {{
             let mut d = TitledWindow::without_title(FissionWindow::new());
+            new_window!(d);
+        }};
+    }
+
+    macro_rules! new_amazons {
+        () => {{
+            let mut d = TitledWindow::without_title(AmazonsWindow::new());
             new_window!(d);
         }};
     }
@@ -444,7 +459,8 @@ fn main() {
 
     // new_domineering!();
     // new_fission!();
-    new_ski_jumps!();
+    new_amazons!();
+    // new_ski_jumps!();
     // new_snort!();
     // new_digraph_placement!();
 
@@ -469,6 +485,9 @@ fn main() {
                 }
                 if ui.menu_item("Fission") {
                     new_fission!();
+                }
+                if ui.menu_item("Amazons") {
+                    new_amazons!();
                 }
                 if ui.menu_item("Ski Jumps") {
                     new_ski_jumps!();
