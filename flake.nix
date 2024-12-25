@@ -39,23 +39,28 @@
           outputs.effects = withSystem "x86_64-linux" ({
             hci-effects,
             config,
+            pkgs,
             ...
           }: {
-            cargoPublish =
-              hci-effects.runIf
-              (herculesArgs.config.repo.tag
+            cargoPublish = let
+              cargoSetupHook = pkgs.runCommand "hercules-ci-cargo-setup-hook" {} ''
+                mkdir -p $out/nix-support
+                cp ${./nix/cargo-setup-hook.sh} $out/nix-support/setup-hook
+              '';
+
+              cargoPublish = pkgs.callPackage ./nix/cargo-publish.nix {
+                inherit (inputs.nixpkgs) lib;
+                inherit (pkgs) cargo;
+                inherit (hci-effects) mkEffect;
+                inherit cargoSetupHook;
+              };
+
+              shouldRun =
+                herculesArgs.config.repo.tag
                 != null
-                && (builtins.match "^v([0-9]+).([0-9]+).([0-9]+)$" herculesArgs.config.repo.tag) != null) ((hci-effects.cargoPublish
-                  {
-                    src = ./.;
-                    secretName = "cratesIoToken";
-                  })
-                .overrideAttrs (_: {
-                  effectScript = ''
-                    cargo publish -p cgt_derive
-                    cargo publish -p cgt
-                  '';
-                }));
+                && (builtins.match "^v([0-9]+).([0-9]+).([0-9]+)$" herculesArgs.config.repo.tag) != null;
+            in
+              hci-effects.runIf shouldRun cargoPublish;
           });
         };
       };
