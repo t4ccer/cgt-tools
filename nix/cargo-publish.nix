@@ -2,11 +2,12 @@
   lib,
   mkEffect,
   cargo,
+  stdenv,
   cargoSetupHook,
 }: {src}:
 mkEffect {
   buildInputs = [cargoSetupHook];
-  inputs = [cargo];
+  inputs = [cargo stdenv.cc];
   secretsMap = {"cargo" = "cratesIoToken";};
   inherit src;
 

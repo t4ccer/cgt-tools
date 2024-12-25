@@ -50,7 +50,7 @@
 
               cargoPublish = pkgs.callPackage ./nix/cargo-publish.nix {
                 inherit (inputs.nixpkgs) lib;
-                inherit (pkgs) cargo;
+                inherit (pkgs) cargo stdenv;
                 inherit (hci-effects) mkEffect;
                 inherit cargoSetupHook;
               };
