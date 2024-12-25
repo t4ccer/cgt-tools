@@ -164,7 +164,7 @@ where
 
 #[derive(Debug)]
 pub struct RawOf<T> {
-    pub value: usize,
+    value: usize,
     _ty: PhantomData<T>,
 }
 
@@ -190,13 +190,13 @@ where
         }
     }
 
-    pub fn as_enum(self) -> T {
+    pub fn get(self) -> T {
         T::from_usize(self.value)
     }
 
     pub fn combo(&mut self, ui: &imgui::Ui, label: impl AsRef<str>, flags: ComboBoxFlags) -> bool {
         let mut changed = false;
-        let preview = self.as_enum().label();
+        let preview = self.get().label();
         if let Some(_combo) = ui.begin_combo_with_flags(label, preview, flags) {
             for (mode_idx, mode) in T::LABELS.iter().enumerate() {
                 let is_selected = self.value == mode_idx;

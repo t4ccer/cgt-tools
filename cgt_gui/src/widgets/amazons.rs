@@ -108,7 +108,7 @@ impl IsCgtWindow for TitledWindow<AmazonsWindow> {
                 short_inputs.end();
 
                 if matches!(
-                    self.content.editing_mode.as_enum(),
+                    self.content.editing_mode.get(),
                     GridEditingMode::MoveLeft | GridEditingMode::MoveRight
                 ) {
                     ui.same_line();
@@ -142,7 +142,7 @@ impl IsCgtWindow for TitledWindow<AmazonsWindow> {
                                         PendingMove::AmazonTargetSelected { amazon, target } if
                                         amazon == (x, y) || target == (x, y))
                         {
-                            match self.content.editing_mode.as_enum() {
+                            match self.content.editing_mode.get() {
                                 GridEditingMode::MoveLeft => {
                                     draw_list
                                         .add_rect(
@@ -263,7 +263,7 @@ impl IsCgtWindow for TitledWindow<AmazonsWindow> {
                             };
                         }
 
-                        match self.content.editing_mode.as_enum() {
+                        match self.content.editing_mode.get() {
                             GridEditingMode::AddStone => place_tile!(Stone),
                             GridEditingMode::AddBlueQueen => place_tile!(Left),
                             GridEditingMode::AddRedQueen => place_tile!(Right),

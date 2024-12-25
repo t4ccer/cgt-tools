@@ -105,7 +105,7 @@ impl IsCgtWindow for TitledWindow<SkiJumpsWindow> {
                 short_inputs.end();
 
                 if matches!(
-                    self.content.editing_mode.as_enum(),
+                    self.content.editing_mode.get(),
                     GridEditingMode::MoveLeft | GridEditingMode::MoveRight
                 ) {
                     ui.same_line();
@@ -118,7 +118,7 @@ impl IsCgtWindow for TitledWindow<SkiJumpsWindow> {
 
                 let mut slide_off_y = None;
 
-                let editing_mode = self.content.editing_mode.as_enum();
+                let editing_mode = self.content.editing_mode.get();
 
                 macro_rules! off_buttons {
                     ($text:expr, $start_x:expr) => {{
@@ -192,7 +192,7 @@ impl IsCgtWindow for TitledWindow<SkiJumpsWindow> {
                             .initial_position
                             .is_some_and(|initial| initial == (x, y))
                         {
-                            match self.content.editing_mode.as_enum() {
+                            match self.content.editing_mode.get() {
                                 GridEditingMode::MoveLeft => {
                                     draw_list
                                         .add_rect(
@@ -278,21 +278,11 @@ impl IsCgtWindow for TitledWindow<SkiJumpsWindow> {
                         }
 
                         match editing_mode {
-                            GridEditingMode::ClearTile => {
-                                place_tile!(Empty);
-                            }
-                            GridEditingMode::LeftJumper => {
-                                place_tile!(LeftJumper);
-                            }
-                            GridEditingMode::LeftSlipper => {
-                                place_tile!(LeftSlipper);
-                            }
-                            GridEditingMode::RightJumper => {
-                                place_tile!(RightJumper);
-                            }
-                            GridEditingMode::RightSlipper => {
-                                place_tile!(RightSlipper);
-                            }
+                            GridEditingMode::ClearTile => place_tile!(Empty),
+                            GridEditingMode::LeftJumper => place_tile!(LeftJumper),
+                            GridEditingMode::LeftSlipper => place_tile!(LeftSlipper),
+                            GridEditingMode::RightJumper => place_tile!(RightJumper),
+                            GridEditingMode::RightSlipper => place_tile!(RightSlipper),
                             GridEditingMode::MoveLeft | GridEditingMode::MoveRight => {
                                 match self.content.initial_position {
                                     None => {

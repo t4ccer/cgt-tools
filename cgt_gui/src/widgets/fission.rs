@@ -94,7 +94,7 @@ impl IsCgtWindow for TitledWindow<FissionWindow> {
                 short_inputs.end();
 
                 if matches!(
-                    self.content.editing_mode.as_enum(),
+                    self.content.editing_mode.get(),
                     GridEditingMode::MoveLeft | GridEditingMode::MoveRight
                 ) {
                     ui.same_line();
@@ -168,25 +168,19 @@ impl IsCgtWindow for TitledWindow<FissionWindow> {
                 match action {
                     GridEditorAction::None => {}
                     GridEditorAction::Clicked { x, y } => {
-                        match self.content.editing_mode.as_enum() {
-                            GridEditingMode::AddStone => {
-                                if self.content.game.grid().get(x, y) != Tile::Stone {
-                                    self.content.game.grid_mut().set(x, y, Tile::Stone);
+                        macro_rules! place_tile {
+                            ($tile:ident) => {
+                                if self.content.game.grid().get(x, y) != Tile::$tile {
+                                    self.content.game.grid_mut().set(x, y, Tile::$tile);
                                     is_dirty = true;
                                 }
-                            }
-                            GridEditingMode::BlockTile => {
-                                if self.content.game.grid().get(x, y) != Tile::Blocked {
-                                    self.content.game.grid_mut().set(x, y, Tile::Blocked);
-                                    is_dirty = true;
-                                }
-                            }
-                            GridEditingMode::ClearTile => {
-                                if self.content.game.grid().get(x, y) != Tile::Empty {
-                                    self.content.game.grid_mut().set(x, y, Tile::Empty);
-                                    is_dirty = true;
-                                }
-                            }
+                            };
+                        }
+
+                        match self.content.editing_mode.get() {
+                            GridEditingMode::AddStone => place_tile!(Stone),
+                            GridEditingMode::BlockTile => place_tile!(Blocked),
+                            GridEditingMode::ClearTile => place_tile!(Empty),
                             GridEditingMode::MoveLeft => {
                                 let moves = self.content.game.available_moves_left();
                                 if moves.contains(&(x, y)) {

@@ -155,7 +155,7 @@ impl DigraphPlacementWindow {
     }
 
     pub fn reposition(&mut self, graph_panel_size: V2f) {
-        match self.reposition_option_selected.as_enum() {
+        match self.reposition_option_selected.get() {
             RepositionMode::Circle => {
                 self.reposition_circle();
             }
@@ -252,7 +252,7 @@ impl IsCgtWindow for TitledWindow<DigraphPlacementWindow> {
                 }
 
                 if matches!(
-                    self.content.editing_mode.as_enum(),
+                    self.content.editing_mode.get(),
                     GraphEditingMode::AddVertex
                         | GraphEditingMode::AddEdge if self.content.edge_creates_vertex
                 ) {
@@ -269,15 +269,12 @@ impl IsCgtWindow for TitledWindow<DigraphPlacementWindow> {
                 short_inputs.end();
 
                 if matches!(
-                    self.content.editing_mode.as_enum(),
+                    self.content.editing_mode.get(),
                     GraphEditingMode::MoveLeft | GraphEditingMode::MoveRight
                 ) {
                     ui.same_line();
                     ui.checkbox("Alternating", &mut self.content.alternating_moves);
-                } else if matches!(
-                    self.content.editing_mode.as_enum(),
-                    GraphEditingMode::AddEdge
-                ) {
+                } else if matches!(self.content.editing_mode.get(), GraphEditingMode::AddEdge) {
                     ui.same_line();
                     ui.checkbox("Add vertex", &mut self.content.edge_creates_vertex);
                 }
@@ -285,16 +282,10 @@ impl IsCgtWindow for TitledWindow<DigraphPlacementWindow> {
                 let action = self.content.graph_editor.draw(
                     ui,
                     &draw_list,
+                    matches!(self.content.editing_mode.get(), GraphEditingMode::AddEdge),
+                    matches!(self.content.editing_mode.get(), GraphEditingMode::AddVertex),
                     matches!(
-                        self.content.editing_mode.as_enum(),
-                        GraphEditingMode::AddEdge
-                    ),
-                    matches!(
-                        self.content.editing_mode.as_enum(),
-                        GraphEditingMode::AddVertex
-                    ),
-                    matches!(
-                        self.content.editing_mode.as_enum(),
+                        self.content.editing_mode.get(),
                         GraphEditingMode::DragVertex
                     ),
                     self.content.edge_creates_vertex,
@@ -304,7 +295,7 @@ impl IsCgtWindow for TitledWindow<DigraphPlacementWindow> {
                 match action {
                     widgets::GraphEditorAction::None => {}
                     widgets::GraphEditorAction::VertexClick(clicked_vertex) => {
-                        match self.content.editing_mode.as_enum() {
+                        match self.content.editing_mode.get() {
                             GraphEditingMode::DragVertex => {}
                             GraphEditingMode::ColorVertexBlue => {
                                 self.content.game.graph.get_vertex_mut(clicked_vertex).color =
@@ -347,9 +338,9 @@ impl IsCgtWindow for TitledWindow<DigraphPlacementWindow> {
                         }
                     }
                     widgets::GraphEditorAction::NewVertex(position, connection) => {
-                        match self.content.editing_mode.as_enum() {
+                        match self.content.editing_mode.get() {
                             GraphEditingMode::AddEdge | GraphEditingMode::AddVertex => {
-                                let color = match self.content.new_vertex_color.as_enum() {
+                                let color = match self.content.new_vertex_color.get() {
                                     NewVertexColor::Left => VertexColor::Left,
                                     NewVertexColor::Right => VertexColor::Right,
                                 };
