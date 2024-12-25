@@ -21,7 +21,7 @@
     };
   };
   outputs = inputs @ {self, ...}:
-    inputs.flake-parts.lib.mkFlake {inherit inputs;} {
+    inputs.flake-parts.lib.mkFlake {inherit inputs;} ({withSystem, ...}: {
       imports = [
         inputs.pre-commit-hooks-nix.flakeModule
         inputs.hercules-ci-effects.flakeModule
@@ -33,7 +33,33 @@
         then [builtins.currentSystem]
         else inputs.nixpkgs.lib.systems.flakeExposed;
 
-      herculesCI.ciSystems = ["x86_64-linux"];
+      herculesCI = herculesArgs: {
+        ciSystems = ["x86_64-linux"];
+        onPush.cargo = {
+          outputs.effects = withSystem "x86_64-linux" ({
+            hci-effects,
+            config,
+            ...
+          }: {
+            cargoPublish =
+              hci-effects.runIf
+              (herculesArgs.config.repo.tag
+                != null
+                && (builtins.match "^v([0-9]+).([0-9]+).([0-9]+)$" herculesArgs.config.repo.tag) != null) ((hci-effects.cargoPublish
+                  {
+                    src = ./.;
+                    secretName = "cratesIoToken";
+                  })
+                .overrideAttrs (_: {
+                  effectScript = ''
+                    cargo publish -p cgt_derive
+                    cargo publish -p cgt
+                  '';
+                }));
+          });
+        };
+      };
+
       hercules-ci.github-releases.files = [
         {
           label = "cgt-tools-x86_64-windows.zip";
@@ -164,5 +190,5 @@
         };
         formatter = pkgs.alejandra;
       };
-    };
+    });
 }

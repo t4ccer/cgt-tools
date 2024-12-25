@@ -320,7 +320,7 @@ dependencies = [
 
 [[package]]
 name = "cgt"
-version = "0.5.1"
+version = "0.6.0"
 dependencies = [
  "ahash",
  "append-only-vec",
@@ -339,7 +339,7 @@ dependencies = [
 
 [[package]]
 name = "cgt_cli"
-version = "0.5.1"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "cgt",
@@ -356,7 +356,7 @@ dependencies = [
 
 [[package]]
 name = "cgt_derive"
-version = "0.5.1"
+version = "0.6.0"
 dependencies = [
  "quote",
  "syn",
@@ -364,7 +364,7 @@ dependencies = [
 
 [[package]]
 name = "cgt_gui"
-version = "0.5.1"
+version = "0.6.0"
 dependencies = [
  "cgt",
  "glium",
@@ -382,7 +382,7 @@ dependencies = [
 
 [[package]]
 name = "cgt_py"
-version = "0.5.1"
+version = "0.6.0"
 dependencies = [
  "cgt",
  "pyo3",
