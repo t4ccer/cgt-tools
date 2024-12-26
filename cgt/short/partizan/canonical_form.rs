@@ -1297,6 +1297,68 @@ impl CanonicalForm {
         }
     }
 
+    /// See: The Reduced Canonical Form Of a Game p. 411
+    pub fn star_projection(&self) -> Self {
+        if let Some(nus) = self.to_nus() {
+            if (nus.nimber() == Nimber::new(0) || nus.nimber() == Nimber::new(1))
+                && nus.up_multiple() == 0
+            {
+                return CanonicalForm::new_nus(Nus::new_number(nus.number()));
+            }
+        }
+
+        let moves = self.to_moves();
+        CanonicalForm::new_from_moves(Moves {
+            left: moves
+                .left
+                .iter()
+                .map(CanonicalForm::star_projection)
+                .collect(),
+            right: moves
+                .right
+                .iter()
+                .map(CanonicalForm::star_projection)
+                .collect(),
+        })
+    }
+
+    /// See: The Reduced Canonical Form Of a Game p. 411
+    pub fn cool_by_star(&self) -> Self {
+        if self.to_nus().is_some_and(Nus::is_number) {
+            return self.clone();
+        }
+
+        let moves = self.to_moves();
+        CanonicalForm::new_from_moves(Moves {
+            left: moves
+                .left
+                .iter()
+                .map(|l| {
+                    l + CanonicalForm::new_nimber(
+                        DyadicRationalNumber::new_integer(0),
+                        Nimber::new(1),
+                    )
+                })
+                .collect(),
+            right: moves
+                .right
+                .iter()
+                .map(|r| {
+                    r + CanonicalForm::new_nimber(
+                        DyadicRationalNumber::new_integer(0),
+                        Nimber::new(1),
+                    )
+                })
+                .collect(),
+        })
+    }
+
+    /// A reduced canonical form of `G` is `\bar{G}`, such that `\bar{G} = \bar{H}`
+    /// whenever `G - H` is infinitesimal.
+    pub fn reduced(&self) -> Self {
+        self.cool_by_star().star_projection()
+    }
+
     /// Parse game using `{a,b,...|c,d,...}` notation
     #[allow(clippy::missing_errors_doc)]
     pub fn parse(input: &str) -> nom::IResult<&str, Self> {
@@ -1795,5 +1857,20 @@ mod tests {
         assert_atomic_weight_eq!("{^2|*}", "1");
         assert_atomic_weight_eq!("{^2,{^|*}|*}", "1");
         assert_atomic_weight_eq!("{*|v2}", "-1");
+    }
+
+    #[test]
+    fn cool_by_star() {
+        let cf = CanonicalForm::from_str("3").unwrap();
+        assert_eq!(cf.cool_by_star().to_string(), "3");
+
+        let cf = CanonicalForm::from_str("{{2|0}, 1|0}").unwrap();
+        assert_eq!(cf.cool_by_star().to_string(), "{1*, {2*|*}|*}");
+    }
+
+    #[test]
+    fn reduced() {
+        let cf = CanonicalForm::from_str("{{2|0}, 1*|*}").unwrap();
+        assert_eq!(cf.reduced().to_string(), "{1|0}");
     }
 }
