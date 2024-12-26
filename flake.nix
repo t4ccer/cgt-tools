@@ -176,15 +176,12 @@
             pkgs.cargo-machete
             pkgs.cargo-modules
             pkgs.cargo-nextest
-            pkgs.cargo-semver-checks
             pkgs.cargo-tarpaulin
             pkgs.cargo-udeps
             pkgs.fd
             pkgs.graphviz
-            pkgs.heaptrack
             pkgs.hyperfine
             pkgs.maturin
-            pkgs.sage
             pkgs.texlive.combined.scheme-full
             pkgs.trunk
 
@@ -192,7 +189,7 @@
             pkgs.SDL2
 
             rustToolchain
-            pkgs.wineWow64Packages.unstableFull
+            # pkgs.wineWow64Packages.unstableFull
           ];
         };
         formatter = pkgs.alejandra;
