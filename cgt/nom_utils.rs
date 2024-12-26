@@ -4,7 +4,7 @@ use nom::{character::complete::multispace0, IResult, Parser};
 
 pub fn lexeme<'input, Output, Error, F>(
     mut inner: F,
-) -> impl FnMut(&'input str) -> IResult<&str, Output, Error>
+) -> impl FnMut(&'input str) -> IResult<&'input str, Output, Error>
 where
     F: Parser<&'input str, Output, Error>,
     Error: nom::error::ParseError<&'input str>,

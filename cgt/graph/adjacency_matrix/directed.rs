@@ -28,11 +28,20 @@ where
 {
     type VertexIter = std::iter::Map<std::ops::Range<usize>, fn(usize) -> VertexIndex>;
 
-    type AdjacentIter<'g> = AdjacentIter<'g, V> where V: 'g;
+    type AdjacentIter<'g>
+        = AdjacentIter<'g, V>
+    where
+        V: 'g;
 
-    type DegreeIter<'g> = DegreeIter<'g, V> where V: 'g;
+    type DegreeIter<'g>
+        = DegreeIter<'g, V>
+    where
+        V: 'g;
 
-    type EdgesIter<'g> = EdgesIter<'g, V> where V: 'g;
+    type EdgesIter<'g>
+        = EdgesIter<'g, V>
+    where
+        V: 'g;
 
     #[inline]
     fn empty(vertices: &[V]) -> Self
@@ -241,7 +250,7 @@ pub struct EdgesIter<'graph, V> {
     graph: &'graph DirectedGraph<V>,
 }
 
-impl<'graph, V> Iterator for EdgesIter<'graph, V>
+impl<V> Iterator for EdgesIter<'_, V>
 where
     V: Clone,
 {
@@ -268,7 +277,7 @@ where
     }
 }
 
-impl<'graph, V> FusedIterator for EdgesIter<'graph, V> where V: Clone {}
+impl<V> FusedIterator for EdgesIter<'_, V> where V: Clone {}
 
 /// Iterator of adjacent vertices. Obtained by calling [`Graph::adjacent_to`]
 #[derive(Debug)]
@@ -278,7 +287,7 @@ pub struct AdjacentIter<'graph, V> {
     graph: &'graph DirectedGraph<V>,
 }
 
-impl<'graph, V> Iterator for AdjacentIter<'graph, V>
+impl<V> Iterator for AdjacentIter<'_, V>
 where
     V: Clone,
 {
@@ -299,7 +308,7 @@ where
     }
 }
 
-impl<'graph, V> FusedIterator for AdjacentIter<'graph, V> where V: Clone {}
+impl<V> FusedIterator for AdjacentIter<'_, V> where V: Clone {}
 
 /// Iterator over degrees of vertices in a graph. Obtained with [`Graph::degrees`]
 #[derive(Debug)]
@@ -308,7 +317,7 @@ pub struct DegreeIter<'graph, V> {
     graph: &'graph DirectedGraph<V>,
 }
 
-impl<'graph, V> Iterator for DegreeIter<'graph, V>
+impl<V> Iterator for DegreeIter<'_, V>
 where
     V: Clone,
 {
@@ -329,7 +338,7 @@ where
     }
 }
 
-impl<'graph, V> FusedIterator for DegreeIter<'graph, V> where V: Clone {}
+impl<V> FusedIterator for DegreeIter<'_, V> where V: Clone {}
 
 /// ```text
 /// 1 -> 3 -> 2

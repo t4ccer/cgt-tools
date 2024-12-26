@@ -19,7 +19,7 @@ pub struct DyadicRationalNumber {
 
 impl DyadicRationalNumber {
     /// Create a new dyadic
-    pub fn new(numerator: i64, denominator_exponent: u32) -> Self {
+    pub const fn new(numerator: i64, denominator_exponent: u32) -> Self {
         Self {
             numerator,
             denominator_exponent,
@@ -36,6 +36,7 @@ impl DyadicRationalNumber {
     }
 
     /// Create a new fraction. Returns [None] if denominator is zero, or the number is not dyadic
+    #[must_use]
     pub fn new_fraction(numerator: i64, mut denominator: u32) -> Option<Self> {
         let mut denominator_exponent = 0;
 
@@ -58,11 +59,13 @@ impl DyadicRationalNumber {
     }
 
     /// Get the numerator (`n` from `n/2^m`)
+    #[must_use]
     pub const fn numerator(&self) -> i64 {
         self.numerator
     }
 
     /// Get the denominator (`2^m` from `n/2^m`) if it fits in [u128]
+    #[must_use]
     pub const fn denominator(&self) -> Option<u128> {
         if self.denominator_exponent as usize >= std::mem::size_of::<u128>() * 8 {
             None
@@ -77,24 +80,18 @@ impl DyadicRationalNumber {
         self.denominator_exponent
     }
 
-    fn normalized(mut self) -> Self {
-        self.normalize();
-        self
-    }
-
-    /// Internal function to normalize numbers
-    fn normalize(&mut self) {
-        // [2*(n)]/[2*d] = n/d
-        // while self.numerator.rem_euclid(2) == 0 && self.denominator_exponent != 0 {
+    #[must_use]
+    const fn normalized(mut self) -> Self {
         while self.numerator % 2 == 0 && self.denominator_exponent != 0 {
             self.numerator >>= 1_i32;
             self.denominator_exponent -= 1;
         }
+        self
     }
 
     /// Add to numerator. It is **NOT** addition function
     #[must_use]
-    pub fn step(&self, n: i64) -> Self {
+    pub const fn step(&self, n: i64) -> Self {
         Self {
             // numerator: self.numerator + (n << self.denominator_exponent),
             numerator: self.numerator + n,
@@ -104,13 +101,31 @@ impl DyadicRationalNumber {
     }
 
     /// Convert to intger if it's an integer
-    pub fn to_integer(&self) -> Option<i64> {
+    #[must_use]
+    pub const fn to_integer(&self) -> Option<i64> {
         // exponent == 0 => denominator == 1 => It's an integer
-        (self.denominator_exponent == 0).then_some(self.numerator)
+        if self.denominator_exponent == 0 {
+            Some(self.numerator)
+        } else {
+            None
+        }
+    }
+
+    /// Check if number equals to given integer
+    ///
+    /// This is a useful util in `const` context
+    #[must_use]
+    pub const fn eq_integer(&self, rhs: i64) -> bool {
+        // exponent == 0 => denominator == 1 => It's an integer
+        if self.denominator_exponent == 0 {
+            self.numerator == rhs
+        } else {
+            false
+        }
     }
 
     /// Ceil division
-    pub fn ceil(self) -> i64 {
+    pub const fn ceil(self) -> i64 {
         // TODO: use `div_ceil` when `int_roundings` lands in stable
         let n = self.numerator();
         let d = self
@@ -120,7 +135,7 @@ impl DyadicRationalNumber {
     }
 
     /// Round a dyadic to the nearest integer
-    pub fn round(self) -> i64 {
+    pub const fn round(self) -> i64 {
         self.numerator()
             / self
                 .denominator()

@@ -84,20 +84,20 @@ impl Nus {
 
     /// Check if the game has only number part (i.e. up multiple and nimber are zero).
     #[inline]
-    pub fn is_number(self) -> bool {
-        self.up_multiple() == 0 && self.nimber() == Nimber::from(0)
+    pub const fn is_number(self) -> bool {
+        self.up_multiple() == 0 && self.nimber().value() == 0
     }
 
     /// Check if the game has only integer number part
     #[inline]
-    pub fn is_integer(self) -> bool {
+    pub const fn is_integer(self) -> bool {
         self.is_number() && self.number().to_integer().is_some()
     }
 
     /// Check if the game is a nimber.
     #[inline]
-    pub fn is_nimber(self) -> bool {
-        self.number() == DyadicRationalNumber::from(0) && self.up_multiple() == 0
+    pub const fn is_nimber(self) -> bool {
+        self.number().eq_integer(0) && self.up_multiple() == 0
     }
 
     fn to_moves(self) -> Moves {
@@ -967,13 +967,13 @@ impl CanonicalForm {
 
     /// Check if a game is only a number
     #[inline]
-    pub fn is_number(&self) -> bool {
+    pub const fn is_number(&self) -> bool {
         matches!(self.inner, CanonicalFormInner::Nus(nus) if nus.is_number())
     }
 
     /// Check if a game is only a nimber
     #[inline]
-    pub fn is_nimber(&self) -> bool {
+    pub const fn is_nimber(&self) -> bool {
         matches!(self.inner, CanonicalFormInner::Nus(nus) if nus.is_nimber())
     }
 
@@ -989,15 +989,17 @@ impl CanonicalForm {
     }
 
     #[inline]
-    fn to_nus_unchecked(&self) -> Nus {
+    const fn to_nus_unchecked(&self) -> Nus {
         self.to_nus().expect("Not a nus")
     }
 
     /// Convert game to number if it is only a number (i.e. [`Self::is_number`])
     #[inline]
-    pub fn to_number(&self) -> Option<DyadicRationalNumber> {
-        self.to_nus()
-            .and_then(|nus| nus.is_number().then_some(nus.number()))
+    pub const fn to_number(&self) -> Option<DyadicRationalNumber> {
+        match self.to_nus() {
+            Some(nus) if nus.is_number() => Some(nus.number()),
+            _ => None,
+        }
     }
 
     /// Less than or equals comparison on two games
