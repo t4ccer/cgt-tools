@@ -166,6 +166,8 @@
             PATH=$PATH:$(pwd)/target/release
           '';
 
+          hardeningDisable = ["fortify"];
+
           nativeBuildInputs = [
             pkgs.${pythonToolchain}
             pkgs.${pythonToolchain}.pkgs.pip
