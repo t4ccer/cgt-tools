@@ -126,6 +126,7 @@ pub trait BitTile: Sized {
 
     /// Flip the tile
     #[inline]
+    #[must_use]
     fn flip(self) -> Self {
         Self::bool_to_tile(!self.tile_to_bool())
     }

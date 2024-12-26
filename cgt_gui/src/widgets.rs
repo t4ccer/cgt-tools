@@ -27,7 +27,10 @@ pub const TILE_SPACING: f32 = 4.0;
 pub const TILE_COLOR_EMPTY: ImColor32 = ImColor32::from_rgb(0xcc, 0xcc, 0xcc);
 pub const TILE_COLOR_FILLED: ImColor32 = ImColor32::from_rgb(0x44, 0x44, 0x44);
 
+#[allow(clippy::unreadable_literal)]
 pub const COLOR_BLUE: ImColor32 = ImColor32::from_bits(0xfffb4a4e);
+
+#[allow(clippy::unreadable_literal)]
 pub const COLOR_RED: ImColor32 = ImColor32::from_bits(0xff7226f9);
 
 const VERTEX_RADIUS: f32 = 16.0;
@@ -54,7 +57,7 @@ fn interactive_color(color: ImColor32, ui: &Ui) -> ImColor32 {
 }
 
 fn lerp(start: f32, end: f32, t: f32) -> f32 {
-    start + t * (end - start)
+    t.mul_add(end - start, start)
 }
 
 // FIXME: Height is too large if Y axis is not visible
@@ -71,8 +74,8 @@ fn thermograph_size(thermograph: &Thermograph) -> V2f {
         .unwrap_or(0.0);
 
     V2f {
-        x: x_len + THERMOGRAPH_AXIS_PAD * 2.0,
-        y: y_top_above_x_axis + 1.0 + THERMOGRAPH_TOP_MAST_LEN + THERMOGRAPH_AXIS_PAD * 2.0, // +1.0 to go up to -1 below y axis,
+        x: THERMOGRAPH_AXIS_PAD.mul_add(2.0, x_len),
+        y: THERMOGRAPH_AXIS_PAD.mul_add(2.0, y_top_above_x_axis + 1.0 + THERMOGRAPH_TOP_MAST_LEN), // +1.0 to go up to -1 below y axis,
     }
 }
 
@@ -110,15 +113,13 @@ pub fn thermograph<'ui>(
         .add_line(
             [
                 pos_x,
-                pos_y
-                    + (y_top_above_x_axis + THERMOGRAPH_TOP_MAST_LEN + THERMOGRAPH_AXIS_PAD)
-                        * thermograph_scale,
+                (y_top_above_x_axis + THERMOGRAPH_TOP_MAST_LEN + THERMOGRAPH_AXIS_PAD)
+                    .mul_add(thermograph_scale, pos_y),
             ],
             [
-                pos_x + thermograph_scale * (x_len + THERMOGRAPH_AXIS_PAD * 2.0),
-                pos_y
-                    + (y_top_above_x_axis + THERMOGRAPH_TOP_MAST_LEN + THERMOGRAPH_AXIS_PAD)
-                        * thermograph_scale,
+                thermograph_scale.mul_add(THERMOGRAPH_AXIS_PAD.mul_add(2.0, x_len), pos_x),
+                (y_top_above_x_axis + THERMOGRAPH_TOP_MAST_LEN + THERMOGRAPH_AXIS_PAD)
+                    .mul_add(thermograph_scale, pos_y),
             ],
             axis_color,
         )
@@ -136,17 +137,14 @@ pub fn thermograph<'ui>(
         draw_list
             .add_line(
                 [
-                    pos_x + (THERMOGRAPH_AXIS_PAD + y_axis_loc) * thermograph_scale,
+                    (THERMOGRAPH_AXIS_PAD + y_axis_loc).mul_add(thermograph_scale, pos_x),
                     pos_y,
                 ],
                 [
-                    pos_x + (THERMOGRAPH_AXIS_PAD + y_axis_loc) * thermograph_scale,
-                    pos_y
-                        + (y_top_above_x_axis
-                            + 1.0 // We need to go up to -1
-                            + THERMOGRAPH_TOP_MAST_LEN
-                            + THERMOGRAPH_AXIS_PAD * 2.0)
-                            * thermograph_scale,
+                    (THERMOGRAPH_AXIS_PAD + y_axis_loc).mul_add(thermograph_scale, pos_x),
+                    THERMOGRAPH_AXIS_PAD
+                        .mul_add(2.0, y_top_above_x_axis + 1.0 + THERMOGRAPH_TOP_MAST_LEN)
+                        .mul_add(thermograph_scale, pos_y),
                 ],
                 axis_color,
             )
@@ -162,7 +160,7 @@ pub fn thermograph<'ui>(
 
     draw_trajectory(
         ui,
-        &draw_list,
+        draw_list,
         [pos_x, pos_y],
         x_offset,
         thermograph_scale,
@@ -172,7 +170,7 @@ pub fn thermograph<'ui>(
     );
     draw_trajectory(
         ui,
-        &draw_list,
+        draw_list,
         [pos_x, pos_y],
         x_offset,
         thermograph_scale,
@@ -204,28 +202,23 @@ fn draw_trajectory<'ui>(
     let mut prev_y = y_top_above_x_axis + THERMOGRAPH_TOP_MAST_LEN;
 
     let arrow_top_point = [
-        pos_x + (THERMOGRAPH_AXIS_PAD + x_offset - prev_x) * thermograph_scale,
-        pos_y
-            + (THERMOGRAPH_AXIS_PAD + y_top_above_x_axis + THERMOGRAPH_TOP_MAST_LEN - prev_y)
-                * thermograph_scale,
+        (THERMOGRAPH_AXIS_PAD + x_offset - prev_x).mul_add(thermograph_scale, pos_x),
+        (THERMOGRAPH_AXIS_PAD + y_top_above_x_axis + THERMOGRAPH_TOP_MAST_LEN - prev_y)
+            .mul_add(thermograph_scale, pos_y),
     ];
     let arrow_left_point = [
-        pos_x
-            + (THERMOGRAPH_AXIS_PAD + x_offset - prev_x - THERMOGRAPH_ARROW_SIZE)
-                * thermograph_scale,
-        pos_y
-            + (THERMOGRAPH_AXIS_PAD + y_top_above_x_axis + THERMOGRAPH_TOP_MAST_LEN - prev_y
-                + THERMOGRAPH_ARROW_SIZE)
-                * thermograph_scale,
+        (THERMOGRAPH_AXIS_PAD + x_offset - prev_x - THERMOGRAPH_ARROW_SIZE)
+            .mul_add(thermograph_scale, pos_x),
+        (THERMOGRAPH_AXIS_PAD + y_top_above_x_axis + THERMOGRAPH_TOP_MAST_LEN - prev_y
+            + THERMOGRAPH_ARROW_SIZE)
+            .mul_add(thermograph_scale, pos_y),
     ];
     let arrow_right_point = [
-        pos_x
-            + (THERMOGRAPH_AXIS_PAD + x_offset - prev_x + THERMOGRAPH_ARROW_SIZE)
-                * thermograph_scale,
-        pos_y
-            + (THERMOGRAPH_AXIS_PAD + y_top_above_x_axis + THERMOGRAPH_TOP_MAST_LEN - prev_y
-                + THERMOGRAPH_ARROW_SIZE)
-                * thermograph_scale,
+        (THERMOGRAPH_AXIS_PAD + x_offset - prev_x + THERMOGRAPH_ARROW_SIZE)
+            .mul_add(thermograph_scale, pos_x),
+        (THERMOGRAPH_AXIS_PAD + y_top_above_x_axis + THERMOGRAPH_TOP_MAST_LEN - prev_y
+            + THERMOGRAPH_ARROW_SIZE)
+            .mul_add(thermograph_scale, pos_y),
     ];
 
     let trajectory_color = ui.style_color(StyleColor::Text);
@@ -252,16 +245,14 @@ fn draw_trajectory<'ui>(
         let this_x = this_x_r.as_f32().unwrap();
 
         let prev_point = [
-            pos_x + (THERMOGRAPH_AXIS_PAD + x_offset - prev_x) * thermograph_scale,
-            pos_y
-                + (THERMOGRAPH_AXIS_PAD + y_top_above_x_axis + THERMOGRAPH_TOP_MAST_LEN - prev_y)
-                    * thermograph_scale,
+            (THERMOGRAPH_AXIS_PAD + x_offset - prev_x).mul_add(thermograph_scale, pos_x),
+            (THERMOGRAPH_AXIS_PAD + y_top_above_x_axis + THERMOGRAPH_TOP_MAST_LEN - prev_y)
+                .mul_add(thermograph_scale, pos_y),
         ];
         let this_point = [
-            pos_x + (THERMOGRAPH_AXIS_PAD + x_offset - this_x) * thermograph_scale,
-            pos_y
-                + (THERMOGRAPH_AXIS_PAD + y_top_above_x_axis + THERMOGRAPH_TOP_MAST_LEN - this_y)
-                    * thermograph_scale,
+            (THERMOGRAPH_AXIS_PAD + x_offset - this_x).mul_add(thermograph_scale, pos_x),
+            (THERMOGRAPH_AXIS_PAD + y_top_above_x_axis + THERMOGRAPH_TOP_MAST_LEN - this_y)
+                .mul_add(thermograph_scale, pos_y),
         ];
 
         // Skip highest point when drawing left side - point is the same as that is the
@@ -327,8 +318,8 @@ where
             let _x_id = ui.push_id_usize(grid_x as usize);
 
             ui.set_cursor_pos([
-                grid_start_pos_x + (TILE_SIZE + TILE_SPACING) * grid_x as f32,
-                grid_start_pos_y + (TILE_SIZE + TILE_SPACING) * grid_y as f32,
+                (TILE_SIZE + TILE_SPACING).mul_add(grid_x as f32, grid_start_pos_x),
+                (TILE_SIZE + TILE_SPACING).mul_add(grid_y as f32, grid_start_pos_y),
             ]);
 
             let pos = V2f::from(ui.cursor_screen_pos());
@@ -345,7 +336,7 @@ where
 
     ui.set_cursor_pos([
         grid_start_pos_x,
-        grid_start_pos_y + (TILE_SIZE + TILE_SPACING) * height as f32,
+        (TILE_SIZE + TILE_SPACING).mul_add(height as f32, grid_start_pos_y),
     ]);
 
     action
@@ -415,7 +406,7 @@ struct GraphEditor {
 }
 
 impl GraphEditor {
-    fn new() -> GraphEditor {
+    const fn new() -> GraphEditor {
         GraphEditor {
             new_edge_starting_vertex: None,
             graph_panel_size: V2f::ZERO,
@@ -506,7 +497,7 @@ impl GraphEditor {
             let off_x = ui.calc_text_size(&scratch_buffer)[0];
             draw_list.add_text(
                 [
-                    this_vertex_pos.x - off_x * 0.5,
+                    off_x.mul_add(-0.5, this_vertex_pos.x),
                     this_vertex_pos.y + VERTEX_RADIUS,
                 ],
                 vertex_border_color,
@@ -542,18 +533,24 @@ impl GraphEditor {
                             .add_triangle(
                                 edge_end_pos,
                                 V2f {
-                                    x: edge_end_pos.x - direction.x * ARROW_HEAD_SIZE
-                                        + direction.y * ARROW_HEAD_SIZE,
-                                    y: edge_end_pos.y
-                                        - direction.y * ARROW_HEAD_SIZE
-                                        - direction.x * ARROW_HEAD_SIZE,
+                                    x: direction.y.mul_add(
+                                        ARROW_HEAD_SIZE,
+                                        direction.x.mul_add(-ARROW_HEAD_SIZE, edge_end_pos.x),
+                                    ),
+                                    y: direction.x.mul_add(
+                                        -ARROW_HEAD_SIZE,
+                                        direction.y.mul_add(-ARROW_HEAD_SIZE, edge_end_pos.y),
+                                    ),
                                 },
                                 V2f {
-                                    x: edge_end_pos.x
-                                        - direction.x * ARROW_HEAD_SIZE
-                                        - direction.y * ARROW_HEAD_SIZE,
-                                    y: edge_end_pos.y - direction.y * ARROW_HEAD_SIZE
-                                        + direction.x * ARROW_HEAD_SIZE,
+                                    x: direction.y.mul_add(
+                                        -ARROW_HEAD_SIZE,
+                                        direction.x.mul_add(-ARROW_HEAD_SIZE, edge_end_pos.x),
+                                    ),
+                                    y: direction.x.mul_add(
+                                        ARROW_HEAD_SIZE,
+                                        direction.y.mul_add(-ARROW_HEAD_SIZE, edge_end_pos.y),
+                                    ),
                                 },
                                 vertex_border_color,
                             )
@@ -576,7 +573,7 @@ impl GraphEditor {
         let item_spacing_y = unsafe { ui.style().item_spacing[1] };
         self.graph_panel_size = V2f {
             x: ui.current_column_width(),
-            y: ui.window_size()[1] - control_panel_height - item_spacing_y * 2.0,
+            y: item_spacing_y.mul_add(-2.0, ui.window_size()[1] - control_panel_height),
         };
         if new_vertex_mode && ui.invisible_button("Add vertex", self.graph_panel_size) {
             let mouse_pos = V2f::from(ui.io().mouse_pos);

@@ -12,6 +12,9 @@ keywords = ["cgt"]
 categories = ["mathematics", "science"]
 documentation = "https://docs.rs/cgt_derive"
 
+[lints]
+workspace = true
+
 [lib]
 proc-macro = true
 

@@ -228,6 +228,7 @@ where
     }
 
     /// Make a move, does not verify if the move is legal
+    #[must_use]
     pub fn move_in(&self, m: Move) -> Self
     where
         G: Clone,
@@ -290,7 +291,7 @@ where
                     match self.grid.get(x, y) {
                         Tile::Empty => {}
                         Tile::LeftJumper | Tile::LeftSlipper => {
-                            value += self.grid.width() as i64 - x as i64
+                            value += self.grid.width() as i64 - x as i64;
                         }
                         Tile::RightJumper | Tile::RightSlipper => value -= (x + 1) as i64,
                     }

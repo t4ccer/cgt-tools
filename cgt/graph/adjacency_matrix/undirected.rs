@@ -48,7 +48,7 @@ where
     }
 
     fn remove_vertex(&mut self, vertex_to_remove: VertexIndex) {
-        self.0.remove_vertex(vertex_to_remove)
+        self.0.remove_vertex(vertex_to_remove);
     }
 
     fn remove_vertices(&mut self, vertices_to_remove: &mut [VertexIndex]) {
@@ -60,7 +60,7 @@ where
         self.0.connect(rhs_vertex, lhs_vertex, connect);
     }
 
-    fn adjacent_to<'g>(&'g self, vertex: VertexIndex) -> Self::AdjacentIter<'g> {
+    fn adjacent_to(&self, vertex: VertexIndex) -> Self::AdjacentIter<'_> {
         self.0.adjacent_to(vertex)
     }
 
@@ -68,7 +68,7 @@ where
         self.0.are_adjacent(lhs_vertex, rhs_vertex)
     }
 
-    fn edges<'g>(&'g self) -> Self::EdgesIter<'g> {
+    fn edges(&self) -> Self::EdgesIter<'_> {
         EdgesIter {
             u: VertexIndex { index: 0 },
             v: VertexIndex { index: 0 },
@@ -76,7 +76,7 @@ where
         }
     }
 
-    fn degrees<'g>(&'g self) -> Self::DegreeIter<'g> {
+    fn degrees(&self) -> Self::DegreeIter<'_> {
         DegreeIter {
             idx: VertexIndex { index: 0 },
             graph: self,

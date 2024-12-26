@@ -51,7 +51,7 @@ where
         self.vertices.len()
     }
 
-    fn vertex_indices<'g>(&'g self) -> Self::VertexIter {
+    fn vertex_indices(&self) -> Self::VertexIter {
         (0..self.size()).map(|index| VertexIndex { index })
     }
 
@@ -166,7 +166,7 @@ where
         self.adjacency_matrix[size * lhs_vertex.index + rhs_vertex.index] = connect;
     }
 
-    fn adjacent_to<'g>(&'g self, vertex: VertexIndex) -> Self::AdjacentIter<'g> {
+    fn adjacent_to(&self, vertex: VertexIndex) -> Self::AdjacentIter<'_> {
         AdjacentIter {
             vertex,
             idx: VertexIndex { index: 0 },
@@ -178,7 +178,7 @@ where
         self.adjacency_matrix[self.size() * lhs_vertex.index + rhs_vertex.index]
     }
 
-    fn edges<'g>(&'g self) -> Self::EdgesIter<'g> {
+    fn edges(&self) -> Self::EdgesIter<'_> {
         EdgesIter {
             u: VertexIndex { index: 0 },
             v: VertexIndex { index: 0 },
@@ -186,7 +186,7 @@ where
         }
     }
 
-    fn degrees<'g>(&'g self) -> Self::DegreeIter<'g> {
+    fn degrees(&self) -> Self::DegreeIter<'_> {
         DegreeIter {
             idx: VertexIndex { index: 0 },
             graph: self,

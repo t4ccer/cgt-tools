@@ -1298,6 +1298,7 @@ impl CanonicalForm {
     }
 
     /// See: The Reduced Canonical Form Of a Game p. 411
+    #[must_use]
     pub fn star_projection(&self) -> Self {
         if let Some(nus) = self.to_nus() {
             if (nus.nimber() == Nimber::new(0) || nus.nimber() == Nimber::new(1))
@@ -1323,6 +1324,7 @@ impl CanonicalForm {
     }
 
     /// See: The Reduced Canonical Form Of a Game p. 411
+    #[must_use]
     pub fn cool_by_star(&self) -> Self {
         if self.to_nus().is_some_and(Nus::is_number) {
             return self.clone();
@@ -1355,6 +1357,7 @@ impl CanonicalForm {
 
     /// A reduced canonical form of `G` is `\bar{G}`, such that `\bar{G} = \bar{H}`
     /// whenever `G - H` is infinitesimal.
+    #[must_use]
     pub fn reduced(&self) -> Self {
         self.cool_by_star().star_projection()
     }

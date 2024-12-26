@@ -12,6 +12,9 @@ keywords = ["cgt"]
 categories = ["mathematics", "science"]
 documentation = "https://docs.rs/cgt"
 
+[lints]
+workspace = true
+
 [dependencies]
 ahash = "0.8"
 append-only-vec = "0.1"
@@ -44,3 +47,27 @@ exclude = ["vendor"]
 [profile.release]
 lto = true
 panic = "abort"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+new_without_default = "allow"
+similar_names = "allow"
+must_use_candidate = "allow"
+cast_lossless = "allow"
+cast_possible_wrap = "allow"
+cast_sign_loss = "allow"
+cast_possible_truncation = "allow"
+module_name_repetitions = "allow"
+uninlined_format_args = "allow"
+too_many_lines = "allow"
+cognitive_complexity = "allow"
+needless_update = "allow"
+cast_precision_loss = "allow"
+missing_panics_doc = "allow"
+use_self = "allow"
+inline_always = "allow"
+too_many_arguments = "allow"
+fn_params_excessive_bools = "allow"
+single_match_else = "allow"

@@ -74,7 +74,7 @@ impl VertexKind {
     }
 
     #[inline]
-    fn degree_factor(self) -> usize {
+    const fn degree_factor(self) -> usize {
         match self {
             VertexKind::Single(_) => 1,
             VertexKind::Cluster(_, cluster_size) => cluster_size.get() as usize,
@@ -132,7 +132,7 @@ where
     G: Graph<V> + Clone,
 {
     /// Create new Snort position from graph
-    pub fn new(graph: G) -> Self {
+    pub const fn new(graph: G) -> Self {
         Self {
             graph,
             _v: PhantomData,
@@ -177,7 +177,6 @@ where
     pub fn degree(&self) -> usize {
         self.graph
             .vertex_indices()
-            .into_iter()
             .map(|v| self.vertex_degree(v))
             .max()
             .unwrap_or(0)
@@ -190,7 +189,6 @@ where
     pub fn second_degree(&self) -> usize {
         self.graph
             .vertex_indices()
-            .into_iter()
             .map(|v| self.vertex_second_degree(v))
             .max()
             .unwrap_or(0)
@@ -213,6 +211,7 @@ where
 
     /// Return position after player move in a given vertex. Note that it does not check
     /// if the move is legal
+    #[must_use]
     pub fn move_in_vertex<const COLOR: u8>(&self, move_vertex_idx: VertexIndex) -> Self {
         let own_tint_color: VertexColor = VertexColor::try_from(COLOR).unwrap();
         let mut position: Self = self.clone();

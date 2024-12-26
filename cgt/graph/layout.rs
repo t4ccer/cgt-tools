@@ -90,8 +90,10 @@ impl CircleEdge {
         for i in graph.vertex_indices() {
             let angle = (2.0 * PI * i.index as f32) / n as f32;
             let vertex_pos = V2f {
-                x: (self.circle_radius - self.vertex_radius) * f32::cos(angle) + self.circle_radius,
-                y: (self.circle_radius - self.vertex_radius) * f32::sin(angle) + self.circle_radius,
+                x: (self.circle_radius - self.vertex_radius)
+                    .mul_add(f32::cos(angle), self.circle_radius),
+                y: (self.circle_radius - self.vertex_radius)
+                    .mul_add(f32::sin(angle), self.circle_radius),
             };
             *graph.get_vertex_mut(i).get_inner_mut() = vertex_pos;
         }

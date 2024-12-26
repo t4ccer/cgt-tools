@@ -52,7 +52,7 @@ pub trait Graph<V>: Sized {
         // Vertex indices shift as we remove them so we need to sort them
         // to remove them in correct order and adjust indices as we go
         vertices_to_remove.sort_unstable();
-        for (idx, v) in vertices_to_remove.into_iter().enumerate() {
+        for (idx, v) in vertices_to_remove.iter_mut().enumerate() {
             self.remove_vertex(VertexIndex {
                 index: v.index - idx,
             });
@@ -63,7 +63,7 @@ pub trait Graph<V>: Sized {
     fn connect(&mut self, lhs_vertex: VertexIndex, rhs_vertex: VertexIndex, connect: bool);
 
     /// Get iterator over vertices adjacent to given vertex
-    fn adjacent_to<'g>(&'g self, vertex: VertexIndex) -> Self::AdjacentIter<'g>;
+    fn adjacent_to(&self, vertex: VertexIndex) -> Self::AdjacentIter<'_>;
 
     /// Check if two vertices are adjacent
     /// (i.e. there exists an out-edge from `lhs_vertex` to `rhs_vertex`)
@@ -73,10 +73,10 @@ pub trait Graph<V>: Sized {
     }
 
     /// Get iterator over edges
-    fn edges<'g>(&'g self) -> Self::EdgesIter<'g>;
+    fn edges(&self) -> Self::EdgesIter<'_>;
 
     /// Get iterator over vertex degrees, in order
-    fn degrees<'g>(&'g self) -> Self::DegreeIter<'g>;
+    fn degrees(&self) -> Self::DegreeIter<'_>;
 
     /// Get degree of a vertex
     fn vertex_degree(&self, vertex: VertexIndex) -> usize;
@@ -90,7 +90,7 @@ pub trait Graph<V>: Sized {
     /// Create nw graph from adjacency matrix.
     #[inline]
     fn from_matrix(matrix: &[&[bool]], vertices: &[V]) -> Option<Self> {
-        let vec: Vec<bool> = matrix.iter().map(|r| r.iter()).flatten().copied().collect();
+        let vec: Vec<bool> = matrix.iter().flat_map(|r| r.iter()).copied().collect();
         Self::from_flat_matrix(&vec, vertices)
     }
 

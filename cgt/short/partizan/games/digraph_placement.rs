@@ -1,6 +1,6 @@
 //! Digraph Placement Game
 //!
-//! http://arxiv.org/abs/2407.12219
+//! <http://arxiv.org/abs/2407.12219>
 
 use std::{hash::Hash, marker::PhantomData};
 
@@ -46,7 +46,7 @@ where
     G: Graph<V> + Clone,
 {
     /// Create new Digraph Placement position from underyling graph
-    pub fn new(graph: G) -> Self {
+    pub const fn new(graph: G) -> Self {
         Self {
             graph,
             _ty: PhantomData,
@@ -55,6 +55,7 @@ where
 
     /// Return position after player move in a given vertex. Note that it does not check
     /// if the move is legal
+    #[must_use]
     pub fn move_in_vertex(&self, move_vertex_idx: VertexIndex) -> Self {
         let mut position = self.clone();
         let mut to_remove = vec![move_vertex_idx];

@@ -31,44 +31,42 @@ fn to_tile_attr(variant: Variant) -> TileAttr {
             if meta.tokens.is_empty() {
                 continue;
             }
-        } else {
-            continue;
+
+            attr.parse_nested_meta(|meta| {
+                if meta.path.is_ident(TILE_ATTR_DEFAULT) {
+                    tile.is_default = true;
+                    return Ok(());
+                }
+
+                if meta.path.is_ident(TILE_ATTR_CHAR) {
+                    let content;
+                    parenthesized!(content in meta.input);
+                    let lit: LitChar = content.parse()?;
+                    tile.tile_char = Some(lit.value());
+                    return Ok(());
+                }
+
+                if meta.path.is_ident(TILE_ATTR_BOOL) {
+                    let content;
+                    parenthesized!(content in meta.input);
+                    let lit: LitBool = content.parse()?;
+                    tile.tile_bool = Some(lit.value());
+                    return Ok(());
+                }
+
+                Err(meta.error(format!(
+                    "Invalid attribute: '{}'",
+                    meta.path.get_ident().unwrap()
+                )))
+            })
+            .unwrap_or_else(|err| panic!("{}", err));
         }
-
-        attr.parse_nested_meta(|meta| {
-            if meta.path.is_ident(TILE_ATTR_DEFAULT) {
-                tile.is_default = true;
-                return Ok(());
-            }
-
-            if meta.path.is_ident(TILE_ATTR_CHAR) {
-                let content;
-                parenthesized!(content in meta.input);
-                let lit: LitChar = content.parse()?;
-                tile.tile_char = Some(lit.value());
-                return Ok(());
-            }
-
-            if meta.path.is_ident(TILE_ATTR_BOOL) {
-                let content;
-                parenthesized!(content in meta.input);
-                let lit: LitBool = content.parse()?;
-                tile.tile_bool = Some(lit.value());
-                return Ok(());
-            }
-
-            Err(meta.error(format!(
-                "Invalid attribute: '{}'",
-                meta.path.get_ident().unwrap()
-            )))
-        })
-        .unwrap_or_else(|err| panic!("{}", err));
     }
 
     tile
 }
 
-pub(crate) fn derive(input: TokenStream) -> TokenStream {
+pub fn derive(input: TokenStream) -> TokenStream {
     // TODO: Detect external usage and use '::cgt' instead
     // maybe via bootstrap internal feature
     let cgt_crate = quote! {crate};
@@ -114,36 +112,38 @@ pub(crate) fn derive(input: TokenStream) -> TokenStream {
 
         let tile_to_chars = tiles
             .iter()
-            .flat_map(|tile| match tile.tile_char {
-                Some(c) => {
-                    let constr = &tile.ident;
-                    Some(quote! {
-                        #tile_enum_name::#constr => #c
-                    })
-                }
-                None => {
-                    without_char += 1;
-                    None
-                }
+            .filter_map(|tile| {
+                tile.tile_char.map_or_else(
+                    || {
+                        without_char += 1;
+                        None
+                    },
+                    |c| {
+                        let constr = &tile.ident;
+                        Some(quote! {
+                            #tile_enum_name::#constr => #c
+                        })
+                    },
+                )
             })
             .collect::<Vec<_>>();
 
         let char_to_tiles = tiles
             .iter()
-            .flat_map(|tile| match tile.tile_char {
-                Some(c) => {
+            .filter_map(|tile| {
+                tile.tile_char.map(|c| {
                     let constr = &tile.ident;
                     Some(quote! {
                         #c => ::core::option::Option::Some(#tile_enum_name::#constr)
                     })
-                }
-                None => None,
+                })
             })
             .collect::<Vec<_>>();
 
-        if without_char > 0 && without_char != tiles.len() {
-            panic!("Either all or no tiles must have 'char' attribute");
-        }
+        assert!(
+            !(without_char > 0 && without_char != tiles.len()),
+            "Either all or no tiles must have 'char' attribute"
+        );
 
         // don't generate CharTile implementation
         if without_char == tiles.len() {
@@ -176,7 +176,7 @@ pub(crate) fn derive(input: TokenStream) -> TokenStream {
         let mut case_true = None;
         let mut case_false = None;
 
-        tiles.iter().for_each(|tile| {
+        for tile in &tiles {
             let constr = &tile.ident;
 
             if let Some(b) = tile.tile_bool {
@@ -194,14 +194,15 @@ pub(crate) fn derive(input: TokenStream) -> TokenStream {
                     }
                 }
             }
-        });
+        }
 
         if with_bool == 0 {
             None
         } else {
-            if with_bool != tiles.len() {
-                panic!("Either all or no tiles must have 'bool' attribute");
-            }
+            assert!(
+                with_bool == tiles.len(),
+                "Either all or no tiles must have 'bool' attribute"
+            );
 
             let case_true = case_true.unwrap();
             let case_false = case_false.unwrap();

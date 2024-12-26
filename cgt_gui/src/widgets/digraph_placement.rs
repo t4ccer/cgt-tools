@@ -172,8 +172,14 @@ impl DigraphPlacementWindow {
                             y: VERTEX_RADIUS,
                         },
                         V2f {
-                            x: f32::max(VERTEX_RADIUS, graph_panel_size.x - VERTEX_RADIUS * 2.0),
-                            y: f32::max(VERTEX_RADIUS, graph_panel_size.y - VERTEX_RADIUS * 2.0),
+                            x: f32::max(
+                                VERTEX_RADIUS,
+                                VERTEX_RADIUS.mul_add(-2.0, graph_panel_size.x),
+                            ),
+                            y: f32::max(
+                                VERTEX_RADIUS,
+                                VERTEX_RADIUS.mul_add(-2.0, graph_panel_size.y),
+                            ),
                         },
                     )),
                 };
@@ -195,13 +201,10 @@ impl IsCgtWindow for TitledWindow<DigraphPlacementWindow> {
     }
     fn update(&mut self, update: crate::UpdateKind) {
         let graph = self.content.game.graph.map(|v| v.color);
-        match update {
-            UpdateKind::DigraphPlacementDetails(game, details) => {
-                if graph == game.graph {
-                    self.content.details = Some(details);
-                }
+        if let UpdateKind::DigraphPlacementDetails(game, details) = update {
+            if graph == game.graph {
+                self.content.details = Some(details);
             }
-            _ => {}
         }
     }
 
@@ -296,7 +299,6 @@ impl IsCgtWindow for TitledWindow<DigraphPlacementWindow> {
                     widgets::GraphEditorAction::None => {}
                     widgets::GraphEditorAction::VertexClick(clicked_vertex) => {
                         match self.content.editing_mode.get() {
-                            GraphEditingMode::DragVertex => {}
                             GraphEditingMode::ColorVertexBlue => {
                                 self.content.game.graph.get_vertex_mut(clicked_vertex).color =
                                     VertexColor::Left;
@@ -329,12 +331,13 @@ impl IsCgtWindow for TitledWindow<DigraphPlacementWindow> {
                                     is_dirty = true;
                                 }
                             }
-                            GraphEditingMode::AddVertex => {}
                             GraphEditingMode::DeleteVertex => {
                                 self.content.game.graph.remove_vertex(clicked_vertex);
                                 is_dirty = true;
                             }
-                            GraphEditingMode::AddEdge => {}
+                            GraphEditingMode::AddVertex
+                            | GraphEditingMode::DragVertex
+                            | GraphEditingMode::AddEdge => {}
                         }
                     }
                     widgets::GraphEditorAction::NewVertex(position, connection) => {

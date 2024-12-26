@@ -87,9 +87,9 @@ impl IsCgtWindow for TitledWindow<DomineeringWindow> {
                     &draw_list,
                     self.content.game.grid(),
                     |screen_pos, _, tile, draw_list| {
-                        let color = match tile.tile_to_bool() {
-                            false => TILE_COLOR_EMPTY,
-                            true => TILE_COLOR_FILLED,
+                        let color = match tile {
+                            Tile::Empty => TILE_COLOR_EMPTY,
+                            Tile::Taken => TILE_COLOR_FILLED,
                         };
                         let color = interactive_color(color, ui);
                         draw_list
@@ -142,13 +142,14 @@ impl IsCgtWindow for TitledWindow<DomineeringWindow> {
                     ui.set_column_width(
                         0,
                         f32::max(
-                            pad_x + (widgets::TILE_SIZE + widgets::TILE_SPACING) * new_width as f32,
+                            (widgets::TILE_SIZE + widgets::TILE_SPACING)
+                                .mul_add(new_width as f32, pad_x),
                             ui.column_width(0),
                         ),
                     );
                     ctx.schedule_task(Task::EvalDomineering(EvalTask {
                         window: self.window_id,
-                        game: self.content.game.clone(),
+                        game: self.content.game,
                     }));
                 }
             });

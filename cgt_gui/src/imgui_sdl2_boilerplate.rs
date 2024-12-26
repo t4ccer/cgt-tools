@@ -10,7 +10,7 @@ use sdl2::{
 // Create a new glow context.
 fn glow_context(window: &Window) -> glow::Context {
     unsafe {
-        glow::Context::from_loader_function(|s| window.subsystem().gl_get_proc_address(s) as _)
+        glow::Context::from_loader_function(|s| window.subsystem().gl_get_proc_address(s).cast())
     }
 }
 

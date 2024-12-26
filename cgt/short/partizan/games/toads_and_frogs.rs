@@ -42,7 +42,7 @@ pub struct ToadsAndFrogs {
 
 impl ToadsAndFrogs {
     /// Creates a new Toads and Frogs game from a row of tiles
-    pub fn new(tiles: Vec<Tile>) -> Self {
+    pub const fn new(tiles: Vec<Tile>) -> Self {
         Self { tiles }
     }
 }

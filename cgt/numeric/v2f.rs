@@ -26,14 +26,17 @@ impl From<[f32; 2]> for V2f {
 impl V2f {
     pub const ZERO: V2f = V2f { x: 0.0, y: 0.0 };
 
+    #[must_use]
     pub fn distance_squared(u: V2f, v: V2f) -> f32 {
-        (v.x - u.x) * (v.x - u.x) + (v.y - u.y) * (v.y - u.y)
+        (v.x - u.x).mul_add(v.x - u.x, (v.y - u.y) * (v.y - u.y))
     }
 
+    #[must_use]
     pub fn distance(u: V2f, v: V2f) -> f32 {
-        f32::sqrt((v.x - u.x) * (v.x - u.x) + (v.y - u.y) * (v.y - u.y))
+        f32::sqrt((v.x - u.x).mul_add(v.x - u.x, (v.y - u.y) * (v.y - u.y)))
     }
 
+    #[must_use]
     pub fn direction(u: V2f, v: V2f) -> V2f {
         (V2f {
             x: v.x - u.x,
@@ -42,10 +45,12 @@ impl V2f {
         .normalized()
     }
 
+    #[must_use]
     pub fn length(self) -> f32 {
-        f32::sqrt(self.x * self.x + self.y * self.y)
+        f32::sqrt(self.x.mul_add(self.x, self.y * self.y))
     }
 
+    #[must_use]
     pub fn normalized(self) -> V2f {
         let l = self.length();
         if l == 0.0 {

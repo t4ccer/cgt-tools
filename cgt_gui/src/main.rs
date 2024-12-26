@@ -42,7 +42,7 @@ pub struct Details {
 
 impl Details {
     // HACK: Very bugly hack to let us reuse drawing macro even when details are not optional
-    pub fn as_ref(&self) -> Option<&Details> {
+    pub const fn as_ref(&self) -> Option<&Details> {
         Some(self)
     }
 }
@@ -55,7 +55,7 @@ pub struct DetailOptions {
 }
 
 impl DetailOptions {
-    pub fn new() -> DetailOptions {
+    pub const fn new() -> DetailOptions {
         DetailOptions {
             show_thermograph: true,
             thermograph_fit: true,
@@ -90,7 +90,7 @@ pub struct TitledWindow<G> {
 }
 
 impl<G> TitledWindow<G> {
-    pub fn without_title(content: G) -> TitledWindow<G> {
+    pub const fn without_title(content: G) -> TitledWindow<G> {
         TitledWindow {
             window_id: WindowId(usize::MAX),
             title: String::new(),
@@ -170,10 +170,7 @@ pub struct RawOf<T> {
 
 impl<T> Clone for RawOf<T> {
     fn clone(&self) -> Self {
-        Self {
-            value: self.value,
-            _ty: PhantomData,
-        }
+        *self
     }
 }
 
@@ -279,7 +276,11 @@ impl GuiContext {
         GuiContext {
             new_windows: Vec::new(),
             removed_windows: Vec::new(),
-            large_font_id: unsafe { core::mem::transmute(core::ptr::null::<imgui::Font>()) },
+            large_font_id: unsafe {
+                core::mem::transmute::<*const imgui::Font, imgui::FontId>(core::ptr::null::<
+                    imgui::Font,
+                >())
+            },
             tasks,
         }
     }
@@ -329,6 +330,7 @@ pub struct SchedulerContext {
     >,
 }
 
+#[allow(clippy::needless_pass_by_value)]
 fn scheduler(ctx: SchedulerContext) {
     macro_rules! handle_game_update {
         ($task:expr, $details:ident, $tt:ident) => {
@@ -504,7 +506,7 @@ fn main() {
             }
         }
 
-        for (&wid, d) in windows.iter_mut() {
+        for (&wid, d) in &mut windows {
             d.draw(ui, &mut gui_context);
             if !d.is_open() {
                 gui_context.removed_windows.push(wid);

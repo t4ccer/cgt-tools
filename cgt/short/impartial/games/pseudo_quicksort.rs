@@ -27,7 +27,7 @@ impl Display for PseudoQuicksort {
 impl PseudoQuicksort {
     /// Create new quicksort position from a given sequence
     #[inline]
-    pub fn new(sequence: Vec<u32>) -> Self {
+    pub const fn new(sequence: Vec<u32>) -> Self {
         Self { sequence }
     }
 

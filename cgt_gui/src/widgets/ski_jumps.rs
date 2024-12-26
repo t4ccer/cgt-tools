@@ -15,6 +15,8 @@ use crate::{
     DetailOptions, Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow,
 };
 
+const OFF_BUTTON_SCALE: f32 = 0.3;
+
 imgui_enum! {
     GridEditingMode {
         LeftJumper, "Place Left Jumper",
@@ -64,7 +66,6 @@ impl IsCgtWindow for TitledWindow<SkiJumpsWindow> {
         let mut new_height = height;
 
         let mut is_dirty = false;
-        const OFF_BUTTON_SCALE: f32 = 0.3;
 
         ui.window(&self.title)
             .position(ui.io().mouse_pos, Condition::Appearing)
@@ -127,8 +128,8 @@ impl IsCgtWindow for TitledWindow<SkiJumpsWindow> {
                         for grid_y in 0..height {
                             let _y_id = ui.push_id_usize(grid_y as usize);
                             ui.set_cursor_pos([
-                                grid_start_pos.x + (TILE_SIZE + TILE_SPACING) * $start_x as f32,
-                                grid_start_pos.y + (TILE_SIZE + TILE_SPACING) * grid_y as f32,
+                                (TILE_SIZE + TILE_SPACING).mul_add(width as f32, grid_start_pos.x),
+                                (TILE_SIZE + TILE_SPACING).mul_add(grid_y as f32, grid_start_pos.y),
                             ]);
                             let pos = V2f::from(ui.cursor_screen_pos());
                             let button_size = V2f {
@@ -149,8 +150,8 @@ impl IsCgtWindow for TitledWindow<SkiJumpsWindow> {
                         }
                         ui.set_cursor_pos([
                             grid_start_pos.x,
-                            grid_start_pos.y
-                                + (TILE_SIZE + TILE_SPACING + TILE_SPACING) * height as f32,
+                            (TILE_SIZE + TILE_SPACING + TILE_SPACING)
+                                .mul_add(height as f32, grid_start_pos.y),
                         ]);
                         drop(off_buttons);
                     }};
@@ -163,7 +164,7 @@ impl IsCgtWindow for TitledWindow<SkiJumpsWindow> {
                 // NOTE: To prevent grid from "jumping" after every move we always apply offset
                 // as if there was move-off-grid buttons
                 ui.set_cursor_pos([
-                    grid_start_pos.x + TILE_SIZE * OFF_BUTTON_SCALE + TILE_SPACING,
+                    TILE_SIZE.mul_add(OFF_BUTTON_SCALE, grid_start_pos.x) + TILE_SPACING,
                     grid_start_pos.y,
                 ]);
 
@@ -286,18 +287,16 @@ impl IsCgtWindow for TitledWindow<SkiJumpsWindow> {
                             GridEditingMode::MoveLeft | GridEditingMode::MoveRight => {
                                 match self.content.initial_position {
                                     None => {
-                                        if matches!(editing_mode, GridEditingMode::MoveLeft)
+                                        if (matches!(editing_mode, GridEditingMode::MoveLeft)
                                             && matches!(
                                                 self.content.game.grid().get(x, y),
                                                 Tile::LeftJumper | Tile::LeftSlipper
-                                            )
-                                        {
-                                            self.content.initial_position = Some((x, y));
-                                        } else if matches!(editing_mode, GridEditingMode::MoveRight)
-                                            && matches!(
-                                                self.content.game.grid().get(x, y),
-                                                Tile::RightJumper | Tile::RightSlipper
-                                            )
+                                            ))
+                                            || (matches!(editing_mode, GridEditingMode::MoveRight)
+                                                && matches!(
+                                                    self.content.game.grid().get(x, y),
+                                                    Tile::RightJumper | Tile::RightSlipper
+                                                ))
                                         {
                                             self.content.initial_position = Some((x, y));
                                         }
@@ -407,7 +406,8 @@ impl IsCgtWindow for TitledWindow<SkiJumpsWindow> {
                     ui.set_column_width(
                         0,
                         f32::max(
-                            pad_x + (widgets::TILE_SIZE + widgets::TILE_SPACING) * new_width as f32,
+                            (widgets::TILE_SIZE + widgets::TILE_SPACING)
+                                .mul_add(new_width as f32, pad_x),
                             ui.column_width(0),
                         ),
                     );

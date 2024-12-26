@@ -299,7 +299,8 @@ impl IsCgtWindow for TitledWindow<AmazonsWindow> {
                     ui.set_column_width(
                         0,
                         f32::max(
-                            pad_x + (widgets::TILE_SIZE + widgets::TILE_SPACING) * new_width as f32,
+                            (widgets::TILE_SIZE + widgets::TILE_SPACING)
+                                .mul_add(new_width as f32, pad_x),
                             ui.column_width(0),
                         ),
                     );

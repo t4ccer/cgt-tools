@@ -103,6 +103,7 @@ where
 
     /// Make Left move in given tile without checking if move is legal
     #[inline]
+    #[must_use]
     pub fn move_in_left(&self, x: u8, y: u8) -> Self
     where
         G: Clone,
@@ -112,6 +113,7 @@ where
 
     /// Make Right move in given tile without checking if move is legal
     #[inline]
+    #[must_use]
     pub fn move_in_right(&self, x: u8, y: u8) -> Self
     where
         G: Clone,
