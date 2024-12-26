@@ -801,6 +801,18 @@ impl Display for Moves {
 
 impl_from_str_via_nom!(Moves);
 
+/// A game `G` even-tempered if, no matter how `G` is played, the first player will have the move
+/// when `G` reaches a number.
+#[derive(Debug, Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum Temper {
+    /// `G` is even-tempered if `G` a number, or every option of `G` is odd-tempered
+    Even,
+
+    /// `G` is odd-tempered if `G` is not a number and every option of `G` is even-tempered
+    Odd,
+}
+
 /// Canonical game form
 ///
 /// Note that ordering is defined structurally for the sake of data structures. For proper partial
@@ -1362,6 +1374,35 @@ impl CanonicalForm {
         self.cool_by_star().star_projection()
     }
 
+    /// Get temper of the game
+    #[must_use]
+    pub fn temper(&self) -> Option<Temper> {
+        if self.to_nus().is_some_and(Nus::is_number) {
+            return Some(Temper::Even);
+        }
+
+        let moves = self.to_moves();
+        if moves
+            .left
+            .iter()
+            .chain(moves.right.iter())
+            .all(|m| CanonicalForm::temper(m).is_some_and(|temper| matches!(temper, Temper::Even)))
+        {
+            return Some(Temper::Odd);
+        }
+
+        if moves
+            .left
+            .iter()
+            .chain(moves.right.iter())
+            .all(|m| CanonicalForm::temper(m).is_some_and(|temper| matches!(temper, Temper::Odd)))
+        {
+            return Some(Temper::Even);
+        }
+
+        None
+    }
+
     /// Parse game using `{a,b,...|c,d,...}` notation
     #[allow(clippy::missing_errors_doc)]
     pub fn parse(input: &str) -> nom::IResult<&str, Self> {
@@ -1875,5 +1916,17 @@ mod tests {
     fn reduced() {
         let cf = CanonicalForm::from_str("{{2|0}, 1*|*}").unwrap();
         assert_eq!(cf.reduced().to_string(), "{1|0}");
+    }
+
+    #[test]
+    fn temper() {
+        let cf = CanonicalForm::from_str("2").unwrap();
+        assert_eq!(cf.temper(), Some(Temper::Even));
+
+        let cf = CanonicalForm::from_str("{2|0}").unwrap();
+        assert_eq!(cf.temper(), Some(Temper::Odd));
+
+        let cf = CanonicalForm::from_str("{2|1,{*|0}}").unwrap();
+        assert_eq!(cf.temper(), None);
     }
 }
