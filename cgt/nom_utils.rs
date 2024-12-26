@@ -52,7 +52,7 @@ macro_rules! impl_from_str_via_nom {
             {
                 use std::str::FromStr;
 
-                Ok($t::from_str(&String::deserialize(deserializer)?).unwrap())
+                $t::from_str(&String::deserialize(deserializer)?).map_err(serde::de::Error::custom)
             }
         }
     };
