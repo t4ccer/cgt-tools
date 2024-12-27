@@ -1191,25 +1191,23 @@ impl CanonicalForm {
     /// Heating is the inverse of cooling, defined as `\int^t G = G` if `G` is a number, or
     /// `\int^t G = {\int^t G^L + t | \int^t G^R - t}` otherwise
     #[must_use]
-    pub fn heat(&self, temperature: DyadicRationalNumber) -> Self {
+    pub fn heat(&self, temperature: &CanonicalForm) -> Self {
         if let Some(nus) = self.to_nus() {
             if nus.is_number() {
                 return self.clone();
             }
         }
 
-        let temperature_game = Self::new_dyadic(temperature);
-
         let moves = self.to_moves();
 
         let mut new_left_moves = Vec::with_capacity(moves.left.len());
         for left_move in moves.left {
-            new_left_moves.push(left_move.heat(temperature) + &temperature_game);
+            new_left_moves.push(left_move.heat(temperature) + temperature);
         }
 
         let mut new_right_moves = Vec::with_capacity(moves.right.len());
         for right_move in moves.right {
-            new_right_moves.push(right_move.heat(temperature) - &temperature_game);
+            new_right_moves.push(right_move.heat(temperature) - temperature);
         }
 
         let new_moves = Moves {
@@ -1337,43 +1335,12 @@ impl CanonicalForm {
         })
     }
 
-    /// See: The Reduced Canonical Form Of a Game p. 411
-    #[must_use]
-    pub fn cool_by_star(&self) -> Self {
-        if self.to_nus().is_some_and(Nus::is_number) {
-            return self.clone();
-        }
-
-        let moves = self.to_moves();
-        CanonicalForm::new_from_moves(Moves {
-            left: moves
-                .left
-                .iter()
-                .map(|l| {
-                    l + CanonicalForm::new_nimber(
-                        DyadicRationalNumber::new_integer(0),
-                        Nimber::new(1),
-                    )
-                })
-                .collect(),
-            right: moves
-                .right
-                .iter()
-                .map(|r| {
-                    r + CanonicalForm::new_nimber(
-                        DyadicRationalNumber::new_integer(0),
-                        Nimber::new(1),
-                    )
-                })
-                .collect(),
-        })
-    }
-
     /// A reduced canonical form of `G` is `\bar{G}`, such that `\bar{G} = \bar{H}`
     /// whenever `G - H` is infinitesimal.
     #[must_use]
     pub fn reduced(&self) -> Self {
-        self.cool_by_star().star_projection()
+        self.heat(&CanonicalForm::new_nus(Nus::new_nimber(Nimber::new(1))))
+            .star_projection()
     }
 
     /// Get temper of the game
@@ -1867,7 +1834,7 @@ mod tests {
     #[test]
     fn heating_numbers() {
         let g = CanonicalForm::new_dyadic(DyadicRationalNumber::from(42));
-        let heated = g.heat(DyadicRationalNumber::from(1));
+        let heated = g.heat(&CanonicalForm::new_integer(1));
         assert_eq!(g, heated);
     }
 
@@ -1878,7 +1845,7 @@ mod tests {
         let cooled = g.cool(t);
         let frozen = g.cool(t + DyadicRationalNumber::from(1));
         let particle = &cooled - &frozen;
-        let heated = particle.heat(t);
+        let heated = particle.heat(&CanonicalForm::new_dyadic(t));
         assert_eq!(heated.to_string(), "{3/2|-3/2}");
         assert_eq!(g, &frozen + &heated);
     }
@@ -1906,18 +1873,15 @@ mod tests {
     }
 
     #[test]
-    fn cool_by_star() {
-        let cf = CanonicalForm::from_str("3").unwrap();
-        assert_eq!(cf.cool_by_star().to_string(), "3");
-
-        let cf = CanonicalForm::from_str("{{2|0}, 1|0}").unwrap();
-        assert_eq!(cf.cool_by_star().to_string(), "{1*, {2*|*}|*}");
-    }
-
-    #[test]
     fn reduced() {
         let cf = CanonicalForm::from_str("{{2|0}, 1*|*}").unwrap();
         assert_eq!(cf.reduced().to_string(), "{1|0}");
+
+        let cf = CanonicalForm::from_str("{{3/2*|1/2}|{0|-3},{-1*,{-1/2|-1*}|-5/2}}").unwrap();
+        assert_eq!(
+            cf.reduced().to_string(),
+            "{{3/2|1/2}|{0|-3}, {{-1/2|-1}|-5/2}}"
+        );
     }
 
     #[test]
