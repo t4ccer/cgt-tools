@@ -54,6 +54,16 @@ impl IsCgtWindow for TitledWindow<CanonicalFormWindow> {
                                 .push(Box::new(TitledWindow::without_title(w)));
                         };
                     }
+
+                    if let Some(_transform_menu) = ui.begin_menu("Transform") {
+                        if ui.menu_item("Reduce") {
+                            self.content.details = Details::from_canonical_form(
+                                self.content.details.canonical_form.reduced(),
+                            );
+                            self.content.value_input =
+                                self.content.details.canonical_form.to_string();
+                        };
+                    }
                 }
 
                 if ui
