@@ -154,7 +154,7 @@ fn bfs<G, T>(
     visited: &mut G,
     x: u8,
     y: u8,
-    is_non_blocking: fn(T) -> bool,
+    mut is_non_blocking: impl FnMut(T) -> bool,
     blocking_tile: T,
     directions: &[(i32, i32)],
 ) -> G
@@ -194,7 +194,7 @@ where
 /// Decompose a grid
 pub fn decompositions<G, T>(
     grid: &G,
-    is_non_blocking: fn(T) -> bool,
+    mut is_non_blocking: impl FnMut(T) -> bool,
     blocking_tile: T,
     directions: &[(i32, i32)],
 ) -> Vec<G>
@@ -214,7 +214,7 @@ where
                     &mut visited,
                     x,
                     y,
-                    is_non_blocking,
+                    &mut is_non_blocking,
                     blocking_tile,
                     directions,
                 ));
@@ -283,7 +283,7 @@ fn fill_one_by_one_holes_with_test() {
 }
 
 /// Remove filled rows and columns from the edges
-pub fn move_top_left<G, T>(grid: &G, is_non_blocking: fn(T) -> bool) -> G
+pub fn move_top_left<G, T>(grid: &G, mut is_non_blocking: impl FnMut(T) -> bool) -> G
 where
     T: Copy + Default,
     G: Grid<Item = T> + FiniteGrid,
