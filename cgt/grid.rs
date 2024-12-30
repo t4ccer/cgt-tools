@@ -225,6 +225,63 @@ where
     ds
 }
 
+/// If `empty_tile` is surrounded (up/down/left/right, diagonals do not count) by other tiles
+/// (i.e. `!=` to `empty_tile`) then it will get replaced by `filler_tile`
+pub fn fill_one_by_one_holes_with<G, T>(grid: &mut G, empty_tile: T, filler_tile: T)
+where
+    T: Copy + PartialEq,
+    G: Grid<Item = T> + FiniteGrid,
+{
+    for y in 0..grid.height() {
+        for x in 0..grid.width() {
+            if grid.get(x, y) == empty_tile {
+                let mut is_surrounded = true;
+                for (dx, dy) in [(0, -1), (0, 1), (-1, 0), (1, 0)] {
+                    let lx = (x as i32) + dx;
+                    let ly = (y as i32) + dy;
+
+                    if lx >= 0
+                        && lx < (grid.width() as i32)
+                        && ly >= 0
+                        && ly < (grid.height() as i32)
+                        && grid.get(lx as u8, ly as u8) == empty_tile
+                    {
+                        is_surrounded = false;
+                        break;
+                    }
+                }
+
+                if is_surrounded {
+                    grid.set(x, y, filler_tile);
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn fill_one_by_one_holes_with_test() {
+    use small_bit_grid::SmallBitGrid;
+
+    let mut grid: SmallBitGrid<bool> = SmallBitGrid::from_arr(
+        3,
+        3,
+        &[true, true, true, true, false, true, true, true, true],
+    )
+    .unwrap();
+    dbg!(grid);
+    fill_one_by_one_holes_with(&mut grid, false, true);
+    assert_eq!(
+        grid,
+        SmallBitGrid::from_arr(
+            3,
+            3,
+            &[true, true, true, true, true, true, true, true, true],
+        )
+        .unwrap()
+    );
+}
+
 /// Remove filled rows and columns from the edges
 pub fn move_top_left<G, T>(grid: &G, is_non_blocking: fn(T) -> bool) -> G
 where

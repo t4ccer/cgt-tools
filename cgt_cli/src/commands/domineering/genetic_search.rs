@@ -102,7 +102,7 @@ impl Algorithm<Domineering, DyadicRationalNumber> for DomineeringHighTemperature
     }
 
     fn score(&self, object: &Domineering) -> DyadicRationalNumber {
-        let clean = object.clone().move_top_left();
+        let clean = object.clone().normalize_grid();
         if object.decompositions().len() > 1 || object != &clean {
             self.lowest_score()
         } else {

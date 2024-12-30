@@ -4,7 +4,7 @@
 extern crate alloc;
 use crate::{
     drawing::svg::{self, ImmSvg, Svg},
-    grid::{decompositions, move_top_left, small_bit_grid::SmallBitGrid, FiniteGrid, Grid},
+    grid::{self, decompositions, small_bit_grid::SmallBitGrid, FiniteGrid, Grid},
     short::partizan::partizan_game::PartizanGame,
 };
 use cgt_derive::Tile;
@@ -153,7 +153,7 @@ where
                     let mut new_grid = self.clone();
                     new_grid.grid.set(x, y, Tile::Taken);
                     new_grid.grid.set(next_x, next_y, Tile::Taken);
-                    moves.push(new_grid.move_top_left());
+                    moves.push(new_grid.normalize_grid());
                 }
             }
         }
@@ -162,7 +162,8 @@ where
         moves
     }
 
-    /// Remove filled rows and columns from the edges
+    /// Normalize underlying grid by filling in empty 1x1 tiles
+    /// and removing filled rows and columns from the edges
     ///
     /// # Examples
     /// ```
@@ -170,16 +171,17 @@ where
     /// use std::str::FromStr;
     ///
     /// let position: Domineering = Domineering::from_str("###|.#.|##.").unwrap();
-    /// assert_eq!(&format!("{}", position.move_top_left()), ".#.|##.");
+    /// assert_eq!(&format!("{}", position.normalize_grid()), ".|.");
     /// ```
-    // Panic at `Self::empty(minimized_width, minimized_height).unwrap();` is unreachable
     #[must_use]
-    #[allow(clippy::missing_panics_doc)]
-    pub fn move_top_left(&self) -> Self {
-        // TODO: We should use this to also "fill 1x1 holes" i.e. when we have grids that after running
-        // bfs has 1x1 regions we can fill them in and reduce grid then.
-
-        Self::new(move_top_left(&self.grid, Tile::is_non_blocking))
+    pub fn normalize_grid(&self) -> Self
+    where
+        G: Clone,
+    {
+        let mut grid = self.grid.clone();
+        grid::fill_one_by_one_holes_with(&mut grid, Tile::Empty, Tile::Taken);
+        let grid = grid::move_top_left(&grid, Tile::is_non_blocking);
+        Self::new(grid)
     }
 }
 
@@ -239,20 +241,21 @@ where
     /// # Examples
     ///
     /// ```
-    /// // ..#       ..   .# |
+    /// // ..#       ..   #. |
     /// // .#.  = {  .# , #. | <...> }
-    /// // ##.            #. |
+    /// // ##.               
     ///
     /// use cgt::short::partizan::games::domineering::Domineering;
     /// use crate::cgt::short::partizan::partizan_game::PartizanGame;
     /// use std::str::FromStr;
     ///
     /// let position: Domineering = Domineering::from_str("..#|.#.|##.").unwrap();
+    ///
     /// assert_eq!(
     ///     position.left_moves(),
     ///     vec![
+    ///         Domineering::from_str(".|.").unwrap(),
     ///         Domineering::from_str("..|.#").unwrap(),
-    ///         Domineering::from_str(".#|#.|#.").unwrap(),
     ///     ]
     /// );
     /// ```
@@ -266,8 +269,8 @@ where
     ///
     /// ```
     /// // ..#             |
-    /// // .#.  = {  <...> | .#. ,
-    /// // ##.             | ##.
+    /// // .#.  = {  <...> | . ,
+    /// // ##.             | .
     ///
     /// use cgt::short::partizan::{partizan_game::PartizanGame, games::domineering::Domineering};
     /// use std::str::FromStr;
@@ -275,7 +278,7 @@ where
     /// let position: Domineering = Domineering::from_str("..#|.#.|##.").unwrap();
     /// assert_eq!(
     ///     position.right_moves(),
-    ///     vec![Domineering::from_str(".#.|##.").unwrap(),]
+    ///     vec![Domineering::from_str(".|.").unwrap(),]
     /// );
     /// ```
     fn right_moves(&self) -> Vec<Self> {

@@ -164,7 +164,7 @@ pub fn run(args: Args) -> Result<()> {
                 i,
             )
             .unwrap();
-            let grid = domineering::Domineering::new(grid).move_top_left();
+            let grid = domineering::Domineering::new(grid).normalize_grid();
 
             let decompositions = grid.decompositions();
 
