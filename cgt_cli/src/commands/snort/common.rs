@@ -3,6 +3,7 @@ use cgt::{
     genetic_algorithm::Scored,
     graph::{adjacency_matrix::undirected::UndirectedGraph, Graph},
     numeric::{dyadic_rational_number::DyadicRationalNumber, rational::Rational},
+    parsing::Parser,
     short::partizan::{
         canonical_form::CanonicalForm,
         games::snort::{Snort, VertexKind},
@@ -47,22 +48,21 @@ pub struct Edge {
 }
 
 impl Edge {
-    fn parse(input: &str) -> nom::IResult<&str, Edge> {
-        let (input, from) = nom::character::complete::u32(input)?;
-        let (input, _) = nom::character::complete::char('-')(input)?;
-        let (input, to) = nom::character::complete::u32(input)?;
+    fn parse(input: &str) -> Option<Edge> {
+        let p = Parser::new(input);
+        let (p, from) = p.parse_u32()?;
+        let p = p.parse_ascii_char('-')?;
+        let (_p, to) = p.parse_u32()?;
 
-        Ok((input, Edge { from, to }))
+        Some(Edge { from, to })
     }
 }
 
 impl FromStr for Edge {
-    type Err = String;
+    type Err = &'static str;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        Edge::parse(s)
-            .map(|(_, edge)| edge)
-            .map_err(|e| e.to_string())
+        Edge::parse(s).ok_or("Invalid edge")
     }
 }
 

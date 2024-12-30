@@ -1,8 +1,8 @@
 //! Number in form `n/2^m`
 
 use crate::{
-    nom_utils::{impl_from_str_via_nom, lexeme},
     numeric::rational::Rational,
+    parsing::{impl_from_str_via_parser, lexeme, try_option, Parser},
 };
 use auto_ops::impl_op_ex;
 use std::{
@@ -37,7 +37,7 @@ impl DyadicRationalNumber {
 
     /// Create a new fraction. Returns [None] if denominator is zero, or the number is not dyadic
     #[must_use]
-    pub fn new_fraction(numerator: i64, mut denominator: u32) -> Option<Self> {
+    pub const fn new_fraction(numerator: i64, mut denominator: u32) -> Option<Self> {
         let mut denominator_exponent = 0;
 
         if denominator == 0 {
@@ -49,13 +49,17 @@ impl DyadicRationalNumber {
             denominator_exponent += 1;
         }
 
-        (denominator == 1).then_some(
-            Self {
-                numerator,
-                denominator_exponent,
-            }
-            .normalized(),
-        )
+        if denominator == 1 {
+            Some(
+                Self {
+                    numerator,
+                    denominator_exponent,
+                }
+                .normalized(),
+            )
+        } else {
+            None
+        }
     }
 
     /// Get the numerator (`n` from `n/2^m`)
@@ -150,22 +154,18 @@ impl DyadicRationalNumber {
         res.normalized()
     }
 
-    pub(crate) fn parse(input: &str) -> nom::IResult<&str, Self> {
-        let (input, numerator) = lexeme(nom::character::complete::i64)(input)?;
-        match lexeme(nom::bytes::complete::tag::<&str, &str, ()>("/"))(input) {
-            Ok((input, _)) => {
-                let (input, denominator) = lexeme(nom::character::complete::u32)(input)?;
-                Self::new_fraction(numerator, denominator).map_or_else(
-                    || {
-                        Err(nom::Err::Error(nom::error::Error::new(
-                            "Not a dyadic fraction",
-                            nom::error::ErrorKind::Verify,
-                        )))
-                    },
-                    |d| Ok((input, d)),
-                )
+    /// Parse dyadic number
+    pub(crate) const fn parse(p: Parser<'_>) -> Option<(Parser<'_>, DyadicRationalNumber)> {
+        let (p, numerator) = try_option!(lexeme!(p, Parser::parse_i64));
+        match p.parse_any_ascii_char() {
+            Some((p, '/')) => {
+                let p = p.trim_whitespace();
+                let (p, denominator) = try_option!(lexeme!(p, Parser::parse_u32));
+                let dyadic =
+                    try_option!(DyadicRationalNumber::new_fraction(numerator, denominator));
+                Some((p, dyadic))
             }
-            Err(_) => Ok((input, Self::from(numerator))),
+            _ => Some((p, DyadicRationalNumber::new_integer(numerator))),
         }
     }
 
@@ -183,12 +183,12 @@ impl DyadicRationalNumber {
     ///
     /// # Panics
     /// - If denominator is too large to fit in [`Rational`]
-    pub fn to_rational(self) -> Rational {
+    pub const fn to_rational(self) -> Rational {
         Rational::new(self.numerator(), self.denominator().unwrap() as u32)
     }
 }
 
-impl_from_str_via_nom!(DyadicRationalNumber);
+impl_from_str_via_parser!(DyadicRationalNumber);
 
 #[test]
 fn step_works() {
@@ -343,6 +343,9 @@ mod tests {
     #[cfg(test)]
     fn test_parsing_works(inp: &str) {
         let number = DyadicRationalNumber::from_str(inp).unwrap();
+        assert_eq!(inp, &format!("{number}"));
+
+        let (_, number) = DyadicRationalNumber::parse(crate::parsing::Parser::new(inp)).unwrap();
         assert_eq!(inp, &format!("{number}"));
     }
 

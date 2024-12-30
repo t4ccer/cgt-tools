@@ -14,8 +14,8 @@ pub mod grid;
 pub mod has;
 pub mod loopy;
 pub mod numeric;
+pub mod parsing;
 pub mod short;
 
 mod display;
 mod macros;
-mod nom_utils;
