@@ -434,7 +434,6 @@ mod tests {
         assert_temperature!(Domineering::from_str(""), -1);
         assert_temperature!(Domineering::from_str(".."), -1);
         assert_temperature!(Domineering::from_str("..|.#"), 0);
-        // FIXME: takes too long
-        // assert_temperature!(Domineering::from_str("#...|....|....|...."), 1);
+        assert_temperature!(Domineering::from_str("#...|....|....|...."), 1);
     }
 }
