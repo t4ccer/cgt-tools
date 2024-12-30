@@ -1,3 +1,5 @@
+#![allow(non_local_definitions)] // These come from pyo3 marcos
+
 use pyo3::prelude::*;
 
 mod canonical_form;
