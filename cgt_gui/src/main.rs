@@ -2,6 +2,7 @@ use crate::widgets::{
     amazons::AmazonsWindow, canonical_form::CanonicalFormWindow,
     digraph_placement::DigraphPlacementWindow, domineering::DomineeringWindow,
     fission::FissionWindow, ski_jumps::SkiJumpsWindow, snort::SnortWindow,
+    toads_and_frogs::ToadsAndFrogsWindow,
 };
 use cgt::{
     graph::adjacency_matrix::{directed::DirectedGraph, undirected::UndirectedGraph},
@@ -15,6 +16,7 @@ use cgt::{
             fission::Fission,
             ski_jumps::SkiJumps,
             snort::{self, Snort},
+            toads_and_frogs::ToadsAndFrogs,
         },
         partizan_game::PartizanGame,
         thermograph::Thermograph,
@@ -253,6 +255,7 @@ pub enum Task {
     EvalFission(EvalTask<Fission>),
     EvalAmazons(EvalTask<Amazons>),
     EvalSkiJumps(EvalTask<SkiJumps>),
+    EvalToadsAndFrogs(EvalTask<ToadsAndFrogs>),
     EvalSnort(EvalTask<Snort<snort::VertexKind, UndirectedGraph<snort::VertexKind>>>),
     EvalDigraphPlacement(
         EvalTask<
@@ -295,6 +298,7 @@ pub enum UpdateKind {
     FissionDetails(Fission, Details),
     AmazonsDetails(Amazons, Details),
     SkiJumpsDetails(SkiJumps, Details),
+    ToadsAndFrogsDetails(ToadsAndFrogs, Details),
     SnortDetails(
         Snort<snort::VertexKind, UndirectedGraph<snort::VertexKind>>,
         Details,
@@ -320,6 +324,7 @@ pub struct SchedulerContext {
     fission_tt: ParallelTranspositionTable<Fission>,
     amazons_tt: ParallelTranspositionTable<Amazons>,
     ski_jumps_tt: ParallelTranspositionTable<SkiJumps>,
+    toads_and_frogs_tt: ParallelTranspositionTable<ToadsAndFrogs>,
     snort_tt:
         ParallelTranspositionTable<Snort<snort::VertexKind, UndirectedGraph<snort::VertexKind>>>,
     digraph_placement_tt: ParallelTranspositionTable<
@@ -359,6 +364,9 @@ fn scheduler(ctx: SchedulerContext) {
             Task::EvalSkiJumps(task) => {
                 handle_game_update!(task, SkiJumpsDetails, ski_jumps_tt);
             }
+            Task::EvalToadsAndFrogs(task) => {
+                handle_game_update!(task, ToadsAndFrogsDetails, toads_and_frogs_tt);
+            }
             Task::EvalSnort(task) => {
                 handle_game_update!(task, SnortDetails, snort_tt);
             }
@@ -382,6 +390,7 @@ fn main() {
         fission_tt: ParallelTranspositionTable::new(),
         amazons_tt: ParallelTranspositionTable::new(),
         ski_jumps_tt: ParallelTranspositionTable::new(),
+        toads_and_frogs_tt: ParallelTranspositionTable::new(),
         snort_tt: ParallelTranspositionTable::new(),
         digraph_placement_tt: ParallelTranspositionTable::new(),
     };
@@ -430,6 +439,13 @@ fn main() {
         }};
     }
 
+    macro_rules! new_toads_and_frogs {
+        () => {{
+            let mut d = TitledWindow::without_title(ToadsAndFrogsWindow::new());
+            new_window!(d);
+        }};
+    }
+
     macro_rules! new_canonical_form {
         () => {{
             let mut d = TitledWindow::without_title(CanonicalFormWindow::new());
@@ -461,8 +477,9 @@ fn main() {
 
     // new_domineering!();
     // new_fission!();
-    new_amazons!();
+    // new_amazons!();
     // new_ski_jumps!();
+    new_toads_and_frogs!();
     // new_snort!();
     // new_digraph_placement!();
 
@@ -493,6 +510,9 @@ fn main() {
                 }
                 if ui.menu_item("Ski Jumps") {
                     new_ski_jumps!();
+                }
+                if ui.menu_item("Toads and Frogs") {
+                    new_toads_and_frogs!();
                 }
                 if ui.menu_item("Snort") {
                     new_snort!();

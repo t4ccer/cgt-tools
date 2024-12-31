@@ -45,6 +45,16 @@ impl ToadsAndFrogs {
     pub const fn new(tiles: Vec<Tile>) -> Self {
         Self { tiles }
     }
+
+    /// Get game row
+    pub fn row(&mut self) -> &Vec<Tile> {
+        &self.tiles
+    }
+
+    /// Get game row
+    pub fn row_mut(&mut self) -> &mut Vec<Tile> {
+        &mut self.tiles
+    }
 }
 
 impl FromStr for ToadsAndFrogs {

@@ -15,6 +15,7 @@ pub mod domineering;
 pub mod fission;
 pub mod ski_jumps;
 pub mod snort;
+pub mod toads_and_frogs;
 
 pub const THERMOGRAPH_TOP_MAST_LEN: f32 = 1.0;
 pub const THERMOGRAPH_AXIS_PAD: f32 = 0.5;
