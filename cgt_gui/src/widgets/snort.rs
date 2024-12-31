@@ -177,7 +177,9 @@ impl SnortWindow {
 impl IsCgtWindow for TitledWindow<SnortWindow> {
     impl_titled_window!("Snort");
 
-    fn initialize(&self, ctx: &GuiContext) {
+    fn initialize(&mut self, ctx: &GuiContext) {
+        self.content.reposition_circle();
+        self.content.reposition(V2f { x: 350.0, y: 400.0 });
         let graph = self.content.game.graph.map(|v| v.kind);
         ctx.schedule_task(crate::Task::EvalSnort(crate::EvalTask {
             window: self.window_id,

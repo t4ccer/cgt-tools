@@ -34,7 +34,7 @@ impl CanonicalFormWindow {
 impl IsCgtWindow for TitledWindow<CanonicalFormWindow> {
     impl_titled_window!("Canonical Form");
 
-    fn initialize(&self, _ctx: &GuiContext) {}
+    fn initialize(&mut self, _ctx: &GuiContext) {}
 
     fn draw(&mut self, ui: &imgui::Ui, ctx: &mut GuiContext) {
         ui.window(&self.title)

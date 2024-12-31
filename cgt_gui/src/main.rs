@@ -6,7 +6,7 @@ use crate::widgets::{
 };
 use cgt::{
     graph::adjacency_matrix::{directed::DirectedGraph, undirected::UndirectedGraph},
-    numeric::{dyadic_rational_number::DyadicRationalNumber, v2f::V2f},
+    numeric::dyadic_rational_number::DyadicRationalNumber,
     short::partizan::{
         canonical_form::CanonicalForm,
         games::{
@@ -105,7 +105,7 @@ impl<G> TitledWindow<G> {
 
 pub trait IsCgtWindow {
     fn set_title(&mut self, id: WindowId);
-    fn initialize(&self, ctx: &GuiContext);
+    fn initialize(&mut self, ctx: &GuiContext);
     fn is_open(&self) -> bool;
     fn draw(&mut self, ui: &imgui::Ui, ctx: &mut GuiContext);
     fn update(&mut self, update: UpdateKind);
@@ -128,7 +128,7 @@ pub(crate) use impl_titled_window;
 
 macro_rules! impl_game_window {
     ($task_kind:ident, $update_kind:ident) => {
-        fn initialize(&self, ctx: &$crate::GuiContext) {
+        fn initialize(&mut self, ctx: &$crate::GuiContext) {
             ctx.schedule_task($crate::Task::$task_kind($crate::EvalTask {
                 window: self.window_id,
                 game: self.content.game.clone(),
@@ -403,85 +403,14 @@ fn main() {
 
     // must be macros because borrow checker
     macro_rules! new_window {
-        ($d:expr) => {{
-            $d.set_title(next_id);
-            $d.initialize(&gui_context);
-            windows.insert(next_id, Box::new($d));
+        ($d:ident) => {{
+            let mut d = TitledWindow::without_title($d::new());
+            d.set_title(next_id);
+            d.initialize(&gui_context);
+            windows.insert(next_id, Box::new(d));
             next_id.0 += 1;
         }};
     }
-
-    macro_rules! new_domineering {
-        () => {{
-            let mut d = TitledWindow::without_title(DomineeringWindow::new());
-            new_window!(d);
-        }};
-    }
-
-    macro_rules! new_fission {
-        () => {{
-            let mut d = TitledWindow::without_title(FissionWindow::new());
-            new_window!(d);
-        }};
-    }
-
-    macro_rules! new_amazons {
-        () => {{
-            let mut d = TitledWindow::without_title(AmazonsWindow::new());
-            new_window!(d);
-        }};
-    }
-
-    macro_rules! new_ski_jumps {
-        () => {{
-            let mut d = TitledWindow::without_title(SkiJumpsWindow::new());
-            new_window!(d);
-        }};
-    }
-
-    macro_rules! new_toads_and_frogs {
-        () => {{
-            let mut d = TitledWindow::without_title(ToadsAndFrogsWindow::new());
-            new_window!(d);
-        }};
-    }
-
-    macro_rules! new_canonical_form {
-        () => {{
-            let mut d = TitledWindow::without_title(CanonicalFormWindow::new());
-            new_window!(d);
-        }};
-    }
-
-    macro_rules! new_snort {
-        () => {{
-            let mut d = SnortWindow::new();
-            d.reposition_circle();
-            d.reposition(V2f { x: 350.0, y: 400.0 });
-            let mut d = TitledWindow::without_title(d);
-            d.set_title(next_id);
-            new_window!(d);
-        }};
-    }
-
-    macro_rules! new_digraph_placement {
-        () => {{
-            let mut d = DigraphPlacementWindow::new();
-            d.reposition_circle();
-            d.reposition(V2f { x: 350.0, y: 400.0 });
-            let mut d = TitledWindow::without_title(d);
-            d.set_title(next_id);
-            new_window!(d);
-        }};
-    }
-
-    // new_domineering!();
-    // new_fission!();
-    // new_amazons!();
-    // new_ski_jumps!();
-    new_toads_and_frogs!();
-    // new_snort!();
-    // new_digraph_placement!();
 
     let mut show_demo = false;
 
@@ -497,28 +426,30 @@ fn main() {
         if let Some(_main_menu) = ui.begin_main_menu_bar() {
             if let Some(_new_menu) = ui.begin_menu("New") {
                 if ui.menu_item("Canonical Form") {
-                    new_canonical_form!();
+                    new_window!(CanonicalFormWindow);
                 }
+                ui.separator();
                 if ui.menu_item("Domineering") {
-                    new_domineering!();
+                    new_window!(DomineeringWindow);
                 }
                 if ui.menu_item("Fission") {
-                    new_fission!();
+                    new_window!(FissionWindow);
                 }
                 if ui.menu_item("Amazons") {
-                    new_amazons!();
+                    new_window!(AmazonsWindow);
                 }
                 if ui.menu_item("Ski Jumps") {
-                    new_ski_jumps!();
+                    new_window!(SkiJumpsWindow);
                 }
                 if ui.menu_item("Toads and Frogs") {
-                    new_toads_and_frogs!();
+                    new_window!(ToadsAndFrogsWindow);
                 }
+                ui.separator();
                 if ui.menu_item("Snort") {
-                    new_snort!();
+                    new_window!(SnortWindow);
                 }
                 if ui.menu_item("Digraph Placement") {
-                    new_digraph_placement!();
+                    new_window!(DigraphPlacementWindow);
                 }
             }
             if ui.menu_item("Debug") {

@@ -192,7 +192,9 @@ impl DigraphPlacementWindow {
 impl IsCgtWindow for TitledWindow<DigraphPlacementWindow> {
     impl_titled_window!("Digraph Placement");
 
-    fn initialize(&self, ctx: &GuiContext) {
+    fn initialize(&mut self, ctx: &GuiContext) {
+        self.content.reposition_circle();
+        self.content.reposition(V2f { x: 350.0, y: 400.0 });
         let graph = self.content.game.graph.map(|v| v.color);
         ctx.schedule_task(crate::Task::EvalDigraphPlacement(crate::EvalTask {
             window: self.window_id,
