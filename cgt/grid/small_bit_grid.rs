@@ -10,9 +10,14 @@ type GridBits = u64;
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SmallBitGrid<T> {
-    width: u8,
-    height: u8,
-    grid: GridBits,
+    /// Grid width
+    pub width: u8,
+
+    /// Grid height
+    pub height: u8,
+
+    /// Underlying bits of lineralized grid
+    pub grid: GridBits,
     _ty: PhantomData<T>,
 }
 
@@ -36,7 +41,7 @@ where
 
 impl<T> FiniteGrid for SmallBitGrid<T>
 where
-    T: BitTile,
+    T: BitTile + Copy,
 {
     fn width(&self) -> u8 {
         self.width
@@ -74,7 +79,7 @@ where
 
 impl<T> Display for SmallBitGrid<T>
 where
-    T: BitTile + CharTile,
+    T: BitTile + CharTile + Copy,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.display(f, '|')
@@ -83,7 +88,7 @@ where
 
 impl<T> SmallBitGrid<T>
 where
-    T: BitTile,
+    T: BitTile + Copy,
 {
     /// Check if dimensions are small enough to fit in the fixed-size bit representation.
     const fn check_dimensions(width: u8, height: u8) -> Option<()> {
@@ -160,7 +165,7 @@ where
     ///
     /// # Errors
     /// - Grid has more than 64 tiles
-    pub fn from_arr(width: u8, height: u8, grid: &[bool]) -> Option<Self> {
+    pub fn from_arr(width: u8, height: u8, grid: &[T]) -> Option<Self> {
         Self::from_number(width, height, arr_to_bits(grid))
     }
 
@@ -183,7 +188,7 @@ where
     where
         Self: Clone,
     {
-        let mut result: Self = self.clone();
+        let mut result = *self;
         for y in 0..self.height() {
             for x in 0..self.width() {
                 result.set(result.width() - x - 1, y, self.get(x, y));
@@ -198,7 +203,7 @@ where
     where
         Self: Clone,
     {
-        let mut result: Self = self.clone();
+        let mut result = *self;
         for y in 0..self.height() {
             for x in 0..self.width() {
                 result.set(x, result.height() - y - 1, self.get(x, y));
@@ -210,7 +215,7 @@ where
 
 impl<T> FromStr for SmallBitGrid<T>
 where
-    T: BitTile + CharTile + Default,
+    T: BitTile + CharTile + Default + Copy,
 {
     type Err = ();
 
@@ -223,7 +228,10 @@ where
 ///
 /// # Panics
 /// - `grid` has more than 64 elements
-pub fn arr_to_bits(grid: &[bool]) -> GridBits {
+pub fn arr_to_bits<T>(grid: &[T]) -> GridBits
+where
+    T: BitTile + Copy,
+{
     assert!(
         grid.len() <= 8 * std::mem::size_of::<GridBits>(),
         "grid cannot have more than 64 elements"
@@ -231,7 +239,7 @@ pub fn arr_to_bits(grid: &[bool]) -> GridBits {
     let mut res: GridBits = 0;
     for i in (0..grid.len()).rev() {
         res <<= 1;
-        res |= grid[i] as GridBits;
+        res |= T::tile_to_bool(grid[i]) as GridBits;
     }
     res
 }

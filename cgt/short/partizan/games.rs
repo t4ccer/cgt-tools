@@ -7,3 +7,4 @@ pub mod fission;
 pub mod ski_jumps;
 pub mod snort;
 pub mod toads_and_frogs;
+pub mod toppling_dominoes;
