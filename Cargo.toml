@@ -27,6 +27,7 @@ rayon = {version = "1.10", optional = true}
 dashmap = { version = "6.1", features = ["inline"] }
 rand = "0.8"
 mint = "0.5"
+itertools = "0.14"
 
 [dev-dependencies]
 quickcheck = { version = "1.0", default-features = false }

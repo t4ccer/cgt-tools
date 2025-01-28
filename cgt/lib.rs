@@ -13,6 +13,7 @@ pub mod graph;
 pub mod grid;
 pub mod has;
 pub mod loopy;
+pub mod misere;
 pub mod numeric;
 pub mod parsing;
 pub mod short;
