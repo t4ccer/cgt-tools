@@ -119,7 +119,7 @@ impl SnortTemperatureDegreeDifference {
         }
 
         // Mutate colors
-        let available_colors = vec![
+        let available_colors = [
             VertexColor::Empty,
             VertexColor::TintLeft,
             VertexColor::TintRight,
@@ -252,7 +252,7 @@ fn seed_positions() -> Vec<Snort<VertexKind, UndirectedGraph<VertexKind>>> {
             (VertexIndex { index: 10 }, VertexIndex { index: 12 }),
             (VertexIndex { index: 10 }, VertexIndex { index: 13 }),
         ],
-        &vec![VertexKind::Single(VertexColor::Empty); 14],
+        &[VertexKind::Single(VertexColor::Empty); 14],
     ));
 
     //         9
@@ -281,7 +281,7 @@ fn seed_positions() -> Vec<Snort<VertexKind, UndirectedGraph<VertexKind>>> {
             (VertexIndex { index: 8 }, VertexIndex { index: 13 }),
             (VertexIndex { index: 8 }, VertexIndex { index: 14 }),
         ],
-        &vec![VertexKind::Single(VertexColor::Empty); 15],
+        &[VertexKind::Single(VertexColor::Empty); 15],
     ));
 
     vec![pos_1, pos_2]
