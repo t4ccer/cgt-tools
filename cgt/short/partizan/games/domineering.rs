@@ -402,7 +402,6 @@ mod tests {
         let grid: Domineering = Domineering::from_str("#...|....|....|....").unwrap();
         let game_id = grid.canonical_form(&transposition_table);
         let temp = game_id.temperature();
-        dbg!(transposition_table.len());
         assert_eq!(&game_id.to_string(), "{1*|-1*}");
         assert_eq!(temp, DyadicRationalNumber::from(1));
     }

@@ -269,7 +269,6 @@ fn fill_one_by_one_holes_with_test() {
         &[true, true, true, true, false, true, true, true, true],
     )
     .unwrap();
-    dbg!(grid);
     fill_one_by_one_holes_with(&mut grid, false, true);
     assert_eq!(
         grid,

@@ -1457,8 +1457,7 @@ mod tests {
         ($inp: expr) => {
             let res = Nus::from_str($inp);
             if let Err(err) = res {
-                eprintln!("Parse error: {}", err);
-                panic!("Parse should succeed");
+                panic!("Parse should succeed, error: {}", err);
             }
         };
     }
@@ -1751,7 +1750,6 @@ mod tests {
                 let g = CanonicalForm::parse(Parser::new($inp))
                     .expect("Could not parse")
                     .1;
-                dbg!($inp, &g);
                 assert_eq!($expected, g.to_string());
             }};
         }
