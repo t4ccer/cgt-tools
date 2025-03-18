@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 //! Left dead end is a game where every follower is a left end (there is no move for Left)
 //!
 //! This code is heavily based on <https://github.com/alfiemd/gemau> by Alfie Davies
@@ -5,6 +7,8 @@
 use crate::parsing::{impl_from_str_via_parser, lexeme, try_option, Parser};
 use auto_ops::impl_op_ex;
 use std::{cmp::Ordering, fmt::Display, mem::ManuallyDrop};
+
+pub mod interned;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 enum LeftDeadEndInner {
@@ -66,9 +70,9 @@ impl PartialOrd for LeftDeadEnd {
             if let Some(rhs) = rhs.to_integer() {
                 if lhs == rhs {
                     return Some(Ordering::Equal);
-                } else {
-                    return None;
                 }
+
+                return None;
             }
         }
 
@@ -165,7 +169,7 @@ impl LeftDeadEnd {
     }
 
     #[inline(always)]
-    fn is_zero(&self) -> bool {
+    const fn is_zero(&self) -> bool {
         matches!(self.to_integer(), Some(0))
     }
 
@@ -181,16 +185,6 @@ impl LeftDeadEnd {
 
         if let Some(lhs) = lhs.to_integer() {
             if let Some(rhs) = rhs.to_integer() {
-                // Optimization: n + n = {n, n}
-                if lhs == rhs {
-                    return LeftDeadEnd {
-                        inner: LeftDeadEndInner::Moves(vec![
-                            LeftDeadEndInner::Integer(lhs),
-                            LeftDeadEndInner::Integer(rhs),
-                        ]),
-                    };
-                }
-
                 // Optimization: 1 + n = {n, {n - 1, {n - 2, {n - ..., {1, 1}}}}}
                 if lhs == 1 || rhs == 1 {
                     let mut acc = LeftDeadEndInner::Moves(vec![
@@ -221,25 +215,20 @@ impl LeftDeadEnd {
         LeftDeadEnd::new_moves(sum_options)
     }
 
-    fn parse<'s>(parser: Parser<'s>) -> Option<(Parser<'s>, LeftDeadEnd)> {
+    fn parse(parser: Parser<'_>) -> Option<(Parser<'_>, LeftDeadEnd)> {
         let parser = parser.trim_whitespace();
         if let Some(parser) = parser.parse_ascii_char('{') {
             let parser = parser.trim_whitespace();
 
             let mut options = Vec::new();
             let mut loop_parser = parser;
-            loop {
-                match lexeme!(loop_parser, LeftDeadEnd::parse) {
-                    Some((parser, option)) => {
-                        loop_parser = parser;
-                        options.push(option);
+            while let Some((parser, option)) = lexeme!(loop_parser, LeftDeadEnd::parse) {
+                loop_parser = parser;
+                options.push(option);
 
-                        match loop_parser.parse_ascii_char(',') {
-                            Some(parser) => {
-                                loop_parser = parser.trim_whitespace();
-                            }
-                            None => break,
-                        }
+                match loop_parser.parse_ascii_char(',') {
+                    Some(parser) => {
+                        loop_parser = parser.trim_whitespace();
                     }
                     None => break,
                 }
@@ -305,7 +294,7 @@ impl LeftDeadEnd {
         LeftDeadEnd::from_inner_vec(novel_factors)
     }
 
-    fn novel_factors_unordered(&self) -> Vec<LeftDeadEnd> {
+    pub fn novel_factors_unordered(&self) -> Vec<LeftDeadEnd> {
         // Optimization: Factors of an integer are exactly all integers less than or equal to it
         if let Some(integer) = self.to_integer() {
             let mut factors = Vec::with_capacity(integer as usize + 2);
@@ -329,13 +318,13 @@ impl LeftDeadEnd {
 
         let mut novel_factors = Vec::new();
 
-        'outer: for factors_of_first_option in &factors_of_options[0] {
+        'outer: for factor_of_first_option in &factors_of_options[0] {
             for factors_of_option in factors_of_options.iter().skip(1) {
-                if !factors_of_option.contains(factors_of_first_option) {
+                if !factors_of_option.contains(factor_of_first_option) {
                     continue 'outer;
                 }
             }
-            novel_factors.push(factors_of_first_option);
+            novel_factors.push(factor_of_first_option);
         }
 
         let mut new_factors = Vec::new();
@@ -367,8 +356,7 @@ impl LeftDeadEnd {
         new_factors
     }
 
-    /// Get factors of the position
-    pub fn factors(&self) -> Vec<LeftDeadEnd> {
+    pub fn non_novel_factors_unordered(&self) -> Vec<LeftDeadEnd> {
         // Optimization: Factors of an integer are exactly all integers less than or equal to it
         if let Some(integer) = self.to_integer() {
             let mut acc = Vec::with_capacity(integer as usize + 2);
@@ -409,6 +397,21 @@ impl LeftDeadEnd {
             factors.push(LeftDeadEnd::new_integer(0));
         }
 
+        factors
+    }
+
+    /// Get factors of the position
+    pub fn factors(&self) -> Vec<LeftDeadEnd> {
+        // Optimization: Factors of an integer are exactly all integers less than or equal to it
+        if let Some(integer) = self.to_integer() {
+            let mut acc = Vec::with_capacity(integer as usize + 2);
+            for i in 0..=integer {
+                acc.push(LeftDeadEnd::new_integer(i));
+            }
+            return acc;
+        }
+
+        let mut factors = self.non_novel_factors_unordered();
         for novel_factor in self.novel_factors_unordered() {
             if !factors.contains(&novel_factor) {
                 factors.push(novel_factor);
@@ -420,6 +423,21 @@ impl LeftDeadEnd {
         LeftDeadEnd::from_inner_vec(factors)
     }
 
+    /// Get game's birthday (height of the game tree)
+    pub fn birthday(&self) -> u32 {
+        if let Some(n) = self.to_integer() {
+            return n;
+        }
+
+        self.clone()
+            .into_moves()
+            .iter()
+            .map(LeftDeadEnd::birthday)
+            .max()
+            .unwrap_or(0)
+            + 1
+    }
+
     /// Check if the position is atom i.e. has only two factors
     pub fn is_atom(&self) -> bool {
         // Optimization: 1 is the only integer with two factors
@@ -429,12 +447,38 @@ impl LeftDeadEnd {
 
         self.factors().len() == 2
     }
+
+    #[must_use]
+    pub fn canonical(&self) -> LeftDeadEnd {
+        LeftDeadEnd::new_moves(self.clone().into_moves().into_iter().fold(
+            Vec::new(),
+            |mut acc, g| {
+                if !self.clone().into_moves().into_iter().any(|h| h < g) && !acc.contains(&g) {
+                    acc.push(g.canonical());
+                }
+                acc
+            },
+        ))
+    }
+
+    pub fn next_day(day: Vec<LeftDeadEnd>) -> Vec<LeftDeadEnd> {
+        use itertools::Itertools;
+
+        day.into_iter()
+            .powerset()
+            .fold(Vec::new(), |mut seen, moves| {
+                let g = LeftDeadEnd::new_moves(moves);
+                if !seen.contains(&g) {
+                    seen.push(g);
+                }
+                seen
+            })
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use itertools::Itertools;
     use quickcheck::{Arbitrary, QuickCheck};
     use std::{str::FromStr, u32};
 
@@ -552,38 +596,26 @@ mod tests {
         qc.quickcheck(test as fn(LeftDeadEnd));
     }
 
-    fn next_day(day: Vec<LeftDeadEnd>) -> Vec<LeftDeadEnd> {
-        day.into_iter()
-            .powerset()
-            .fold(Vec::new(), |mut seen, moves| {
-                let g = LeftDeadEnd::new_moves(moves);
-                if !seen.contains(&g) {
-                    seen.push(g);
-                }
-                seen
-            })
-    }
-
     #[test]
     fn born_by_day() {
         let day0 = vec![LeftDeadEnd::new_integer(0)];
 
-        let day1 = next_day(day0);
+        let day1 = LeftDeadEnd::next_day(day0);
         assert_eq!(
             day1.iter().map(|g| g.to_string()).collect::<Vec<String>>(),
             vec!["0", "1"],
         );
 
-        let day2 = next_day(day1);
+        let day2 = LeftDeadEnd::next_day(day1);
         assert_eq!(
             day2.iter().map(|g| g.to_string()).collect::<Vec<String>>(),
             vec!["0", "1", "2", "{0, 1}"],
         );
 
-        let day3 = next_day(day2);
+        let day3 = LeftDeadEnd::next_day(day2);
         assert_eq!(day3.len(), 10);
 
-        let day4 = next_day(day3);
+        let day4 = LeftDeadEnd::next_day(day3);
         assert_eq!(day4.len(), 52);
     }
 
@@ -601,7 +633,7 @@ mod tests {
 
         assert_eq!(
             (LeftDeadEnd::new_integer(2) + LeftDeadEnd::new_integer(3)).to_string(),
-            "{{2, 2}, {3, {2, {1, 1}}}}"
+            "{{3, {2, {1, 1}}}, {{2, {1, 1}}, {2, {1, 1}}}}"
         );
     }
 

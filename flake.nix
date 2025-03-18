@@ -190,6 +190,9 @@
             pkgs.pkg-config
             pkgs.SDL2
 
+            pkgs.valgrind
+            pkgs.kdePackages.kcachegrind
+
             rustToolchain
             # pkgs.wineWow64Packages.unstableFull
           ];
