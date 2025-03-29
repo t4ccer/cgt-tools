@@ -294,7 +294,7 @@ impl LeftDeadEnd {
         LeftDeadEnd::from_inner_vec(novel_factors)
     }
 
-    pub fn novel_factors_unordered(&self) -> Vec<LeftDeadEnd> {
+    fn novel_factors_unordered(&self) -> Vec<LeftDeadEnd> {
         // Optimization: Factors of an integer are exactly all integers less than or equal to it
         if let Some(integer) = self.to_integer() {
             let mut factors = Vec::with_capacity(integer as usize + 2);
@@ -356,7 +356,7 @@ impl LeftDeadEnd {
         new_factors
     }
 
-    pub fn non_novel_factors_unordered(&self) -> Vec<LeftDeadEnd> {
+    fn non_novel_factors_unordered(&self) -> Vec<LeftDeadEnd> {
         // Optimization: Factors of an integer are exactly all integers less than or equal to it
         if let Some(integer) = self.to_integer() {
             let mut acc = Vec::with_capacity(integer as usize + 2);

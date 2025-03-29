@@ -1,11 +1,9 @@
-#![allow(missing_docs)]
-
 //! Left Dead Ends with interned storage
 
 use append_only_vec::AppendOnlyVec;
 use dashmap::DashMap;
 use itertools::Itertools;
-use std::{cmp::Ordering, io, iter::FusedIterator, sync::Arc};
+use std::{cmp::Ordering, io, iter::FusedIterator};
 
 /// Interned Left Dead End
 ///
@@ -47,11 +45,7 @@ impl LeftDeadEnd {
 /// Interner acts as a storage of Left Dead Ends. It stores only games that are not integers
 pub struct Interner {
     /// Storage of game moves
-    ///
-    /// This is implemented as Arc of `AppendOnlyVec` so we can give out `MovesIter`s without
-    /// tying its lifetime to lifetime of the Interner. This allows us to have a mutable Interner
-    /// when iterating moves of a game
-    games: Arc<AppendOnlyVec<Box<[LeftDeadEnd]>>>,
+    games: AppendOnlyVec<Box<[LeftDeadEnd]>>,
 
     /// Mapping from game moves to its index in `games` vector
     table: DashMap<Box<[LeftDeadEnd]>, usize, ahash::RandomState>,
@@ -64,7 +58,7 @@ impl Interner {
     /// Construct new interner with empty storage
     pub fn new() -> Interner {
         Interner {
-            games: Arc::new(AppendOnlyVec::new()),
+            games: AppendOnlyVec::new(),
             factors: DashMap::default(),
             table: DashMap::default(),
         }
@@ -85,6 +79,14 @@ impl Interner {
                 .or_insert_with(|| self.games.push(moves));
             LeftDeadEnd { idx: *idx as i64 }
         }
+    }
+
+    pub fn new_from_string<'p>(&self, input: &'p str) -> Option<LeftDeadEnd> {
+        use crate::parsing::Parser;
+
+        let p = Parser::new(input);
+        let (_, parsed) = self.parse(p)?;
+        Some(parsed)
     }
 
     /// Get iterator over game's moves
@@ -209,17 +211,42 @@ impl Interner {
             + 1
     }
 
+    pub fn flexibility(&self, game: LeftDeadEnd) -> u32 {
+        if game.to_integer().is_some() {
+            0
+        } else {
+            self.into_moves(game)
+                .map(|g| self.flexibility(g))
+                .max()
+                .map_or(0, |f| f + 1)
+        }
+    }
+
+    pub fn race(&self, game: LeftDeadEnd) -> u32 {
+        if game.is_zero() {
+            0
+        } else {
+            self.into_moves(game)
+                .map(|g| self.race(g))
+                .min()
+                .map_or(0, |f| f + 1)
+        }
+    }
+
+    pub fn racing(&self, game: LeftDeadEnd) -> impl Iterator<Item = LeftDeadEnd> + use<'_> {
+        let b = self.race(game);
+        self.into_moves(game)
+            .filter(move |g| self.race(*g) + 1 == b)
+    }
+
+    pub fn stalling(&self, game: LeftDeadEnd) -> impl Iterator<Item = LeftDeadEnd> + use<'_> {
+        let b = self.birthday(game);
+        self.into_moves(game)
+            .filter(move |g| self.birthday(*g) + 1 == b)
+    }
+
     /// Compute game factors
     pub fn factors(&self, game: LeftDeadEnd) -> Vec<(LeftDeadEnd, LeftDeadEnd)> {
-        // // Optimization: Factors of an integer are exactly all integers less than or equal to it
-        // if let Some(integer) = game.to_integer() {
-        //     let mut acc = Vec::with_capacity(integer as usize + 2);
-        //     for i in 0..=integer {
-        //         acc.push(LeftDeadEnd::new_integer(i));
-        //     }
-        //     return acc;
-        // }
-
         if let Some(cached) = self.factors.get(&game) {
             return Vec::from(cached.as_ref());
         }
@@ -239,7 +266,7 @@ impl Interner {
         factors
     }
 
-    pub fn novel_factors_unordered(&self, game: LeftDeadEnd) -> Vec<(LeftDeadEnd, LeftDeadEnd)> {
+    fn novel_factors_unordered(&self, game: LeftDeadEnd) -> Vec<(LeftDeadEnd, LeftDeadEnd)> {
         if game.is_zero() {
             return Vec::new();
         }
@@ -295,18 +322,7 @@ impl Interner {
         new_factors
     }
 
-    pub fn non_novel_factors_unordered(
-        &self,
-        game: LeftDeadEnd,
-    ) -> Vec<(LeftDeadEnd, LeftDeadEnd)> {
-        // if let Some(integer) = game.to_integer() {
-        //     let mut acc = Vec::with_capacity(integer as usize + 2);
-        //     for i in 0..=integer {
-        //         acc.push(LeftDeadEnd::new_integer(i));
-        //     }
-        //     return acc;
-        // }
-
+    fn non_novel_factors_unordered(&self, game: LeftDeadEnd) -> Vec<(LeftDeadEnd, LeftDeadEnd)> {
         let mut candidates = vec![];
 
         for option in self.into_moves(game) {
@@ -386,6 +402,9 @@ impl Interner {
         }
     }
 
+    /// Check if game is greater than or equal to other game
+    ///
+    /// This is more efficient than [`Interner::partial_cmp`]
     pub fn ge(&self, lhs: LeftDeadEnd, rhs: LeftDeadEnd) -> bool {
         if lhs == rhs {
             return true;
@@ -406,13 +425,6 @@ impl Interner {
             self.into_moves(rhs)
                 .any(|right_option| self.ge(left_option, right_option))
         });
-
-        // eprintln!(
-        //     "{} >= {} [{}]",
-        //     self.to_string(lhs),
-        //     self.to_string(rhs),
-        //     res
-        // );
 
         res
     }
@@ -450,6 +462,39 @@ impl Interner {
             acc
         });
         self.new_moves(moves.into_boxed_slice())
+    }
+
+    pub fn parse<'p>(
+        &self,
+        parser: crate::parsing::Parser<'p>,
+    ) -> Option<(crate::parsing::Parser<'p>, LeftDeadEnd)> {
+        use crate::parsing::{lexeme, try_option, Parser};
+
+        let parser = parser.trim_whitespace();
+        if let Some(parser) = parser.parse_ascii_char('{') {
+            let parser = parser.trim_whitespace();
+
+            let mut options = Vec::new();
+            let mut loop_parser = parser;
+            while let Some((parser, option)) = lexeme!(loop_parser, |p| self.parse(p)) {
+                loop_parser = parser;
+                options.push(option);
+
+                match loop_parser.parse_ascii_char(',') {
+                    Some(parser) => {
+                        loop_parser = parser.trim_whitespace();
+                    }
+                    None => break,
+                }
+            }
+            let parser = loop_parser.trim_whitespace();
+            let parser = try_option!(parser.parse_ascii_char('}'));
+            let parser = parser.trim_whitespace();
+            Some((parser, self.new_moves(options.into_boxed_slice())))
+        } else {
+            let (parser, integer) = try_option!(lexeme!(parser, Parser::parse_u32));
+            Some((parser, LeftDeadEnd::new_integer(integer)))
+        }
     }
 }
 
@@ -553,4 +598,61 @@ fn partial_order() {
         interner.partial_cmp(LeftDeadEnd::new_integer(1), g),
         Some(Ordering::Equal),
     );
+
+    let g = interner.new_sum(LeftDeadEnd::new_integer(2), LeftDeadEnd::new_integer(2));
+    assert_eq!(interner.partial_cmp(LeftDeadEnd::new_integer(3), g), None);
+}
+
+#[test]
+fn parsing() {
+    let input = "{{{0, {1, 0}, {2, 0}, {2, 1}}, {{0, {1, 0}}, {{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}, {{{0, {1, 0}}}}}, {{0, {1, 0}, {2, 0}, {2, 1}}, {{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}, {{{1, 0}}, {{{1, 0}}}}, {{0, {1, 0}, {2, 0}, {2, 1}}}}, {{{0, {1, 0}}}, {{{0, {1, 0}}}}}}, {{0, {1, 0}, {2, 0}, {2, 1}}, {{0, {2, 0}, {2, 1}}, {{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}, {{{1, 0}}, {{{1, 0}}}}, {{0, {2, 0}, {2, 1}}}}, {{0, {1, 0}, {2, 0}, {2, 1}}, {{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}, {{2, 0}, {{{2, 0}}}}, {{{0, {1, 0}, {2, 0}, {2, 1}}}}}, {{{0, {1, 0}, {2, 0}, {2, 1}}}, {{{0, {1, 0}, {2, 0}, {2, 1}}}}}}, {{{0, {1, 0}, {2, 0}, {2, 1}}, {{0, {2, 0}, {2, 1}}, {{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}, {{{1, 0}}, {{{1, 0}}}}, {{0, {2, 0}, {2, 1}}}}, {{0, {1, 0}, {2, 0}, {2, 1}}, {{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}, {{2, 0}, {{{2, 0}}}}, {{{0, {1, 0}, {2, 0}, {2, 1}}}}}, {{{0, {1, 0}, {2, 0}, {2, 1}}}, {{{0, {1, 0}, {2, 0}, {2, 1}}}}}}, {{{0, {1, 0}, {2, 0}, {2, 1}}, {{0, {2, 0}, {2, 1}}, {{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}, {{{1, 0}}, {{{1, 0}}}}, {{0, {2, 0}, {2, 1}}}}, {{0, {1, 0}, {2, 0}, {2, 1}}, {{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}, {{2, 0}, {{{2, 0}}}}, {{{0, {1, 0}, {2, 0}, {2, 1}}}}}, {{{0, {1, 0}, {2, 0}, {2, 1}}}, {{{0, {1, 0}, {2, 0}, {2, 1}}}}}}}, {{{0, {1, 0}, {2, 0}, {2, 1}}, {{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}, {{{1, 0}}, {{{1, 0}}}}, {{0, {1, 0}, {2, 0}, {2, 1}}}}, {{0, {1, 0}, {2, 0}, {2, 1}}, {{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}, {{2, 0}, {{{2, 0}}}}, {{{0, {1, 0}, {2, 0}, {2, 1}}}}}, {{{0, {1, 0}, {2, 0}, {2, 1}}, {{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}, {{2, 0}, {{{2, 0}}}}, {{{0, {1, 0}, {2, 0}, {2, 1}}}}}}, {{{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}, {{2, 0}, {{{2, 0}}}}, {{{{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}}}, {{{2, 0}, {{{2, 0}}}}}}, {{{{0, {1, 0}, {2, 0}, {2, 1}}, {{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}, {{{1, 0}}, {{{1, 0}}}}, {{0, {1, 0}, {2, 0}, {2, 1}}}}}}}, {{{{0, {1, 0}, {2, 0}, {2, 1}}, {{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}, {{{1, 0}}, {{{1, 0}}}}, {{0, {1, 0}, {2, 0}, {2, 1}}}}}, {{{{0, {1, 0}, {2, 0}, {2, 1}}, {{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}, {{{1, 0}}, {{{1, 0}}}}, {{0, {1, 0}, {2, 0}, {2, 1}}}}}}}}, {{{0, {1, 0}, {2, 0}, {2, 1}}, {{0, {1, 0}}, {{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}, {{{0, {1, 0}}}}}, {{0, {1, 0}, {2, 0}, {2, 1}}, {{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}, {{{1, 0}}, {{{1, 0}}}}, {{0, {1, 0}, {2, 0}, {2, 1}}}}, {{{0, {1, 0}}}, {{{0, {1, 0}}}}}}, {{{0, {1, 0}, {2, 0}, {2, 1}}, {{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}, {{{1, 0}}, {{{1, 0}}}}, {{0, {1, 0}, {2, 0}, {2, 1}}}}, {{0, {1, 0}, {2, 0}, {2, 1}}, {{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}, {{2, 0}, {{{2, 0}}}}, {{{0, {1, 0}, {2, 0}, {2, 1}}}}}, {{{0, {1, 0}, {2, 0}, {2, 1}}, {{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}, {{2, 0}, {{{2, 0}}}}, {{{0, {1, 0}, {2, 0}, {2, 1}}}}}}, {{{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}, {{2, 0}, {{{2, 0}}}}, {{{{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}}}, {{{2, 0}, {{{2, 0}}}}}}, {{{{0, {1, 0}, {2, 0}, {2, 1}}, {{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}, {{{1, 0}}, {{{1, 0}}}}, {{0, {1, 0}, {2, 0}, {2, 1}}}}}}}, {{{0, {1, 0}}, {{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}, {{{0, {1, 0}}}}}, {{{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}, {{2, 0}, {{{2, 0}}}}, {{{{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}}}, {{{2, 0}, {{{2, 0}}}}}}, {{{{0, {1, 0}}, {{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}, {{{0, {1, 0}}}}}}}}, {{{{0, {1, 0}, {2, 0}, {2, 1}}, {{0, {1, 0}}, {{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}, {{{0, {1, 0}}}}}, {{0, {1, 0}, {2, 0}, {2, 1}}, {{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}, {{{1, 0}}, {{{1, 0}}}}, {{0, {1, 0}, {2, 0}, {2, 1}}}}, {{{0, {1, 0}}}, {{{0, {1, 0}}}}}}}}}, {{{{0, {1, 0}, {2, 0}, {2, 1}}, {{0, {1, 0}}, {{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}, {{{0, {1, 0}}}}}, {{0, {1, 0}, {2, 0}, {2, 1}}, {{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}, {{{1, 0}}, {{{1, 0}}}}, {{0, {1, 0}, {2, 0}, {2, 1}}}}, {{{0, {1, 0}}}, {{{0, {1, 0}}}}}}}, {{{{0, {1, 0}, {2, 0}, {2, 1}}, {{0, {1, 0}}, {{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}, {{{0, {1, 0}}}}}, {{0, {1, 0}, {2, 0}, {2, 1}}, {{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}, {{{1, 0}}, {{{1, 0}}}}, {{0, {1, 0}, {2, 0}, {2, 1}}}}, {{{0, {1, 0}}}, {{{0, {1, 0}}}}}}}}}}";
+
+    let interner = Interner::new();
+    let g = interner.new_from_string(input).unwrap();
+    assert_eq!(interner.birthday(g), 11);
+}
+
+#[test]
+fn factors() {
+    let interner = Interner::new();
+    let g = interner.new_from_string("{{{{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}}, {{{1, 0}}, {{{1, 0}}}}, {{{{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}}}, {{{{{1, 0}}, {{{1, 0}}}}}}}").unwrap();
+
+    let mut expected_factors = vec![
+        (
+            interner.new_from_string("0").unwrap(),
+            interner.new_from_string("{{{{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}}, {{{1, 0}}, {{{1, 0}}}}, {{{{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}}}, {{{{{1, 0}}, {{{1, 0}}}}}}}").unwrap(),
+        ),
+        (
+            interner.new_from_string("{1, 0}").unwrap(),
+            interner.new_from_string("{{{2, 0}}, {2, 1}, {{{2, 0}}}, {{{2, 1}}}}").unwrap()
+        ),
+        (
+            interner.new_from_string("{2, 0}").unwrap(
+            ),
+            interner.new_from_string("{{{1, 0}}, {{{1, 0}}}}").unwrap()
+        ),
+        (
+            interner.new_from_string("{{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}").unwrap(),
+            interner.new_from_string("{2, 1}").unwrap()
+        ),
+        (
+            interner.new_from_string("{{{1, 0}}, {{{1, 0}}}}").unwrap(),
+            interner.new_from_string("{2, 0}").unwrap()
+        ),
+        (
+            interner.new_from_string("{{{{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}}, {{{1, 0}}, {{{1, 0}}}}, {{{{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}}}, {{{{{1, 0}}, {{{1, 0}}}}}}}").unwrap(),
+            interner.new_from_string("0").unwrap()
+        ),
+        (
+            interner.new_from_string("{2, 1}").unwrap(),
+            interner.new_from_string("{{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}").unwrap()
+        ),
+        (
+            interner.new_from_string("{{{2, 0}}, {2, 1}, {{{2, 0}}}, {{{2, 1}}}}").unwrap(),
+            interner.new_from_string("{1, 0}").unwrap()
+        ),
+    ];
+    expected_factors.sort();
+
+    assert_eq!(interner.factors(g), expected_factors);
 }
