@@ -81,7 +81,7 @@ impl Interner {
         }
     }
 
-    pub fn new_from_string<'p>(&self, input: &'p str) -> Option<LeftDeadEnd> {
+    pub fn new_from_string(&self, input: &str) -> Option<LeftDeadEnd> {
         use crate::parsing::Parser;
 
         let p = Parser::new(input);

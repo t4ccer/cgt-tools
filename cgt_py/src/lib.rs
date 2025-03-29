@@ -35,8 +35,8 @@ macro_rules! wrap_struct {
 #[macro_export]
 macro_rules! impl_py_partizan_game {
     ($game_str:expr, $game:ident, $py_game:ident, $tt_str:expr, $tt:path, $py_tt:ident) => {
-        crate::wrap_struct!($tt, $py_tt, $tt_str, Default);
-        crate::wrap_struct!($game, $py_game, $game_str, Clone);
+        $crate::wrap_struct!($tt, $py_tt, $tt_str, Default);
+        $crate::wrap_struct!($game, $py_game, $game_str, Clone);
 
         #[pymethods]
         impl $py_game {
