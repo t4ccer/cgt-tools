@@ -34,7 +34,7 @@ impl DomineeringWindow {
 
 impl IsCgtWindow for TitledWindow<DomineeringWindow> {
     impl_titled_window!("Domineering");
-    impl_game_window!(EvalDomineering, DomineeringDetails);
+    impl_game_window!("Domineering", EvalDomineering, DomineeringDetails);
 
     fn draw(&mut self, ui: &imgui::Ui, ctx: &mut GuiContext) {
         let width = self.content.game.grid().width();
@@ -147,10 +147,13 @@ impl IsCgtWindow for TitledWindow<DomineeringWindow> {
                             ui.column_width(0),
                         ),
                     );
-                    ctx.schedule_task(Task::EvalDomineering(EvalTask {
-                        window: self.window_id,
-                        game: self.content.game,
-                    }));
+                    ctx.schedule_task(
+                        "Domineering",
+                        Task::EvalDomineering(EvalTask {
+                            window: self.window_id,
+                            game: self.content.game,
+                        }),
+                    );
                 }
             });
     }

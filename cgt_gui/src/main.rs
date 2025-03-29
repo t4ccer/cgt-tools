@@ -23,8 +23,16 @@ use cgt::{
         transposition_table::ParallelTranspositionTable,
     },
 };
-use imgui::{ComboBoxFlags, FontId};
-use std::{collections::BTreeMap, marker::PhantomData, sync::mpsc, thread};
+use imgui::{ComboBoxFlags, Condition, FontId, TableColumnSetup};
+use std::{
+    collections::{BTreeMap, VecDeque},
+    marker::PhantomData,
+    sync::{
+        atomic::{self, AtomicU64},
+        mpsc, Arc, Condvar, Mutex,
+    },
+    thread,
+};
 
 mod imgui_sdl2_boilerplate;
 mod widgets;
@@ -127,12 +135,15 @@ macro_rules! impl_titled_window {
 pub(crate) use impl_titled_window;
 
 macro_rules! impl_game_window {
-    ($task_kind:ident, $update_kind:ident) => {
+    ($title: literal, $task_kind:ident, $update_kind:ident) => {
         fn initialize(&mut self, ctx: &$crate::GuiContext) {
-            ctx.schedule_task($crate::Task::$task_kind($crate::EvalTask {
-                window: self.window_id,
-                game: self.content.game.clone(),
-            }));
+            ctx.schedule_task(
+                $title,
+                $crate::Task::$task_kind($crate::EvalTask {
+                    window: self.window_id,
+                    game: self.content.game.clone(),
+                }),
+            );
         }
 
         fn update(&mut self, update: $crate::UpdateKind) {
@@ -249,6 +260,22 @@ pub struct EvalTask<D> {
     pub game: D,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TaskId(u64);
+
+pub struct CurrentTask {
+    id: TaskId,
+    name: &'static str,
+    canceller: Option<Box<dyn FnMut() -> () + Sync + Send>>,
+}
+
+#[derive(Debug)]
+pub struct ScheduledTask {
+    task: Task,
+    name: &'static str,
+    id: TaskId,
+}
+
 #[derive(Debug)]
 pub enum Task {
     EvalDomineering(EvalTask<Domineering>),
@@ -271,11 +298,16 @@ pub struct GuiContext {
     pub new_windows: Vec<Box<dyn IsCgtWindow>>,
     removed_windows: Vec<WindowId>,
     large_font_id: FontId,
-    tasks: mpsc::Sender<Task>,
+    tasks: Arc<Mutex<VecDeque<ScheduledTask>>>,
+    tasks_condvar: Arc<Condvar>,
+    next_id: AtomicU64,
 }
 
 impl GuiContext {
-    pub fn new(tasks: mpsc::Sender<Task>) -> GuiContext {
+    pub fn new(
+        tasks: Arc<Mutex<VecDeque<ScheduledTask>>>,
+        tasks_condvar: Arc<Condvar>,
+    ) -> GuiContext {
         GuiContext {
             new_windows: Vec::new(),
             removed_windows: Vec::new(),
@@ -285,11 +317,20 @@ impl GuiContext {
                 >())
             },
             tasks,
+            tasks_condvar,
+            next_id: AtomicU64::new(0),
         }
     }
 
-    pub fn schedule_task(&self, task: Task) {
-        self.tasks.send(task).unwrap();
+    pub fn schedule_task(&self, name: &'static str, task: Task) -> TaskId {
+        // TODO: Cancel pending evals that would get overwritten anyway
+        let id = TaskId(self.next_id.fetch_add(1, atomic::Ordering::SeqCst));
+        self.tasks
+            .lock()
+            .unwrap()
+            .push_back(ScheduledTask { task, name, id });
+        self.tasks_condvar.notify_one();
+        id
     }
 }
 
@@ -318,7 +359,9 @@ pub struct Update {
 }
 
 pub struct SchedulerContext {
-    tasks: mpsc::Receiver<Task>,
+    current_task: Arc<Mutex<Option<CurrentTask>>>,
+    tasks: Arc<Mutex<VecDeque<ScheduledTask>>>,
+    tasks_condvar: Arc<Condvar>,
     updates: mpsc::Sender<Update>,
     domineering_tt: ParallelTranspositionTable<Domineering>,
     fission_tt: ParallelTranspositionTable<Fission>,
@@ -350,41 +393,67 @@ fn scheduler(ctx: SchedulerContext) {
         };
     }
 
-    while let Ok(task) = ctx.tasks.recv() {
-        match task {
-            Task::EvalDomineering(task) => {
-                handle_game_update!(task, DomineeringDetails, domineering_tt);
+    let mut should_wait = true;
+    loop {
+        let task = {
+            let mut tasks = ctx.tasks.lock().unwrap();
+
+            if should_wait {
+                let mut tasks = ctx.tasks_condvar.wait(tasks).unwrap();
+                tasks.pop_front()
+            } else {
+                tasks.pop_front()
             }
-            Task::EvalFission(task) => {
-                handle_game_update!(task, FissionDetails, fission_tt);
+        };
+
+        should_wait = task.is_none();
+
+        if let Some(task) = task {
+            *ctx.current_task.lock().unwrap() = Some(CurrentTask {
+                id: task.id,
+                name: task.name,
+                canceller: None,
+            });
+
+            match task.task {
+                Task::EvalDomineering(task) => {
+                    handle_game_update!(task, DomineeringDetails, domineering_tt);
+                }
+                Task::EvalFission(task) => {
+                    handle_game_update!(task, FissionDetails, fission_tt);
+                }
+                Task::EvalAmazons(task) => {
+                    handle_game_update!(task, AmazonsDetails, amazons_tt);
+                }
+                Task::EvalSkiJumps(task) => {
+                    handle_game_update!(task, SkiJumpsDetails, ski_jumps_tt);
+                }
+                Task::EvalToadsAndFrogs(task) => {
+                    handle_game_update!(task, ToadsAndFrogsDetails, toads_and_frogs_tt);
+                }
+                Task::EvalSnort(task) => {
+                    handle_game_update!(task, SnortDetails, snort_tt);
+                }
+                Task::EvalDigraphPlacement(task) => {
+                    handle_game_update!(task, DigraphPlacementDetails, digraph_placement_tt);
+                }
             }
-            Task::EvalAmazons(task) => {
-                handle_game_update!(task, AmazonsDetails, amazons_tt);
-            }
-            Task::EvalSkiJumps(task) => {
-                handle_game_update!(task, SkiJumpsDetails, ski_jumps_tt);
-            }
-            Task::EvalToadsAndFrogs(task) => {
-                handle_game_update!(task, ToadsAndFrogsDetails, toads_and_frogs_tt);
-            }
-            Task::EvalSnort(task) => {
-                handle_game_update!(task, SnortDetails, snort_tt);
-            }
-            Task::EvalDigraphPlacement(task) => {
-                handle_game_update!(task, DigraphPlacementDetails, digraph_placement_tt);
-            }
+
+            *ctx.current_task.lock().unwrap() = None;
         }
     }
 }
 
 fn main() {
-    // let snort_tt = ParallelTranspositionTable::new();
-
-    let (task_sender, task_receiver) = mpsc::channel();
+    let tasks = Arc::new(Mutex::new(VecDeque::new()));
+    let tasks_condvar = Arc::new(Condvar::new());
     let (update_sender, update_receiver) = mpsc::channel();
 
+    let current_task = Arc::new(Mutex::new(None));
     let scheduler_ctx = SchedulerContext {
-        tasks: task_receiver,
+        current_task: current_task.clone(),
+        tasks: tasks.clone(),
+        tasks_condvar: tasks_condvar.clone(),
         updates: update_sender,
         domineering_tt: ParallelTranspositionTable::new(),
         fission_tt: ParallelTranspositionTable::new(),
@@ -398,7 +467,7 @@ fn main() {
     thread::spawn(move || scheduler(scheduler_ctx));
 
     let mut next_id = WindowId(0);
-    let mut gui_context = GuiContext::new(task_sender);
+    let mut gui_context = GuiContext::new(tasks.clone(), tasks_condvar);
     let mut windows: BTreeMap<WindowId, Box<dyn IsCgtWindow>> = BTreeMap::new();
 
     // must be macros because borrow checker
@@ -413,6 +482,7 @@ fn main() {
     }
 
     let mut show_demo = false;
+    let mut show_queue = false;
 
     imgui_sdl2_boilerplate::run("cgt-gui", |large_font, ui| {
         gui_context.large_font_id = large_font;
@@ -421,6 +491,61 @@ fn main() {
 
         if show_demo {
             ui.show_demo_window(&mut show_demo);
+        }
+
+        if show_queue {
+            ui.window("Work Queue")
+                .size([300.0, 600.0], Condition::Appearing)
+                .bring_to_front_on_focus(true)
+                .menu_bar(false)
+                .opened(&mut show_queue)
+                .build(|| {
+                    if let Some(_table) = ui.begin_table("work table", 3) {
+                        ui.table_setup_column_with(TableColumnSetup::new("Name"));
+                        ui.table_setup_column_with(TableColumnSetup::new("Status"));
+                        ui.table_setup_column_with(TableColumnSetup::new("##Action"));
+
+                        ui.table_headers_row();
+
+                        let mut to_cancel = None;
+                        if let Some(current) = &mut *current_task.lock().unwrap() {
+                            ui.table_next_row();
+                            ui.table_next_column();
+
+                            ui.text(format!("{}#{}", current.name, current.id.0));
+                            ui.table_next_column();
+
+                            ui.text("Running");
+                            ui.table_next_column();
+
+                            if let Some(canceller) = &mut current.canceller {
+                                if ui.button("Cancel") {
+                                    canceller();
+                                }
+                            }
+                            ui.table_next_column();
+                        }
+
+                        for task in tasks.lock().unwrap().iter() {
+                            ui.table_next_row();
+                            ui.table_next_column();
+
+                            ui.text(format!("{}#{}", task.name, task.id.0));
+                            ui.table_next_column();
+
+                            ui.text("Queued");
+                            ui.table_next_column();
+
+                            if ui.button("Cancel") {
+                                to_cancel = Some(task.id);
+                            }
+                        }
+
+                        if let Some(to_cancel) = to_cancel {
+                            tasks.lock().unwrap().retain(|t| t.id != to_cancel);
+                        }
+                    }
+                });
         }
 
         if let Some(_main_menu) = ui.begin_main_menu_bar() {
@@ -452,8 +577,13 @@ fn main() {
                     new_window!(DigraphPlacementWindow);
                 }
             }
-            if ui.menu_item("Debug") {
-                show_demo = true;
+            if let Some(_debug_menu) = ui.begin_menu("Debug") {
+                if ui.menu_item("Work Queue") {
+                    show_queue = true;
+                }
+                if ui.menu_item("Dear ImGui") {
+                    show_demo = true;
+                }
             }
         }
 

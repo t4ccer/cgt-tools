@@ -47,7 +47,7 @@ impl ToadsAndFrogsWindow {
 
 impl IsCgtWindow for TitledWindow<ToadsAndFrogsWindow> {
     impl_titled_window!("Toads and Frogs");
-    impl_game_window!(EvalToadsAndFrogs, ToadsAndFrogsDetails);
+    impl_game_window!("Toads and Frogs", EvalToadsAndFrogs, ToadsAndFrogsDetails);
 
     fn draw(&mut self, ui: &imgui::Ui, ctx: &mut GuiContext) {
         let width = self.content.game.row().len();
@@ -259,10 +259,13 @@ impl IsCgtWindow for TitledWindow<ToadsAndFrogsWindow> {
                             ui.column_width(0),
                         ),
                     );
-                    ctx.schedule_task(Task::EvalToadsAndFrogs(EvalTask {
-                        window: self.window_id,
-                        game: self.content.game.clone(),
-                    }));
+                    ctx.schedule_task(
+                        "Toads And Frogs",
+                        Task::EvalToadsAndFrogs(EvalTask {
+                            window: self.window_id,
+                            game: self.content.game.clone(),
+                        }),
+                    );
                 }
             });
     }

@@ -58,7 +58,7 @@ impl AmazonsWindow {
 
 impl IsCgtWindow for TitledWindow<AmazonsWindow> {
     impl_titled_window!("Amazons");
-    impl_game_window!(EvalAmazons, AmazonsDetails);
+    impl_game_window!("Amazons", EvalAmazons, AmazonsDetails);
 
     fn draw(&mut self, ui: &imgui::Ui, ctx: &mut GuiContext) {
         let width = self.content.game.grid().width();
@@ -304,10 +304,13 @@ impl IsCgtWindow for TitledWindow<AmazonsWindow> {
                             ui.column_width(0),
                         ),
                     );
-                    ctx.schedule_task(Task::EvalAmazons(EvalTask {
-                        window: self.window_id,
-                        game: self.content.game.clone(),
-                    }));
+                    ctx.schedule_task(
+                        "Amazons",
+                        Task::EvalAmazons(EvalTask {
+                            window: self.window_id,
+                            game: self.content.game.clone(),
+                        }),
+                    );
                 }
             });
     }

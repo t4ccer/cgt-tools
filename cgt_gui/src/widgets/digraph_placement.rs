@@ -196,10 +196,13 @@ impl IsCgtWindow for TitledWindow<DigraphPlacementWindow> {
         self.content.reposition_circle();
         self.content.reposition(V2f { x: 350.0, y: 400.0 });
         let graph = self.content.game.graph.map(|v| v.color);
-        ctx.schedule_task(crate::Task::EvalDigraphPlacement(crate::EvalTask {
-            window: self.window_id,
-            game: DigraphPlacement::new(graph),
-        }));
+        ctx.schedule_task(
+            "Digraph Placement",
+            crate::Task::EvalDigraphPlacement(crate::EvalTask {
+                window: self.window_id,
+                game: DigraphPlacement::new(graph),
+            }),
+        );
     }
     fn update(&mut self, update: crate::UpdateKind) {
         let graph = self.content.game.graph.map(|v| v.color);
@@ -375,10 +378,13 @@ impl IsCgtWindow for TitledWindow<DigraphPlacementWindow> {
                 if is_dirty {
                     self.content.details = None;
                     let graph = self.content.game.graph.map(|v| v.color);
-                    ctx.schedule_task(Task::EvalDigraphPlacement(EvalTask {
-                        window: self.window_id,
-                        game: DigraphPlacement::new(graph),
-                    }));
+                    ctx.schedule_task(
+                        "Digraph Placement",
+                        Task::EvalDigraphPlacement(EvalTask {
+                            window: self.window_id,
+                            game: DigraphPlacement::new(graph),
+                        }),
+                    );
                 }
             });
 

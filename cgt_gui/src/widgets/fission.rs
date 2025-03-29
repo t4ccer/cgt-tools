@@ -48,7 +48,7 @@ impl FissionWindow {
 
 impl IsCgtWindow for TitledWindow<FissionWindow> {
     impl_titled_window!("Fission");
-    impl_game_window!(EvalFission, FissionDetails);
+    impl_game_window!("Fission", EvalFission, FissionDetails);
 
     fn draw(&mut self, ui: &imgui::Ui, ctx: &mut GuiContext) {
         let width = self.content.game.grid().width();
@@ -237,10 +237,13 @@ impl IsCgtWindow for TitledWindow<FissionWindow> {
                             ui.column_width(0),
                         ),
                     );
-                    ctx.schedule_task(Task::EvalFission(EvalTask {
-                        window: self.window_id,
-                        game: self.content.game.clone(),
-                    }));
+                    ctx.schedule_task(
+                        "Fission",
+                        Task::EvalFission(EvalTask {
+                            window: self.window_id,
+                            game: self.content.game.clone(),
+                        }),
+                    );
                 }
             });
     }

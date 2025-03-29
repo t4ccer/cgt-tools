@@ -56,7 +56,7 @@ impl SkiJumpsWindow {
 
 impl IsCgtWindow for TitledWindow<SkiJumpsWindow> {
     impl_titled_window!("Ski Jumps");
-    impl_game_window!(EvalSkiJumps, SkiJumpsDetails);
+    impl_game_window!("Ski Jumps", EvalSkiJumps, SkiJumpsDetails);
 
     fn draw(&mut self, ui: &imgui::Ui, ctx: &mut GuiContext) {
         let width = self.content.game.grid().width();
@@ -411,10 +411,13 @@ impl IsCgtWindow for TitledWindow<SkiJumpsWindow> {
                             ui.column_width(0),
                         ),
                     );
-                    ctx.schedule_task(Task::EvalSkiJumps(EvalTask {
-                        window: self.window_id,
-                        game: self.content.game.clone(),
-                    }));
+                    ctx.schedule_task(
+                        "Ski Jumps",
+                        Task::EvalSkiJumps(EvalTask {
+                            window: self.window_id,
+                            game: self.content.game.clone(),
+                        }),
+                    );
                 }
             });
     }

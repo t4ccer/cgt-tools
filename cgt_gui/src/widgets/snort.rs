@@ -181,10 +181,13 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
         self.content.reposition_circle();
         self.content.reposition(V2f { x: 350.0, y: 400.0 });
         let graph = self.content.game.graph.map(|v| v.kind);
-        ctx.schedule_task(crate::Task::EvalSnort(crate::EvalTask {
-            window: self.window_id,
-            game: Snort::new(graph),
-        }));
+        ctx.schedule_task(
+            "Snort",
+            crate::Task::EvalSnort(crate::EvalTask {
+                window: self.window_id,
+                game: Snort::new(graph),
+            }),
+        );
     }
     fn update(&mut self, update: crate::UpdateKind) {
         let graph = self.content.game.graph.map(|v| v.kind);
@@ -385,10 +388,13 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                 if is_dirty {
                     self.content.details = None;
                     let graph = self.content.game.graph.map(|v| v.kind);
-                    ctx.schedule_task(Task::EvalSnort(EvalTask {
-                        window: self.window_id,
-                        game: Snort::new(graph),
-                    }));
+                    ctx.schedule_task(
+                        "Snort",
+                        Task::EvalSnort(EvalTask {
+                            window: self.window_id,
+                            game: Snort::new(graph),
+                        }),
+                    );
                 }
             });
 
