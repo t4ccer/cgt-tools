@@ -52,7 +52,7 @@ pub fn run(args: Args) -> Result<()> {
             .with_context(|| format!("Could not open input file `{}`", &args.input))?,
     );
     let output =
-        Mutex::new(BufWriter::new(args.output.open().with_context(|| {
+        Mutex::new(BufWriter::new(args.output.create().with_context(|| {
             format!("Could not open output file `{}`", &args.output)
         })?));
 
