@@ -27,6 +27,7 @@ struct Game {
     birthday: u32,
     race: u32,
     flexibility: u32,
+    number_of_options: u32,
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -90,6 +91,7 @@ pub fn run(args: Args) -> Result<()> {
                     birthday: interner.birthday(game),
                     race: interner.race(game),
                     flexibility: interner.flexibility(game),
+                    number_of_options: interner.into_moves(game).count() as u32,
                 }
             };
 
