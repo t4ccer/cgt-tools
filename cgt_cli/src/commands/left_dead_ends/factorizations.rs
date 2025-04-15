@@ -1,11 +1,12 @@
+use crate::io::FileOrStdout;
 use anyhow::{Context, Result};
 use cgt::misere::left_dead_end::interned::{Interner, LeftDeadEnd};
 use clap::{self, Parser};
 use itertools::Itertools;
 use rayon::iter::{ParallelBridge, ParallelIterator};
 use std::{
-    io::{stdout, Write},
-    sync::atomic::AtomicU64,
+    io::{BufWriter, Write},
+    sync::{atomic::AtomicU64, Mutex},
 };
 
 #[derive(Debug, Clone, Parser)]
@@ -18,6 +19,9 @@ pub struct Args {
 
     #[arg(long, default_value = None)]
     threads: Option<u32>,
+
+    #[arg(long, default_value = "-")]
+    output: FileOrStdout,
 }
 
 pub fn run(args: Args) -> Result<()> {
@@ -27,6 +31,11 @@ pub fn run(args: Args) -> Result<()> {
             .build_global()
             .context("Could not build the thread pool")?;
     }
+
+    let output =
+        Mutex::new(BufWriter::new(args.output.create().with_context(|| {
+            format!("Could not open output file `{}`", &args.output)
+        })?));
 
     let interner = Interner::new();
 
@@ -64,11 +73,11 @@ pub fn run(args: Args) -> Result<()> {
             }
 
             let l = analyze_left_dead_end(&interner, d);
-            stdout().lock().write_all(l.as_bytes()).unwrap();
+            output.lock().unwrap().write_all(l.as_bytes()).unwrap();
         });
 
     eprintln!("len = {}", interner.len());
-    stdout().flush().unwrap();
+    output.lock().unwrap().flush().unwrap();
 
     Ok(())
 }
