@@ -1,7 +1,7 @@
 use crate::widgets::{
     amazons::AmazonsWindow, canonical_form::CanonicalFormWindow,
     digraph_placement::DigraphPlacementWindow, domineering::DomineeringWindow,
-    fission::FissionWindow, ski_jumps::SkiJumpsWindow, snort::SnortWindow,
+    fission::FissionWindow, konane::KonaneWindow, ski_jumps::SkiJumpsWindow, snort::SnortWindow,
     toads_and_frogs::ToadsAndFrogsWindow,
 };
 use cgt::{
@@ -14,6 +14,7 @@ use cgt::{
             digraph_placement::{self, DigraphPlacement},
             domineering::Domineering,
             fission::Fission,
+            konane::Konane,
             ski_jumps::SkiJumps,
             snort::{self, Snort},
             toads_and_frogs::ToadsAndFrogs,
@@ -281,6 +282,7 @@ pub enum Task {
     EvalDomineering(EvalTask<Domineering>),
     EvalFission(EvalTask<Fission>),
     EvalAmazons(EvalTask<Amazons>),
+    EvalKonane(EvalTask<Konane>),
     EvalSkiJumps(EvalTask<SkiJumps>),
     EvalToadsAndFrogs(EvalTask<ToadsAndFrogs>),
     EvalSnort(EvalTask<Snort<snort::VertexKind, UndirectedGraph<snort::VertexKind>>>),
@@ -338,6 +340,7 @@ pub enum UpdateKind {
     DomineeringDetails(Domineering, Details),
     FissionDetails(Fission, Details),
     AmazonsDetails(Amazons, Details),
+    KonaneDetails(Konane, Details),
     SkiJumpsDetails(SkiJumps, Details),
     ToadsAndFrogsDetails(ToadsAndFrogs, Details),
     SnortDetails(
@@ -366,6 +369,7 @@ pub struct SchedulerContext {
     domineering_tt: ParallelTranspositionTable<Domineering>,
     fission_tt: ParallelTranspositionTable<Fission>,
     amazons_tt: ParallelTranspositionTable<Amazons>,
+    konane_tt: ParallelTranspositionTable<Konane>,
     ski_jumps_tt: ParallelTranspositionTable<SkiJumps>,
     toads_and_frogs_tt: ParallelTranspositionTable<ToadsAndFrogs>,
     snort_tt:
@@ -425,6 +429,9 @@ fn scheduler(ctx: SchedulerContext) {
                 Task::EvalAmazons(task) => {
                     handle_game_update!(task, AmazonsDetails, amazons_tt);
                 }
+                Task::EvalKonane(task) => {
+                    handle_game_update!(task, KonaneDetails, konane_tt);
+                }
                 Task::EvalSkiJumps(task) => {
                     handle_game_update!(task, SkiJumpsDetails, ski_jumps_tt);
                 }
@@ -458,6 +465,7 @@ fn main() {
         domineering_tt: ParallelTranspositionTable::new(),
         fission_tt: ParallelTranspositionTable::new(),
         amazons_tt: ParallelTranspositionTable::new(),
+        konane_tt: ParallelTranspositionTable::new(),
         ski_jumps_tt: ParallelTranspositionTable::new(),
         toads_and_frogs_tt: ParallelTranspositionTable::new(),
         snort_tt: ParallelTranspositionTable::new(),
@@ -568,6 +576,9 @@ fn main() {
                 }
                 if ui.menu_item("Toads and Frogs") {
                     new_window!(ToadsAndFrogsWindow);
+                }
+                if ui.menu_item("Konane") {
+                    new_window!(KonaneWindow);
                 }
                 ui.separator();
                 if ui.menu_item("Snort") {
