@@ -621,3 +621,16 @@ impl Display for Thermograph {
         display::parens(f, |f| write!(f, "{}, {}", self.left_wall, self.right_wall))
     }
 }
+
+#[test]
+fn thermograph() {
+    use super::canonical_form::CanonicalForm;
+    use std::str::FromStr;
+
+    let cf = CanonicalForm::from_str("{{2|0}|-1}").unwrap();
+    let t = cf.thermograph();
+    assert_eq!(
+        t.to_string(),
+        "Thermograph(Trajectory(0, [], [0]), Trajectory(0, [1], [0, 1]))"
+    );
+}
