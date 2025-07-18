@@ -15,7 +15,7 @@ use crate::{
         self, canonical_form::CanonicalFormWindow, interactive_color, GridEditorAction, COLOR_BLUE,
         COLOR_RED, TILE_COLOR_EMPTY, TILE_COLOR_FILLED, TILE_SIZE,
     },
-    DetailOptions, Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow,
+    Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow,
 };
 
 imgui_enum! {
@@ -38,7 +38,6 @@ enum PendingMove {
 #[derive(Debug, Clone)]
 pub struct KonaneWindow {
     game: Konane,
-    details_options: DetailOptions,
     editing_mode: RawOf<GridEditingMode>,
     alternating_moves: bool,
     pending_move: PendingMove,
@@ -49,7 +48,6 @@ impl KonaneWindow {
     pub fn new() -> KonaneWindow {
         KonaneWindow {
             game: Konane::from_str("....|....|....").unwrap(),
-            details_options: DetailOptions::new(),
             editing_mode: RawOf::new(GridEditingMode::AddBlocked),
             alternating_moves: true,
             pending_move: PendingMove::None,

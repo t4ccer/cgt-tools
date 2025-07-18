@@ -350,35 +350,19 @@ macro_rules! game_details {
             $ui.text_wrapped(&details.canonical_form_rendered);
             $ui.text_wrapped(&details.temperature_rendered);
 
-            if $self.content.details_options.thermograph_fit {
-                let thermograph_size = $crate::widgets::thermograph_size(&details.thermograph);
-                let [_, text_height] = $ui.calc_text_size("1234567890()");
-                let available_w = $ui.current_column_width();
-                let pos_y = $ui.cursor_pos()[1];
-                let available_h = $ui.window_size()[1] - pos_y - text_height;
-                let scale_w = available_w / thermograph_size.x;
-                let scale_h = available_h / thermograph_size.y;
-
-                $self.content.details_options.thermograph_scale = f32::min(scale_w, scale_h);
-            } else {
-                // NOTE: When adding widgets here, account for extra height above
-                $ui.align_text_to_frame_padding();
-                $ui.text("Scale: ");
-                $ui.same_line();
-                let short_slider = $ui.push_item_width(200.0);
-                $ui.slider(
-                    "##Thermograph scale",
-                    5.0,
-                    100.0,
-                    &mut $self.content.details_options.thermograph_scale,
-                );
-                short_slider.end();
-            }
+            let thermograph_size = $crate::widgets::thermograph_size(&details.thermograph);
+            let [_, text_height] = $ui.calc_text_size("1234567890()");
+            let available_w = $ui.current_column_width();
+            let pos_y = $ui.cursor_pos()[1];
+            let available_h = $ui.window_size()[1] - pos_y - text_height;
+            let scale_w = available_w / thermograph_size.x;
+            let scale_h = available_h / thermograph_size.y;
+            let thermograph_scale = f32::min(scale_w, scale_h);
 
             $crate::widgets::thermograph(
                 $ui,
                 &$draw_list,
-                $self.content.details_options.thermograph_scale,
+                thermograph_scale,
                 &mut $self.scratch_buffer,
                 &details.thermograph,
             );

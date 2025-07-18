@@ -4,8 +4,7 @@ use crate::{
         self, canonical_form::CanonicalFormWindow, GraphEditor, VertexFillColor, COLOR_BLUE,
         COLOR_RED, VERTEX_RADIUS,
     },
-    DetailOptions, Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow,
-    UpdateKind,
+    Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow, UpdateKind,
 };
 use cgt::{
     graph::{
@@ -89,7 +88,6 @@ pub struct DigraphPlacementWindow {
     editing_mode: RawOf<GraphEditingMode>,
     alternating_moves: bool,
     edge_creates_vertex: bool,
-    details_options: DetailOptions,
     details: Option<Details>,
     graph_editor: GraphEditor,
 }
@@ -140,7 +138,6 @@ impl DigraphPlacementWindow {
             editing_mode: RawOf::new(GraphEditingMode::DragVertex),
             alternating_moves: true,
             edge_creates_vertex: true,
-            details_options: DetailOptions::new(),
             details: None,
             graph_editor: GraphEditor::new(),
         }

@@ -12,7 +12,7 @@ use crate::{
         self, canonical_form::CanonicalFormWindow, interactive_color, GridEditorAction, COLOR_BLUE,
         COLOR_RED, TILE_COLOR_EMPTY, TILE_COLOR_FILLED, TILE_SIZE, TILE_SPACING,
     },
-    DetailOptions, Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow,
+    Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow,
 };
 
 const OFF_BUTTON_SCALE: f32 = 0.3;
@@ -32,7 +32,6 @@ imgui_enum! {
 #[derive(Debug, Clone)]
 pub struct SkiJumpsWindow {
     game: SkiJumps,
-    details_options: DetailOptions,
     editing_mode: RawOf<GridEditingMode>,
     alternating_moves: bool,
 
@@ -45,7 +44,6 @@ impl SkiJumpsWindow {
     pub fn new() -> SkiJumpsWindow {
         SkiJumpsWindow {
             game: SkiJumps::from_str("L....|....R|.....").unwrap(),
-            details_options: DetailOptions::new(),
             editing_mode: RawOf::new(GridEditingMode::ClearTile),
             alternating_moves: true,
             initial_position: None,

@@ -12,13 +12,12 @@ use crate::{
         self, canonical_form::CanonicalFormWindow, interactive_color, GridEditorAction,
         TILE_COLOR_EMPTY, TILE_COLOR_FILLED, TILE_SIZE,
     },
-    DetailOptions, Details, EvalTask, GuiContext, IsCgtWindow, Task, TitledWindow,
+    Details, EvalTask, GuiContext, IsCgtWindow, Task, TitledWindow,
 };
 
 #[derive(Debug, Clone)]
 pub struct DomineeringWindow {
     game: Domineering,
-    details_options: DetailOptions,
     pub details: Option<Details>,
 }
 
@@ -26,7 +25,6 @@ impl DomineeringWindow {
     pub fn new() -> DomineeringWindow {
         DomineeringWindow {
             game: Domineering::from_str(".#.##|...##|#....|#...#|###..").unwrap(),
-            details_options: DetailOptions::new(),
             details: None,
         }
     }

@@ -58,23 +58,6 @@ impl Details {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct DetailOptions {
-    pub show_thermograph: bool,
-    pub thermograph_fit: bool,
-    pub thermograph_scale: f32,
-}
-
-impl DetailOptions {
-    pub const fn new() -> DetailOptions {
-        DetailOptions {
-            show_thermograph: true,
-            thermograph_fit: true,
-            thermograph_scale: 50.0,
-        }
-    }
-}
-
 impl Details {
     pub fn from_canonical_form(canonical_form: CanonicalForm) -> Details {
         let canonical_form_rendered = format!("Canonical Form: {canonical_form}");

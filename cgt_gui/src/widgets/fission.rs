@@ -12,7 +12,7 @@ use crate::{
         self, canonical_form::CanonicalFormWindow, interactive_color, GridEditorAction,
         TILE_COLOR_EMPTY, TILE_COLOR_FILLED, TILE_SIZE,
     },
-    DetailOptions, Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow,
+    Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow,
 };
 
 imgui_enum! {
@@ -28,7 +28,6 @@ imgui_enum! {
 #[derive(Debug, Clone)]
 pub struct FissionWindow {
     game: Fission,
-    details_options: DetailOptions,
     editing_mode: RawOf<GridEditingMode>,
     alternating_moves: bool,
     pub details: Option<Details>,
@@ -38,7 +37,6 @@ impl FissionWindow {
     pub fn new() -> FissionWindow {
         FissionWindow {
             game: Fission::from_str("....|..x.|....|....").unwrap(),
-            details_options: DetailOptions::new(),
             editing_mode: RawOf::new(GridEditingMode::AddStone),
             alternating_moves: true,
             details: None,

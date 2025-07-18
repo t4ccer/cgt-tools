@@ -11,7 +11,7 @@ use crate::{
         self, canonical_form::CanonicalFormWindow, interactive_color, TILE_COLOR_EMPTY,
         TILE_COLOR_FILLED, TILE_SIZE, TILE_SPACING,
     },
-    DetailOptions, Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow,
+    Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow,
 };
 
 imgui_enum! {
@@ -27,7 +27,6 @@ imgui_enum! {
 #[derive(Debug, Clone)]
 pub struct ToadsAndFrogsWindow {
     game: ToadsAndFrogs,
-    details_options: DetailOptions,
     editing_mode: RawOf<GridEditingMode>,
     alternating_moves: bool,
     pub details: Option<Details>,
@@ -37,7 +36,6 @@ impl ToadsAndFrogsWindow {
     pub fn new() -> ToadsAndFrogsWindow {
         ToadsAndFrogsWindow {
             game: ToadsAndFrogs::from_str("T.TF.").unwrap(),
-            details_options: DetailOptions::new(),
             editing_mode: RawOf::new(GridEditingMode::ClearTile),
             alternating_moves: true,
             details: None,

@@ -3,8 +3,7 @@ use imgui::{Condition, ImColor32};
 use std::str::FromStr;
 
 use crate::{
-    impl_titled_window, widgets, DetailOptions, Details, GuiContext, IsCgtWindow, TitledWindow,
-    UpdateKind,
+    impl_titled_window, widgets, Details, GuiContext, IsCgtWindow, TitledWindow, UpdateKind,
 };
 
 #[derive(Debug, Clone)]
@@ -12,7 +11,6 @@ pub struct CanonicalFormWindow {
     details: Details,
     value_input: String,
     input_error: bool,
-    details_options: DetailOptions,
 }
 
 impl CanonicalFormWindow {
@@ -26,7 +24,6 @@ impl CanonicalFormWindow {
             value_input: details.canonical_form.to_string(),
             details,
             input_error: false,
-            details_options: DetailOptions::new(),
         }
     }
 }

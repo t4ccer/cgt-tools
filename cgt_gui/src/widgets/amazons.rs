@@ -12,7 +12,7 @@ use crate::{
         self, canonical_form::CanonicalFormWindow, interactive_color, GridEditorAction, COLOR_BLUE,
         COLOR_RED, TILE_COLOR_EMPTY, TILE_COLOR_FILLED, TILE_SIZE,
     },
-    DetailOptions, Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow,
+    Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow,
 };
 
 imgui_enum! {
@@ -36,7 +36,6 @@ enum PendingMove {
 #[derive(Debug, Clone)]
 pub struct AmazonsWindow {
     game: Amazons,
-    details_options: DetailOptions,
     editing_mode: RawOf<GridEditingMode>,
     alternating_moves: bool,
     pending_move: PendingMove,
@@ -47,7 +46,6 @@ impl AmazonsWindow {
     pub fn new() -> AmazonsWindow {
         AmazonsWindow {
             game: Amazons::from_str("x..#|....|.#.o").unwrap(),
-            details_options: DetailOptions::new(),
             editing_mode: RawOf::new(GridEditingMode::AddStone),
             alternating_moves: true,
             pending_move: PendingMove::None,
