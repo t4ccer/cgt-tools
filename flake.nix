@@ -25,6 +25,7 @@
       imports = [
         inputs.pre-commit-hooks-nix.flakeModule
         inputs.hercules-ci-effects.flakeModule
+        ./nix/github-pages.nix
       ];
 
       # `nix flake show --impure` hack
