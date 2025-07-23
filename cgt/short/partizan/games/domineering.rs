@@ -58,6 +58,19 @@ where
     }
 }
 
+/// Config for [`Domineering::to_latex_with_config`]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+pub struct LatexConfig {
+    /// `scale` of `tikzpicture`
+    pub scale: f32,
+
+    /// `ysep` of `fit=(current bounding box)` node
+    pub vertical_marigin: Option<f32>,
+
+    /// `baseline` of `tikzpicture`
+    pub baseline: Option<f32>,
+}
+
 impl<G> Domineering<G>
 where
     G: Grid<Item = Tile> + FiniteGrid,
@@ -79,22 +92,28 @@ where
 
     /// Output positions as LaTeX `TikZ` picture where empty tiles are 1x1 tiles
     pub fn to_latex(&self) -> String {
-        self.to_latex_with_scale(1.)
+        self.to_latex_with_config(LatexConfig {
+            scale: 1.0,
+            vertical_marigin: None,
+            baseline: None,
+        })
     }
 
-    /// Like [`Self::to_latex`] but allows to specify image scale. Scale must be positive
-    ///
-    /// # Panics
-    /// - `scale` is negative
-    pub fn to_latex_with_scale(&self, scale: f32) -> String {
+    /// Like [`Self::to_latex`] but allows to specify tikz config
+    pub fn to_latex_with_config(&self, config: LatexConfig) -> String {
         use std::fmt::Write;
 
-        assert!(scale >= 0., "Scale must be positive");
-
-        let scale = scale.to_string();
+        let scale = config.scale.to_string();
 
         let mut buf = String::new();
-        write!(buf, "\\begin{{tikzpicture}}[scale={}] ", scale).unwrap();
+        write!(buf, "\\begin{{tikzpicture}}[scale={}", scale).unwrap();
+
+        // https://tex.stackexchange.com/a/152098/229946
+        if let Some(baseline) = config.baseline {
+            write!(buf, ", baseline={}", baseline).unwrap();
+        }
+
+        write!(buf, "] ",).unwrap();
         for y in 0..self.grid.height() {
             for x in 0..self.grid.width() {
                 if self.grid.get(x, y) == Tile::Taken {
@@ -112,11 +131,22 @@ where
         }
         write!(
             buf,
-            "\\draw[step=1cm,black] (0,0) grid ({}, {}); \\end{{tikzpicture}}",
+            "\\draw[step=1cm,black] (0,0) grid ({}, {}); ",
             self.grid.width(),
             self.grid.height()
         )
         .unwrap();
+
+        // https://tex.stackexchange.com/a/152098/229946
+        if let Some(vertical_marigin) = config.vertical_marigin {
+            write!(
+                buf,
+                "\\node[fit=(current bounding box),inner ysep={}mm,inner xsep=0]{{}};",
+                vertical_marigin
+            )
+            .unwrap();
+        }
+        write!(buf, "\\end{{tikzpicture}}").unwrap();
         buf
     }
 

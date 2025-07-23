@@ -118,7 +118,7 @@ pub fn run(args: Args) -> Result<()> {
         .iter()
         .map(|entry| entry.grid.grid().width())
         .max()
-        .context("Input file was empty")?;
+        .unwrap_or(0);
 
     let mut input = input.into_iter().peekable();
 
@@ -156,7 +156,11 @@ pub fn run(args: Args) -> Result<()> {
                 writeln!(
                     output,
                     "{} & ${}$ ",
-                    entry.grid.to_latex_with_scale(args.position_scale),
+                    entry.grid.to_latex_with_config(domineering::LatexConfig {
+                        scale: args.position_scale,
+                        vertical_marigin: Some(1.5),
+                        baseline: Some(0.0)
+                    }),
                     entry.temperature
                 )?;
             };
