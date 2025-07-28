@@ -2,11 +2,11 @@
 
 Combinatorial Game Theory framework and toolkit  in Rust and Python.
 
-## CGT GUI
+## `cgt-gui`
 
 Experimental graphical interface. See [README](./cgt_gui/README.md).
 
-## CGT CLI utils
+## `cgt-cli` utils
 
 Some of the library features are exposed through CLI utility tool. See [CLI README](./cgt_cli/README.md) for installation and usage instructions.
 
@@ -14,9 +14,9 @@ Some of the library features are exposed through CLI utility tool. See [CLI READ
 
 [Documentation](https://docs.rs/cgt/latest/cgt/)
 
-## Python Library
+## Python library (`cgt-py`)
 
-Not published yet
+Available on [pypi](https://pypi.org/project/cgt-py)
 
 Python interface is inteded as a thin wrapper for interactive exploration using notebook software like [Jupyter](https://jupyter.org/) rather than exhaustive searches of large search spaces.
 
@@ -24,6 +24,33 @@ Python interface is inteded as a thin wrapper for interactive exploration using 
 
 - Library is heavily inspired by https://github.com/aaron-siegel/cgsuite
 - Library in Haskell that provides basic functions to work with combinatorial games https://github.com/kamekura/haskell-cgt
+
+## Citing
+
+If you found the toolkit useful for your work please consider citing it.
+
+### BibTeX
+
+```bib
+@misc{maciosowskiCgttools,
+  title = {cgt-tools},
+  author = {Maciosowski, Tomasz},
+  howpublished = {https://cgt.tools},
+  abstract = {Combinatorial Game Theory toolkit},
+  copyright = {AGPL-3.0}
+}
+```
+
+### BibLaTeX
+
+```bib
+@software{maciosowskiCgttools,
+  title = {cgt-tools},
+  author = {Maciosowski, Tomasz},
+  url = {https://cgt.tools},
+  abstract = {Combinatorial Game Theory toolkit}
+}
+```
 
 ## License
 
