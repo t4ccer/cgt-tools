@@ -250,7 +250,7 @@ pub struct TaskId(u64);
 pub struct CurrentTask {
     id: TaskId,
     name: &'static str,
-    canceller: Option<Box<dyn FnMut() -> () + Sync + Send>>,
+    canceller: Option<Box<dyn FnMut() + Sync + Send>>,
 }
 
 #[derive(Debug)]
