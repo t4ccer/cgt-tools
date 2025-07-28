@@ -1,8 +1,13 @@
 use super::common::DomineeringResult;
 use anyhow::{Context, Result};
-use cgt::{grid::FiniteGrid, numeric::rational::Rational, short::partizan::games::domineering};
+use cgt::{
+    grid::{small_bit_grid::SmallBitGrid, FiniteGrid},
+    numeric::rational::Rational,
+    short::partizan::games::domineering::{self, Domineering},
+};
 use clap::Parser;
 use std::{
+    collections::HashSet,
     fs::File,
     io::{stdin, stdout, BufReader, BufWriter, Read, Write},
     num::NonZeroU32,
@@ -83,32 +88,37 @@ pub fn run(args: Args) -> Result<()> {
     let mut input = if args.include_rotations {
         input
     } else {
-        let mut input_without_rotations = input.iter().cloned().map(Some).collect::<Vec<_>>();
-        for (idx, entry) in input.iter().enumerate() {
-            let grid = *entry.grid.grid();
-            let rot_90deg = grid.rotate();
-            let rot_180deg = rot_90deg.rotate();
-            let rot_270deg = rot_180deg.rotate();
-            let vertical_flip = grid.vertical_flip();
-            let horizontal_flip = grid.horizontal_flip();
-            let equivalent_grids = [
-                rot_90deg,
-                rot_180deg,
-                rot_270deg,
-                vertical_flip,
-                horizontal_flip,
-            ];
-            for next_entry in input_without_rotations.iter_mut().skip(idx + 1) {
-                if let Some(ref next_entry_val) = next_entry {
-                    if equivalent_grids.contains(next_entry_val.grid.grid()) {
-                        *next_entry = None;
-                    }
-                }
-            }
-        }
-        input_without_rotations
-            .into_iter()
-            .flatten()
+        let mut seen = HashSet::new();
+        input
+            .iter()
+            .filter_map(|entry| {
+                let grid = *entry.grid.grid();
+                let rotated = |grid: SmallBitGrid<domineering::Tile>| {
+                    [
+                        grid,
+                        grid.rotate(),
+                        grid.rotate().rotate(),
+                        grid.rotate().rotate().rotate(),
+                    ]
+                };
+                let equivalent_grids = [
+                    rotated(grid),
+                    rotated(grid.vertical_flip()),
+                    rotated(grid.horizontal_flip()),
+                    rotated(grid.vertical_flip().horizontal_flip()),
+                ];
+                let representative = equivalent_grids
+                    .as_flattened()
+                    .iter()
+                    .max_by_key(|grid| (grid.width, grid.grid))
+                    .copied()
+                    .unwrap();
+
+                seen.insert(representative).then_some(DomineeringEntry {
+                    grid: Domineering::new(representative),
+                    ..*entry
+                })
+            })
             .collect::<Vec<_>>()
     };
 
