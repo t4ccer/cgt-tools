@@ -28,14 +28,16 @@ dashmap = { version = "6.1", features = ["inline"] }
 rand = "0.8"
 mint = "0.5"
 itertools = "0.14"
+tiny-skia = {version = "0.11.4", optional = true}
 
 [dev-dependencies]
 quickcheck = { version = "1.0", default-features = false }
 
 [features]
-default = []
+default = ["tiny_skia"]
 serde = ["dep:serde", "dep:serde_repr", "num-rational/serde"]
 rayon = ["dep:rayon"]
+tiny_skia = ["dep:tiny-skia"]
 
 [lib]
 path = "./cgt/lib.rs"

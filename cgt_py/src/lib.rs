@@ -53,14 +53,6 @@ macro_rules! impl_py_partizan_game {
                 format!("{}('{}')", stringify!($game), self.inner)
             }
 
-            fn _repr_svg_(&self) -> String {
-                let mut buf = String::new();
-                self.inner
-                    .to_svg(&mut buf)
-                    .expect("Write to String should not fail");
-                buf
-            }
-
             #[staticmethod]
             fn transposition_table() -> $py_tt {
                 $py_tt::default()

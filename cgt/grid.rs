@@ -2,6 +2,11 @@
 
 use std::{collections::VecDeque, fmt::Write};
 
+use crate::{
+    drawing::{Canvas, Color},
+    numeric::v2f::V2f,
+};
+
 pub mod small_bit_grid;
 pub mod vec_grid;
 
@@ -86,6 +91,50 @@ pub trait FiniteGrid: Grid + Sized {
             return None;
         }
         Some(grid)
+    }
+
+    /// Minimum required canvas size to paint the whole grid
+    fn canvas_size<C>(&self) -> V2f
+    where
+        C: Canvas,
+    {
+        let tile_size = C::tile_size();
+        let grid_weight = C::default_line_weight();
+        V2f {
+            x: tile_size
+                .x
+                .mul_add(self.width() as f32, grid_weight * (self.width() + 1) as f32),
+            y: tile_size.y.mul_add(
+                self.height() as f32,
+                grid_weight * (self.height() + 1) as f32,
+            ),
+        }
+    }
+
+    /// Paint grid on existing canvas
+    fn draw<C>(&self, canvas: &mut C, mut get_tile_color: impl FnMut(Self::Item) -> Color)
+    where
+        C: Canvas,
+    {
+        // TODO: get_tile_color should return shape to handle fissions etc.
+
+        let tile_size = C::tile_size();
+        let grid_weight = C::default_line_weight();
+
+        for y in 0..self.height() {
+            for x in 0..self.width() {
+                let color = get_tile_color(self.get(x, y));
+                canvas.tile(
+                    V2f {
+                        x: (x as f32).mul_add(tile_size.x, (x + 1) as f32 * grid_weight),
+                        y: (y as f32).mul_add(tile_size.y, (y + 1) as f32 * grid_weight),
+                    },
+                    color,
+                );
+            }
+        }
+
+        canvas.grid(V2f::ZERO, self.width() as u32, self.height() as u32);
     }
 }
 

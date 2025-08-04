@@ -10,12 +10,10 @@
 //! a slipper that cannot jump anymore.
 
 use crate::{
-    drawing::svg::{self, ImmSvg, Svg},
-    grid::{vec_grid::VecGrid, CharTile, FiniteGrid, Grid},
+    grid::{vec_grid::VecGrid, FiniteGrid, Grid},
     short::partizan::{canonical_form::CanonicalForm, partizan_game::PartizanGame},
 };
 use cgt_derive::Tile;
-use core::fmt;
 use std::{fmt::Display, hash::Hash, str::FromStr};
 
 /// Ski Jumps game grid tile
@@ -301,55 +299,6 @@ where
         }
 
         None
-    }
-}
-
-impl<G> Svg for SkiJumps<G>
-where
-    G: Grid<Item = Tile> + FiniteGrid,
-{
-    fn to_svg<W>(&self, buf: &mut W) -> fmt::Result
-    where
-        W: fmt::Write,
-    {
-        // Chosen arbitrarily
-        let tile_size = 48;
-        let grid_width = 4;
-
-        let offset = grid_width / 2;
-        let svg_width = self.grid.width() as u32 * tile_size + grid_width;
-        let svg_height = self.grid.height() as u32 * tile_size + grid_width;
-
-        ImmSvg::new(buf, svg_width, svg_height, |buf| {
-            for y in 0..self.grid.height() {
-                for x in 0..self.grid.width() {
-                    match self.grid.get(x, y) {
-                        Tile::Empty => {}
-                        tile => {
-                            let text = svg::Text {
-                                x: (x as u32 * tile_size + offset + tile_size / 2) as i32,
-                                y: (y as u32 * tile_size + offset + (0.6 * tile_size as f32) as u32)
-                                    as i32,
-                                text: tile.tile_to_char().to_string(),
-                                text_anchor: svg::TextAnchor::Middle,
-                                ..svg::Text::default()
-                            };
-                            ImmSvg::text(buf, &text)?;
-                        }
-                    }
-                }
-            }
-
-            let grid = svg::Grid {
-                x1: 0,
-                y1: 0,
-                x2: svg_width as i32,
-                y2: svg_height as i32,
-                grid_width,
-                tile_size,
-            };
-            ImmSvg::grid(buf, &grid)
-        })
     }
 }
 

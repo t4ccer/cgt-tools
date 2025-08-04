@@ -480,7 +480,7 @@ impl LeftDeadEnd {
 mod tests {
     use super::*;
     use quickcheck::{Arbitrary, QuickCheck};
-    use std::{str::FromStr, u32};
+    use std::str::FromStr;
 
     #[test]
     fn to_from_moves() {
@@ -602,13 +602,17 @@ mod tests {
 
         let day1 = LeftDeadEnd::next_day(day0);
         assert_eq!(
-            day1.iter().map(|g| g.to_string()).collect::<Vec<String>>(),
+            day1.iter()
+                .map(std::string::ToString::to_string)
+                .collect::<Vec<String>>(),
             vec!["0", "1"],
         );
 
         let day2 = LeftDeadEnd::next_day(day1);
         assert_eq!(
-            day2.iter().map(|g| g.to_string()).collect::<Vec<String>>(),
+            day2.iter()
+                .map(std::string::ToString::to_string)
+                .collect::<Vec<String>>(),
             vec!["0", "1", "2", "{0, 1}"],
         );
 
@@ -644,7 +648,7 @@ mod tests {
             three
                 .factors()
                 .iter()
-                .map(|g| g.to_string())
+                .map(std::string::ToString::to_string)
                 .collect::<Vec<String>>(),
             vec!["0", "1", "2", "3"],
         );

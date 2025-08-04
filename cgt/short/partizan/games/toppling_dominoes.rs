@@ -118,11 +118,11 @@ fn correct_left() {
     assert_eq!(
         td.left_moves()
             .iter()
-            .map(|m| m.to_string())
+            .map(std::string::ToString::to_string)
             .collect::<Vec<String>>(),
         ["", "ooxx", "xoo", "x", "xoox", ""]
             .iter()
-            .map(|m| m.to_string())
+            .map(|m| (*m).to_string())
             .collect::<Vec<String>>()
     );
 }
@@ -138,11 +138,11 @@ fn correct_right() {
     assert_eq!(
         td.right_moves()
             .iter()
-            .map(|m| m.to_string())
+            .map(std::string::ToString::to_string)
             .collect::<Vec<String>>(),
         ["x", "oxx", "xo", "xx"]
             .iter()
-            .map(|m| m.to_string())
+            .map(|m| (*m).to_string())
             .collect::<Vec<String>>()
     );
 }

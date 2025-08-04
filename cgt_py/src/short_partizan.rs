@@ -1,11 +1,8 @@
 use crate::canonical_form::PyCanonicalForm;
-use cgt::{
-    drawing::svg::Svg,
-    short::partizan::{
-        games::{domineering::Domineering, ski_jumps::SkiJumps, toads_and_frogs::ToadsAndFrogs},
-        partizan_game::PartizanGame,
-        transposition_table::ParallelTranspositionTable,
-    },
+use cgt::short::partizan::{
+    games::{domineering::Domineering, ski_jumps::SkiJumps, toads_and_frogs::ToadsAndFrogs},
+    partizan_game::PartizanGame,
+    transposition_table::ParallelTranspositionTable,
 };
 use pyo3::prelude::*;
 use std::str::FromStr;

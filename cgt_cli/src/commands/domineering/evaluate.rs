@@ -1,7 +1,8 @@
 use crate::io::FileOrStdout;
 use anyhow::{Context, Result};
 use cgt::{
-    drawing::svg::Svg,
+    drawing::{svg, tiny_skia},
+    grid::FiniteGrid,
     short::partizan::{
         games::domineering::Domineering, partizan_game::PartizanGame,
         transposition_table::ParallelTranspositionTable,
@@ -23,23 +24,43 @@ pub struct Args {
     /// SVG render output path
     #[arg(long, default_value = None)]
     output_svg: Option<FileOrStdout>,
+
+    /// PNG render output path
+    #[arg(long, default_value = None)]
+    output_png: Option<FileOrStdout>,
 }
 
 pub fn run(args: Args) -> Result<()> {
     let position: Domineering =
         Domineering::from_str(&args.position).expect("Could not parse position");
 
-    if let Some(ref svg_fp) = args.output_svg {
+    if let Some(svg_fp) = &args.output_svg {
         let mut w = BufWriter::new(
             svg_fp
-                .open()
+                .create()
                 .context(format!("Could not create file '{}'", svg_fp))?,
         );
-        let mut buf = String::new();
-        position.to_svg(&mut buf).expect("Could not render SVG");
-        buf.push('\n');
-        w.write_all(buf.as_bytes())
+
+        let canvas_size = position.grid().canvas_size::<svg::Canvas>();
+        let mut canvas = svg::Canvas::new(canvas_size);
+        position.draw(&mut canvas);
+        let svg = canvas.to_svg();
+        w.write_all(svg.as_bytes())
             .context(format!("Could not write to file '{}'", svg_fp))?;
+    }
+
+    if let Some(png_fp) = &args.output_png {
+        let mut w = BufWriter::new(
+            png_fp
+                .create()
+                .context(format!("Could not create file '{}'", png_fp))?,
+        );
+        let canvas_size = position.grid().canvas_size::<tiny_skia::Canvas>();
+        let mut canvas = tiny_skia::Canvas::new(canvas_size);
+        position.draw(&mut canvas);
+        let png_bytes = canvas.to_png();
+        w.write_all(&png_bytes)
+            .context(format!("Could not write to file '{}'", png_fp))?;
     }
 
     let tt = ParallelTranspositionTable::new();

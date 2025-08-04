@@ -5,11 +5,7 @@
 //! a Frog to the empty square behind it. Right player moves Frogs and jumps over Toads to the left
 //! in the same way.
 
-use crate::{
-    drawing::svg::{self, ImmSvg, Svg},
-    grid::CharTile,
-    short::partizan::partizan_game::PartizanGame,
-};
+use crate::{grid::CharTile, short::partizan::partizan_game::PartizanGame};
 use cgt_derive::Tile;
 use std::{
     fmt::{self, Display},
@@ -76,60 +72,6 @@ impl Display for ToadsAndFrogs {
         }
 
         Ok(())
-    }
-}
-
-impl Svg for ToadsAndFrogs {
-    fn to_svg<W>(&self, buf: &mut W) -> fmt::Result
-    where
-        W: fmt::Write,
-    {
-        let tile_size = 48;
-        let grid_width = 4;
-
-        let offset = grid_width / 2;
-        let svg_width = self.tiles.len() as u32 * tile_size + grid_width;
-        let svg_height = tile_size + grid_width;
-
-        ImmSvg::new(buf, svg_width, svg_height, |buf| {
-            ImmSvg::g(buf, "black", |buf| {
-                for (x, tile) in self.tiles.iter().enumerate() {
-                    let (fill, label) = match tile {
-                        Tile::Empty => continue,
-                        Tile::Toad => ("blue", 'T'),
-                        Tile::Frog => ("red", 'F'),
-                    };
-                    ImmSvg::rect(
-                        buf,
-                        (x as u32 * tile_size + offset) as i32,
-                        offset as i32,
-                        tile_size,
-                        tile_size,
-                        fill,
-                    )?;
-
-                    let label = svg::Text {
-                        x: (x as u32 * tile_size + tile_size / 2 + offset) as i32,
-                        y: (tile_size * 2 / 3) as i32,
-                        text: format!("{}", label),
-                        text_anchor: svg::TextAnchor::Middle,
-                        ..svg::Text::default()
-                    };
-                    ImmSvg::text(buf, &label)?;
-                }
-                Ok(())
-            })?;
-
-            let grid = svg::Grid {
-                x1: 0,
-                y1: 0,
-                x2: svg_width as i32,
-                y2: svg_height as i32,
-                grid_width,
-                tile_size,
-            };
-            ImmSvg::grid(buf, &grid)
-        })
     }
 }
 

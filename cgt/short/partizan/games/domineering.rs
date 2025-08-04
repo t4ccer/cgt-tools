@@ -3,12 +3,12 @@
 
 extern crate alloc;
 use crate::{
-    drawing::svg::{self, ImmSvg, Svg},
+    drawing::{Canvas, Color},
     grid::{self, decompositions, small_bit_grid::SmallBitGrid, FiniteGrid, Grid},
     short::partizan::partizan_game::PartizanGame,
 };
 use cgt_derive::Tile;
-use core::{fmt, hash::Hash};
+use core::hash::Hash;
 use std::{fmt::Display, str::FromStr};
 
 /// Tile on a Domineering grid
@@ -169,7 +169,7 @@ where
     {
         let mut moves = Vec::new();
 
-        if self.grid.height() == 0 || self.grid.width() == 0 {
+        if self.grid.width() <= DIR_X || self.grid.height() <= DIR_Y {
             return moves;
         }
 
@@ -213,52 +213,16 @@ where
         let grid = grid::move_top_left(&grid, Tile::is_non_blocking);
         Self::new(grid)
     }
-}
 
-impl<G> Svg for Domineering<G>
-where
-    G: Grid<Item = Tile> + FiniteGrid,
-{
-    fn to_svg<W>(&self, buf: &mut W) -> fmt::Result
+    /// Paint grid on existing canvas
+    pub fn draw<C>(&self, canvas: &mut C)
     where
-        W: fmt::Write,
+        C: Canvas,
     {
-        // Chosen arbitrarily
-        let tile_size = 48;
-        let grid_width = 4;
-
-        let offset = grid_width / 2;
-        let svg_width = self.grid.width() as u32 * tile_size + grid_width;
-        let svg_height = self.grid.height() as u32 * tile_size + grid_width;
-
-        ImmSvg::new(buf, svg_width, svg_height, |buf| {
-            for y in 0..self.grid.height() {
-                for x in 0..self.grid.width() {
-                    let fill = match self.grid.get(x, y) {
-                        Tile::Empty => "white",
-                        Tile::Taken => "gray",
-                    };
-                    ImmSvg::rect(
-                        buf,
-                        (x as u32 * tile_size + offset) as i32,
-                        (y as u32 * tile_size + offset) as i32,
-                        tile_size,
-                        tile_size,
-                        fill,
-                    )?;
-                }
-            }
-
-            let grid = svg::Grid {
-                x1: 0,
-                y1: 0,
-                x2: svg_width as i32,
-                y2: svg_height as i32,
-                grid_width,
-                tile_size,
-            };
-            ImmSvg::grid(buf, &grid)
-        })
+        self.grid.draw(canvas, |tile| match tile {
+            Tile::Empty => Color::LIGHT_GRAY,
+            Tile::Taken => Color::DARK_GRAY,
+        });
     }
 }
 
