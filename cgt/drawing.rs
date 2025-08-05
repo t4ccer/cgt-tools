@@ -69,13 +69,41 @@ impl From<Color> for ::imgui::ImColor32 {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Tile {
+    Square {
+        color: Color,
+    },
+    Circle {
+        tile_color: Color,
+        circle_color: Color,
+    },
+}
+
 /// Anything that can be used for drawing
 pub trait Canvas {
     // TODO: Tile should allow for circles
-    fn tile(&mut self, position: V2f, color: Color);
+    fn rect(&mut self, position: V2f, size: V2f, color: Color);
     fn circle(&mut self, position: V2f, radius: f32, color: Color);
     // TODO: Weight?
     fn line(&mut self, start: V2f, end: V2f);
+
+    fn tile(&mut self, position: V2f, tile: Tile) {
+        let tile_size = Self::tile_size();
+        match tile {
+            Tile::Square { color } => {
+                self.rect(position, tile_size, color);
+            }
+            Tile::Circle {
+                tile_color,
+                circle_color,
+            } => {
+                self.rect(position, tile_size, tile_color);
+                self.circle(position + tile_size * 0.5, tile_size.x * 0.4, circle_color);
+            }
+        }
+    }
+
     fn grid(&mut self, position: V2f, columns: u32, rows: u32) {
         let cell_size = Self::tile_size();
         let grid_weight = Self::default_line_weight();

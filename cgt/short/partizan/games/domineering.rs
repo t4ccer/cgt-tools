@@ -3,7 +3,7 @@
 
 extern crate alloc;
 use crate::{
-    drawing::{Canvas, Color},
+    drawing::{self, Canvas, Color},
     grid::{self, decompositions, small_bit_grid::SmallBitGrid, FiniteGrid, Grid},
     short::partizan::partizan_game::PartizanGame,
 };
@@ -220,8 +220,12 @@ where
         C: Canvas,
     {
         self.grid.draw(canvas, |tile| match tile {
-            Tile::Empty => Color::LIGHT_GRAY,
-            Tile::Taken => Color::DARK_GRAY,
+            Tile::Empty => drawing::Tile::Square {
+                color: Color::LIGHT_GRAY,
+            },
+            Tile::Taken => drawing::Tile::Square {
+                color: Color::DARK_GRAY,
+            },
         });
     }
 }

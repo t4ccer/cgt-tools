@@ -3,7 +3,7 @@
 use std::{collections::VecDeque, fmt::Write};
 
 use crate::{
-    drawing::{Canvas, Color},
+    drawing::{self, Canvas},
     numeric::v2f::V2f,
 };
 
@@ -112,7 +112,7 @@ pub trait FiniteGrid: Grid + Sized {
     }
 
     /// Paint grid on existing canvas
-    fn draw<C>(&self, canvas: &mut C, mut get_tile_color: impl FnMut(Self::Item) -> Color)
+    fn draw<C>(&self, canvas: &mut C, mut get_tile: impl FnMut(Self::Item) -> drawing::Tile)
     where
         C: Canvas,
     {
@@ -120,8 +120,8 @@ pub trait FiniteGrid: Grid + Sized {
 
         for y in 0..self.height() {
             for x in 0..self.width() {
-                let color = get_tile_color(self.get(x, y));
-                canvas.tile(C::tile_position(x, y), color);
+                let tile = get_tile(self.get(x, y));
+                canvas.tile(C::tile_position(x, y), tile);
             }
         }
 

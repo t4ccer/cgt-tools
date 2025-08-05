@@ -70,13 +70,12 @@ impl Canvas {
 }
 
 impl crate::drawing::Canvas for Canvas {
-    fn tile(&mut self, position: V2f, color: Color) {
-        let tile_size = Self::tile_size();
+    fn rect(&mut self, position: V2f, size: V2f, color: Color) {
         let mut rect = self.self_closing_tag("rect");
         rect.attribute("x", position.x);
         rect.attribute("y", position.y);
-        rect.attribute("width", tile_size.x);
-        rect.attribute("height", tile_size.y);
+        rect.attribute("width", size.x);
+        rect.attribute("height", size.y);
         rect.attribute("fill", Rgba(color));
     }
 

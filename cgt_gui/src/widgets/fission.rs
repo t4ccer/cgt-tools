@@ -1,17 +1,14 @@
+use ::imgui::{ComboBoxFlags, Condition, Ui};
 use cgt::{
+    drawing::imgui,
     grid::{vec_grid::VecGrid, FiniteGrid, Grid},
-    numeric::v2f::V2f,
     short::partizan::games::fission::{Fission, Tile},
 };
-use imgui::{ComboBoxFlags, Condition};
 use std::str::FromStr;
 
 use crate::{
     imgui_enum, impl_game_window, impl_titled_window,
-    widgets::{
-        self, canonical_form::CanonicalFormWindow, interactive_color, GridEditorAction,
-        TILE_COLOR_EMPTY, TILE_COLOR_FILLED, TILE_SIZE,
-    },
+    widgets::{self, canonical_form::CanonicalFormWindow},
     Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow,
 };
 
@@ -48,7 +45,7 @@ impl IsCgtWindow for TitledWindow<FissionWindow> {
     impl_titled_window!("Fission");
     impl_game_window!("Fission", EvalFission, FissionDetails);
 
-    fn draw(&mut self, ui: &imgui::Ui, ctx: &mut GuiContext) {
+    fn draw(&mut self, ui: &Ui, ctx: &mut GuiContext) {
         let width = self.content.game.grid().width();
         let height = self.content.game.grid().height();
 
@@ -101,109 +98,51 @@ impl IsCgtWindow for TitledWindow<FissionWindow> {
 
                 widgets::grid_size_selector(ui, &mut new_width, &mut new_height);
                 ui.spacing();
-                let action = widgets::grid(
-                    ui,
-                    &draw_list,
-                    self.content.game.grid(),
-                    |pos, _, tile, draw_list| match tile {
-                        Tile::Empty => {
-                            let color = interactive_color(TILE_COLOR_EMPTY, ui);
-                            draw_list
-                                .add_rect(
-                                    pos,
-                                    pos + V2f {
-                                        x: TILE_SIZE,
-                                        y: TILE_SIZE,
-                                    },
-                                    color,
-                                )
-                                .filled(true)
-                                .build();
-                        }
-                        Tile::Stone => {
-                            draw_list
-                                .add_rect(
-                                    pos,
-                                    pos + V2f {
-                                        x: TILE_SIZE,
-                                        y: TILE_SIZE,
-                                    },
-                                    TILE_COLOR_EMPTY,
-                                )
-                                .filled(true)
-                                .build();
-
-                            let color = interactive_color(TILE_COLOR_FILLED, ui);
-                            draw_list
-                                .add_circle(
-                                    pos + V2f {
-                                        x: TILE_SIZE * 0.5,
-                                        y: TILE_SIZE * 0.5,
-                                    },
-                                    TILE_SIZE * 0.4,
-                                    color,
-                                )
-                                .filled(true)
-                                .build();
-                        }
-                        Tile::Blocked => {
-                            let color = interactive_color(TILE_COLOR_FILLED, ui);
-                            draw_list
-                                .add_rect(
-                                    pos,
-                                    pos + V2f {
-                                        x: TILE_SIZE,
-                                        y: TILE_SIZE,
-                                    },
-                                    color,
-                                )
-                                .filled(true)
-                                .build();
-                        }
-                    },
-                );
-
-                match action {
-                    GridEditorAction::None => {}
-                    GridEditorAction::Clicked { x, y } => {
-                        macro_rules! place_tile {
-                            ($tile:ident) => {
-                                if self.content.game.grid().get(x, y) != Tile::$tile {
-                                    self.content.game.grid_mut().set(x, y, Tile::$tile);
-                                    is_dirty = true;
-                                }
-                            };
-                        }
-
-                        match self.content.editing_mode.get() {
-                            GridEditingMode::AddStone => place_tile!(Stone),
-                            GridEditingMode::BlockTile => place_tile!(Blocked),
-                            GridEditingMode::ClearTile => place_tile!(Empty),
-                            GridEditingMode::MoveLeft => {
-                                let moves = self.content.game.available_moves_left();
-                                if moves.contains(&(x, y)) {
-                                    self.content.game = self.content.game.move_in_left(x, y);
-                                    if self.content.alternating_moves {
-                                        self.content.editing_mode =
-                                            RawOf::new(GridEditingMode::MoveRight);
-                                    }
-                                    is_dirty = true;
-                                }
+                let mut canvas = imgui::Canvas::new(ui, &draw_list);
+                self.content.game.draw(&mut canvas);
+                if let Some((x, y)) = canvas.clicked_tile_position().and_then(|clicked_pos| {
+                    self.content
+                        .game
+                        .grid()
+                        .tile_at_position::<imgui::Canvas>(clicked_pos)
+                }) {
+                    macro_rules! place_tile {
+                        ($tile:ident) => {
+                            if self.content.game.grid().get(x, y) != Tile::$tile {
+                                self.content.game.grid_mut().set(x, y, Tile::$tile);
+                                is_dirty = true;
                             }
-                            GridEditingMode::MoveRight => {
-                                let moves = self.content.game.available_moves_right();
-                                if moves.contains(&(x, y)) {
-                                    self.content.game = self.content.game.move_in_right(x, y);
-                                    if self.content.alternating_moves {
-                                        self.content.editing_mode =
-                                            RawOf::new(GridEditingMode::MoveLeft);
-                                    }
-                                    is_dirty = true;
+                        };
+                    }
+
+                    match self.content.editing_mode.get() {
+                        GridEditingMode::AddStone => place_tile!(Stone),
+                        GridEditingMode::BlockTile => place_tile!(Blocked),
+                        GridEditingMode::ClearTile => place_tile!(Empty),
+                        GridEditingMode::MoveLeft => {
+                            let moves = self.content.game.available_moves_left();
+                            if moves.contains(&(x, y)) {
+                                self.content.game = self.content.game.move_in_left(x, y);
+                                if self.content.alternating_moves {
+                                    self.content.editing_mode =
+                                        RawOf::new(GridEditingMode::MoveRight);
                                 }
+                                is_dirty = true;
+                            }
+                        }
+                        GridEditingMode::MoveRight => {
+                            let moves = self.content.game.available_moves_right();
+                            if moves.contains(&(x, y)) {
+                                self.content.game = self.content.game.move_in_right(x, y);
+                                if self.content.alternating_moves {
+                                    self.content.editing_mode =
+                                        RawOf::new(GridEditingMode::MoveLeft);
+                                }
+                                is_dirty = true;
                             }
                         }
                     }
-                }
+                };
 
                 if new_width != width || new_height != height {
                     is_dirty = true;
