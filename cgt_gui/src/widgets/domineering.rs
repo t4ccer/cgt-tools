@@ -1,19 +1,15 @@
-use cgt::{
-    grid::{small_bit_grid::SmallBitGrid, BitTile, FiniteGrid, Grid},
-    numeric::v2f::V2f,
-    short::partizan::games::domineering::{Domineering, Tile},
-};
-use imgui::Condition;
-use std::str::FromStr;
-
 use crate::{
     impl_game_window, impl_titled_window,
-    widgets::{
-        self, canonical_form::CanonicalFormWindow, interactive_color, GridEditorAction,
-        TILE_COLOR_EMPTY, TILE_COLOR_FILLED, TILE_SIZE,
-    },
+    widgets::{self, canonical_form::CanonicalFormWindow},
     Details, EvalTask, GuiContext, IsCgtWindow, Task, TitledWindow,
 };
+use ::imgui::{Condition, Ui};
+use cgt::{
+    drawing::imgui,
+    grid::{small_bit_grid::SmallBitGrid, BitTile, FiniteGrid, Grid},
+    short::partizan::games::domineering::{Domineering, Tile},
+};
+use std::str::FromStr;
 
 #[derive(Debug, Clone)]
 pub struct DomineeringWindow {
@@ -34,7 +30,7 @@ impl IsCgtWindow for TitledWindow<DomineeringWindow> {
     impl_titled_window!("Domineering");
     impl_game_window!("Domineering", EvalDomineering, DomineeringDetails);
 
-    fn draw(&mut self, ui: &imgui::Ui, ctx: &mut GuiContext) {
+    fn draw(&mut self, ui: &Ui, ctx: &mut GuiContext) {
         let width = self.content.game.grid().width();
         let height = self.content.game.grid().height();
 
@@ -80,39 +76,18 @@ impl IsCgtWindow for TitledWindow<DomineeringWindow> {
                 widgets::grid_size_selector(ui, &mut new_width, &mut new_height);
                 ui.spacing();
 
-                let action = widgets::grid(
-                    ui,
-                    &draw_list,
-                    self.content.game.grid(),
-                    |screen_pos, _, tile, draw_list| {
-                        let color = match tile {
-                            Tile::Empty => TILE_COLOR_EMPTY,
-                            Tile::Taken => TILE_COLOR_FILLED,
-                        };
-                        let color = interactive_color(color, ui);
-                        draw_list
-                            .add_rect(
-                                screen_pos,
-                                screen_pos
-                                    + V2f {
-                                        x: TILE_SIZE,
-                                        y: TILE_SIZE,
-                                    },
-                                color,
-                            )
-                            .filled(true)
-                            .build();
-                    },
-                );
-
-                match action {
-                    GridEditorAction::None => {}
-                    GridEditorAction::Clicked { x, y } => {
-                        let flipped = self.content.game.grid().get(x, y).flip();
-                        self.content.game.grid_mut().set(x, y, flipped);
-                        is_dirty = true;
-                    }
-                }
+                let mut canvas = imgui::Canvas::new(ui, &draw_list);
+                self.content.game.draw(&mut canvas);
+                if let Some((x, y)) = canvas.clicked_tile_position().and_then(|clicked_pos| {
+                    self.content
+                        .game
+                        .grid()
+                        .tile_at_position::<imgui::Canvas>(clicked_pos)
+                }) {
+                    let flipped = self.content.game.grid().get(x, y).flip();
+                    self.content.game.grid_mut().set(x, y, flipped);
+                    is_dirty = true;
+                };
 
                 if new_width != width || new_height != height {
                     is_dirty = true;

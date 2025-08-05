@@ -5,9 +5,14 @@
 use crate::numeric::v2f::V2f;
 
 pub mod svg;
+
 #[cfg(feature = "tiny_skia")]
 pub mod tiny_skia;
 
+#[cfg(feature = "imgui")]
+pub mod imgui;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Color {
     pub r: u8,
     pub g: u8,
@@ -31,12 +36,21 @@ impl Color {
     #[allow(clippy::unreadable_literal)]
     pub const DARK_GRAY: Color = Color::from_hex(0x444444ff);
 
+    #[must_use]
     pub const fn from_hex(hex: u32) -> Color {
         Color {
             r: ((hex >> 24) & 0xff) as u8,
             g: ((hex >> 16) & 0xff) as u8,
             b: ((hex >> 8) & 0xff) as u8,
             a: (hex & 0xff) as u8,
+        }
+    }
+
+    #[must_use]
+    pub const fn faded(self, alpha: u8) -> Color {
+        Color {
+            a: ((self.a as f32) * (alpha as f32 / 255.0)) as u8,
+            ..self
         }
     }
 }
@@ -48,8 +62,16 @@ impl From<Color> for ::tiny_skia::Color {
     }
 }
 
+#[cfg(feature = "imgui")]
+impl From<Color> for ::imgui::ImColor32 {
+    fn from(color: Color) -> ::imgui::ImColor32 {
+        ::imgui::ImColor32::from_rgba(color.r, color.g, color.b, color.a)
+    }
+}
+
 /// Anything that can be used for drawing
 pub trait Canvas {
+    // TODO: Tile should allow for circles
     fn tile(&mut self, position: V2f, color: Color);
     fn circle(&mut self, position: V2f, radius: f32, color: Color);
     // TODO: Weight?
@@ -102,4 +124,12 @@ pub trait Canvas {
     }
     fn tile_size() -> V2f;
     fn default_line_weight() -> f32;
+    fn tile_position(x: u8, y: u8) -> V2f {
+        let tile_size = Self::tile_size();
+        let grid_weight = Self::default_line_weight();
+        V2f {
+            x: (x as f32).mul_add(tile_size.x, (x + 1) as f32 * grid_weight),
+            y: (y as f32).mul_add(tile_size.y, (y + 1) as f32 * grid_weight),
+        }
+    }
 }

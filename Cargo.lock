@@ -333,6 +333,7 @@ dependencies = [
  "auto_ops",
  "cgt_derive",
  "dashmap",
+ "imgui",
  "itertools 0.14.0",
  "mint",
  "num-rational",

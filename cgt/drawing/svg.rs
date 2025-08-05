@@ -2,6 +2,51 @@
 
 use crate::{drawing::Color, numeric::v2f::V2f};
 use core::fmt::Write;
+use std::fmt::Display;
+
+struct Rgba(Color);
+
+impl Display for Rgba {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "rgba({},{},{},{})",
+            self.0.r,
+            self.0.g,
+            self.0.b,
+            self.0.a as f32 / 255.0
+        )
+    }
+}
+
+struct SelfClosingTag<'buf> {
+    buffer: &'buf mut String,
+}
+
+impl Drop for SelfClosingTag<'_> {
+    fn drop(&mut self) {
+        self.buffer.push_str(" />");
+    }
+}
+
+impl<'buf> SelfClosingTag<'buf> {
+    fn new(buffer: &'buf mut String, tag: &str) -> SelfClosingTag<'buf> {
+        buffer.push('<');
+        buffer.push_str(tag);
+        SelfClosingTag { buffer }
+    }
+
+    fn attribute<V>(&mut self, name: &str, value: V)
+    where
+        V: Display,
+    {
+        self.buffer.push(' ');
+        self.buffer.push_str(name);
+        self.buffer.push_str("=\"");
+        write!(self.buffer, "{}", value).unwrap();
+        self.buffer.push('"');
+    }
+}
 
 pub struct Canvas {
     buffer: String,
@@ -18,57 +63,44 @@ impl Canvas {
         self.buffer.push_str("</svg>");
         self.buffer
     }
+
+    fn self_closing_tag(&mut self, tag: &str) -> SelfClosingTag<'_> {
+        SelfClosingTag::new(&mut self.buffer, tag)
+    }
 }
 
 impl crate::drawing::Canvas for Canvas {
     fn tile(&mut self, position: V2f, color: Color) {
         let tile_size = Self::tile_size();
-        write!(
-            &mut self.buffer,
-            "<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" fill=\"rgba({},{},{},{})\"/>",
-            position.x,
-            position.y,
-            position.x + tile_size.x,
-            position.y + tile_size.y,
-            color.r,
-            color.g,
-            color.b,
-            color.a as f32 / 255.0,
-        )
-        .unwrap();
+        let mut rect = self.self_closing_tag("rect");
+        rect.attribute("x", position.x);
+        rect.attribute("y", position.y);
+        rect.attribute("width", tile_size.x);
+        rect.attribute("height", tile_size.y);
+        rect.attribute("fill", Rgba(color));
     }
 
     fn circle(&mut self, position: V2f, radius: f32, color: Color) {
-        write!(
-            &mut self.buffer,
-            "<circle cx=\"{}\" cy=\"{}\" r=\"{}\" stroke=\"{}\" fill=\"rgba({},{},{},{})\" />",
-            position.x,
-            position.y,
-            radius,
-            2.0,
-            color.r,
-            color.g,
-            color.b,
-            color.a as f32 / 255.0,
-        )
-        .unwrap();
+        let mut circle = self.self_closing_tag("circle");
+        circle.attribute("cx", position.x);
+        circle.attribute("cy", position.y);
+        circle.attribute("r", radius);
+        circle.attribute("stroke", 2.0);
+        circle.attribute("fill", Rgba(color));
     }
 
     fn line(&mut self, start: V2f, end: V2f) {
-        write!(
-            &mut self.buffer,
-            "<line x1=\"{}\" y1=\"{}\" x2=\"{}\" y2=\"{}\" stroke-width=\"{}\" stroke=\"black\"/>",
-            start.x,
-            start.y,
-            end.x,
-            end.y,
-            Self::default_line_weight()
-        )
-        .unwrap();
+        let mut line = self.self_closing_tag("line");
+        line.attribute("x1", start.x);
+        line.attribute("y1", start.y);
+        line.attribute("x2", end.x);
+        line.attribute("y2", end.y);
+        line.attribute("stroke-width", Self::default_line_weight());
+        line.attribute("stroke", Rgba(Color::BLACK));
     }
 
     fn tile_size() -> V2f {
-        V2f { x: 50.0, y: 50.0 }
+        V2f { x: 64.0, y: 64.0 }
     }
 
     fn default_line_weight() -> f32 {

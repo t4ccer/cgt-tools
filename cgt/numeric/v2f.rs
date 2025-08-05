@@ -8,6 +8,7 @@ pub struct V2f {
     pub y: f32,
 }
 
+#[cfg(feature = "mint")]
 impl From<V2f> for mint::Vector2<f32> {
     fn from(value: V2f) -> Self {
         Self {
@@ -61,6 +62,14 @@ impl V2f {
             x: self.x / l,
             y: self.y / l,
         }
+    }
+
+    #[must_use]
+    pub fn inside_rect(self, position: V2f, size: V2f) -> bool {
+        self.x >= position.x
+            && self.x <= position.x + size.x
+            && self.y >= position.y
+            && self.y <= position.y + size.y
     }
 }
 

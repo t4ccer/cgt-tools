@@ -65,7 +65,7 @@ impl super::Canvas for Canvas {
     }
 
     fn tile_size() -> V2f {
-        V2f { x: 50.0, y: 50.0 }
+        V2f { x: 64.0, y: 64.0 }
     }
 
     fn default_line_weight() -> f32 {

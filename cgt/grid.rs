@@ -118,23 +118,31 @@ pub trait FiniteGrid: Grid + Sized {
     {
         // TODO: get_tile_color should return shape to handle fissions etc.
 
-        let tile_size = C::tile_size();
-        let grid_weight = C::default_line_weight();
-
         for y in 0..self.height() {
             for x in 0..self.width() {
                 let color = get_tile_color(self.get(x, y));
-                canvas.tile(
-                    V2f {
-                        x: (x as f32).mul_add(tile_size.x, (x + 1) as f32 * grid_weight),
-                        y: (y as f32).mul_add(tile_size.y, (y + 1) as f32 * grid_weight),
-                    },
-                    color,
-                );
+                canvas.tile(C::tile_position(x, y), color);
             }
         }
 
         canvas.grid(V2f::ZERO, self.width() as u32, self.height() as u32);
+    }
+
+    /// Get tile position from canvas position
+    fn tile_at_position<C>(&self, position: V2f) -> Option<(u8, u8)>
+    where
+        C: Canvas,
+    {
+        // TODO: Compute that instead of looping
+        for y in 0..self.height() {
+            for x in 0..self.width() {
+                if position.inside_rect(C::tile_position(x, y), C::tile_size()) {
+                    return Some((x, y));
+                }
+            }
+        }
+
+        None
     }
 }
 
