@@ -1,5 +1,6 @@
 use crate::{
     drawing::{self, Color},
+    grid::FiniteGrid,
     numeric::v2f::V2f,
 };
 use imgui::DrawListMut;
@@ -23,8 +24,12 @@ impl<'ui> Canvas<'ui> {
         }
     }
 
-    pub const fn clicked_tile_position(&self) -> Option<V2f> {
+    pub fn clicked_tile<G>(&self, grid: &G) -> Option<(u8, u8)>
+    where
+        G: FiniteGrid,
+    {
         self.clicked_tile
+            .and_then(|clicked_pos| grid.tile_at_position::<Canvas>(clicked_pos))
     }
 }
 
@@ -47,7 +52,7 @@ impl drawing::Canvas for Canvas<'_> {
             .build();
     }
 
-    fn line(&mut self, start: V2f, end: V2f) {
+    fn line(&mut self, start: V2f, end: V2f, weight: f32, color: Color) {
         // HACK: https://github.com/ocornut/imgui/issues/3258
         let offset = V2f { x: -0.5, y: -0.5 };
 
@@ -55,9 +60,9 @@ impl drawing::Canvas for Canvas<'_> {
             .add_line(
                 self.start_position + start + offset,
                 self.start_position + end + offset,
-                Color::BLACK,
+                color,
             )
-            .thickness(Self::default_line_weight())
+            .thickness(weight)
             .build();
     }
 
@@ -100,51 +105,16 @@ impl drawing::Canvas for Canvas<'_> {
         }
     }
 
-    fn grid(&mut self, position: V2f, columns: u32, rows: u32) {
-        let cell_size = Self::tile_size();
-        let grid_weight = Self::default_line_weight();
-
-        for row in 0..=rows {
-            let line_start = V2f {
-                x: position.x,
-                y: grid_weight.mul_add(
-                    row as f32 + 0.5,
-                    cell_size.y.mul_add(row as f32, position.y),
-                ),
-            };
-            let line_end = V2f {
-                x: grid_weight.mul_add(
-                    (columns + 1) as f32,
-                    cell_size.x.mul_add(columns as f32, position.x),
-                ),
-                y: grid_weight.mul_add(
-                    row as f32 + 0.5,
-                    cell_size.y.mul_add(row as f32, position.y),
-                ),
-            };
-            self.line(line_start, line_end);
-        }
-
-        for column in 0..=columns {
-            let line_start = V2f {
-                x: grid_weight.mul_add(
-                    column as f32 + 0.5,
-                    cell_size.x.mul_add(column as f32, position.x),
-                ),
-                y: position.y,
-            };
-            let line_end = V2f {
-                x: grid_weight.mul_add(
-                    column as f32 + 0.5,
-                    cell_size.x.mul_add(column as f32, position.x),
-                ),
-                y: grid_weight.mul_add(
-                    (rows + 1) as f32,
-                    cell_size.y.mul_add(rows as f32, position.y),
-                ),
-            };
-            self.line(line_start, line_end);
-        }
+    fn highlight_tile(&mut self, position: V2f, color: Color) {
+        self.draw_list
+            .add_rect(
+                self.start_position + position,
+                self.start_position + position + Self::tile_size(),
+                color,
+            )
+            .thickness(Self::default_line_weight() * 2.0)
+            .filled(false)
+            .build();
     }
 
     fn tile_size() -> V2f {

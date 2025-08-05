@@ -86,7 +86,7 @@ pub trait Canvas {
     fn rect(&mut self, position: V2f, size: V2f, color: Color);
     fn circle(&mut self, position: V2f, radius: f32, color: Color);
     // TODO: Weight?
-    fn line(&mut self, start: V2f, end: V2f);
+    fn line(&mut self, start: V2f, end: V2f, weight: f32, color: Color);
 
     fn tile(&mut self, position: V2f, tile: Tile) {
         let tile_size = Self::tile_size();
@@ -102,6 +102,60 @@ pub trait Canvas {
                 self.circle(position + tile_size * 0.5, tile_size.x * 0.4, circle_color);
             }
         }
+    }
+
+    fn highlight_tile(&mut self, position: V2f, color: Color) {
+        let tile_size = Self::tile_size();
+        let weight = Self::default_line_weight() * 2.0;
+
+        self.line(
+            position,
+            position
+                + V2f {
+                    x: tile_size.x,
+                    y: 0.0,
+                },
+            weight,
+            color,
+        );
+        self.line(
+            position,
+            position
+                + V2f {
+                    x: 0.0,
+                    y: Self::tile_size().y,
+                },
+            weight,
+            color,
+        );
+        self.line(
+            position
+                + V2f {
+                    x: tile_size.x,
+                    y: 0.0,
+                },
+            position
+                + V2f {
+                    x: tile_size.x,
+                    y: tile_size.y,
+                },
+            weight,
+            color,
+        );
+        self.line(
+            position
+                + V2f {
+                    x: 0.0,
+                    y: tile_size.y,
+                },
+            position
+                + V2f {
+                    x: tile_size.x,
+                    y: tile_size.y,
+                },
+            weight,
+            color,
+        );
     }
 
     fn grid(&mut self, position: V2f, columns: u32, rows: u32) {
@@ -126,7 +180,12 @@ pub trait Canvas {
                     cell_size.y.mul_add(row as f32, position.y),
                 ),
             };
-            self.line(line_start, line_end);
+            self.line(
+                line_start,
+                line_end,
+                Self::default_line_weight(),
+                Color::BLACK,
+            );
         }
 
         for column in 0..=columns {
@@ -147,9 +206,15 @@ pub trait Canvas {
                     cell_size.y.mul_add(rows as f32, position.y),
                 ),
             };
-            self.line(line_start, line_end);
+            self.line(
+                line_start,
+                line_end,
+                Self::default_line_weight(),
+                Color::BLACK,
+            );
         }
     }
+
     fn tile_size() -> V2f;
     fn default_line_weight() -> f32;
     fn tile_position(x: u8, y: u8) -> V2f {

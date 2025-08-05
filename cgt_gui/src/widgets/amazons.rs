@@ -1,17 +1,14 @@
+use ::imgui::{ComboBoxFlags, Condition, Ui};
 use cgt::{
+    drawing::{imgui, Canvas, Color},
     grid::{vec_grid::VecGrid, FiniteGrid, Grid},
-    numeric::v2f::V2f,
     short::partizan::games::amazons::{Amazons, Tile},
 };
-use imgui::{ComboBoxFlags, Condition};
 use std::str::FromStr;
 
 use crate::{
     imgui_enum, impl_game_window, impl_titled_window,
-    widgets::{
-        self, canonical_form::CanonicalFormWindow, interactive_color, GridEditorAction, COLOR_BLUE,
-        COLOR_RED, TILE_COLOR_EMPTY, TILE_COLOR_FILLED, TILE_SIZE,
-    },
+    widgets::{self, canonical_form::CanonicalFormWindow},
     Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow,
 };
 
@@ -58,7 +55,7 @@ impl IsCgtWindow for TitledWindow<AmazonsWindow> {
     impl_titled_window!("Amazons");
     impl_game_window!("Amazons", EvalAmazons, AmazonsDetails);
 
-    fn draw(&mut self, ui: &imgui::Ui, ctx: &mut GuiContext) {
+    fn draw(&mut self, ui: &Ui, ctx: &mut GuiContext) {
         let width = self.content.game.grid().width();
         let height = self.content.game.grid().height();
 
@@ -115,160 +112,96 @@ impl IsCgtWindow for TitledWindow<AmazonsWindow> {
 
                 widgets::grid_size_selector(ui, &mut new_width, &mut new_height);
                 ui.spacing();
-                let action = widgets::grid(
-                    ui,
-                    &draw_list,
-                    self.content.game.grid(),
-                    |screen_pos, (x, y), tile, draw_list| {
-                        draw_list
-                            .add_rect(
-                                screen_pos,
-                                screen_pos
-                                    + V2f {
-                                        x: TILE_SIZE,
-                                        y: TILE_SIZE,
-                                    },
-                                interactive_color(TILE_COLOR_EMPTY, ui),
-                            )
-                            .filled(true)
-                            .build();
 
-                        if matches!(self.content.pending_move,
-                                    PendingMove::AmazonSelected { amazon } if
-                                    amazon == (x, y))
-                            || matches!(self.content.pending_move,
-                                        PendingMove::AmazonTargetSelected { amazon, target } if
-                                        amazon == (x, y) || target == (x, y))
-                        {
-                            match self.content.editing_mode.get() {
-                                GridEditingMode::MoveLeft => {
-                                    draw_list
-                                        .add_rect(
-                                            screen_pos,
-                                            screen_pos
-                                                + V2f {
-                                                    x: TILE_SIZE,
-                                                    y: TILE_SIZE,
-                                                },
-                                            COLOR_BLUE,
-                                        )
-                                        .thickness(4.0)
-                                        .filled(false)
-                                        .build();
-                                }
-                                GridEditingMode::MoveRight => {
-                                    draw_list
-                                        .add_rect(
-                                            screen_pos,
-                                            screen_pos
-                                                + V2f {
-                                                    x: TILE_SIZE,
-                                                    y: TILE_SIZE,
-                                                },
-                                            COLOR_RED,
-                                        )
-                                        .thickness(4.0)
-                                        .filled(false)
-                                        .build();
-                                }
-                                _ => {}
+                let mut canvas = imgui::Canvas::new(ui, &draw_list);
+                self.content.game.draw(&mut canvas);
+                if let Some((x, y)) = canvas.clicked_tile(self.content.game.grid()) {
+                    macro_rules! place_tile {
+                        ($tile:ident) => {
+                            if self.content.game.grid().get(x, y) != Tile::$tile {
+                                self.content.game.grid_mut().set(x, y, Tile::$tile);
+                                is_dirty = true;
                             }
-                        }
+                        };
+                    }
 
-                        if let Some(stone_color) = match tile {
-                            Tile::Empty => None,
-                            Tile::Left => Some(COLOR_BLUE),
-                            Tile::Right => Some(COLOR_RED),
-                            Tile::Stone => Some(TILE_COLOR_FILLED),
-                        } {
-                            draw_list
-                                .add_circle(
-                                    screen_pos
-                                        + V2f {
-                                            x: TILE_SIZE * 0.5,
-                                            y: TILE_SIZE * 0.5,
-                                        },
-                                    TILE_SIZE * 0.4,
-                                    interactive_color(stone_color, ui),
-                                )
-                                .filled(true)
-                                .build();
-                        }
-                    },
-                );
-
-                match action {
-                    GridEditorAction::None => {}
-                    GridEditorAction::Clicked { x, y } => {
-                        macro_rules! place_tile {
-                            ($tile:ident) => {
-                                if self.content.game.grid().get(x, y) != Tile::$tile {
-                                    self.content.game.grid_mut().set(x, y, Tile::$tile);
-                                    is_dirty = true;
-                                }
-                            };
-                        }
-
-                        macro_rules! make_move {
-                            ($own_tile:ident, $other_mode:ident) => {
-                                match self.content.pending_move {
-                                    PendingMove::None => {
-                                        if matches!(
-                                            self.content.game.grid().get(x, y),
-                                            Tile::$own_tile
-                                        ) {
-                                            self.content.pending_move =
-                                                PendingMove::AmazonSelected { amazon: (x, y) };
-                                        }
-                                    }
-                                    PendingMove::AmazonSelected { amazon } => {
-                                        if matches!(self.content.game.grid().get(x, y), Tile::Empty)
-                                        {
-                                            self.content.pending_move =
-                                                PendingMove::AmazonTargetSelected {
-                                                    amazon,
-                                                    target: (x, y),
-                                                };
-                                        }
-                                    }
-                                    PendingMove::AmazonTargetSelected { amazon, target } => {
-                                        let stone_target = (x, y);
-                                        let mut new_game = self.content.game.clone();
-                                        new_game.grid_mut().set(amazon.0, amazon.1, Tile::Empty);
-                                        new_game.grid_mut().set(
-                                            target.0,
-                                            target.1,
-                                            Tile::$own_tile,
-                                        );
-                                        new_game.grid_mut().set(
-                                            stone_target.0,
-                                            stone_target.1,
-                                            Tile::Stone,
-                                        );
-                                        self.content.pending_move = PendingMove::None;
-                                        let moves =
-                                            self.content.game.moves_for(Tile::$own_tile, false);
-                                        if moves.contains(&new_game) {
-                                            self.content.game = new_game;
-                                            if self.content.alternating_moves {
-                                                self.content.editing_mode =
-                                                    RawOf::new(GridEditingMode::$other_mode);
-                                            }
-                                            is_dirty = true;
-                                        }
+                    macro_rules! make_move {
+                        ($own_tile:ident, $other_mode:ident) => {
+                            match self.content.pending_move {
+                                PendingMove::None => {
+                                    if matches!(self.content.game.grid().get(x, y), Tile::$own_tile)
+                                    {
+                                        self.content.pending_move =
+                                            PendingMove::AmazonSelected { amazon: (x, y) };
                                     }
                                 }
-                            };
-                        }
+                                PendingMove::AmazonSelected { amazon } => {
+                                    if matches!(self.content.game.grid().get(x, y), Tile::Empty) {
+                                        self.content.pending_move =
+                                            PendingMove::AmazonTargetSelected {
+                                                amazon,
+                                                target: (x, y),
+                                            };
+                                    }
+                                }
+                                PendingMove::AmazonTargetSelected { amazon, target } => {
+                                    let stone_target = (x, y);
+                                    let mut new_game = self.content.game.clone();
+                                    new_game.grid_mut().set(amazon.0, amazon.1, Tile::Empty);
+                                    new_game.grid_mut().set(target.0, target.1, Tile::$own_tile);
+                                    new_game.grid_mut().set(
+                                        stone_target.0,
+                                        stone_target.1,
+                                        Tile::Stone,
+                                    );
+                                    self.content.pending_move = PendingMove::None;
+                                    let moves = self.content.game.moves_for(Tile::$own_tile, false);
+                                    if moves.contains(&new_game) {
+                                        self.content.game = new_game;
+                                        if self.content.alternating_moves {
+                                            self.content.editing_mode =
+                                                RawOf::new(GridEditingMode::$other_mode);
+                                        }
+                                        is_dirty = true;
+                                    }
+                                }
+                            }
+                        };
+                    }
 
-                        match self.content.editing_mode.get() {
-                            GridEditingMode::AddStone => place_tile!(Stone),
-                            GridEditingMode::AddBlueQueen => place_tile!(Left),
-                            GridEditingMode::AddRedQueen => place_tile!(Right),
-                            GridEditingMode::ClearTile => place_tile!(Empty),
-                            GridEditingMode::MoveLeft => make_move!(Left, MoveRight),
-                            GridEditingMode::MoveRight => make_move!(Right, MoveLeft),
-                        }
+                    match self.content.editing_mode.get() {
+                        GridEditingMode::AddStone => place_tile!(Stone),
+                        GridEditingMode::AddBlueQueen => place_tile!(Left),
+                        GridEditingMode::AddRedQueen => place_tile!(Right),
+                        GridEditingMode::ClearTile => place_tile!(Empty),
+                        GridEditingMode::MoveLeft => make_move!(Left, MoveRight),
+                        GridEditingMode::MoveRight => make_move!(Right, MoveLeft),
+                    }
+                };
+
+                let highlight_color =
+                    if matches!(self.content.editing_mode.get(), GridEditingMode::MoveLeft) {
+                        Color::BLUE
+                    } else {
+                        Color::RED
+                    };
+                match self.content.pending_move {
+                    PendingMove::None => {}
+                    PendingMove::AmazonSelected { amazon } => {
+                        canvas.highlight_tile(
+                            imgui::Canvas::tile_position(amazon.0, amazon.1),
+                            highlight_color,
+                        );
+                    }
+                    PendingMove::AmazonTargetSelected { amazon, target } => {
+                        canvas.highlight_tile(
+                            imgui::Canvas::tile_position(amazon.0, amazon.1),
+                            highlight_color,
+                        );
+                        canvas.highlight_tile(
+                            imgui::Canvas::tile_position(target.0, target.1),
+                            highlight_color,
+                        );
                     }
                 }
 

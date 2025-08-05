@@ -1,6 +1,7 @@
 //! Amazons game
 
 use crate::{
+    drawing::{self, Canvas, Color},
     grid::{decompositions, move_top_left, vec_grid::VecGrid, FiniteGrid, Grid},
     short::partizan::partizan_game::PartizanGame,
 };
@@ -152,6 +153,30 @@ where
         }
 
         moves
+    }
+
+    /// Paint grid on existing canvas
+    pub fn draw<C>(&self, canvas: &mut C)
+    where
+        C: Canvas,
+    {
+        self.grid.draw(canvas, |tile| match tile {
+            Tile::Empty => drawing::Tile::Square {
+                color: Color::LIGHT_GRAY,
+            },
+            Tile::Stone => drawing::Tile::Circle {
+                tile_color: Color::LIGHT_GRAY,
+                circle_color: Color::DARK_GRAY,
+            },
+            Tile::Left => drawing::Tile::Circle {
+                tile_color: Color::LIGHT_GRAY,
+                circle_color: Color::BLUE,
+            },
+            Tile::Right => drawing::Tile::Circle {
+                tile_color: Color::LIGHT_GRAY,
+                circle_color: Color::RED,
+            },
+        });
     }
 }
 

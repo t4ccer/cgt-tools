@@ -100,12 +100,7 @@ impl IsCgtWindow for TitledWindow<FissionWindow> {
                 ui.spacing();
                 let mut canvas = imgui::Canvas::new(ui, &draw_list);
                 self.content.game.draw(&mut canvas);
-                if let Some((x, y)) = canvas.clicked_tile_position().and_then(|clicked_pos| {
-                    self.content
-                        .game
-                        .grid()
-                        .tile_at_position::<imgui::Canvas>(clicked_pos)
-                }) {
+                if let Some((x, y)) = canvas.clicked_tile(self.content.game.grid()) {
                     macro_rules! place_tile {
                         ($tile:ident) => {
                             if self.content.game.grid().get(x, y) != Tile::$tile {

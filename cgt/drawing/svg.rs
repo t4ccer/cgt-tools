@@ -88,14 +88,14 @@ impl crate::drawing::Canvas for Canvas {
         circle.attribute("fill", Rgba(color));
     }
 
-    fn line(&mut self, start: V2f, end: V2f) {
+    fn line(&mut self, start: V2f, end: V2f, weight: f32, color: Color) {
         let mut line = self.self_closing_tag("line");
         line.attribute("x1", start.x);
         line.attribute("y1", start.y);
         line.attribute("x2", end.x);
         line.attribute("y2", end.y);
-        line.attribute("stroke-width", Self::default_line_weight());
-        line.attribute("stroke", Rgba(Color::BLACK));
+        line.attribute("stroke-width", weight);
+        line.attribute("stroke", Rgba(color));
     }
 
     fn tile_size() -> V2f {
