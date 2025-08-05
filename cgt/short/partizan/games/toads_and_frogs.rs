@@ -134,7 +134,7 @@ impl PartizanGame for ToadsAndFrogs {
                     new_tiles[idx] = Tile::Empty;
                     new_tiles[idx + 1] = own;
                     moves.push(Self::new(new_tiles));
-                } else if idx < self.tiles.len() - 2
+                } else if idx + 2 < self.tiles.len()
                     && self.tiles[idx + 1] == opponent
                     && self.tiles[idx + 2] == Tile::Empty
                 {
@@ -220,6 +220,10 @@ mod tests {
 
     #[test]
     fn canonical_form() {
+        assert_canonical_form!("", "0");
+        assert_canonical_form!(".", "0");
+        assert_canonical_form!("F", "0");
+        assert_canonical_form!("T", "0");
         assert_canonical_form!("TFTF.TF", "0");
         assert_canonical_form!("TFTFTF.", "0");
         assert_canonical_form!("TFTFT.F", "*");
