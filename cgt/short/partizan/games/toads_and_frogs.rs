@@ -5,7 +5,12 @@
 //! a Frog to the empty square behind it. Right player moves Frogs and jumps over Toads to the left
 //! in the same way.
 
-use crate::{grid::CharTile, short::partizan::partizan_game::PartizanGame};
+use crate::{
+    drawing::{self, Canvas, Color, Draw},
+    grid::{vec_grid::VecGrid, CharTile, FiniteGrid, Grid},
+    numeric::v2f::V2f,
+    short::partizan::partizan_game::PartizanGame,
+};
 use cgt_derive::Tile;
 use std::{
     fmt::{self, Display},
@@ -51,6 +56,16 @@ impl ToadsAndFrogs {
     pub fn row_mut(&mut self) -> &mut Vec<Tile> {
         &mut self.tiles
     }
+
+    /// Construct grid equal to underlying game
+    pub fn grid(&self) -> VecGrid<Tile> {
+        // TODO: Use grid internally
+        let mut grid = VecGrid::filled(self.tiles.len() as u8, 1, Tile::Empty).unwrap();
+        for (i, t) in self.tiles.iter().copied().enumerate() {
+            grid.set(i as u8, 0, t);
+        }
+        grid
+    }
 }
 
 impl FromStr for ToadsAndFrogs {
@@ -72,6 +87,36 @@ impl Display for ToadsAndFrogs {
         }
 
         Ok(())
+    }
+}
+
+impl Draw for ToadsAndFrogs {
+    fn draw<C>(&self, canvas: &mut C)
+    where
+        C: Canvas,
+    {
+        self.grid().draw(canvas, |tile| match tile {
+            Tile::Empty => drawing::Tile::Square {
+                color: Color::LIGHT_GRAY,
+            },
+            Tile::Toad => drawing::Tile::Char {
+                tile_color: Color::LIGHT_GRAY,
+                text_color: Color::BLUE,
+                letter: 'T',
+            },
+            Tile::Frog => drawing::Tile::Char {
+                tile_color: Color::LIGHT_GRAY,
+                text_color: Color::RED,
+                letter: 'F',
+            },
+        });
+    }
+
+    fn canvas_size<C>(&self) -> V2f
+    where
+        C: Canvas,
+    {
+        self.grid().canvas_size::<C>()
     }
 }
 

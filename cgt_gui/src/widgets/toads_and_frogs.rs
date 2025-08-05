@@ -1,18 +1,14 @@
-use cgt::{
-    numeric::v2f::V2f,
-    short::partizan::games::toads_and_frogs::{Tile, ToadsAndFrogs},
-};
-use imgui::{ComboBoxFlags, Condition};
-use std::str::FromStr;
-
 use crate::{
     imgui_enum, impl_game_window, impl_titled_window,
-    widgets::{
-        self, canonical_form::CanonicalFormWindow, interactive_color, TILE_COLOR_EMPTY,
-        TILE_COLOR_FILLED, TILE_SIZE, TILE_SPACING,
-    },
+    widgets::{self, canonical_form::CanonicalFormWindow},
     Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow,
 };
+use ::imgui::{ComboBoxFlags, Condition, Ui};
+use cgt::{
+    drawing::{imgui, Draw},
+    short::partizan::games::toads_and_frogs::{Tile, ToadsAndFrogs},
+};
+use std::str::FromStr;
 
 imgui_enum! {
     GridEditingMode {
@@ -47,7 +43,7 @@ impl IsCgtWindow for TitledWindow<ToadsAndFrogsWindow> {
     impl_titled_window!("Toads and Frogs");
     impl_game_window!("Toads and Frogs", EvalToadsAndFrogs, ToadsAndFrogsDetails);
 
-    fn draw(&mut self, ui: &imgui::Ui, ctx: &mut GuiContext) {
+    fn draw(&mut self, ui: &Ui, ctx: &mut GuiContext) {
         let width = self.content.game.row().len();
 
         let mut new_width = width;
@@ -102,58 +98,11 @@ impl IsCgtWindow for TitledWindow<ToadsAndFrogsWindow> {
 
                 ui.spacing();
 
-                let grid_pos = V2f::from(ui.cursor_pos());
-                let mut move_tile = None;
+                let mut canvas = imgui::Canvas::new(ui, &draw_list, ctx.large_font_id);
+                self.content.game.draw(&mut canvas);
+                if let Some((x, _)) = canvas.clicked_tile(&self.content.game.grid()) {
+                    let grid_x = x as usize;
 
-                let large_font = ui.push_font(ctx.large_font_id);
-                for (grid_x, tile) in self.content.game.row().iter().copied().enumerate() {
-                    let _x_id = ui.push_id_usize(grid_x);
-
-                    ui.set_cursor_pos([
-                        (TILE_SIZE + TILE_SPACING).mul_add(grid_x as f32, grid_pos.x),
-                        grid_pos.y,
-                    ]);
-
-                    let screen_pos = V2f::from(ui.cursor_screen_pos());
-
-                    if ui.invisible_button("", [TILE_SIZE, TILE_SIZE]) {
-                        move_tile = Some(grid_x);
-                    }
-
-                    draw_list
-                        .add_rect(
-                            screen_pos,
-                            screen_pos
-                                + V2f {
-                                    x: TILE_SIZE,
-                                    y: TILE_SIZE,
-                                },
-                            interactive_color(TILE_COLOR_EMPTY, ui),
-                        )
-                        .filled(true)
-                        .build();
-
-                    macro_rules! draw_text {
-                        ($text:expr) => {{
-                            let size = V2f::from(ui.calc_text_size($text));
-                            let text_pos = screen_pos
-                                + (V2f {
-                                    x: TILE_SIZE,
-                                    y: TILE_SIZE,
-                                } - size)
-                                    * 0.5;
-                            draw_list.add_text(text_pos, TILE_COLOR_FILLED, $text);
-                        }};
-                    }
-                    match tile {
-                        Tile::Empty => {}
-                        Tile::Toad => draw_text!("T"),
-                        Tile::Frog => draw_text!("F"),
-                    }
-                }
-                drop(large_font);
-
-                if let Some(grid_x) = move_tile {
                     macro_rules! place_tile {
                         ($tile:ident) => {
                             if self.content.game.row()[grid_x] != Tile::$tile {
@@ -168,7 +117,8 @@ impl IsCgtWindow for TitledWindow<ToadsAndFrogsWindow> {
                         GridEditingMode::PlaceFrog => place_tile!(Frog),
                         GridEditingMode::ClearTile => place_tile!(Empty),
                         GridEditingMode::MoveLeft => {
-                            // TODO: De-duplicate game logic, introduce abstract move associated type to each game
+                            // TODO: De-duplicate game logic, introduce abstract move associated
+                            // type to each game
                             if matches!(self.content.game.row()[grid_x], Tile::Toad) {
                                 if grid_x + 1 < width
                                     && matches!(self.content.game.row()[grid_x + 1], Tile::Empty)
