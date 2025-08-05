@@ -3,9 +3,10 @@
 //! vertices in their own color.
 
 use crate::{
+    drawing::{BoundingBox, Canvas, Color, Draw},
     graph::{Graph, VertexIndex},
     has::Has,
-    numeric::{dyadic_rational_number::DyadicRationalNumber, nimber::Nimber},
+    numeric::{dyadic_rational_number::DyadicRationalNumber, nimber::Nimber, v2f::V2f},
     short::partizan::{canonical_form::CanonicalForm, partizan_game::PartizanGame},
 };
 use std::{collections::VecDeque, fmt::Write, hash::Hash, marker::PhantomData, num::NonZeroU32};
@@ -361,6 +362,78 @@ where
 
         write!(buf, "}}").unwrap();
         buf
+    }
+}
+
+impl<V, G> Draw for Snort<V, G>
+where
+    V: Has<VertexKind> + Has<V2f>,
+    G: Graph<V> + Clone,
+{
+    fn draw<C>(&self, canvas: &mut C)
+    where
+        C: Canvas,
+    {
+        // TODO: Move up graph drawing code to Graph trait
+        for this_vertex_idx in self.graph.vertex_indices() {
+            let this_position: V2f = *self.graph.get_vertex(this_vertex_idx).get_inner();
+            for adjacent_vertex_id in self.graph.adjacent_to(this_vertex_idx) {
+                let adjacent_position: V2f = *self.graph.get_vertex(adjacent_vertex_id).get_inner();
+                canvas.line(
+                    this_position,
+                    adjacent_position,
+                    C::thin_line_weight(),
+                    Color::BLACK,
+                );
+            }
+        }
+
+        for this_vertex_idx in self.graph.vertex_indices() {
+            let this_position: V2f = *self.graph.get_vertex(this_vertex_idx).get_inner();
+            let this_kind: VertexKind = *self.graph.get_vertex(this_vertex_idx).get_inner();
+            canvas.vertex(
+                this_position,
+                match this_kind.color() {
+                    VertexColor::Empty => Color::LIGHT_GRAY,
+                    VertexColor::TintLeft => Color::BLUE,
+                    VertexColor::TintRight => Color::RED,
+                },
+                this_vertex_idx,
+            );
+        }
+    }
+
+    fn required_canvas<C>(&self) -> BoundingBox
+    where
+        C: Canvas,
+    {
+        // TODO: Special case empty graph to ZERO
+        let r = C::node_radius();
+        self.graph
+            .vertex_indices()
+            .map(|idx| *self.graph.get_vertex(idx).get_inner())
+            .fold(
+                BoundingBox {
+                    top_left: V2f {
+                        x: f32::INFINITY,
+                        y: f32::INFINITY,
+                    },
+                    bottom_right: V2f {
+                        x: f32::NEG_INFINITY,
+                        y: f32::NEG_INFINITY,
+                    },
+                },
+                |bounding_box, v: V2f| BoundingBox {
+                    top_left: V2f {
+                        x: f32::min(bounding_box.top_left.x, v.x - r),
+                        y: f32::min(bounding_box.top_left.y, v.y - r),
+                    },
+                    bottom_right: V2f {
+                        x: f32::max(bounding_box.bottom_right.x, v.x + r),
+                        y: f32::max(bounding_box.bottom_right.y, v.y + r),
+                    },
+                },
+            )
     }
 }
 

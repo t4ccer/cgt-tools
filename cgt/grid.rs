@@ -3,7 +3,7 @@
 use std::{collections::VecDeque, fmt::Write};
 
 use crate::{
-    drawing::{self, Canvas},
+    drawing::{self, BoundingBox, Canvas},
     numeric::v2f::V2f,
 };
 
@@ -94,20 +94,23 @@ pub trait FiniteGrid: Grid + Sized {
     }
 
     /// Minimum required canvas size to paint the whole grid
-    fn canvas_size<C>(&self) -> V2f
+    fn canvas_size<C>(&self) -> BoundingBox
     where
         C: Canvas,
     {
         let tile_size = C::tile_size();
-        let grid_weight = C::default_line_weight();
-        V2f {
-            x: tile_size
-                .x
-                .mul_add(self.width() as f32, grid_weight * (self.width() + 1) as f32),
-            y: tile_size.y.mul_add(
-                self.height() as f32,
-                grid_weight * (self.height() + 1) as f32,
-            ),
+        let grid_weight = C::thick_line_weight();
+        BoundingBox {
+            top_left: V2f::ZERO,
+            bottom_right: V2f {
+                x: tile_size
+                    .x
+                    .mul_add(self.width() as f32, grid_weight * (self.width() + 1) as f32),
+                y: tile_size.y.mul_add(
+                    self.height() as f32,
+                    grid_weight * (self.height() + 1) as f32,
+                ),
+            },
         }
     }
 

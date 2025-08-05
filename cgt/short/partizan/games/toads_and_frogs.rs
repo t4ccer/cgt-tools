@@ -6,9 +6,8 @@
 //! in the same way.
 
 use crate::{
-    drawing::{self, Canvas, Color, Draw},
+    drawing::{self, BoundingBox, Canvas, Color, Draw},
     grid::{vec_grid::VecGrid, CharTile, FiniteGrid, Grid},
-    numeric::v2f::V2f,
     short::partizan::partizan_game::PartizanGame,
 };
 use cgt_derive::Tile;
@@ -112,7 +111,7 @@ impl Draw for ToadsAndFrogs {
         });
     }
 
-    fn canvas_size<C>(&self) -> V2f
+    fn required_canvas<C>(&self) -> BoundingBox
     where
         C: Canvas,
     {

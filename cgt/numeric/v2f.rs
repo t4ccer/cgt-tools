@@ -1,6 +1,6 @@
 #![allow(missing_docs, dead_code)]
 
-use std::ops::{Add, AddAssign, Mul, Sub, SubAssign};
+use std::ops::{Add, AddAssign, Mul, Neg, Sub, SubAssign};
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct V2f {
@@ -71,6 +71,15 @@ impl V2f {
             && self.y >= position.y
             && self.y <= position.y + size.y
     }
+
+    #[must_use]
+    #[allow(clippy::suspicious_operation_groupings)] // False positive
+    pub fn inside_circle(self, position: V2f, radius: f32) -> bool {
+        (self.x - position.x).mul_add(
+            self.x - position.x,
+            (self.y - position.y) * (self.y - position.y),
+        ) <= radius * radius
+    }
 }
 
 impl Add for V2f {
@@ -138,6 +147,17 @@ impl Mul<V2f> for f32 {
         V2f {
             x: self * rhs.x,
             y: self * rhs.y,
+        }
+    }
+}
+
+impl Neg for V2f {
+    type Output = V2f;
+
+    fn neg(self) -> Self::Output {
+        V2f {
+            x: -self.x,
+            y: -self.y,
         }
     }
 }

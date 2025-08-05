@@ -1,12 +1,11 @@
 use crate::{
     imgui_enum, impl_titled_window,
-    widgets::{
-        self, canonical_form::CanonicalFormWindow, GraphEditor, VertexFillColor, COLOR_BLUE,
-        COLOR_RED, VERTEX_RADIUS,
-    },
+    widgets::{self, canonical_form::CanonicalFormWindow},
     Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow, UpdateKind,
 };
+use ::imgui::{ComboBoxFlags, Condition, Ui};
 use cgt::{
+    drawing::{imgui, svg, tiny_skia, Canvas, Color, Draw},
     graph::{
         adjacency_matrix::undirected::UndirectedGraph,
         layout::{CircleEdge, SpringEmbedder},
@@ -16,7 +15,6 @@ use cgt::{
     numeric::v2f::V2f,
     short::partizan::games::snort::{Snort, VertexColor, VertexKind},
 };
-use imgui::{ComboBoxFlags, Condition, ImColor32};
 use std::fmt::Write;
 
 imgui_enum! {
@@ -46,35 +44,22 @@ pub struct PositionedVertex {
     position: V2f,
 }
 
-impl Has<VertexKind> for PositionedVertex {
-    fn get_inner(&self) -> &VertexKind {
-        &self.kind
-    }
+macro_rules! impl_has {
+    ($ty:ident -> $getter:ident -> $res:ident) => {
+        impl Has<$res> for $ty {
+            fn get_inner(&self) -> &$res {
+                &self.$getter
+            }
 
-    fn get_inner_mut(&mut self) -> &mut VertexKind {
-        &mut self.kind
-    }
-}
-
-impl Has<V2f> for PositionedVertex {
-    fn get_inner(&self) -> &V2f {
-        &self.position
-    }
-
-    fn get_inner_mut(&mut self) -> &mut V2f {
-        &mut self.position
-    }
-}
-
-impl VertexFillColor for PositionedVertex {
-    fn fill_color(&self) -> ImColor32 {
-        match self.kind.color() {
-            VertexColor::TintLeft => COLOR_BLUE,
-            VertexColor::TintRight => COLOR_RED,
-            VertexColor::Empty => ImColor32::TRANSPARENT,
+            fn get_inner_mut(&mut self) -> &mut $res {
+                &mut self.$getter
+            }
         }
-    }
+    };
 }
+
+impl_has!(PositionedVertex -> kind -> VertexKind);
+impl_has!(PositionedVertex -> position -> V2f);
 
 #[derive(Debug, Clone)]
 pub struct SnortWindow {
@@ -83,8 +68,8 @@ pub struct SnortWindow {
     editing_mode: RawOf<GraphEditingMode>,
     alternating_moves: bool,
     edge_creates_vertex: bool,
+    edge_start_vertex: Option<VertexIndex>,
     details: Option<Details>,
-    graph_editor: GraphEditor,
 }
 
 impl SnortWindow {
@@ -123,15 +108,17 @@ impl SnortWindow {
             editing_mode: RawOf::new(GraphEditingMode::DragVertex),
             alternating_moves: true,
             edge_creates_vertex: true,
+            edge_start_vertex: None,
             details: None,
-            graph_editor: GraphEditor::new(),
         }
     }
 
     pub fn reposition_circle(&mut self) {
         let circle = CircleEdge {
-            circle_radius: VERTEX_RADIUS * (self.game.graph.size() as f32 + 4.0) * 0.5,
-            vertex_radius: VERTEX_RADIUS,
+            circle_radius: imgui::Canvas::node_radius()
+                * (self.game.graph.size() as f32 + 4.0)
+                * 0.5,
+            vertex_radius: imgui::Canvas::node_radius(),
         };
         circle.layout(&mut self.game.graph);
     }
@@ -150,17 +137,17 @@ impl SnortWindow {
                     iterations: 1 << 14,
                     bounds: Some((
                         V2f {
-                            x: VERTEX_RADIUS,
-                            y: VERTEX_RADIUS,
+                            x: imgui::Canvas::node_radius(),
+                            y: imgui::Canvas::node_radius(),
                         },
                         V2f {
                             x: f32::max(
-                                VERTEX_RADIUS,
-                                VERTEX_RADIUS.mul_add(-2.0, graph_panel_size.x),
+                                imgui::Canvas::node_radius(),
+                                imgui::Canvas::node_radius().mul_add(-2.0, graph_panel_size.x),
                             ),
                             y: f32::max(
-                                VERTEX_RADIUS,
-                                VERTEX_RADIUS.mul_add(-2.0, graph_panel_size.y),
+                                imgui::Canvas::node_radius(),
+                                imgui::Canvas::node_radius().mul_add(-2.0, graph_panel_size.y),
                             ),
                         },
                     )),
@@ -195,7 +182,7 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
         }
     }
 
-    fn draw(&mut self, ui: &imgui::Ui, ctx: &mut GuiContext) {
+    fn draw(&mut self, ui: &Ui, ctx: &mut GuiContext) {
         let mut should_reposition = false;
         let mut is_dirty = false;
 
@@ -222,6 +209,23 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                                     .push(Box::new(TitledWindow::without_title(w)));
                             }
                         }
+                    }
+                    if let Some(_save_menu) = ui.begin_menu("Save") {
+                        // TODO: Popups for file path
+                        if ui.menu_item("as SVG") {
+                            let canvas_size = self.content.game.required_canvas::<svg::Canvas>();
+                            let mut canvas = svg::Canvas::new(canvas_size);
+                            self.content.game.draw(&mut canvas);
+                            eprintln!("{}", canvas.to_svg());
+                        };
+                        if ui.menu_item("as PNG") {
+                            let canvas_size =
+                                self.content.game.required_canvas::<tiny_skia::Canvas>();
+                            let mut canvas = tiny_skia::Canvas::new(canvas_size);
+                            self.content.game.draw(&mut canvas);
+                            let mut f = std::fs::File::create("out.png").unwrap();
+                            std::io::Write::write_all(&mut f, &canvas.to_png()).unwrap();
+                        };
                     }
                 }
 
@@ -257,118 +261,150 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                     ui.checkbox("Add vertex", &mut self.content.edge_creates_vertex);
                 }
 
-                let action = self.content.graph_editor.draw(
-                    ui,
-                    &draw_list,
-                    matches!(self.content.editing_mode.get(), GraphEditingMode::AddEdge),
-                    matches!(self.content.editing_mode.get(), GraphEditingMode::AddVertex),
-                    matches!(
-                        self.content.editing_mode.get(),
-                        GraphEditingMode::DragVertex
-                    ),
-                    self.content.edge_creates_vertex,
-                    &mut self.scratch_buffer,
-                    &mut self.content.game.graph,
-                );
-                match action {
-                    widgets::GraphEditorAction::None => {}
-                    widgets::GraphEditorAction::VertexClick(clicked_vertex) => {
-                        match self.content.editing_mode.get() {
-                            GraphEditingMode::TintVertexBlue => {
-                                *self
-                                    .content
-                                    .game
-                                    .graph
-                                    .get_vertex_mut(clicked_vertex)
-                                    .kind
-                                    .color_mut() = VertexColor::TintLeft;
-                                is_dirty = true;
-                            }
-                            GraphEditingMode::TintVertexRed => {
-                                *self
-                                    .content
-                                    .game
-                                    .graph
-                                    .get_vertex_mut(clicked_vertex)
-                                    .kind
-                                    .color_mut() = VertexColor::TintRight;
-                                is_dirty = true;
-                            }
-                            GraphEditingMode::TintVertexNone => {
-                                *self
-                                    .content
-                                    .game
-                                    .graph
-                                    .get_vertex_mut(clicked_vertex)
-                                    .kind
-                                    .color_mut() = VertexColor::Empty;
-                                is_dirty = true;
-                            }
-                            GraphEditingMode::MoveLeft => {
-                                if self
-                                    .content
-                                    .game
-                                    .available_moves_for::<{ VertexColor::TintLeft as u8 }>()
-                                    .any(|available_vertex| available_vertex == clicked_vertex)
-                                {
-                                    self.content.game =
-                                        self.content
-                                            .game
-                                            .move_in_vertex::<{ VertexColor::TintLeft as u8 }>(
-                                                clicked_vertex,
-                                            );
-                                    self.content.editing_mode =
-                                        RawOf::new(GraphEditingMode::MoveRight);
-                                    is_dirty = true;
-                                }
-                            }
-                            GraphEditingMode::MoveRight => {
-                                if self
-                                    .content
-                                    .game
-                                    .available_moves_for::<{ VertexColor::TintRight as u8 }>()
-                                    .any(|available_vertex| available_vertex == clicked_vertex)
-                                {
-                                    self.content.game =
-                                        self.content
-                                            .game
-                                            .move_in_vertex::<{ VertexColor::TintRight as u8 }>(
-                                                clicked_vertex,
-                                            );
-                                    self.content.editing_mode =
-                                        RawOf::new(GraphEditingMode::MoveLeft);
-                                    is_dirty = true;
-                                }
-                            }
-                            GraphEditingMode::DeleteVertex => {
-                                self.content.game.graph.remove_vertex(clicked_vertex);
-                                is_dirty = true;
-                            }
-                            GraphEditingMode::AddEdge
-                            | GraphEditingMode::AddVertex
-                            | GraphEditingMode::DragVertex => {}
+                let graph_area_position = V2f::from(ui.cursor_screen_pos());
+                let graph_area_size = V2f {
+                    x: ui.current_column_width(),
+                    y: unsafe { ui.style().item_spacing[1] }
+                        .mul_add(-2.0, ui.window_size()[1] - ui.cursor_pos()[1]),
+                };
+                let new_vertex_position =
+                    (matches!(self.content.editing_mode.get(), GraphEditingMode::AddVertex)
+                        && ui.invisible_button("Add vertex", graph_area_size))
+                    .then(|| V2f::from(ui.io().mouse_pos) - graph_area_position);
+                ui.set_cursor_screen_pos(graph_area_position);
+
+                let mut canvas = imgui::Canvas::new(ui, &draw_list, ctx.large_font_id);
+                self.content.game.draw(&mut canvas);
+
+                let pressed = canvas.pressed_vertex(&self.content.game.graph);
+                let clicked = canvas.clicked_vertex(&self.content.game.graph);
+                match self.content.editing_mode.get() {
+                    GraphEditingMode::DragVertex => {
+                        if let Some(pressed) = pressed {
+                            let delta = V2f::from(ui.io().mouse_delta);
+                            let current_pos: &mut V2f = self
+                                .content
+                                .game
+                                .graph
+                                .get_vertex_mut(pressed)
+                                .get_inner_mut();
+                            *current_pos += delta;
                         }
                     }
-                    widgets::GraphEditorAction::NewVertex(position, connection) => {
-                        match self.content.editing_mode.get() {
-                            GraphEditingMode::AddEdge | GraphEditingMode::AddVertex => {
-                                let kind = VertexKind::Single(VertexColor::Empty);
-                                self.content
-                                    .game
-                                    .graph
-                                    .add_vertex(PositionedVertex { kind, position });
-                                if let Some(from) = connection {
-                                    self.content.game.graph.connect(
-                                        from,
-                                        VertexIndex {
-                                            index: self.content.game.graph.size() - 1,
-                                        },
-                                        true,
-                                    );
-                                }
+                    GraphEditingMode::TintVertexBlue => {
+                        if let Some(clicked) = clicked {
+                            let clicked_vertex: &mut VertexKind = self
+                                .content
+                                .game
+                                .graph
+                                .get_vertex_mut(clicked)
+                                .get_inner_mut();
+                            *clicked_vertex.color_mut() = VertexColor::TintLeft;
+                        }
+                    }
+                    GraphEditingMode::TintVertexRed => {
+                        if let Some(clicked) = clicked {
+                            let clicked_vertex: &mut VertexKind = self
+                                .content
+                                .game
+                                .graph
+                                .get_vertex_mut(clicked)
+                                .get_inner_mut();
+                            *clicked_vertex.color_mut() = VertexColor::TintRight;
+                        }
+                    }
+                    GraphEditingMode::TintVertexNone => {
+                        if let Some(clicked) = clicked {
+                            let clicked_vertex: &mut VertexKind = self
+                                .content
+                                .game
+                                .graph
+                                .get_vertex_mut(clicked)
+                                .get_inner_mut();
+                            *clicked_vertex.color_mut() = VertexColor::Empty;
+                        }
+                    }
+                    GraphEditingMode::MoveLeft => {
+                        if let Some(clicked) = clicked {
+                            if self
+                                .content
+                                .game
+                                .available_moves_for::<{ VertexColor::TintLeft as u8 }>()
+                                .any(|available_vertex| available_vertex == clicked)
+                            {
+                                self.content.game =
+                                    self.content
+                                        .game
+                                        .move_in_vertex::<{ VertexColor::TintLeft as u8 }>(clicked);
+                                self.content.editing_mode = RawOf::new(GraphEditingMode::MoveRight);
                                 is_dirty = true;
                             }
-                            _ => {}
+                        }
+                    }
+                    GraphEditingMode::MoveRight => {
+                        if let Some(clicked) = clicked {
+                            if self
+                                .content
+                                .game
+                                .available_moves_for::<{ VertexColor::TintRight as u8 }>()
+                                .any(|available_vertex| available_vertex == clicked)
+                            {
+                                self.content.game =
+                                    self.content
+                                        .game
+                                        .move_in_vertex::<{ VertexColor::TintRight as u8 }>(
+                                            clicked,
+                                        );
+                                self.content.editing_mode = RawOf::new(GraphEditingMode::MoveLeft);
+                                is_dirty = true;
+                            }
+                        }
+                    }
+                    GraphEditingMode::AddVertex => {
+                        if let Some(new_vertex_position) = new_vertex_position {
+                            self.content.game.graph.add_vertex(PositionedVertex {
+                                kind: VertexKind::Single(VertexColor::Empty),
+                                position: new_vertex_position,
+                            });
+                            is_dirty = true;
+                        }
+                    }
+                    GraphEditingMode::DeleteVertex => {
+                        if let Some(clicked) = clicked {
+                            self.content.game.graph.remove_vertex(clicked);
+                            is_dirty = true;
+                        }
+                    }
+                    GraphEditingMode::AddEdge => {
+                        let mouse_position = V2f::from(ui.io().mouse_pos) - graph_area_position;
+                        if let Some(pressed) = pressed {
+                            self.content.edge_start_vertex = Some(pressed);
+                            let pressed_position: V2f =
+                                self.content.game.graph.get_vertex_mut(pressed).position;
+                            canvas.line(
+                                pressed_position,
+                                mouse_position,
+                                imgui::Canvas::thin_line_weight(),
+                                Color::BLACK,
+                            );
+                        } else if let Some(start) = self.content.edge_start_vertex.take() {
+                            if let Some(end) =
+                                canvas.vertex_at_position(mouse_position, &self.content.game.graph)
+                            {
+                                self.content.game.graph.connect(
+                                    start,
+                                    end,
+                                    !self.content.game.graph.are_adjacent(start, end),
+                                );
+                                is_dirty = true;
+                            } else if self.content.edge_creates_vertex {
+                                let end = self.content.game.graph.add_vertex(PositionedVertex {
+                                    kind: VertexKind::Single(VertexColor::Empty),
+                                    position: mouse_position,
+                                });
+                                self.content.game.graph.connect(start, end, true);
+                                is_dirty = true;
+                            }
                         }
                     }
                 }
@@ -393,11 +429,10 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                         }),
                     );
                 }
-            });
 
-        if should_reposition {
-            self.content
-                .reposition(self.content.graph_editor.graph_panel_size);
-        }
+                if should_reposition {
+                    self.content.reposition(graph_area_size);
+                }
+            });
     }
 }

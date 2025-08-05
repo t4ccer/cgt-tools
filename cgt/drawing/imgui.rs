@@ -1,6 +1,8 @@
 use crate::{
     drawing::{self, Color},
+    graph::{Graph, VertexIndex},
     grid::FiniteGrid,
+    has::Has,
     numeric::v2f::V2f,
 };
 use imgui::{DrawListMut, FontId};
@@ -12,7 +14,8 @@ pub struct Canvas<'ui> {
     ui: &'ui imgui::Ui,
     draw_list: &'ui DrawListMut<'ui>,
     large_font_id: FontId,
-    clicked_tile: Option<V2f>,
+    clicked_position: Option<V2f>,
+    pressed_position: Option<V2f>,
 }
 
 impl<'ui> Canvas<'ui> {
@@ -26,7 +29,8 @@ impl<'ui> Canvas<'ui> {
             ui,
             draw_list,
             large_font_id,
-            clicked_tile: None,
+            clicked_position: None,
+            pressed_position: None,
         }
     }
 
@@ -34,8 +38,51 @@ impl<'ui> Canvas<'ui> {
     where
         G: FiniteGrid,
     {
-        self.clicked_tile
+        self.clicked_position
             .and_then(|clicked_pos| grid.tile_at_position::<Canvas>(clicked_pos))
+    }
+
+    pub fn clicked_vertex<G, V>(&self, graph: &G) -> Option<VertexIndex>
+    where
+        V: Has<V2f>,
+        G: Graph<V>,
+    {
+        self.clicked_position
+            .and_then(|clicked_pos| self.vertex_at_position(clicked_pos, graph))
+    }
+
+    pub fn pressed_vertex<G, V>(&self, graph: &G) -> Option<VertexIndex>
+    where
+        V: Has<V2f>,
+        G: Graph<V>,
+    {
+        self.pressed_position
+            .and_then(|clicked_pos| self.vertex_at_position(clicked_pos, graph))
+    }
+
+    // TODO: Move to graph
+    pub fn vertex_at_position<G, V>(&self, position: V2f, graph: &G) -> Option<VertexIndex>
+    where
+        V: Has<V2f>,
+        G: Graph<V>,
+    {
+        for vertex_idx in graph.vertex_indices() {
+            let vertex_position: V2f = *graph.get_vertex(vertex_idx).get_inner();
+            if position.inside_circle(vertex_position, <Canvas as drawing::Canvas>::node_radius()) {
+                return Some(vertex_idx);
+            }
+        }
+        None
+    }
+
+    fn faded(&self, color: Color) -> Color {
+        if self.ui.is_item_active() {
+            color.faded(155)
+        } else if self.ui.is_item_hovered() {
+            color.faded(200)
+        } else {
+            color
+        }
     }
 }
 
@@ -88,33 +135,23 @@ impl drawing::Canvas for Canvas<'_> {
         self.ui
             .set_cursor_screen_pos(self.start_position + position);
         if self.ui.invisible_button("", Self::tile_size()) {
-            self.clicked_tile = Some(position);
+            self.clicked_position = Some(position);
         }
-
-        let faded = |color: Color| {
-            if self.ui.is_item_active() {
-                color.faded(155)
-            } else if self.ui.is_item_hovered() {
-                color.faded(200)
-            } else {
-                color
-            }
-        };
 
         let tile_size = Self::tile_size();
         match tile {
             drawing::Tile::Square { color } => {
-                self.rect(position, tile_size, faded(color));
+                self.rect(position, tile_size, self.faded(color));
             }
             drawing::Tile::Circle {
                 tile_color,
                 circle_color,
             } => {
-                self.rect(position, tile_size, faded(tile_color));
+                self.rect(position, tile_size, self.faded(tile_color));
                 self.circle(
                     position + tile_size * 0.5,
                     tile_size.x * 0.4,
-                    faded(circle_color),
+                    self.faded(circle_color),
                 );
             }
             drawing::Tile::Char {
@@ -122,8 +159,8 @@ impl drawing::Canvas for Canvas<'_> {
                 text_color,
                 letter,
             } => {
-                self.rect(position, tile_size, faded(tile_color));
-                self.large_char(letter, position, faded(text_color));
+                self.rect(position, tile_size, self.faded(tile_color));
+                self.large_char(letter, position, self.faded(text_color));
             }
         }
     }
@@ -135,7 +172,7 @@ impl drawing::Canvas for Canvas<'_> {
                 self.start_position + position + Self::tile_size(),
                 color,
             )
-            .thickness(Self::default_line_weight() * 2.0)
+            .thickness(Self::thick_line_weight() * 2.0)
             .filled(false)
             .build();
     }
@@ -144,7 +181,37 @@ impl drawing::Canvas for Canvas<'_> {
         V2f { x: 64.0, y: 64.0 }
     }
 
-    fn default_line_weight() -> f32 {
+    fn thick_line_weight() -> f32 {
         2.0
+    }
+
+    fn vertex(&mut self, position: V2f, color: Color, idx: VertexIndex) {
+        let radius = Self::node_radius();
+
+        let _tile_id = self.ui.push_id_usize(idx.index);
+
+        self.ui.set_cursor_screen_pos(
+            self.start_position + position
+                - V2f {
+                    x: radius,
+                    y: radius,
+                },
+        );
+        if self.ui.invisible_button(
+            "",
+            V2f {
+                x: radius * 2.0,
+                y: radius * 2.0,
+            },
+        ) {
+            self.clicked_position = Some(position);
+        }
+
+        if self.ui.is_item_active() {
+            self.pressed_position = Some(position);
+        }
+
+        self.circle(position, radius, Color::BLACK);
+        self.circle(position, radius - 1.0, self.faded(color));
     }
 }

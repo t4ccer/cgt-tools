@@ -2,16 +2,22 @@
 
 // TODO: Remove unwraps
 
-use crate::{drawing::Color, numeric::v2f::V2f};
+use crate::{
+    drawing::{BoundingBox, Color},
+    numeric::v2f::V2f,
+};
 use tiny_skia;
 
 pub struct Canvas {
+    offset: V2f,
     pixmap: tiny_skia::Pixmap,
 }
 
 impl Canvas {
-    pub fn new(size: V2f) -> Canvas {
+    pub fn new(viewport: BoundingBox) -> Canvas {
+        let size = viewport.size();
         Canvas {
+            offset: -viewport.top_left,
             pixmap: tiny_skia::Pixmap::new(size.x as u32, size.y as u32).unwrap(),
         }
     }
@@ -23,6 +29,7 @@ impl Canvas {
 
 impl super::Canvas for Canvas {
     fn rect(&mut self, position: V2f, size: V2f, color: Color) {
+        let position = self.offset + position;
         self.pixmap.fill_rect(
             tiny_skia::Rect::from_xywh(position.x, position.y, size.x, size.y).unwrap(),
             &paint_solid_color(color),
@@ -32,6 +39,7 @@ impl super::Canvas for Canvas {
     }
 
     fn circle(&mut self, position: V2f, radius: f32, color: Color) {
+        let position = self.offset + position;
         let path = tiny_skia::PathBuilder::from_circle(position.x, position.y, radius).unwrap();
         self.pixmap.fill_path(
             &path,
@@ -43,6 +51,9 @@ impl super::Canvas for Canvas {
     }
 
     fn line(&mut self, start: V2f, end: V2f, weight: f32, color: Color) {
+        let start = self.offset + start;
+        let end = self.offset + end;
+
         // TODO: with_capacity
         let mut path = tiny_skia::PathBuilder::new();
         path.move_to(start.x, start.y);
@@ -71,7 +82,7 @@ impl super::Canvas for Canvas {
         V2f { x: 64.0, y: 64.0 }
     }
 
-    fn default_line_weight() -> f32 {
+    fn thick_line_weight() -> f32 {
         2.0
     }
 }

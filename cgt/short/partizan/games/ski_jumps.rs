@@ -10,9 +10,8 @@
 //! a slipper that cannot jump anymore.
 
 use crate::{
-    drawing::{self, Canvas, Color, Draw},
+    drawing::{self, BoundingBox, Canvas, Color, Draw},
     grid::{vec_grid::VecGrid, FiniteGrid, Grid},
-    numeric::v2f::V2f,
     short::partizan::{canonical_form::CanonicalForm, partizan_game::PartizanGame},
 };
 use cgt_derive::Tile;
@@ -294,7 +293,7 @@ where
         });
     }
 
-    fn canvas_size<C>(&self) -> V2f
+    fn required_canvas<C>(&self) -> BoundingBox
     where
         C: Canvas,
     {

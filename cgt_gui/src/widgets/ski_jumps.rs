@@ -171,10 +171,15 @@ impl IsCgtWindow for TitledWindow<SkiJumpsWindow> {
 
                 if matches!(editing_mode, GridEditingMode::MoveLeft) {
                     ui.set_cursor_pos([
-                        grid_start_pos.x
-                            + imgui::Canvas::tile_position(self.content.game.grid().width() + 1, 0)
-                                .x
-                            - (1.0 - OFF_BUTTON_SCALE) * imgui::Canvas::tile_size().x,
+                        (1.0 - OFF_BUTTON_SCALE).mul_add(
+                            -imgui::Canvas::tile_size().x,
+                            grid_start_pos.x
+                                + imgui::Canvas::tile_position(
+                                    self.content.game.grid().width() + 1,
+                                    0,
+                                )
+                                .x,
+                        ),
                         grid_start_pos.y,
                     ]);
                     off_buttons!(">", width);

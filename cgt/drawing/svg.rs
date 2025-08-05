@@ -1,6 +1,9 @@
 //! Canvas that can draw to SVG
 
-use crate::{drawing::Color, numeric::v2f::V2f};
+use crate::{
+    drawing::{BoundingBox, Color},
+    numeric::v2f::V2f,
+};
 use core::fmt::Write;
 use std::{fmt::Display, marker::PhantomData, mem::ManuallyDrop};
 
@@ -114,9 +117,15 @@ pub struct Canvas {
 }
 
 impl Canvas {
-    pub fn new(size: V2f) -> Self {
+    pub fn new(viewport: BoundingBox) -> Self {
         Self {
-            buffer: format!("<svg width=\"{}\" height=\"{}\">", size.x, size.y),
+            buffer: format!(
+                "<svg viewBox=\"{} {} {} {}\">",
+                viewport.top_left.x,
+                viewport.top_left.y,
+                viewport.bottom_right.x - viewport.top_left.x,
+                viewport.bottom_right.y - viewport.top_left.y
+            ),
         }
     }
 
@@ -199,7 +208,7 @@ impl crate::drawing::Canvas for Canvas {
         V2f { x: 64.0, y: 64.0 }
     }
 
-    fn default_line_weight() -> f32 {
+    fn thick_line_weight() -> f32 {
         2.0
     }
 }

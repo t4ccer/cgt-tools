@@ -1,9 +1,8 @@
 //! Konane
 
 use crate::{
-    drawing::{self, Canvas, Color, Draw},
+    drawing::{self, BoundingBox, Canvas, Color, Draw},
     grid::{vec_grid::VecGrid, FiniteGrid, Grid},
-    numeric::v2f::V2f,
     short::partizan::partizan_game::PartizanGame,
 };
 use cgt_derive::Tile;
@@ -84,10 +83,10 @@ where
             Tile::Blocked => drawing::Tile::Square {
                 color: Color::DARK_GRAY,
             },
-        })
+        });
     }
 
-    fn canvas_size<C>(&self) -> V2f
+    fn required_canvas<C>(&self) -> BoundingBox
     where
         C: Canvas,
     {

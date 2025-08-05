@@ -2,7 +2,7 @@
 
 //! Drawing module
 
-use crate::numeric::v2f::V2f;
+use crate::{graph::VertexIndex, numeric::v2f::V2f};
 
 pub mod svg;
 
@@ -99,10 +99,12 @@ pub enum Tile {
 
 /// Anything that can be used for drawing
 pub trait Canvas {
-    // TODO: Tile should allow for circles
     fn rect(&mut self, position: V2f, size: V2f, color: Color);
+
     fn circle(&mut self, position: V2f, radius: f32, color: Color);
+
     fn line(&mut self, start: V2f, end: V2f, weight: f32, color: Color);
+
     fn large_char(&mut self, letter: char, position: V2f, color: Color);
 
     fn tile(&mut self, position: V2f, tile: Tile) {
@@ -131,7 +133,7 @@ pub trait Canvas {
 
     fn highlight_tile(&mut self, position: V2f, color: Color) {
         let tile_size = Self::tile_size();
-        let weight = Self::default_line_weight() * 2.0;
+        let weight = Self::thick_line_weight() * 2.0;
 
         self.line(
             position,
@@ -177,7 +179,7 @@ pub trait Canvas {
 
     fn grid(&mut self, position: V2f, columns: u32, rows: u32) {
         let cell_size = Self::tile_size();
-        let grid_weight = Self::default_line_weight();
+        let grid_weight = Self::thick_line_weight();
 
         for row in 0..=rows {
             let line_start = V2f {
@@ -200,7 +202,7 @@ pub trait Canvas {
             self.line(
                 line_start,
                 line_end,
-                Self::default_line_weight(),
+                Self::thick_line_weight(),
                 Color::BLACK,
             );
         }
@@ -226,21 +228,50 @@ pub trait Canvas {
             self.line(
                 line_start,
                 line_end,
-                Self::default_line_weight(),
+                Self::thick_line_weight(),
                 Color::BLACK,
             );
         }
     }
 
+    fn vertex(&mut self, position: V2f, color: Color, _idx: VertexIndex) {
+        let radius = Self::node_radius();
+        self.circle(position, radius, Color::BLACK);
+        self.circle(position, radius - 1.0, color);
+    }
+
     fn tile_size() -> V2f;
-    fn default_line_weight() -> f32;
+
+    fn node_radius() -> f32 {
+        // FIXME: Remove default
+        Self::tile_size().x * 0.25
+    }
+
+    fn thick_line_weight() -> f32;
+
+    fn thin_line_weight() -> f32 {
+        Self::thick_line_weight() * 0.5
+    }
+
     fn tile_position(x: u8, y: u8) -> V2f {
         let tile_size = Self::tile_size();
-        let grid_weight = Self::default_line_weight();
+        let grid_weight = Self::thick_line_weight();
         V2f {
             x: (x as f32).mul_add(tile_size.x, (x + 1) as f32 * grid_weight),
             y: (y as f32).mul_add(tile_size.y, (y + 1) as f32 * grid_weight),
         }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+pub struct BoundingBox {
+    pub top_left: V2f,
+    pub bottom_right: V2f,
+}
+
+impl BoundingBox {
+    pub fn size(self) -> V2f {
+        self.bottom_right - self.top_left
     }
 }
 
@@ -251,7 +282,7 @@ pub trait Draw {
         C: Canvas;
 
     /// Minimum required canvas size to paint the whole position
-    fn canvas_size<C>(&self) -> V2f
+    fn required_canvas<C>(&self) -> BoundingBox
     where
         C: Canvas;
 }
