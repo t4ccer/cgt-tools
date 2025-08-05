@@ -1,6 +1,5 @@
 use cgt::{
     graph::{Graph, VertexIndex},
-    grid::{FiniteGrid, Grid},
     has::Has,
     numeric::{rational::Rational, v2f::V2f},
     short::partizan::{thermograph::Thermograph, trajectory::Trajectory},
@@ -318,59 +317,6 @@ pub fn grid_size_selector(ui: &imgui::Ui, new_width: &mut u8, new_height: &mut u
     ui.input_scalar("Width", new_width).step(1).build();
     ui.input_scalar("Height", new_height).step(1).build();
     short_inputs.end();
-}
-
-#[must_use]
-pub enum GridEditorAction {
-    None,
-    Clicked { x: u8, y: u8 },
-}
-
-pub fn grid<'ui, G>(
-    ui: &'ui imgui::Ui,
-    draw_list: &'ui DrawListMut<'ui>,
-    grid: &G,
-    draw_tile: impl Fn(V2f, (u8, u8), G::Item, &'ui DrawListMut<'ui>),
-) -> GridEditorAction
-where
-    G: Grid + FiniteGrid,
-{
-    let mut action = GridEditorAction::None;
-
-    let width = grid.width();
-    let height = grid.height();
-
-    let [grid_start_pos_x, grid_start_pos_y] = ui.cursor_pos();
-
-    for grid_y in 0..height {
-        let _y_id = ui.push_id_usize(grid_y as usize);
-
-        for grid_x in 0..width {
-            let _x_id = ui.push_id_usize(grid_x as usize);
-
-            ui.set_cursor_pos([
-                (TILE_SIZE + TILE_SPACING).mul_add(grid_x as f32, grid_start_pos_x),
-                (TILE_SIZE + TILE_SPACING).mul_add(grid_y as f32, grid_start_pos_y),
-            ]);
-
-            let pos = V2f::from(ui.cursor_screen_pos());
-            if ui.invisible_button("", [TILE_SIZE, TILE_SIZE]) {
-                action = GridEditorAction::Clicked {
-                    x: grid_x,
-                    y: grid_y,
-                };
-            }
-
-            draw_tile(pos, (grid_x, grid_y), grid.get(grid_x, grid_y), draw_list);
-        }
-    }
-
-    ui.set_cursor_pos([
-        grid_start_pos_x,
-        (TILE_SIZE + TILE_SPACING).mul_add(height as f32, grid_start_pos_y),
-    ]);
-
-    action
 }
 
 macro_rules! game_details {

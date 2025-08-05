@@ -1,7 +1,9 @@
 //! Konane
 
 use crate::{
+    drawing::{self, Canvas, Color, Draw},
     grid::{vec_grid::VecGrid, FiniteGrid, Grid},
+    numeric::v2f::V2f,
     short::partizan::partizan_game::PartizanGame,
 };
 use cgt_derive::Tile;
@@ -56,6 +58,40 @@ where
     #[inline]
     pub fn grid_mut(&mut self) -> &mut G {
         &mut self.grid
+    }
+}
+
+impl<G> Draw for Konane<G>
+where
+    G: Grid<Item = Tile> + FiniteGrid,
+{
+    fn draw<C>(&self, canvas: &mut C)
+    where
+        C: Canvas,
+    {
+        self.grid.draw(canvas, |tile| match tile {
+            Tile::Empty => drawing::Tile::Square {
+                color: Color::LIGHT_GRAY,
+            },
+            Tile::Left => drawing::Tile::Circle {
+                tile_color: Color::LIGHT_GRAY,
+                circle_color: Color::BLUE,
+            },
+            Tile::Right => drawing::Tile::Circle {
+                tile_color: Color::LIGHT_GRAY,
+                circle_color: Color::RED,
+            },
+            Tile::Blocked => drawing::Tile::Square {
+                color: Color::DARK_GRAY,
+            },
+        })
+    }
+
+    fn canvas_size<C>(&self) -> V2f
+    where
+        C: Canvas,
+    {
+        self.grid().canvas_size::<C>()
     }
 }
 

@@ -1,22 +1,18 @@
+use crate::{
+    imgui_enum, impl_game_window, impl_titled_window,
+    widgets::{self, canonical_form::CanonicalFormWindow},
+    Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow,
+};
+use ::imgui::{ComboBoxFlags, Condition, Ui};
 use cgt::{
+    drawing::{imgui, Canvas, Color, Draw},
     grid::{vec_grid::VecGrid, FiniteGrid, Grid},
-    numeric::v2f::V2f,
     short::partizan::{
         games::konane::{Konane, Tile},
         partizan_game::PartizanGame,
     },
 };
-use imgui::{ComboBoxFlags, Condition};
 use std::str::FromStr;
-
-use crate::{
-    imgui_enum, impl_game_window, impl_titled_window,
-    widgets::{
-        self, canonical_form::CanonicalFormWindow, interactive_color, GridEditorAction, COLOR_BLUE,
-        COLOR_RED, TILE_COLOR_EMPTY, TILE_COLOR_FILLED, TILE_SIZE,
-    },
-    Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow,
-};
 
 imgui_enum! {
     GridEditingMode {
@@ -60,7 +56,7 @@ impl IsCgtWindow for TitledWindow<KonaneWindow> {
     impl_titled_window!("Konane");
     impl_game_window!("Konane", EvalKonane, KonaneDetails);
 
-    fn draw(&mut self, ui: &imgui::Ui, ctx: &mut GuiContext) {
+    fn draw(&mut self, ui: &Ui, ctx: &mut GuiContext) {
         let width = self.content.game.grid().width();
         let height = self.content.game.grid().height();
 
@@ -117,199 +113,111 @@ impl IsCgtWindow for TitledWindow<KonaneWindow> {
 
                 widgets::grid_size_selector(ui, &mut new_width, &mut new_height);
                 ui.spacing();
-                let action = widgets::grid(
-                    ui,
-                    &draw_list,
-                    self.content.game.grid(),
-                    |screen_pos, (x, y), tile, draw_list| {
-                        draw_list
-                            .add_rect(
-                                screen_pos,
-                                screen_pos
-                                    + V2f {
-                                        x: TILE_SIZE,
-                                        y: TILE_SIZE,
-                                    },
-                                interactive_color(TILE_COLOR_EMPTY, ui),
-                            )
-                            .filled(true)
-                            .build();
 
-                        if matches!(self.content.pending_move,
-                                    PendingMove::PieceSelected { piece } if
-                                    piece == (x, y))
-                        {
-                            match self.content.editing_mode.get() {
-                                GridEditingMode::MoveLeft => {
-                                    draw_list
-                                        .add_rect(
-                                            screen_pos,
-                                            screen_pos
-                                                + V2f {
-                                                    x: TILE_SIZE,
-                                                    y: TILE_SIZE,
-                                                },
-                                            COLOR_BLUE,
-                                        )
-                                        .thickness(4.0)
-                                        .filled(false)
-                                        .build();
-                                }
-                                GridEditingMode::MoveRight => {
-                                    draw_list
-                                        .add_rect(
-                                            screen_pos,
-                                            screen_pos
-                                                + V2f {
-                                                    x: TILE_SIZE,
-                                                    y: TILE_SIZE,
-                                                },
-                                            COLOR_RED,
-                                        )
-                                        .thickness(4.0)
-                                        .filled(false)
-                                        .build();
-                                }
-                                _ => {}
+                let mut canvas = imgui::Canvas::new(ui, &draw_list, ctx.large_font_id);
+                self.content.game.draw(&mut canvas);
+                if let Some((x, y)) = canvas.clicked_tile(self.content.game.grid()) {
+                    macro_rules! place_tile {
+                        ($tile:ident) => {
+                            if self.content.game.grid().get(x, y) != Tile::$tile {
+                                self.content.game.grid_mut().set(x, y, Tile::$tile);
+                                is_dirty = true;
                             }
-                        }
+                        };
+                    }
 
-                        if let Some(stone_color) = match tile {
-                            Tile::Empty => None,
-                            Tile::Left => Some(COLOR_BLUE),
-                            Tile::Right => Some(COLOR_RED),
-                            Tile::Blocked => Some(TILE_COLOR_FILLED),
-                        } {
-                            draw_list
-                                .add_circle(
-                                    screen_pos
-                                        + V2f {
-                                            x: TILE_SIZE * 0.5,
-                                            y: TILE_SIZE * 0.5,
-                                        },
-                                    TILE_SIZE * 0.4,
-                                    interactive_color(stone_color, ui),
-                                )
-                                .filled(true)
-                                .build();
-                        }
-                    },
-                );
-
-                match action {
-                    GridEditorAction::None => {}
-                    GridEditorAction::Clicked { x, y } => {
-                        macro_rules! place_tile {
-                            ($tile:ident) => {
-                                if self.content.game.grid().get(x, y) != Tile::$tile {
-                                    self.content.game.grid_mut().set(x, y, Tile::$tile);
-                                    is_dirty = true;
-                                }
-                            };
-                        }
-
-                        macro_rules! make_move {
-                            ($own_tile:ident, $other_mode:ident) => {
-                                match self.content.pending_move {
-                                    PendingMove::None => {
-                                        if matches!(
-                                            self.content.game.grid().get(x, y),
-                                            Tile::$own_tile
-                                        ) {
-                                            self.content.pending_move =
-                                                PendingMove::PieceSelected { piece: (x, y) };
-                                        }
-                                    }
-                                    PendingMove::PieceSelected { piece } => {
-                                        let target = (x, y);
-                                        let mut new_game = self.content.game.clone();
-
-                                        if target.0 == piece.0 {
-                                            if target.1 < piece.1 {
-                                                for y in target.1..piece.1 {
-                                                    new_game.grid_mut().set(
-                                                        piece.0,
-                                                        y,
-                                                        Tile::Empty,
-                                                    );
-                                                }
-                                            } else {
-                                                for y in piece.1..target.1 {
-                                                    new_game.grid_mut().set(
-                                                        piece.0,
-                                                        y,
-                                                        Tile::Empty,
-                                                    );
-                                                }
-                                            }
-                                        } else if target.1 == piece.1 {
-                                            if target.0 < piece.0 {
-                                                for x in target.0..piece.0 {
-                                                    new_game.grid_mut().set(
-                                                        x,
-                                                        piece.1,
-                                                        Tile::Empty,
-                                                    );
-                                                }
-                                            } else {
-                                                for x in piece.0..target.0 {
-                                                    new_game.grid_mut().set(
-                                                        x,
-                                                        piece.1,
-                                                        Tile::Empty,
-                                                    );
-                                                }
-                                            }
-                                        }
-
-                                        new_game.grid_mut().set(piece.0, piece.1, Tile::Empty);
-                                        new_game.grid_mut().set(
-                                            target.0,
-                                            target.1,
-                                            Tile::$own_tile,
-                                        );
-                                        self.content.pending_move = PendingMove::None;
-
-                                        match Tile::$own_tile {
-                                            Tile::Left => {
-                                                let moves = self.content.game.left_moves();
-                                                if moves.contains(&new_game) {
-                                                    self.content.game = new_game;
-                                                    if self.content.alternating_moves {
-                                                        self.content.editing_mode = RawOf::new(
-                                                            GridEditingMode::$other_mode,
-                                                        );
-                                                    }
-                                                    is_dirty = true;
-                                                }
-                                            }
-                                            Tile::Right => {
-                                                let moves = self.content.game.right_moves();
-                                                if moves.contains(&new_game) {
-                                                    self.content.game = new_game;
-                                                    if self.content.alternating_moves {
-                                                        self.content.editing_mode = RawOf::new(
-                                                            GridEditingMode::$other_mode,
-                                                        );
-                                                    }
-                                                    is_dirty = true;
-                                                }
-                                            }
-                                            _ => {}
-                                        }
+                    macro_rules! make_move {
+                        ($own_tile:ident, $other_mode:ident) => {
+                            match self.content.pending_move {
+                                PendingMove::None => {
+                                    if matches!(self.content.game.grid().get(x, y), Tile::$own_tile)
+                                    {
+                                        self.content.pending_move =
+                                            PendingMove::PieceSelected { piece: (x, y) };
                                     }
                                 }
-                            };
-                        }
+                                PendingMove::PieceSelected { piece } => {
+                                    let target = (x, y);
+                                    let mut new_game = self.content.game.clone();
 
-                        match self.content.editing_mode.get() {
-                            GridEditingMode::AddBlocked => place_tile!(Blocked),
-                            GridEditingMode::AddBlue => place_tile!(Left),
-                            GridEditingMode::AddRed => place_tile!(Right),
-                            GridEditingMode::ClearTile => place_tile!(Empty),
-                            GridEditingMode::MoveLeft => make_move!(Left, MoveRight),
-                            GridEditingMode::MoveRight => make_move!(Right, MoveLeft),
-                        }
+                                    if target.0 == piece.0 {
+                                        if target.1 < piece.1 {
+                                            for y in target.1..piece.1 {
+                                                new_game.grid_mut().set(piece.0, y, Tile::Empty);
+                                            }
+                                        } else {
+                                            for y in piece.1..target.1 {
+                                                new_game.grid_mut().set(piece.0, y, Tile::Empty);
+                                            }
+                                        }
+                                    } else if target.1 == piece.1 {
+                                        if target.0 < piece.0 {
+                                            for x in target.0..piece.0 {
+                                                new_game.grid_mut().set(x, piece.1, Tile::Empty);
+                                            }
+                                        } else {
+                                            for x in piece.0..target.0 {
+                                                new_game.grid_mut().set(x, piece.1, Tile::Empty);
+                                            }
+                                        }
+                                    }
+
+                                    new_game.grid_mut().set(piece.0, piece.1, Tile::Empty);
+                                    new_game.grid_mut().set(target.0, target.1, Tile::$own_tile);
+                                    self.content.pending_move = PendingMove::None;
+
+                                    match Tile::$own_tile {
+                                        Tile::Left => {
+                                            let moves = self.content.game.left_moves();
+                                            if moves.contains(&new_game) {
+                                                self.content.game = new_game;
+                                                if self.content.alternating_moves {
+                                                    self.content.editing_mode =
+                                                        RawOf::new(GridEditingMode::$other_mode);
+                                                }
+                                                is_dirty = true;
+                                            }
+                                        }
+                                        Tile::Right => {
+                                            let moves = self.content.game.right_moves();
+                                            if moves.contains(&new_game) {
+                                                self.content.game = new_game;
+                                                if self.content.alternating_moves {
+                                                    self.content.editing_mode =
+                                                        RawOf::new(GridEditingMode::$other_mode);
+                                                }
+                                                is_dirty = true;
+                                            }
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                            }
+                        };
+                    }
+
+                    match self.content.editing_mode.get() {
+                        GridEditingMode::AddBlocked => place_tile!(Blocked),
+                        GridEditingMode::AddBlue => place_tile!(Left),
+                        GridEditingMode::AddRed => place_tile!(Right),
+                        GridEditingMode::ClearTile => place_tile!(Empty),
+                        GridEditingMode::MoveLeft => make_move!(Left, MoveRight),
+                        GridEditingMode::MoveRight => make_move!(Right, MoveLeft),
+                    }
+                }
+
+                match self.content.pending_move {
+                    PendingMove::None => {}
+                    PendingMove::PieceSelected { piece } => {
+                        canvas.highlight_tile(
+                            imgui::Canvas::tile_position(piece.0, piece.1),
+                            if matches!(self.content.editing_mode.get(), GridEditingMode::MoveLeft)
+                            {
+                                Color::BLUE
+                            } else {
+                                Color::RED
+                            },
+                        );
                     }
                 }
 
