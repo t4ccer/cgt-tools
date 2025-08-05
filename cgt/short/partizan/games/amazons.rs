@@ -1,8 +1,9 @@
 //! Amazons game
 
 use crate::{
-    drawing::{self, Canvas, Color},
+    drawing::{self, Canvas, Color, Draw},
     grid::{decompositions, move_top_left, vec_grid::VecGrid, FiniteGrid, Grid},
+    numeric::v2f::V2f,
     short::partizan::partizan_game::PartizanGame,
 };
 use cgt_derive::Tile;
@@ -154,9 +155,13 @@ where
 
         moves
     }
+}
 
-    /// Paint grid on existing canvas
-    pub fn draw<C>(&self, canvas: &mut C)
+impl<G> Draw for Amazons<G>
+where
+    G: Grid<Item = Tile> + FiniteGrid,
+{
+    fn draw<C>(&self, canvas: &mut C)
     where
         C: Canvas,
     {
@@ -177,6 +182,13 @@ where
                 circle_color: Color::RED,
             },
         });
+    }
+
+    fn canvas_size<C>(&self) -> V2f
+    where
+        C: Canvas,
+    {
+        self.grid().canvas_size::<C>()
     }
 }
 

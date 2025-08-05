@@ -1,6 +1,6 @@
 use ::imgui::{ComboBoxFlags, Condition, Ui};
 use cgt::{
-    drawing::imgui,
+    drawing::{imgui, Draw},
     grid::{vec_grid::VecGrid, FiniteGrid, Grid},
     short::partizan::games::fission::{Fission, Tile},
 };
@@ -98,7 +98,7 @@ impl IsCgtWindow for TitledWindow<FissionWindow> {
 
                 widgets::grid_size_selector(ui, &mut new_width, &mut new_height);
                 ui.spacing();
-                let mut canvas = imgui::Canvas::new(ui, &draw_list);
+                let mut canvas = imgui::Canvas::new(ui, &draw_list, ctx.large_font_id);
                 self.content.game.draw(&mut canvas);
                 if let Some((x, y)) = canvas.clicked_tile(self.content.game.grid()) {
                     macro_rules! place_tile {

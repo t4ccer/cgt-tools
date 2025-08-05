@@ -6,8 +6,9 @@
 //! Similarly Right playes on sqares to the left and right instead.
 
 use crate::{
-    drawing::{self, Canvas, Color},
+    drawing::{self, Canvas, Color, Draw},
     grid::{vec_grid::VecGrid, FiniteGrid, Grid},
+    numeric::v2f::V2f,
     short::partizan::partizan_game::PartizanGame,
 };
 use cgt_derive::Tile;
@@ -185,9 +186,13 @@ where
 
         moves
     }
+}
 
-    /// Paint grid on existing canvas
-    pub fn draw<C>(&self, canvas: &mut C)
+impl<G> Draw for Fission<G>
+where
+    G: Grid<Item = Tile> + FiniteGrid,
+{
+    fn draw<C>(&self, canvas: &mut C)
     where
         C: Canvas,
     {
@@ -203,6 +208,13 @@ where
                 color: Color::DARK_GRAY,
             },
         });
+    }
+
+    fn canvas_size<C>(&self) -> V2f
+    where
+        C: Canvas,
+    {
+        self.grid().canvas_size::<C>()
     }
 }
 

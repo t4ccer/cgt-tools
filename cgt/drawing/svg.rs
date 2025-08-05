@@ -2,7 +2,7 @@
 
 use crate::{drawing::Color, numeric::v2f::V2f};
 use core::fmt::Write;
-use std::fmt::Display;
+use std::{fmt::Display, marker::PhantomData, mem::ManuallyDrop};
 
 struct Rgba(Color);
 
@@ -19,23 +19,64 @@ impl Display for Rgba {
     }
 }
 
-struct SelfClosingTag<'buf> {
-    buffer: &'buf mut String,
+struct SelfClosing;
+struct Open;
+struct Content;
+
+trait TagType {
+    fn close(buffer: &mut String, tag: &str);
 }
 
-impl Drop for SelfClosingTag<'_> {
-    fn drop(&mut self) {
-        self.buffer.push_str(" />");
+impl TagType for SelfClosing {
+    fn close(buffer: &mut String, _tag: &str) {
+        buffer.push_str(" />");
     }
 }
 
-impl<'buf> SelfClosingTag<'buf> {
-    fn new(buffer: &'buf mut String, tag: &str) -> SelfClosingTag<'buf> {
-        buffer.push('<');
+impl TagType for Open {
+    fn close(buffer: &mut String, tag: &str) {
+        buffer.push_str("></");
         buffer.push_str(tag);
-        SelfClosingTag { buffer }
+        buffer.push('>');
     }
+}
 
+impl TagType for Content {
+    fn close(buffer: &mut String, tag: &str) {
+        buffer.push_str("</");
+        buffer.push_str(tag);
+        buffer.push('>');
+    }
+}
+
+trait HasAttributes: TagType {}
+
+impl HasAttributes for SelfClosing {}
+impl HasAttributes for Open {}
+
+struct Tag<'buf, 'tag, Type>
+where
+    Type: TagType,
+{
+    buffer: &'buf mut String,
+    #[allow(clippy::struct_field_names)]
+    tag_name: &'tag str,
+    _type: PhantomData<Type>,
+}
+
+impl<Type> Drop for Tag<'_, '_, Type>
+where
+    Type: TagType,
+{
+    fn drop(&mut self) {
+        Type::close(self.buffer, self.tag_name);
+    }
+}
+
+impl<Type> Tag<'_, '_, Type>
+where
+    Type: HasAttributes,
+{
     fn attribute<V>(&mut self, name: &str, value: V)
     where
         V: Display,
@@ -45,6 +86,26 @@ impl<'buf> SelfClosingTag<'buf> {
         self.buffer.push_str("=\"");
         write!(self.buffer, "{}", value).unwrap();
         self.buffer.push('"');
+    }
+}
+
+impl<'buf, 'tag> Tag<'buf, 'tag, Open> {
+    fn finish_attributes(self) -> Tag<'buf, 'tag, Content> {
+        self.buffer.push('>');
+        let tag: &'tag str = self.tag_name;
+        let buffer: &'buf mut String = unsafe { &mut *{ std::ptr::from_mut(self.buffer) } };
+        let _ = ManuallyDrop::new(self);
+        Tag {
+            buffer,
+            tag_name: tag,
+            _type: PhantomData,
+        }
+    }
+}
+
+impl Tag<'_, '_, Content> {
+    fn content(&mut self, value: &str) {
+        self.buffer.push_str(value);
     }
 }
 
@@ -64,8 +125,27 @@ impl Canvas {
         self.buffer
     }
 
-    fn self_closing_tag(&mut self, tag: &str) -> SelfClosingTag<'_> {
-        SelfClosingTag::new(&mut self.buffer, tag)
+    fn self_closing_tag<'buf, 'tag>(
+        &'buf mut self,
+        tag: &'tag str,
+    ) -> Tag<'buf, 'tag, SelfClosing> {
+        self.buffer.push('<');
+        self.buffer.push_str(tag);
+        Tag {
+            buffer: &mut self.buffer,
+            tag_name: tag,
+            _type: PhantomData,
+        }
+    }
+
+    fn tag<'buf, 'tag>(&'buf mut self, tag: &'tag str) -> Tag<'buf, 'tag, Open> {
+        self.buffer.push('<');
+        self.buffer.push_str(tag);
+        Tag {
+            buffer: &mut self.buffer,
+            tag_name: tag,
+            _type: PhantomData,
+        }
     }
 }
 
@@ -96,6 +176,23 @@ impl crate::drawing::Canvas for Canvas {
         line.attribute("y2", end.y);
         line.attribute("stroke-width", weight);
         line.attribute("stroke", Rgba(color));
+    }
+
+    fn large_char(&mut self, letter: char, position: V2f, color: Color) {
+        let tile_size = Self::tile_size();
+
+        let mut text = self.tag("text");
+        text.attribute("x", tile_size.x.mul_add(0.5, position.x));
+        text.attribute("y", tile_size.y.mul_add(0.5, position.y));
+        text.attribute("text-anchor", "middle");
+        text.attribute("dominant-baseline", "central");
+        text.attribute("font-size", "52px");
+        text.attribute("fill", Rgba(color));
+
+        let mut text = text.finish_attributes();
+        let mut buf = [0u8; 4];
+        let content = letter.encode_utf8(&mut buf);
+        text.content(content);
     }
 
     fn tile_size() -> V2f {

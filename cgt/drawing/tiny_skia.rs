@@ -22,8 +22,7 @@ impl Canvas {
 }
 
 impl super::Canvas for Canvas {
-    fn tile(&mut self, position: V2f, color: Color) {
-        let size = Self::tile_size();
+    fn rect(&mut self, position: V2f, size: V2f, color: Color) {
         self.pixmap.fill_rect(
             tiny_skia::Rect::from_xywh(position.x, position.y, size.x, size.y).unwrap(),
             &paint_solid_color(color),
@@ -43,7 +42,7 @@ impl super::Canvas for Canvas {
         );
     }
 
-    fn line(&mut self, start: V2f, end: V2f) {
+    fn line(&mut self, start: V2f, end: V2f, weight: f32, color: Color) {
         // TODO: with_capacity
         let mut path = tiny_skia::PathBuilder::new();
         path.move_to(start.x, start.y);
@@ -51,9 +50,9 @@ impl super::Canvas for Canvas {
         let path = path.finish().unwrap();
         self.pixmap.stroke_path(
             &path,
-            &paint_solid_color(Color::BLACK),
+            &paint_solid_color(color),
             &tiny_skia::Stroke {
-                width: Self::default_line_weight(),
+                width: weight,
                 miter_limit: 4.0,
                 line_cap: tiny_skia::LineCap::Butt,
                 line_join: tiny_skia::LineJoin::Miter,
@@ -62,6 +61,10 @@ impl super::Canvas for Canvas {
             tiny_skia::Transform::identity(),
             None,
         );
+    }
+
+    fn large_char(&mut self, _letter: char, _position: V2f, _color: Color) {
+        // TODO: Not implemented to not crash the whole renderer
     }
 
     fn tile_size() -> V2f {

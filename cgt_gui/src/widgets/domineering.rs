@@ -5,7 +5,7 @@ use crate::{
 };
 use ::imgui::{Condition, Ui};
 use cgt::{
-    drawing::imgui,
+    drawing::{imgui, Draw},
     grid::{small_bit_grid::SmallBitGrid, BitTile, FiniteGrid, Grid},
     short::partizan::games::domineering::{Domineering, Tile},
 };
@@ -76,7 +76,7 @@ impl IsCgtWindow for TitledWindow<DomineeringWindow> {
                 widgets::grid_size_selector(ui, &mut new_width, &mut new_height);
                 ui.spacing();
 
-                let mut canvas = imgui::Canvas::new(ui, &draw_list);
+                let mut canvas = imgui::Canvas::new(ui, &draw_list, ctx.large_font_id);
                 self.content.game.draw(&mut canvas);
 
                 if let Some((x, y)) = canvas.clicked_tile(self.content.game.grid()) {

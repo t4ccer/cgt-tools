@@ -69,6 +69,18 @@ impl From<Color> for ::imgui::ImColor32 {
     }
 }
 
+#[cfg(feature = "mint")]
+impl From<Color> for ::mint::Vector4<f32> {
+    fn from(color: Color) -> ::mint::Vector4<f32> {
+        ::mint::Vector4 {
+            x: color.r as f32 / 255.0,
+            y: color.g as f32 / 255.0,
+            z: color.b as f32 / 255.0,
+            w: color.a as f32 / 255.0,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Tile {
     Square {
@@ -78,6 +90,11 @@ pub enum Tile {
         tile_color: Color,
         circle_color: Color,
     },
+    Char {
+        tile_color: Color,
+        text_color: Color,
+        letter: char,
+    },
 }
 
 /// Anything that can be used for drawing
@@ -85,8 +102,8 @@ pub trait Canvas {
     // TODO: Tile should allow for circles
     fn rect(&mut self, position: V2f, size: V2f, color: Color);
     fn circle(&mut self, position: V2f, radius: f32, color: Color);
-    // TODO: Weight?
     fn line(&mut self, start: V2f, end: V2f, weight: f32, color: Color);
+    fn large_char(&mut self, letter: char, position: V2f, color: Color);
 
     fn tile(&mut self, position: V2f, tile: Tile) {
         let tile_size = Self::tile_size();
@@ -100,6 +117,14 @@ pub trait Canvas {
             } => {
                 self.rect(position, tile_size, tile_color);
                 self.circle(position + tile_size * 0.5, tile_size.x * 0.4, circle_color);
+            }
+            Tile::Char {
+                tile_color,
+                text_color,
+                letter,
+            } => {
+                self.rect(position, tile_size, tile_color);
+                self.large_char(letter, position, text_color);
             }
         }
     }
@@ -134,11 +159,7 @@ pub trait Canvas {
                     x: tile_size.x,
                     y: 0.0,
                 },
-            position
-                + V2f {
-                    x: tile_size.x,
-                    y: tile_size.y,
-                },
+            position + tile_size,
             weight,
             color,
         );
@@ -148,11 +169,7 @@ pub trait Canvas {
                     x: 0.0,
                     y: tile_size.y,
                 },
-            position
-                + V2f {
-                    x: tile_size.x,
-                    y: tile_size.y,
-                },
+            position + tile_size,
             weight,
             color,
         );
@@ -225,4 +242,16 @@ pub trait Canvas {
             y: (y as f32).mul_add(tile_size.y, (y + 1) as f32 * grid_weight),
         }
     }
+}
+
+pub trait Draw {
+    /// Paint position on existing canvas
+    fn draw<C>(&self, canvas: &mut C)
+    where
+        C: Canvas;
+
+    /// Minimum required canvas size to paint the whole position
+    fn canvas_size<C>(&self) -> V2f
+    where
+        C: Canvas;
 }

@@ -4,6 +4,7 @@ use clap::Parser;
 
 pub(crate) mod clap_utils;
 mod commands;
+mod evaluate;
 mod io;
 
 #[cfg(not(windows))]

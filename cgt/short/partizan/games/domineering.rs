@@ -3,8 +3,9 @@
 
 extern crate alloc;
 use crate::{
-    drawing::{self, Canvas, Color},
+    drawing::{self, Canvas, Color, Draw},
     grid::{self, decompositions, small_bit_grid::SmallBitGrid, FiniteGrid, Grid},
+    numeric::v2f::V2f,
     short::partizan::partizan_game::PartizanGame,
 };
 use cgt_derive::Tile;
@@ -213,9 +214,13 @@ where
         let grid = grid::move_top_left(&grid, Tile::is_non_blocking);
         Self::new(grid)
     }
+}
 
-    /// Paint grid on existing canvas
-    pub fn draw<C>(&self, canvas: &mut C)
+impl<G> Draw for Domineering<G>
+where
+    G: Grid<Item = Tile> + FiniteGrid,
+{
+    fn draw<C>(&self, canvas: &mut C)
     where
         C: Canvas,
     {
@@ -227,6 +232,13 @@ where
                 color: Color::DARK_GRAY,
             },
         });
+    }
+
+    fn canvas_size<C>(&self) -> V2f
+    where
+        C: Canvas,
+    {
+        self.grid().canvas_size::<C>()
     }
 }
 

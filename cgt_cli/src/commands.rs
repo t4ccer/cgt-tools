@@ -6,4 +6,5 @@ crate::clap_utils::mk_subcommand! {
     CanonicalForm => canonical_form,
     Amazons => amazons,
     LeftDeadEnds => left_dead_ends,
+    SkiJumps => ski_jumps,
 }

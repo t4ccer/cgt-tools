@@ -3,7 +3,7 @@ use crate::{
     grid::FiniteGrid,
     numeric::v2f::V2f,
 };
-use imgui::DrawListMut;
+use imgui::{DrawListMut, FontId};
 
 // TODO: Move cursor to the bottom after drawing?
 
@@ -11,15 +11,21 @@ pub struct Canvas<'ui> {
     start_position: V2f,
     ui: &'ui imgui::Ui,
     draw_list: &'ui DrawListMut<'ui>,
+    large_font_id: FontId,
     clicked_tile: Option<V2f>,
 }
 
 impl<'ui> Canvas<'ui> {
-    pub fn new(ui: &'ui imgui::Ui, draw_list: &'ui DrawListMut<'ui>) -> Self {
+    pub fn new(
+        ui: &'ui imgui::Ui,
+        draw_list: &'ui DrawListMut<'ui>,
+        large_font_id: FontId,
+    ) -> Self {
         Self {
             start_position: V2f::from(ui.cursor_screen_pos()),
             ui,
             draw_list,
+            large_font_id,
             clicked_tile: None,
         }
     }
@@ -66,6 +72,15 @@ impl drawing::Canvas for Canvas<'_> {
             .build();
     }
 
+    fn large_char(&mut self, letter: char, position: V2f, color: Color) {
+        let _large_font = self.ui.push_font(self.large_font_id);
+        let mut buf: [u8; 4] = [0; 4];
+        let text = letter.encode_utf8(&mut buf);
+        let size = V2f::from(self.ui.calc_text_size(&text));
+        let text_pos = self.start_position + position + (Self::tile_size() - size) * 0.5;
+        self.draw_list.add_text(text_pos, color, &text);
+    }
+
     fn tile(&mut self, position: V2f, tile: drawing::Tile) {
         let _tile_id_x = self.ui.push_id_int(position.x as i32);
         let _tile_id_y = self.ui.push_id_int(position.y as i32);
@@ -101,6 +116,14 @@ impl drawing::Canvas for Canvas<'_> {
                     tile_size.x * 0.4,
                     faded(circle_color),
                 );
+            }
+            drawing::Tile::Char {
+                tile_color,
+                text_color,
+                letter,
+            } => {
+                self.rect(position, tile_size, faded(tile_color));
+                self.large_char(letter, position, faded(text_color));
             }
         }
     }

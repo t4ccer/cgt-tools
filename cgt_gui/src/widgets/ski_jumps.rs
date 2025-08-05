@@ -1,16 +1,17 @@
+use ::imgui::{ComboBoxFlags, Condition, Ui};
 use cgt::{
+    drawing::{imgui, Canvas, Color, Draw},
     grid::{vec_grid::VecGrid, FiniteGrid, Grid},
     numeric::v2f::V2f,
     short::partizan::games::ski_jumps::{Move, SkiJumps, Tile},
 };
-use imgui::{ComboBoxFlags, Condition};
 use std::str::FromStr;
 
 use crate::{
     imgui_enum, impl_game_window, impl_titled_window,
     widgets::{
-        self, canonical_form::CanonicalFormWindow, interactive_color, GridEditorAction, COLOR_BLUE,
-        COLOR_RED, TILE_COLOR_EMPTY, TILE_COLOR_FILLED, TILE_SIZE, TILE_SPACING,
+        self, canonical_form::CanonicalFormWindow, interactive_color, TILE_COLOR_EMPTY,
+        TILE_COLOR_FILLED, TILE_SPACING,
     },
     Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow,
 };
@@ -56,7 +57,7 @@ impl IsCgtWindow for TitledWindow<SkiJumpsWindow> {
     impl_titled_window!("Ski Jumps");
     impl_game_window!("Ski Jumps", EvalSkiJumps, SkiJumpsDetails);
 
-    fn draw(&mut self, ui: &imgui::Ui, ctx: &mut GuiContext) {
+    fn draw(&mut self, ui: &Ui, ctx: &mut GuiContext) {
         let width = self.content.game.grid().width();
         let height = self.content.game.grid().height();
 
@@ -121,18 +122,19 @@ impl IsCgtWindow for TitledWindow<SkiJumpsWindow> {
 
                 macro_rules! off_buttons {
                     ($text:expr, $start_x:expr) => {{
-                        let grid_start_pos = V2f::from(ui.cursor_pos());
                         let off_buttons = ui.push_id("off_buttons");
+                        let current_pos = V2f::from(ui.cursor_pos());
                         for grid_y in 0..height {
                             let _y_id = ui.push_id_usize(grid_y as usize);
                             ui.set_cursor_pos([
-                                (TILE_SIZE + TILE_SPACING).mul_add(width as f32, grid_start_pos.x),
-                                (TILE_SIZE + TILE_SPACING).mul_add(grid_y as f32, grid_start_pos.y),
+                                current_pos.x,
+                                (imgui::Canvas::tile_size().y + TILE_SPACING)
+                                    .mul_add(grid_y as f32, grid_start_pos.y),
                             ]);
                             let pos = V2f::from(ui.cursor_screen_pos());
                             let button_size = V2f {
-                                x: TILE_SIZE * OFF_BUTTON_SCALE,
-                                y: TILE_SIZE,
+                                x: imgui::Canvas::tile_size().x * OFF_BUTTON_SCALE,
+                                y: imgui::Canvas::tile_size().y,
                             };
                             if ui.invisible_button("", button_size) {
                                 slide_off_y = Some(grid_y);
@@ -146,15 +148,11 @@ impl IsCgtWindow for TitledWindow<SkiJumpsWindow> {
                             let text_pos = pos + (button_size - size) * 0.5;
                             draw_list.add_text(text_pos, TILE_COLOR_FILLED, $text);
                         }
-                        ui.set_cursor_pos([
-                            grid_start_pos.x,
-                            (TILE_SIZE + TILE_SPACING + TILE_SPACING)
-                                .mul_add(height as f32, grid_start_pos.y),
-                        ]);
                         drop(off_buttons);
                     }};
                 }
 
+                // ui.text("Right buttons");
                 if matches!(editing_mode, GridEditingMode::MoveRight) {
                     off_buttons!("<", 0);
                 }
@@ -162,152 +160,69 @@ impl IsCgtWindow for TitledWindow<SkiJumpsWindow> {
                 // NOTE: To prevent grid from "jumping" after every move we always apply offset
                 // as if there was move-off-grid buttons
                 ui.set_cursor_pos([
-                    TILE_SIZE.mul_add(OFF_BUTTON_SCALE, grid_start_pos.x) + TILE_SPACING,
+                    imgui::Canvas::tile_size()
+                        .x
+                        .mul_add(OFF_BUTTON_SCALE, grid_start_pos.x),
                     grid_start_pos.y,
                 ]);
 
-                let large_font = ui.push_font(ctx.large_font_id);
-                let action = widgets::grid(
-                    ui,
-                    &draw_list,
-                    self.content.game.grid(),
-                    |screen_pos, (x, y), tile, draw_list| {
-                        let color = interactive_color(TILE_COLOR_EMPTY, ui);
-                        draw_list
-                            .add_rect(
-                                screen_pos,
-                                screen_pos
-                                    + V2f {
-                                        x: TILE_SIZE,
-                                        y: TILE_SIZE,
-                                    },
-                                color,
-                            )
-                            .filled(true)
-                            .build();
-
-                        if self
-                            .content
-                            .initial_position
-                            .is_some_and(|initial| initial == (x, y))
-                        {
-                            match self.content.editing_mode.get() {
-                                GridEditingMode::MoveLeft => {
-                                    draw_list
-                                        .add_rect(
-                                            screen_pos,
-                                            screen_pos
-                                                + V2f {
-                                                    x: TILE_SIZE,
-                                                    y: TILE_SIZE,
-                                                },
-                                            COLOR_BLUE,
-                                        )
-                                        .thickness(4.0)
-                                        .filled(false)
-                                        .build();
-                                }
-                                GridEditingMode::MoveRight => {
-                                    draw_list
-                                        .add_rect(
-                                            screen_pos,
-                                            screen_pos
-                                                + V2f {
-                                                    x: TILE_SIZE,
-                                                    y: TILE_SIZE,
-                                                },
-                                            COLOR_RED,
-                                        )
-                                        .thickness(4.0)
-                                        .filled(false)
-                                        .build();
-                                }
-                                _ => {}
-                            }
-                        }
-
-                        macro_rules! draw_text {
-                            ($text:expr) => {
-                                let size = V2f::from(ui.calc_text_size($text));
-                                let text_pos = screen_pos
-                                    + (V2f {
-                                        x: TILE_SIZE,
-                                        y: TILE_SIZE,
-                                    } - size)
-                                        * 0.5;
-                                draw_list.add_text(text_pos, TILE_COLOR_FILLED, $text);
-                            };
-                        }
-                        match tile {
-                            Tile::Empty => {}
-                            Tile::LeftJumper => {
-                                draw_text!("L");
-                            }
-                            Tile::LeftSlipper => {
-                                draw_text!("l");
-                            }
-                            Tile::RightJumper => {
-                                draw_text!("R");
-                            }
-                            Tile::RightSlipper => {
-                                draw_text!("r");
-                            }
-                        }
-                    },
-                );
-                drop(large_font);
+                let mut canvas = imgui::Canvas::new(ui, &draw_list, ctx.large_font_id);
+                self.content.game.draw(&mut canvas);
 
                 if matches!(editing_mode, GridEditingMode::MoveLeft) {
-                    let current_pos = V2f::from(ui.cursor_pos());
-                    ui.set_cursor_pos([current_pos.x, grid_start_pos.y]);
+                    ui.set_cursor_pos([
+                        grid_start_pos.x
+                            + imgui::Canvas::tile_position(self.content.game.grid().width() + 1, 0)
+                                .x
+                            - (1.0 - OFF_BUTTON_SCALE) * imgui::Canvas::tile_size().x,
+                        grid_start_pos.y,
+                    ]);
                     off_buttons!(">", width);
                 }
 
                 let mut move_target = None;
-                match action {
-                    GridEditorAction::None => {}
-                    GridEditorAction::Clicked { x, y } => {
-                        macro_rules! place_tile {
-                            ($tile:ident) => {
-                                if self.content.game.grid().get(x, y) != Tile::$tile {
-                                    self.content.game.grid_mut().set(x, y, Tile::$tile);
-                                    is_dirty = true;
-                                }
-                            };
-                        }
 
-                        match editing_mode {
-                            GridEditingMode::ClearTile => place_tile!(Empty),
-                            GridEditingMode::LeftJumper => place_tile!(LeftJumper),
-                            GridEditingMode::LeftSlipper => place_tile!(LeftSlipper),
-                            GridEditingMode::RightJumper => place_tile!(RightJumper),
-                            GridEditingMode::RightSlipper => place_tile!(RightSlipper),
-                            GridEditingMode::MoveLeft | GridEditingMode::MoveRight => {
-                                match self.content.initial_position {
-                                    None => {
-                                        if (matches!(editing_mode, GridEditingMode::MoveLeft)
+                if let Some((x, y)) = canvas.clicked_tile(self.content.game.grid()) {
+                    macro_rules! place_tile {
+                        ($tile:ident) => {
+                            if self.content.game.grid().get(x, y) != Tile::$tile {
+                                self.content.game.grid_mut().set(x, y, Tile::$tile);
+                                is_dirty = true;
+                            }
+                        };
+                    }
+
+                    match editing_mode {
+                        GridEditingMode::ClearTile => place_tile!(Empty),
+                        GridEditingMode::LeftJumper => place_tile!(LeftJumper),
+                        GridEditingMode::LeftSlipper => place_tile!(LeftSlipper),
+                        GridEditingMode::RightJumper => place_tile!(RightJumper),
+                        GridEditingMode::RightSlipper => place_tile!(RightSlipper),
+                        GridEditingMode::MoveLeft | GridEditingMode::MoveRight => {
+                            match self.content.initial_position {
+                                None => {
+                                    if (matches!(editing_mode, GridEditingMode::MoveLeft)
+                                        && matches!(
+                                            self.content.game.grid().get(x, y),
+                                            Tile::LeftJumper | Tile::LeftSlipper
+                                        ))
+                                        || (matches!(editing_mode, GridEditingMode::MoveRight)
                                             && matches!(
                                                 self.content.game.grid().get(x, y),
-                                                Tile::LeftJumper | Tile::LeftSlipper
+                                                Tile::RightJumper | Tile::RightSlipper
                                             ))
-                                            || (matches!(editing_mode, GridEditingMode::MoveRight)
-                                                && matches!(
-                                                    self.content.game.grid().get(x, y),
-                                                    Tile::RightJumper | Tile::RightSlipper
-                                                ))
-                                        {
-                                            self.content.initial_position = Some((x, y));
-                                        }
+                                    {
+                                        self.content.initial_position = Some((x, y));
                                     }
-                                    Some((start_x, start_y)) => {
-                                        if (start_x, start_y) == (x, y) {
-                                            self.content.initial_position = None;
-                                        } else if matches!(
-                                            self.content.game.grid().get(x, y),
-                                            Tile::Empty
-                                        ) {
-                                            move_target = Some((x, y));
-                                        }
+                                }
+                                Some((start_x, start_y)) => {
+                                    if (start_x, start_y) == (x, y) {
+                                        self.content.initial_position = None;
+                                    } else if matches!(
+                                        self.content.game.grid().get(x, y),
+                                        Tile::Empty
+                                    ) {
+                                        move_target = Some((x, y));
                                     }
                                 }
                             }
@@ -316,6 +231,15 @@ impl IsCgtWindow for TitledWindow<SkiJumpsWindow> {
                 }
 
                 if let Some((start_x, start_y)) = self.content.initial_position {
+                    canvas.highlight_tile(
+                        imgui::Canvas::tile_position(start_x, start_y),
+                        if matches!(editing_mode, GridEditingMode::MoveLeft) {
+                            Color::BLUE
+                        } else {
+                            Color::RED
+                        },
+                    );
+
                     if move_target.is_some() || slide_off_y.is_some() {
                         let available_moves = if matches!(editing_mode, GridEditingMode::MoveLeft) {
                             self.content.game.available_left_moves()
@@ -348,7 +272,7 @@ impl IsCgtWindow for TitledWindow<SkiJumpsWindow> {
                                 } => {
                                     if (move_x, move_y) == (start_x, start_y)
                                         && slide_off_y
-                                            .is_some_and(|slide_off_y| slide_off_y == move_y)
+                                            .is_some_and(|slide_off_y: u8| slide_off_y == move_y)
                                     {
                                         make_move!(available_move);
                                     }
