@@ -2,6 +2,12 @@
 
 use std::collections::VecDeque;
 
+use crate::{
+    drawing::{BoundingBox, Canvas, Color},
+    has::Has,
+    numeric::v2f::V2f,
+};
+
 pub mod adjacency_matrix;
 pub mod layout;
 
@@ -133,4 +139,74 @@ pub trait Graph<V>: Sized {
 
     /// Get vertex mutably
     fn get_vertex_mut(&mut self, vertex: VertexIndex) -> &mut V;
+
+    /// Draw graph on existing canvas
+    fn draw<C>(&self, canvas: &mut C, mut get_vertex_color: impl FnMut(&V) -> Color)
+    where
+        V: Has<V2f>,
+        C: Canvas,
+    {
+        // TODO: Move up graph drawing code to Graph trait
+        for this_vertex_idx in self.vertex_indices() {
+            let this_position: V2f = *self.get_vertex(this_vertex_idx).get_inner();
+            for adjacent_vertex_id in self.adjacent_to(this_vertex_idx) {
+                let adjacent_position: V2f = *self.get_vertex(adjacent_vertex_id).get_inner();
+                canvas.line(
+                    this_position,
+                    adjacent_position,
+                    C::thin_line_weight(),
+                    Color::BLACK,
+                );
+            }
+        }
+
+        for this_vertex_idx in self.vertex_indices() {
+            let this_position: V2f = *self.get_vertex(this_vertex_idx).get_inner();
+            canvas.vertex(
+                this_position,
+                get_vertex_color(self.get_vertex(this_vertex_idx)),
+                this_vertex_idx,
+            );
+        }
+    }
+
+    /// Get required canvas size to fit whole graph
+    fn required_canvas<C>(&self) -> BoundingBox
+    where
+        V: Has<V2f>,
+        C: Canvas,
+    {
+        if self.size() == 0 {
+            return BoundingBox {
+                top_left: V2f::ZERO,
+                bottom_right: V2f::ZERO,
+            };
+        }
+
+        let r = C::node_radius();
+        self.vertex_indices()
+            .map(|idx| *self.get_vertex(idx).get_inner())
+            .fold(
+                BoundingBox {
+                    top_left: V2f {
+                        x: f32::INFINITY,
+                        y: f32::INFINITY,
+                    },
+                    bottom_right: V2f {
+                        x: f32::NEG_INFINITY,
+                        y: f32::NEG_INFINITY,
+                    },
+                },
+                |bounding_box, v: V2f| BoundingBox {
+                    top_left: V2f {
+                        x: f32::min(bounding_box.top_left.x, v.x - r),
+                        y: f32::min(bounding_box.top_left.y, v.y - r),
+                    },
+                    bottom_right: V2f {
+                        x: f32::max(bounding_box.bottom_right.x, v.x + r),
+                        y: f32::max(bounding_box.bottom_right.y, v.y + r),
+                    },
+                },
+            )
+    }
 }
