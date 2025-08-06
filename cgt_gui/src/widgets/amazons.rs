@@ -2,7 +2,10 @@ use ::imgui::{ComboBoxFlags, Condition, Ui};
 use cgt::{
     drawing::{imgui, Canvas, Color, Draw},
     grid::{vec_grid::VecGrid, FiniteGrid, Grid},
-    short::partizan::games::amazons::{Amazons, Tile},
+    short::partizan::{
+        games::amazons::{Amazons, Tile},
+        Player,
+    },
 };
 use std::str::FromStr;
 
@@ -20,6 +23,25 @@ imgui_enum! {
         ClearTile, "Clear Tile",
         MoveLeft, "Left move",
         MoveRight, "Right move",
+    }
+}
+
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
+enum Edit {
+    Place(Tile),
+    Move(Player),
+}
+
+impl From<GridEditingMode> for Edit {
+    fn from(mode: GridEditingMode) -> Self {
+        match mode {
+            GridEditingMode::AddStone => Edit::Place(Tile::Stone),
+            GridEditingMode::AddBlueQueen => Edit::Place(Tile::Left),
+            GridEditingMode::AddRedQueen => Edit::Place(Tile::Right),
+            GridEditingMode::ClearTile => Edit::Place(Tile::Empty),
+            GridEditingMode::MoveLeft => Edit::Move(Player::Left),
+            GridEditingMode::MoveRight => Edit::Move(Player::Right),
+        }
     }
 }
 
@@ -116,21 +138,23 @@ impl IsCgtWindow for TitledWindow<AmazonsWindow> {
                 let mut canvas = imgui::Canvas::new(ui, &draw_list, ctx.large_font_id);
                 self.content.game.draw(&mut canvas);
                 if let Some((x, y)) = canvas.clicked_tile(self.content.game.grid()) {
-                    macro_rules! place_tile {
-                        ($tile:ident) => {
-                            if self.content.game.grid().get(x, y) != Tile::$tile {
-                                self.content.game.grid_mut().set(x, y, Tile::$tile);
+                    match Edit::from(self.content.editing_mode.get()) {
+                        Edit::Place(tile) => {
+                            if self.content.game.grid().get(x, y) != tile {
+                                self.content.game.grid_mut().set(x, y, tile);
                                 is_dirty = true;
                             }
-                        };
-                    }
+                        }
+                        Edit::Move(player) => {
+                            let own_tile = Tile::from(player);
+                            let other_mode = match player {
+                                Player::Left => GridEditingMode::AddRedQueen,
+                                Player::Right => GridEditingMode::AddBlueQueen,
+                            };
 
-                    macro_rules! make_move {
-                        ($own_tile:ident, $other_mode:ident) => {
                             match self.content.pending_move {
                                 PendingMove::None => {
-                                    if matches!(self.content.game.grid().get(x, y), Tile::$own_tile)
-                                    {
+                                    if self.content.game.grid().get(x, y) == own_tile {
                                         self.content.pending_move =
                                             PendingMove::AmazonSelected { amazon: (x, y) };
                                     }
@@ -148,34 +172,24 @@ impl IsCgtWindow for TitledWindow<AmazonsWindow> {
                                     let stone_target = (x, y);
                                     let mut new_game = self.content.game.clone();
                                     new_game.grid_mut().set(amazon.0, amazon.1, Tile::Empty);
-                                    new_game.grid_mut().set(target.0, target.1, Tile::$own_tile);
+                                    new_game.grid_mut().set(target.0, target.1, own_tile);
                                     new_game.grid_mut().set(
                                         stone_target.0,
                                         stone_target.1,
                                         Tile::Stone,
                                     );
                                     self.content.pending_move = PendingMove::None;
-                                    let moves = self.content.game.moves_for(Tile::$own_tile, false);
+                                    let moves = self.content.game.moves_for(own_tile, false);
                                     if moves.contains(&new_game) {
                                         self.content.game = new_game;
                                         if self.content.alternating_moves {
-                                            self.content.editing_mode =
-                                                RawOf::new(GridEditingMode::$other_mode);
+                                            self.content.editing_mode = RawOf::new(other_mode);
                                         }
                                         is_dirty = true;
                                     }
                                 }
                             }
-                        };
-                    }
-
-                    match self.content.editing_mode.get() {
-                        GridEditingMode::AddStone => place_tile!(Stone),
-                        GridEditingMode::AddBlueQueen => place_tile!(Left),
-                        GridEditingMode::AddRedQueen => place_tile!(Right),
-                        GridEditingMode::ClearTile => place_tile!(Empty),
-                        GridEditingMode::MoveLeft => make_move!(Left, MoveRight),
-                        GridEditingMode::MoveRight => make_move!(Right, MoveLeft),
+                        }
                     }
                 };
 

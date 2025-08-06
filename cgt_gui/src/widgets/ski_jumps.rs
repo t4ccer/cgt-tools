@@ -3,7 +3,10 @@ use cgt::{
     drawing::{imgui, Canvas, Color, Draw},
     grid::{vec_grid::VecGrid, FiniteGrid, Grid},
     numeric::v2f::V2f,
-    short::partizan::games::ski_jumps::{Move, SkiJumps, Tile},
+    short::partizan::{
+        games::ski_jumps::{Move, SkiJumps, Tile},
+        Player,
+    },
 };
 use std::str::FromStr;
 
@@ -27,6 +30,26 @@ imgui_enum! {
         ClearTile, "Clear Tile",
         MoveLeft, "Left move",
         MoveRight, "Right move",
+    }
+}
+
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
+enum Edit {
+    Place(Tile),
+    Move(Player),
+}
+
+impl From<GridEditingMode> for Edit {
+    fn from(mode: GridEditingMode) -> Self {
+        match mode {
+            GridEditingMode::LeftJumper => Edit::Place(Tile::LeftJumper),
+            GridEditingMode::LeftSlipper => Edit::Place(Tile::LeftSlipper),
+            GridEditingMode::RightJumper => Edit::Place(Tile::RightJumper),
+            GridEditingMode::RightSlipper => Edit::Place(Tile::RightSlipper),
+            GridEditingMode::ClearTile => Edit::Place(Tile::Empty),
+            GridEditingMode::MoveLeft => Edit::Move(Player::Left),
+            GridEditingMode::MoveRight => Edit::Move(Player::Right),
+        }
     }
 }
 
@@ -120,41 +143,38 @@ impl IsCgtWindow for TitledWindow<SkiJumpsWindow> {
 
                 let editing_mode = self.content.editing_mode.get();
 
-                macro_rules! off_buttons {
-                    ($text:expr, $start_x:expr) => {{
-                        let off_buttons = ui.push_id("off_buttons");
-                        let current_pos = V2f::from(ui.cursor_pos());
-                        for grid_y in 0..height {
-                            let _y_id = ui.push_id_usize(grid_y as usize);
-                            ui.set_cursor_pos([
-                                current_pos.x,
-                                (imgui::Canvas::tile_size().y + TILE_SPACING)
-                                    .mul_add(grid_y as f32, grid_start_pos.y),
-                            ]);
-                            let pos = V2f::from(ui.cursor_screen_pos());
-                            let button_size = V2f {
-                                x: imgui::Canvas::tile_size().x * OFF_BUTTON_SCALE,
-                                y: imgui::Canvas::tile_size().y,
-                            };
-                            if ui.invisible_button("", button_size) {
-                                slide_off_y = Some(grid_y);
-                            }
-                            let color = interactive_color(TILE_COLOR_EMPTY, ui);
-                            draw_list
-                                .add_rect(pos, pos + button_size, color)
-                                .filled(true)
-                                .build();
-                            let size = V2f::from(ui.calc_text_size($text));
-                            let text_pos = pos + (button_size - size) * 0.5;
-                            draw_list.add_text(text_pos, TILE_COLOR_FILLED, $text);
+                let mut off_buttons = |text| {
+                    let off_buttons = ui.push_id("off_buttons");
+                    let current_pos = V2f::from(ui.cursor_pos());
+                    for grid_y in 0..height {
+                        let _y_id = ui.push_id_usize(grid_y as usize);
+                        ui.set_cursor_pos([
+                            current_pos.x,
+                            (imgui::Canvas::tile_size().y + TILE_SPACING)
+                                .mul_add(grid_y as f32, grid_start_pos.y),
+                        ]);
+                        let pos = V2f::from(ui.cursor_screen_pos());
+                        let button_size = V2f {
+                            x: imgui::Canvas::tile_size().x * OFF_BUTTON_SCALE,
+                            y: imgui::Canvas::tile_size().y,
+                        };
+                        if ui.invisible_button("", button_size) {
+                            slide_off_y = Some(grid_y);
                         }
-                        drop(off_buttons);
-                    }};
-                }
+                        let color = interactive_color(TILE_COLOR_EMPTY, ui);
+                        draw_list
+                            .add_rect(pos, pos + button_size, color)
+                            .filled(true)
+                            .build();
+                        let size = V2f::from(ui.calc_text_size(text));
+                        let text_pos = pos + (button_size - size) * 0.5;
+                        draw_list.add_text(text_pos, TILE_COLOR_FILLED, text);
+                    }
+                    drop(off_buttons);
+                };
 
-                // ui.text("Right buttons");
                 if matches!(editing_mode, GridEditingMode::MoveRight) {
-                    off_buttons!("<", 0);
+                    off_buttons("<");
                 }
 
                 // NOTE: To prevent grid from "jumping" after every move we always apply offset
@@ -182,56 +202,44 @@ impl IsCgtWindow for TitledWindow<SkiJumpsWindow> {
                         ),
                         grid_start_pos.y,
                     ]);
-                    off_buttons!(">", width);
+                    off_buttons(">");
                 }
 
                 let mut move_target = None;
 
                 if let Some((x, y)) = canvas.clicked_tile(self.content.game.grid()) {
-                    macro_rules! place_tile {
-                        ($tile:ident) => {
-                            if self.content.game.grid().get(x, y) != Tile::$tile {
-                                self.content.game.grid_mut().set(x, y, Tile::$tile);
+                    match Edit::from(self.content.editing_mode.get()) {
+                        Edit::Place(tile) => {
+                            if self.content.game.grid().get(x, y) != tile {
+                                self.content.game.grid_mut().set(x, y, tile);
                                 is_dirty = true;
                             }
-                        };
-                    }
-
-                    match editing_mode {
-                        GridEditingMode::ClearTile => place_tile!(Empty),
-                        GridEditingMode::LeftJumper => place_tile!(LeftJumper),
-                        GridEditingMode::LeftSlipper => place_tile!(LeftSlipper),
-                        GridEditingMode::RightJumper => place_tile!(RightJumper),
-                        GridEditingMode::RightSlipper => place_tile!(RightSlipper),
-                        GridEditingMode::MoveLeft | GridEditingMode::MoveRight => {
-                            match self.content.initial_position {
-                                None => {
-                                    if (matches!(editing_mode, GridEditingMode::MoveLeft)
+                        }
+                        Edit::Move(player) => match self.content.initial_position {
+                            None => {
+                                if (matches!(player, Player::Left)
+                                    && matches!(
+                                        self.content.game.grid().get(x, y),
+                                        Tile::LeftJumper | Tile::LeftSlipper
+                                    ))
+                                    || (matches!(player, Player::Right)
                                         && matches!(
                                             self.content.game.grid().get(x, y),
-                                            Tile::LeftJumper | Tile::LeftSlipper
+                                            Tile::RightJumper | Tile::RightSlipper
                                         ))
-                                        || (matches!(editing_mode, GridEditingMode::MoveRight)
-                                            && matches!(
-                                                self.content.game.grid().get(x, y),
-                                                Tile::RightJumper | Tile::RightSlipper
-                                            ))
-                                    {
-                                        self.content.initial_position = Some((x, y));
-                                    }
-                                }
-                                Some((start_x, start_y)) => {
-                                    if (start_x, start_y) == (x, y) {
-                                        self.content.initial_position = None;
-                                    } else if matches!(
-                                        self.content.game.grid().get(x, y),
-                                        Tile::Empty
-                                    ) {
-                                        move_target = Some((x, y));
-                                    }
+                                {
+                                    self.content.initial_position = Some((x, y));
                                 }
                             }
-                        }
+                            Some((start_x, start_y)) => {
+                                if (start_x, start_y) == (x, y) {
+                                    self.content.initial_position = None;
+                                } else if matches!(self.content.game.grid().get(x, y), Tile::Empty)
+                                {
+                                    move_target = Some((x, y));
+                                }
+                            }
+                        },
                     }
                 }
 
@@ -252,59 +260,45 @@ impl IsCgtWindow for TitledWindow<SkiJumpsWindow> {
                             self.content.game.available_right_moves()
                         };
 
-                        macro_rules! make_move {
-                            ($move:expr) => {{
-                                self.content.game = self.content.game.move_in($move);
-                                self.content.initial_position = None;
-                                if self.content.alternating_moves {
-                                    if matches!(editing_mode, GridEditingMode::MoveLeft) {
-                                        self.content.editing_mode =
-                                            RawOf::new(GridEditingMode::MoveRight);
-                                    } else {
-                                        self.content.editing_mode =
-                                            RawOf::new(GridEditingMode::MoveLeft);
-                                    }
-                                }
-                                is_dirty = true;
-                                break;
-                            }};
-                        }
-
-                        for available_move in available_moves {
-                            match available_move {
-                                Move::SlideOff {
-                                    from: (move_x, move_y),
-                                } => {
-                                    if (move_x, move_y) == (start_x, start_y)
+                        if let Some(legal_move) =
+                            available_moves.into_iter().find_map(|available_move| {
+                                match available_move {
+                                    Move::SlideOff {
+                                        from: (move_x, move_y),
+                                    } => ((move_x, move_y) == (start_x, start_y)
                                         && slide_off_y
-                                            .is_some_and(|slide_off_y: u8| slide_off_y == move_y)
-                                    {
-                                        make_move!(available_move);
-                                    }
-                                }
-                                Move::Slide {
-                                    from: (move_x, move_y),
-                                    to_x: move_to_x,
-                                } => {
-                                    if (move_x, move_y) == (start_x, start_y)
+                                            .is_some_and(|slide_off_y: u8| slide_off_y == move_y))
+                                    .then_some(available_move),
+                                    Move::Slide {
+                                        from: (move_x, move_y),
+                                        to_x: move_to_x,
+                                    } => ((move_x, move_y) == (start_x, start_y)
                                         && move_target
-                                            .is_some_and(|target| target == (move_to_x, move_y))
-                                    {
-                                        make_move!(available_move);
-                                    }
-                                }
-                                Move::Jump {
-                                    from: (move_x, move_y),
-                                } => {
-                                    if (move_x, move_y) == (start_x, start_y)
+                                            .is_some_and(|target| target == (move_to_x, move_y)))
+                                    .then_some(available_move),
+                                    Move::Jump {
+                                        from: (move_x, move_y),
+                                    } => ((move_x, move_y) == (start_x, start_y)
                                         && move_target
-                                            .is_some_and(|target| target == (move_x, move_y + 2))
-                                    {
-                                        make_move!(available_move);
-                                    }
+                                            .is_some_and(|target| target == (move_x, move_y + 2)))
+                                    .then_some(available_move),
+                                }
+                            })
+                        {
+                            self.content.game = self.content.game.move_in(legal_move);
+                            if self.content.alternating_moves {
+                                if matches!(editing_mode, GridEditingMode::MoveLeft) {
+                                    self.content.editing_mode =
+                                        RawOf::new(GridEditingMode::MoveRight);
+                                } else {
+                                    self.content.editing_mode =
+                                        RawOf::new(GridEditingMode::MoveLeft);
                                 }
                             }
-                        }
+                            is_dirty = true;
+                        };
+
+                        self.content.initial_position = None;
                     }
                 }
 

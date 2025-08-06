@@ -10,6 +10,7 @@ use cgt::{
     short::partizan::{
         games::konane::{Konane, Tile},
         partizan_game::PartizanGame,
+        Player,
     },
 };
 use std::str::FromStr;
@@ -22,6 +23,25 @@ imgui_enum! {
         ClearTile, "Clear Tile",
         MoveLeft, "Left move",
         MoveRight, "Right move",
+    }
+}
+
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
+enum Edit {
+    Place(Tile),
+    Move(Player),
+}
+
+impl From<GridEditingMode> for Edit {
+    fn from(mode: GridEditingMode) -> Self {
+        match mode {
+            GridEditingMode::AddBlocked => Edit::Place(Tile::Blocked),
+            GridEditingMode::AddBlue => Edit::Place(Tile::Left),
+            GridEditingMode::AddRed => Edit::Place(Tile::Right),
+            GridEditingMode::ClearTile => Edit::Place(Tile::Empty),
+            GridEditingMode::MoveLeft => Edit::Move(Player::Left),
+            GridEditingMode::MoveRight => Edit::Move(Player::Right),
+        }
     }
 }
 
@@ -117,92 +137,81 @@ impl IsCgtWindow for TitledWindow<KonaneWindow> {
                 let mut canvas = imgui::Canvas::new(ui, &draw_list, ctx.large_font_id);
                 self.content.game.draw(&mut canvas);
                 if let Some((x, y)) = canvas.clicked_tile(self.content.game.grid()) {
-                    macro_rules! place_tile {
-                        ($tile:ident) => {
-                            if self.content.game.grid().get(x, y) != Tile::$tile {
-                                self.content.game.grid_mut().set(x, y, Tile::$tile);
+                    match Edit::from(self.content.editing_mode.get()) {
+                        Edit::Place(tile) => {
+                            if self.content.game.grid().get(x, y) != tile {
+                                self.content.game.grid_mut().set(x, y, tile);
                                 is_dirty = true;
                             }
-                        };
-                    }
+                        }
+                        Edit::Move(player) => match self.content.pending_move {
+                            PendingMove::None => {
+                                if self.content.game.grid().get(x, y) == Tile::from(player) {
+                                    self.content.pending_move =
+                                        PendingMove::PieceSelected { piece: (x, y) };
+                                }
+                            }
+                            PendingMove::PieceSelected { piece } => {
+                                let target = (x, y);
+                                let mut new_game = self.content.game.clone();
 
-                    macro_rules! make_move {
-                        ($own_tile:ident, $other_mode:ident) => {
-                            match self.content.pending_move {
-                                PendingMove::None => {
-                                    if matches!(self.content.game.grid().get(x, y), Tile::$own_tile)
-                                    {
-                                        self.content.pending_move =
-                                            PendingMove::PieceSelected { piece: (x, y) };
+                                if target.0 == piece.0 {
+                                    if target.1 < piece.1 {
+                                        for y in target.1..piece.1 {
+                                            new_game.grid_mut().set(piece.0, y, Tile::Empty);
+                                        }
+                                    } else {
+                                        for y in piece.1..target.1 {
+                                            new_game.grid_mut().set(piece.0, y, Tile::Empty);
+                                        }
+                                    }
+                                } else if target.1 == piece.1 {
+                                    if target.0 < piece.0 {
+                                        for x in target.0..piece.0 {
+                                            new_game.grid_mut().set(x, piece.1, Tile::Empty);
+                                        }
+                                    } else {
+                                        for x in piece.0..target.0 {
+                                            new_game.grid_mut().set(x, piece.1, Tile::Empty);
+                                        }
                                     }
                                 }
-                                PendingMove::PieceSelected { piece } => {
-                                    let target = (x, y);
-                                    let mut new_game = self.content.game.clone();
 
-                                    if target.0 == piece.0 {
-                                        if target.1 < piece.1 {
-                                            for y in target.1..piece.1 {
-                                                new_game.grid_mut().set(piece.0, y, Tile::Empty);
+                                new_game.grid_mut().set(piece.0, piece.1, Tile::Empty);
+                                new_game
+                                    .grid_mut()
+                                    .set(target.0, target.1, Tile::from(player));
+                                self.content.pending_move = PendingMove::None;
+
+                                let other_mode = match player {
+                                    Player::Left => GridEditingMode::AddRed,
+                                    Player::Right => GridEditingMode::AddBlue,
+                                };
+
+                                match player {
+                                    Player::Left => {
+                                        let moves = self.content.game.left_moves();
+                                        if moves.contains(&new_game) {
+                                            self.content.game = new_game;
+                                            if self.content.alternating_moves {
+                                                self.content.editing_mode = RawOf::new(other_mode);
                                             }
-                                        } else {
-                                            for y in piece.1..target.1 {
-                                                new_game.grid_mut().set(piece.0, y, Tile::Empty);
-                                            }
-                                        }
-                                    } else if target.1 == piece.1 {
-                                        if target.0 < piece.0 {
-                                            for x in target.0..piece.0 {
-                                                new_game.grid_mut().set(x, piece.1, Tile::Empty);
-                                            }
-                                        } else {
-                                            for x in piece.0..target.0 {
-                                                new_game.grid_mut().set(x, piece.1, Tile::Empty);
-                                            }
+                                            is_dirty = true;
                                         }
                                     }
-
-                                    new_game.grid_mut().set(piece.0, piece.1, Tile::Empty);
-                                    new_game.grid_mut().set(target.0, target.1, Tile::$own_tile);
-                                    self.content.pending_move = PendingMove::None;
-
-                                    match Tile::$own_tile {
-                                        Tile::Left => {
-                                            let moves = self.content.game.left_moves();
-                                            if moves.contains(&new_game) {
-                                                self.content.game = new_game;
-                                                if self.content.alternating_moves {
-                                                    self.content.editing_mode =
-                                                        RawOf::new(GridEditingMode::$other_mode);
-                                                }
-                                                is_dirty = true;
+                                    Player::Right => {
+                                        let moves = self.content.game.right_moves();
+                                        if moves.contains(&new_game) {
+                                            self.content.game = new_game;
+                                            if self.content.alternating_moves {
+                                                self.content.editing_mode = RawOf::new(other_mode);
                                             }
+                                            is_dirty = true;
                                         }
-                                        Tile::Right => {
-                                            let moves = self.content.game.right_moves();
-                                            if moves.contains(&new_game) {
-                                                self.content.game = new_game;
-                                                if self.content.alternating_moves {
-                                                    self.content.editing_mode =
-                                                        RawOf::new(GridEditingMode::$other_mode);
-                                                }
-                                                is_dirty = true;
-                                            }
-                                        }
-                                        _ => {}
                                     }
                                 }
                             }
-                        };
-                    }
-
-                    match self.content.editing_mode.get() {
-                        GridEditingMode::AddBlocked => place_tile!(Blocked),
-                        GridEditingMode::AddBlue => place_tile!(Left),
-                        GridEditingMode::AddRed => place_tile!(Right),
-                        GridEditingMode::ClearTile => place_tile!(Empty),
-                        GridEditingMode::MoveLeft => make_move!(Left, MoveRight),
-                        GridEditingMode::MoveRight => make_move!(Right, MoveLeft),
+                        },
                     }
                 }
 

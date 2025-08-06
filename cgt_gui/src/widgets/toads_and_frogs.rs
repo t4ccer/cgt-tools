@@ -103,19 +103,17 @@ impl IsCgtWindow for TitledWindow<ToadsAndFrogsWindow> {
                 if let Some((x, _)) = canvas.clicked_tile(&self.content.game.grid()) {
                     let grid_x = x as usize;
 
-                    macro_rules! place_tile {
-                        ($tile:ident) => {
-                            if self.content.game.row()[grid_x] != Tile::$tile {
-                                self.content.game.row_mut()[grid_x] = Tile::$tile;
-                                is_dirty = true;
-                            }
-                        };
-                    }
+                    let mut place_tile = |tile| {
+                        if self.content.game.row()[grid_x] != tile {
+                            self.content.game.row_mut()[grid_x] = tile;
+                            is_dirty = true;
+                        }
+                    };
 
                     match self.content.editing_mode.get() {
-                        GridEditingMode::PlaceToad => place_tile!(Toad),
-                        GridEditingMode::PlaceFrog => place_tile!(Frog),
-                        GridEditingMode::ClearTile => place_tile!(Empty),
+                        GridEditingMode::PlaceToad => place_tile(Tile::Toad),
+                        GridEditingMode::PlaceFrog => place_tile(Tile::Frog),
+                        GridEditingMode::ClearTile => place_tile(Tile::Empty),
                         GridEditingMode::MoveLeft => {
                             // TODO: De-duplicate game logic, introduce abstract move associated
                             // type to each game

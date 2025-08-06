@@ -3,7 +3,7 @@
 use crate::{
     drawing::{self, BoundingBox, Canvas, Color, Draw},
     grid::{decompositions, move_top_left, vec_grid::VecGrid, FiniteGrid, Grid},
-    short::partizan::partizan_game::PartizanGame,
+    short::partizan::{partizan_game::PartizanGame, Player},
 };
 use cgt_derive::Tile;
 use std::{fmt::Display, hash::Hash, str::FromStr};
@@ -33,6 +33,15 @@ impl Tile {
     #[inline]
     fn is_non_blocking(self) -> bool {
         self != Self::Stone
+    }
+}
+
+impl From<Player> for Tile {
+    fn from(player: Player) -> Tile {
+        match player {
+            Player::Left => Tile::Left,
+            Player::Right => Tile::Right,
+        }
     }
 }
 

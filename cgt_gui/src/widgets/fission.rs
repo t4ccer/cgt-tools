@@ -101,19 +101,17 @@ impl IsCgtWindow for TitledWindow<FissionWindow> {
                 let mut canvas = imgui::Canvas::new(ui, &draw_list, ctx.large_font_id);
                 self.content.game.draw(&mut canvas);
                 if let Some((x, y)) = canvas.clicked_tile(self.content.game.grid()) {
-                    macro_rules! place_tile {
-                        ($tile:ident) => {
-                            if self.content.game.grid().get(x, y) != Tile::$tile {
-                                self.content.game.grid_mut().set(x, y, Tile::$tile);
-                                is_dirty = true;
-                            }
-                        };
-                    }
+                    let mut place_tile = |tile| {
+                        if self.content.game.grid().get(x, y) != tile {
+                            self.content.game.grid_mut().set(x, y, tile);
+                            is_dirty = true;
+                        }
+                    };
 
                     match self.content.editing_mode.get() {
-                        GridEditingMode::AddStone => place_tile!(Stone),
-                        GridEditingMode::BlockTile => place_tile!(Blocked),
-                        GridEditingMode::ClearTile => place_tile!(Empty),
+                        GridEditingMode::AddStone => place_tile(Tile::Stone),
+                        GridEditingMode::BlockTile => place_tile(Tile::Blocked),
+                        GridEditingMode::ClearTile => place_tile(Tile::Empty),
                         GridEditingMode::MoveLeft => {
                             let moves = self.content.game.available_moves_left();
                             if moves.contains(&(x, y)) {

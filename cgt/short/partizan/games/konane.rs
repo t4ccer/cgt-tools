@@ -3,7 +3,7 @@
 use crate::{
     drawing::{self, BoundingBox, Canvas, Color, Draw},
     grid::{vec_grid::VecGrid, FiniteGrid, Grid},
-    short::partizan::partizan_game::PartizanGame,
+    short::partizan::{partizan_game::PartizanGame, Player},
 };
 use cgt_derive::Tile;
 use std::{fmt::Display, hash::Hash, str::FromStr};
@@ -28,6 +28,15 @@ pub enum Tile {
     /// Used to model non-rectangular grids
     #[tile(char('#'))]
     Blocked,
+}
+
+impl From<Player> for Tile {
+    fn from(player: Player) -> Self {
+        match player {
+            Player::Left => Tile::Left,
+            Player::Right => Tile::Right,
+        }
+    }
 }
 
 /// Game of Konane
