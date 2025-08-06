@@ -46,7 +46,6 @@ where
         })
     }
 
-    #[must_use]
     fn zero_size() -> Self {
         Self {
             width: 0,
