@@ -1,7 +1,7 @@
 use crate::Details;
 use ::imgui::{DrawListMut, FontId, ImColor32, Ui};
 use cgt::{
-    drawing::{imgui, svg, tiny_skia, Draw},
+    drawing::{Draw, imgui, svg, tiny_skia},
     numeric::v2f::V2f,
 };
 

@@ -4,7 +4,7 @@
 extern crate alloc;
 use crate::{
     drawing::{self, BoundingBox, Canvas, Color, Draw},
-    grid::{self, decompositions, small_bit_grid::SmallBitGrid, FiniteGrid, Grid},
+    grid::{self, FiniteGrid, Grid, decompositions, small_bit_grid::SmallBitGrid},
     short::partizan::partizan_game::PartizanGame,
 };
 use cgt_derive::Tile;

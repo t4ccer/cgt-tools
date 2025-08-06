@@ -1,12 +1,12 @@
 use crate::{
-    impl_game_window, impl_titled_window,
+    Details, EvalTask, GuiContext, IsCgtWindow, Task, TitledWindow, impl_game_window,
+    impl_titled_window,
     widgets::{self, canonical_form::CanonicalFormWindow},
-    Details, EvalTask, GuiContext, IsCgtWindow, Task, TitledWindow,
 };
 use ::imgui::{Condition, Ui};
 use cgt::{
-    drawing::{imgui, Draw},
-    grid::{small_bit_grid::SmallBitGrid, BitTile, FiniteGrid, Grid},
+    drawing::{Draw, imgui},
+    grid::{BitTile, FiniteGrid, Grid, small_bit_grid::SmallBitGrid},
     short::partizan::games::domineering::{Domineering, Tile},
 };
 use std::str::FromStr;

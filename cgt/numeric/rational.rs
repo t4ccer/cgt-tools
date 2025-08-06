@@ -1,6 +1,6 @@
 //! Infinite rational number.
 
-use crate::parsing::{impl_from_str_via_parser, lexeme, try_option, Parser};
+use crate::parsing::{Parser, impl_from_str_via_parser, lexeme, try_option};
 use auto_ops::impl_op_ex;
 use num_rational::Rational64;
 use std::{

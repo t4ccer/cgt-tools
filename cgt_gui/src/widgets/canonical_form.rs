@@ -3,7 +3,7 @@ use imgui::{Condition, ImColor32};
 use std::str::FromStr;
 
 use crate::{
-    impl_titled_window, widgets, Details, GuiContext, IsCgtWindow, TitledWindow, UpdateKind,
+    Details, GuiContext, IsCgtWindow, TitledWindow, UpdateKind, impl_titled_window, widgets,
 };
 
 #[derive(Debug, Clone)]

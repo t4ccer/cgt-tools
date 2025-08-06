@@ -132,7 +132,10 @@
           src = ./.;
           hooks = {
             alejandra.enable = true;
-            rustfmt.enable = true;
+            rustfmt = {
+              enable = true;
+              args = ["--style-edition=2024"];
+            };
           };
           tools = {
             rustfmt = lib.mkForce rustToolchain;

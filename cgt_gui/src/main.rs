@@ -29,8 +29,9 @@ use std::{
     collections::{BTreeMap, VecDeque},
     marker::PhantomData,
     sync::{
+        Arc, Condvar, Mutex,
         atomic::{self, AtomicU64},
-        mpsc, Arc, Condvar, Mutex,
+        mpsc,
     },
     thread,
 };

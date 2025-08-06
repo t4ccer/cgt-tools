@@ -1,22 +1,22 @@
 use crate::{
-    imgui_enum, impl_titled_window,
+    Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow, UpdateKind, imgui_enum,
+    impl_titled_window,
     widgets::{self, canonical_form::CanonicalFormWindow, save_button},
-    Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow, UpdateKind,
 };
 use ::imgui::{ComboBoxFlags, Condition, Ui};
 use cgt::{
-    drawing::{imgui, Canvas, Color, Draw},
+    drawing::{Canvas, Color, Draw, imgui},
     graph::{
+        Graph, VertexIndex,
         adjacency_matrix::directed::DirectedGraph,
         layout::{CircleEdge, SpringEmbedder},
-        Graph, VertexIndex,
     },
     has::Has,
     impl_has,
     numeric::v2f::V2f,
     short::partizan::{
-        games::digraph_placement::{DigraphPlacement, VertexColor},
         Player,
+        games::digraph_placement::{DigraphPlacement, VertexColor},
     },
 };
 

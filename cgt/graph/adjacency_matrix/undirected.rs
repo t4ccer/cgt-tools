@@ -3,8 +3,8 @@
 use core::iter::FusedIterator;
 
 use crate::graph::{
-    adjacency_matrix::directed::{self, AdjacentIter},
     Graph, VertexIndex,
+    adjacency_matrix::directed::{self, AdjacentIter},
 };
 
 /// Undirected graph, implements [`Graph`] trait

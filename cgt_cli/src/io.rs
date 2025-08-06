@@ -1,6 +1,6 @@
 use std::{
     fs::File,
-    io::{self, stderr, stdin, stdout, Stderr, Stdin, Stdout},
+    io::{self, Stderr, Stdin, Stdout, stderr, stdin, stdout},
 };
 
 macro_rules! define_output_file_or_std {

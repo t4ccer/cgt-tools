@@ -9,7 +9,7 @@ use crate::{
     graph::{Graph, VertexIndex},
     has::Has,
     numeric::v2f::V2f,
-    short::partizan::{partizan_game::PartizanGame, Player},
+    short::partizan::{Player, partizan_game::PartizanGame},
 };
 
 /// Vertex color of Digraph Placement Game

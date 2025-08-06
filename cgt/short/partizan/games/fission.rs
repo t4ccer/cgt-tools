@@ -7,7 +7,7 @@
 
 use crate::{
     drawing::{self, BoundingBox, Canvas, Color, Draw},
-    grid::{vec_grid::VecGrid, FiniteGrid, Grid},
+    grid::{FiniteGrid, Grid, vec_grid::VecGrid},
     short::partizan::partizan_game::PartizanGame,
 };
 use cgt_derive::Tile;

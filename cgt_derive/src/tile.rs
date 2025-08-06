@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::{quote, quote_spanned};
-use syn::{parenthesized, parse_macro_input, Data, DeriveInput, Ident, LitBool, LitChar, Variant};
+use syn::{Data, DeriveInput, Ident, LitBool, LitChar, Variant, parenthesized, parse_macro_input};
 
 const TILE_ATTR: &str = "tile";
 const TILE_ATTR_DEFAULT: &str = "default";

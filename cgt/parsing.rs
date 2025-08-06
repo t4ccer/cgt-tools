@@ -134,8 +134,10 @@ impl<'s> Parser<'s> {
 
         loop {
             match bs {
-                [b @ (b'0' | b'1' | b'2' | b'3' | b'4' | b'5' | b'6' | b'7' | b'8' | b'9'), rest @ ..] =>
-                {
+                [
+                    b @ (b'0' | b'1' | b'2' | b'3' | b'4' | b'5' | b'6' | b'7' | b'8' | b'9'),
+                    rest @ ..,
+                ] => {
                     parsed_anything = true;
                     match acc.checked_mul(10) {
                         Some(a) => acc = a,
@@ -181,8 +183,10 @@ impl<'s> Parser<'s> {
 
         loop {
             match bs {
-                [b @ (b'0' | b'1' | b'2' | b'3' | b'4' | b'5' | b'6' | b'7' | b'8' | b'9'), rest @ ..] =>
-                {
+                [
+                    b @ (b'0' | b'1' | b'2' | b'3' | b'4' | b'5' | b'6' | b'7' | b'8' | b'9'),
+                    rest @ ..,
+                ] => {
                     parsed_anything = true;
                     match acc.checked_mul(10) {
                         Some(a) => acc = a,

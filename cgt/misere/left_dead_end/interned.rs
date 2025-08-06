@@ -468,7 +468,7 @@ impl Interner {
         &self,
         parser: crate::parsing::Parser<'p>,
     ) -> Option<(crate::parsing::Parser<'p>, LeftDeadEnd)> {
-        use crate::parsing::{lexeme, try_option, Parser};
+        use crate::parsing::{Parser, lexeme, try_option};
 
         let parser = parser.trim_whitespace();
         if let Some(parser) = parser.parse_ascii_char('{') {

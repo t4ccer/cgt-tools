@@ -1,18 +1,18 @@
 use ::imgui::{ComboBoxFlags, Condition, Ui};
 use cgt::{
-    drawing::{imgui, Canvas, Color, Draw},
-    grid::{vec_grid::VecGrid, FiniteGrid, Grid},
+    drawing::{Canvas, Color, Draw, imgui},
+    grid::{FiniteGrid, Grid, vec_grid::VecGrid},
     short::partizan::{
-        games::amazons::{Amazons, Tile},
         Player,
+        games::amazons::{Amazons, Tile},
     },
 };
 use std::str::FromStr;
 
 use crate::{
-    imgui_enum, impl_game_window, impl_titled_window,
+    Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow, imgui_enum,
+    impl_game_window, impl_titled_window,
     widgets::{self, canonical_form::CanonicalFormWindow},
-    Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow,
 };
 
 imgui_enum! {

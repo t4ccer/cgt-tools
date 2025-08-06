@@ -20,7 +20,7 @@ impl PyCanonicalForm {
                 Err(_) => {
                     return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
                         "Could not parse CanonicalForm. Invalid input format.",
-                    ))
+                    ));
                 }
             }
         } else if let Ok(canonical_form) = value.extract::<PyCanonicalForm>() {

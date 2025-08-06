@@ -1,7 +1,7 @@
 use crate::io::FileOrStdout;
 use anyhow::{Context, Result};
 use cgt::{
-    drawing::{svg, tiny_skia, Draw},
+    drawing::{Draw, svg, tiny_skia},
     short::partizan::{
         partizan_game::PartizanGame, transposition_table::ParallelTranspositionTable,
     },

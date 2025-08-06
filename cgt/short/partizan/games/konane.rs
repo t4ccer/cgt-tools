@@ -2,8 +2,8 @@
 
 use crate::{
     drawing::{self, BoundingBox, Canvas, Color, Draw},
-    grid::{vec_grid::VecGrid, FiniteGrid, Grid},
-    short::partizan::{partizan_game::PartizanGame, Player},
+    grid::{FiniteGrid, Grid, vec_grid::VecGrid},
+    short::partizan::{Player, partizan_game::PartizanGame},
 };
 use cgt_derive::Tile;
 use std::{fmt::Display, hash::Hash, str::FromStr};

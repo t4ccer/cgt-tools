@@ -2,7 +2,7 @@
 
 use crate::{
     numeric::rational::Rational,
-    parsing::{impl_from_str_via_parser, lexeme, try_option, Parser},
+    parsing::{Parser, impl_from_str_via_parser, lexeme, try_option},
 };
 use auto_ops::impl_op_ex;
 use std::{

@@ -160,11 +160,7 @@ pub trait CharTile: Sized {
 
 impl CharTile for bool {
     fn tile_to_char(self) -> char {
-        if self {
-            '#'
-        } else {
-            '.'
-        }
+        if self { '#' } else { '.' }
     }
 
     fn char_to_tile(input: char) -> Option<Self> {

@@ -4,7 +4,7 @@
 //!
 //! This code is heavily based on <https://github.com/alfiemd/gemau> by Alfie Davies
 
-use crate::parsing::{impl_from_str_via_parser, lexeme, try_option, Parser};
+use crate::parsing::{Parser, impl_from_str_via_parser, lexeme, try_option};
 use auto_ops::impl_op_ex;
 use std::{cmp::Ordering, fmt::Display, mem::ManuallyDrop};
 
@@ -537,17 +537,17 @@ mod tests {
     }
 
     impl LeftDeadEnd {
-        fn arbitrary_sized(gen: &mut quickcheck::Gen, size: &mut usize) -> LeftDeadEnd {
-            let is_integer = (u32::arbitrary(gen) % 10) < 4;
+        fn arbitrary_sized(generator: &mut quickcheck::Gen, size: &mut usize) -> LeftDeadEnd {
+            let is_integer = (u32::arbitrary(generator) % 10) < 4;
             if *size == 0 || is_integer {
                 *size = size.saturating_sub(1);
-                LeftDeadEnd::new_integer(u32::arbitrary(gen) % 5)
+                LeftDeadEnd::new_integer(u32::arbitrary(generator) % 5)
             } else {
-                let num_options = (usize::arbitrary(gen) % *size) % 4;
+                let num_options = (usize::arbitrary(generator) % *size) % 4;
                 *size /= num_options + 1;
                 let mut options = Vec::with_capacity(num_options);
                 for _ in 0..num_options {
-                    options.push(LeftDeadEnd::arbitrary_sized(gen, size));
+                    options.push(LeftDeadEnd::arbitrary_sized(generator, size));
                 }
                 LeftDeadEnd::new_moves(options)
             }
@@ -555,9 +555,9 @@ mod tests {
     }
 
     impl Arbitrary for LeftDeadEnd {
-        fn arbitrary(gen: &mut quickcheck::Gen) -> LeftDeadEnd {
-            let mut size = gen.size();
-            LeftDeadEnd::arbitrary_sized(gen, &mut size)
+        fn arbitrary(generator: &mut quickcheck::Gen) -> LeftDeadEnd {
+            let mut size = generator.size();
+            LeftDeadEnd::arbitrary_sized(generator, &mut size)
         }
 
         fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {

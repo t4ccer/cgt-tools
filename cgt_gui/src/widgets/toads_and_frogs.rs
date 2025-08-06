@@ -1,11 +1,11 @@
 use crate::{
-    imgui_enum, impl_game_window, impl_titled_window,
+    Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow, imgui_enum,
+    impl_game_window, impl_titled_window,
     widgets::{self, canonical_form::CanonicalFormWindow},
-    Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow,
 };
 use ::imgui::{ComboBoxFlags, Condition, Ui};
 use cgt::{
-    drawing::{imgui, Draw},
+    drawing::{Draw, imgui},
     short::partizan::games::toads_and_frogs::{Tile, ToadsAndFrogs},
 };
 use std::str::FromStr;

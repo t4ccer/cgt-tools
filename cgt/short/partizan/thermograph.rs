@@ -4,7 +4,7 @@ use crate::{
     display,
     drawing::{BoundingBox, Canvas, Color, Draw, TextAlignment},
     numeric::{dyadic_rational_number::DyadicRationalNumber, rational::Rational, v2f::V2f},
-    short::partizan::{trajectory::Trajectory, Player},
+    short::partizan::{Player, trajectory::Trajectory},
 };
 use core::fmt;
 use std::{cmp::Ordering, fmt::Display};

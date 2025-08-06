@@ -4,7 +4,7 @@ use crate::{
     display,
     macros::if_chain,
     numeric::{dyadic_rational_number::DyadicRationalNumber, nimber::Nimber, rational::Rational},
-    parsing::{impl_from_str_via_parser, lexeme, try_option, Parser},
+    parsing::{Parser, impl_from_str_via_parser, lexeme, try_option},
     short::partizan::{thermograph::Thermograph, trajectory::Trajectory},
 };
 use auto_ops::impl_op_ex;
@@ -1534,11 +1534,7 @@ mod tests {
     where
         T: Neg<Output = T>,
     {
-        if Arbitrary::arbitrary(g) {
-            n
-        } else {
-            -n
-        }
+        if Arbitrary::arbitrary(g) { n } else { -n }
     }
 
     #[test]

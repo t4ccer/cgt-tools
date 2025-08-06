@@ -5,7 +5,7 @@
 use std::fmt::Display;
 
 use crate::{
-    grid::{small_bit_grid::SmallBitGrid, CharTile, FiniteGrid, Grid},
+    grid::{CharTile, FiniteGrid, Grid, small_bit_grid::SmallBitGrid},
     short::partizan::partizan_game::PartizanGame,
 };
 use cgt_derive::Tile;
@@ -109,12 +109,14 @@ impl PartizanGame for TopplingDominoes {
 
 #[test]
 fn correct_left() {
-    let td = TopplingDominoes::new(vec![SmallBitGrid::from_arr(
-        5,
-        1,
-        &[Tile::Blue, Tile::Red, Tile::Red, Tile::Blue, Tile::Blue],
-    )
-    .unwrap()]);
+    let td = TopplingDominoes::new(vec![
+        SmallBitGrid::from_arr(
+            5,
+            1,
+            &[Tile::Blue, Tile::Red, Tile::Red, Tile::Blue, Tile::Blue],
+        )
+        .unwrap(),
+    ]);
     assert_eq!(
         td.left_moves()
             .iter()
@@ -129,12 +131,14 @@ fn correct_left() {
 
 #[test]
 fn correct_right() {
-    let td = TopplingDominoes::new(vec![SmallBitGrid::from_arr(
-        5,
-        1,
-        &[Tile::Blue, Tile::Red, Tile::Red, Tile::Blue, Tile::Blue],
-    )
-    .unwrap()]);
+    let td = TopplingDominoes::new(vec![
+        SmallBitGrid::from_arr(
+            5,
+            1,
+            &[Tile::Blue, Tile::Red, Tile::Red, Tile::Blue, Tile::Blue],
+        )
+        .unwrap(),
+    ]);
     assert_eq!(
         td.right_moves()
             .iter()
@@ -151,12 +155,14 @@ fn correct_right() {
 fn correct_canonical() {
     use crate::short::partizan::transposition_table::ParallelTranspositionTable;
 
-    let td = TopplingDominoes::new(vec![SmallBitGrid::from_arr(
-        5,
-        1,
-        &[Tile::Blue, Tile::Red, Tile::Red, Tile::Blue, Tile::Blue],
-    )
-    .unwrap()]);
+    let td = TopplingDominoes::new(vec![
+        SmallBitGrid::from_arr(
+            5,
+            1,
+            &[Tile::Blue, Tile::Red, Tile::Red, Tile::Blue, Tile::Blue],
+        )
+        .unwrap(),
+    ]);
     let tt = ParallelTranspositionTable::new();
     assert_eq!(td.canonical_form(&tt).to_string(), "{1|*}");
 }

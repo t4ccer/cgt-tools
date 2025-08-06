@@ -1,22 +1,22 @@
 use ::imgui::{ComboBoxFlags, Condition, Ui};
 use cgt::{
-    drawing::{imgui, Canvas, Color, Draw},
-    grid::{vec_grid::VecGrid, FiniteGrid, Grid},
+    drawing::{Canvas, Color, Draw, imgui},
+    grid::{FiniteGrid, Grid, vec_grid::VecGrid},
     numeric::v2f::V2f,
     short::partizan::{
-        games::ski_jumps::{Move, SkiJumps, Tile},
         Player,
+        games::ski_jumps::{Move, SkiJumps, Tile},
     },
 };
 use std::str::FromStr;
 
 use crate::{
-    imgui_enum, impl_game_window, impl_titled_window,
+    Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow, imgui_enum,
+    impl_game_window, impl_titled_window,
     widgets::{
-        self, canonical_form::CanonicalFormWindow, interactive_color, TILE_COLOR_EMPTY,
-        TILE_COLOR_FILLED, TILE_SPACING,
+        self, TILE_COLOR_EMPTY, TILE_COLOR_FILLED, TILE_SPACING,
+        canonical_form::CanonicalFormWindow, interactive_color,
     },
-    Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow,
 };
 
 const OFF_BUTTON_SCALE: f32 = 0.3;
