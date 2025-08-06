@@ -9,7 +9,7 @@ use crate::{
     graph::{Graph, VertexIndex},
     has::Has,
     numeric::v2f::V2f,
-    short::partizan::partizan_game::PartizanGame,
+    short::partizan::{partizan_game::PartizanGame, Player},
 };
 
 /// Vertex color of Digraph Placement Game
@@ -21,6 +21,15 @@ pub enum VertexColor {
 
     /// Right vertex where only Right can move
     Right,
+}
+
+impl From<Player> for VertexColor {
+    fn from(player: Player) -> VertexColor {
+        match player {
+            Player::Left => VertexColor::Left,
+            Player::Right => VertexColor::Right,
+        }
+    }
 }
 
 impl VertexColor {

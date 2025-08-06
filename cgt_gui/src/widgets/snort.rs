@@ -363,12 +363,14 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                             if let Some(end) =
                                 canvas.vertex_at_position(mouse_position, &self.content.game.graph)
                             {
-                                self.content.game.graph.connect(
-                                    start,
-                                    end,
-                                    !self.content.game.graph.are_adjacent(start, end),
-                                );
-                                is_dirty = true;
+                                if start != end {
+                                    self.content.game.graph.connect(
+                                        start,
+                                        end,
+                                        !self.content.game.graph.are_adjacent(start, end),
+                                    );
+                                    is_dirty = true;
+                                }
                             } else if self.content.edge_creates_vertex {
                                 let end = self.content.game.graph.add_vertex(PositionedVertex {
                                     kind: VertexKind::Single(VertexColor::Empty),
