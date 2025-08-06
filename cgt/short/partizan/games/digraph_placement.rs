@@ -5,8 +5,10 @@
 use std::{hash::Hash, marker::PhantomData};
 
 use crate::{
+    drawing::{self, BoundingBox, Canvas, Draw},
     graph::{Graph, VertexIndex},
     has::Has,
+    numeric::v2f::V2f,
     short::partizan::partizan_game::PartizanGame,
 };
 
@@ -73,6 +75,29 @@ where
             }
         }
         moves
+    }
+}
+
+impl<V, G> Draw for DigraphPlacement<V, G>
+where
+    V: Has<VertexColor> + Has<V2f>,
+    G: Graph<V>,
+{
+    fn draw<C>(&self, canvas: &mut C)
+    where
+        C: Canvas,
+    {
+        self.graph.draw(canvas, |vertex| match vertex.get_inner() {
+            VertexColor::Left => drawing::Color::BLUE,
+            VertexColor::Right => drawing::Color::RED,
+        });
+    }
+
+    fn required_canvas<C>(&self) -> BoundingBox
+    where
+        C: Canvas,
+    {
+        self.graph.required_canvas::<C>()
     }
 }
 
