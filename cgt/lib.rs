@@ -19,4 +19,3 @@ pub mod parsing;
 pub mod short;
 
 mod display;
-mod macros;

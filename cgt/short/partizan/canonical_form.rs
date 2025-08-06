@@ -2,7 +2,6 @@
 
 use crate::{
     display,
-    macros::if_chain,
     numeric::{dyadic_rational_number::DyadicRationalNumber, nimber::Nimber, rational::Rational},
     parsing::{Parser, impl_from_str_via_parser, lexeme, try_option},
     short::partizan::{thermograph::Thermograph, trajectory::Trajectory},
@@ -372,158 +371,146 @@ impl Moves {
     }
 
     /// Try converting moves to NUS. Returns [None] if moves do not form a NUS
-    // Macro expands to loads of ifs
     #[allow(clippy::cognitive_complexity)]
     pub fn to_nus(&self) -> Option<Nus> {
-        let mut result = Nus::new_integer(0);
-
         let num_lo = self.left.len();
         let num_ro = self.right.len();
 
-        if_chain! {
-            if num_lo == 0;
-            if num_ro == 0;
-            then {
-                // Case: {|}
-                // No left or right moves so the game is 0
-                result.number = DyadicRationalNumber::from(0);
-                result.up_multiple = 0;
-                result.nimber = Nimber::from(0);
-            };
+        if num_lo == 0 && num_ro == 0 {
+            // Case: {|}
+            // No left or right moves so the game is 0
+            Some(Nus {
+                number: DyadicRationalNumber::from(0),
+                up_multiple: 0,
+                nimber: Nimber::from(0),
+            })
+        } else if num_lo == 0 {
+            // Case: n-1 = {|n}
+            // We assume that entry is normalized, no left moves, thus there must be only one
+            // right entry that's a number
+            debug_assert!(num_ro == 1, "Entry not normalized");
+            Some(Nus {
+                number: self.right[0].to_nus_unchecked().number() - DyadicRationalNumber::from(1),
+                up_multiple: 0,
+                nimber: Nimber::from(0),
+            })
+        } else if num_ro == 0 {
+            // Case: n+1 = {n|}
+            // We assume that entry is normalized, no left moves, thus there must be only one
+            // right entry that's a number
+            debug_assert!(num_lo == 1, "Entry not normalized");
+            Some(Nus {
+                number: self.left[0].to_nus_unchecked().number() + DyadicRationalNumber::from(1),
+                up_multiple: 0,
+                nimber: Nimber::from(0),
+            })
+        } else if let [left_move] = &self.left[..]
+            && let [right_move] = &self.right[..]
+            && let Some(left_number) = left_move.to_number()
+            && let Some(right_number) = right_move.to_number()
+            && left_number < right_number
+        {
+            // Case: {n|m}, n < m
+            // We're a number but not an integer.  Conveniently, since the option lists are
+            // canonicalized, the value of this game is the mean of its left & right moves.
 
-            if num_lo == 0;
-            then {
-                // Case: n-1 = {|n}
-                // We assume that entry is normalized, no left moves, thus there must be only one
-                // right entry that's a number
-                debug_assert!(num_ro == 1, "Entry not normalized");
-                result.number =
-                    self.right[0].to_nus_unchecked().number() - DyadicRationalNumber::from(1);
-                result.up_multiple = 0;
-                result.nimber = Nimber::from(0);
-            };
+            Some(Nus {
+                number: DyadicRationalNumber::mean(&left_number, &right_number),
+                up_multiple: 0,
+                nimber: Nimber::from(0),
+            })
+        } else if let [left_move1, left_move2] = &self.left[..]
+            && let [right_move] = &self.right[..]
+            && let Some(left_number) = left_move1.to_number()
+            && left_move1 == right_move
+            && let Some(left_nus) = left_move2.to_nus()
+            && left_number == left_nus.number()
+            && left_nus.up_multiple() == 0
+            && left_nus.nimber() == Nimber::new(1)
+        {
+            // Case: {n,n*|n}
+            Some(Nus {
+                number: left_number,
+                up_multiple: 1,
+                nimber: Nimber::from(1),
+            })
+        } else if let [left_move] = &self.left[..]
+            && let [right_move1, right_move2] = &self.right[..]
+            && let Some(right_number) = right_move1.to_number()
+            && left_move == right_move1
+            && let Some(right_nus) = right_move2.to_nus()
+            && right_number == right_nus.number()
+            && right_nus.up_multiple() == 0
+            && right_nus.nimber() == Nimber::new(1)
+        {
+            // Inverse of the previous one
+            Some(Nus {
+                number: right_number,
+                up_multiple: -1,
+                nimber: Nimber::from(1),
+            })
+        } else if let [left_move] = &self.left[..]
+            && let [right_move] = &self.right[..]
+            && let Some(left_number) = left_move.to_number()
+            && let Some(right_nus) = right_move.to_nus()
+            && !right_nus.is_number()
+            && left_number == right_nus.number()
+            && right_nus.up_multiple() >= 0
+        {
+            // Case: n + {0|G}, G is a number-up-star of up multiple >= 0
+            Some(Nus {
+                number: right_nus.number(),
+                up_multiple: right_nus.up_multiple() + 1,
+                nimber: right_nus.nimber() + Nimber::from(1),
+            })
+        } else if let [left_move] = &self.left[..]
+            && let [right_move] = &self.right[..]
+            && let Some(left_nus) = left_move.to_nus()
+            && let Some(right_number) = right_move.to_number()
+            && !left_nus.is_number()
+            && right_number == left_nus.number()
+            && left_nus.up_multiple() <= 0
+        {
+            // Inverse of the previous one
+            Some(Nus {
+                number: left_nus.number(),
+                up_multiple: left_nus.up_multiple() - 1,
+                nimber: left_nus.nimber() + Nimber::from(1),
+            })
+        } else if num_lo >= 1
+            && num_lo == num_ro
+            && let Some(left_number) = self.left[0].to_number()
+            && self.left[0] == self.right[0]
+        {
+            // Case: n + *k
+            // If doesn't hold then it's not a NUS
 
-            if num_ro == 0;
-            then {
-                // Case: n+1 = {n|}
-                // We assume that entry is normalized, no left moves, thus there must be only one
-                // right entry that's a number
-                debug_assert!(num_lo == 1, "Entry not normalized");
-                result.number =
-                    self.left[0].to_nus_unchecked().number() + DyadicRationalNumber::from(1);
-                result.up_multiple = 0;
-                result.nimber = Nimber::from(0);
-            };
+            for i in 0..num_lo {
+                let l = &self.left[i];
+                let r = &self.right[i];
 
-            if let [left_move] = &self.left[..];
-            if let [right_move] = &self.right[..];
-            if let Some(left_number) = left_move.to_number();
-            if let Some(right_number) = right_move.to_number();
-            if left_number < right_number;
-            then {
-                // Case: {n|m}, n < m
-                // We're a number but not an integer.  Conveniently, since the option lists are
-                // canonicalized, the value of this game is the mean of its left & right moves.
-                result.number = DyadicRationalNumber::mean(&left_number, &right_number);
-                result.up_multiple = 0;
-                result.nimber = Nimber::from(0);
-            };
-
-            if let [left_move1, left_move2] = &self.left[..];
-            if let [right_move] = &self.right[..];
-            if let Some(left_number) = left_move1.to_number();
-            if left_move1 == right_move;
-            if let Some(left_nus) = left_move2.to_nus();
-            if left_number == left_nus.number();
-            if left_nus.up_multiple() == 0;
-            if left_nus.nimber() == Nimber::new(1);
-            then {
-                // Case: {n,n*|n}
-                result.number = left_number;
-                result.up_multiple = 1;
-                result.nimber = Nimber::from(1);
-            };
-
-            if let [left_move] = &self.left[..];
-            if let [right_move1, right_move2] = &self.right[..];
-            if let Some(right_number) = right_move1.to_number();
-            if left_move == right_move1;
-            if let Some(right_nus) = right_move2.to_nus();
-            if right_number == right_nus.number();
-            if right_nus.up_multiple() == 0;
-            if right_nus.nimber() == Nimber::new(1);
-            then {
-                // Inverse of the previous one
-                result.number = right_number;
-                result.up_multiple = -1;
-                result.nimber = Nimber::from(1);
-            };
-
-            if let [left_move] = &self.left[..];
-            if let [right_move] = &self.right[..];
-            if let Some(left_number) = left_move.to_number();
-            if let Some(right_nus) = right_move.to_nus();
-            if !right_nus.is_number();
-            if left_number == right_nus.number();
-            if right_nus.up_multiple() >= 0;
-            then {
-                // Case: n + {0|G}, G is a number-up-star of up multiple >= 0
-                result.number = right_nus.number();
-                result.up_multiple = right_nus.up_multiple() + 1;
-                result.nimber = right_nus.nimber() + Nimber::from(1);
-            };
-
-            if let [left_move] = &self.left[..];
-            if let [right_move] = &self.right[..];
-            if let Some(left_nus) = left_move.to_nus();
-            if let Some(right_number) = right_move.to_number();
-            if !left_nus.is_number();
-            if right_number == left_nus.number();
-            if left_nus.up_multiple() <= 0;
-            then {
-                // Inverse of the previous one
-                result.number = left_nus.number();
-                result.up_multiple = left_nus.up_multiple() - 1;
-                result.nimber = left_nus.nimber() + Nimber::from(1);
-            };
-
-            if num_lo >= 1;
-            if num_lo == num_ro;
-            if let Some(left_number) = self.left[0].to_number();
-            if self.left[0] == self.right[0];
-            then {
-                // Case: n + *k
-                // If doesn't hold then it's not a NUS
-
-                for i in 0..num_lo {
-                    let l = &self.left[i];
-                    let r = &self.right[i];
-
-                    if l != r
-                        || !l.is_number_up_star()
-                        || l.to_nus_unchecked().number() != r.to_nus_unchecked().number()
-                    {
-                        return None;
-                    }
-
-                    if l.to_nus_unchecked().up_multiple() != 0
-                        || l.to_nus_unchecked().nimber().value() != (i as u32)
-                    {
-                        return None;
-                    }
+                if l != r
+                    || !l.is_number_up_star()
+                    || l.to_nus_unchecked().number() != r.to_nus_unchecked().number()
+                {
+                    return None;
                 }
-                // It's a nimber
-                result.number = left_number;
-                result.up_multiple = 0;
-                result.nimber = Nimber::from(num_lo as u32);
-            };
 
-            else {
-                return None;
-            };
-        };
-
-        Some(result)
+                if l.to_nus_unchecked().up_multiple() != 0
+                    || l.to_nus_unchecked().nimber().value() != (i as u32)
+                {
+                    return None;
+                }
+            }
+            // It's a nimber
+            Some(Nus {
+                number: left_number,
+                up_multiple: 0,
+                nimber: Nimber::from(num_lo as u32),
+            })
+        } else {
+            None
+        }
     }
 
     // TODO: Rewrite it to work on mutable vec and not clone
