@@ -2,8 +2,9 @@
 
 use crate::{
     display,
-    numeric::{dyadic_rational_number::DyadicRationalNumber, rational::Rational},
-    short::partizan::trajectory::Trajectory,
+    drawing::{BoundingBox, Canvas, Color, Draw, TextAlignment},
+    numeric::{dyadic_rational_number::DyadicRationalNumber, rational::Rational, v2f::V2f},
+    short::partizan::{trajectory::Trajectory, Player},
 };
 use core::fmt;
 use std::{cmp::Ordering, fmt::Display};
@@ -480,6 +481,228 @@ impl Thermograph {
             left_wall,
             right_wall,
         }
+    }
+
+    /// Draw thermograph with scale (length of one thermograph unit)
+    pub fn draw_scaled<C>(&self, canvas: &mut C, scale: f32)
+    where
+        C: Canvas,
+    {
+        let padding = 0.5;
+        let mast_height = 0.5;
+
+        let left_x = self
+            .left_wall
+            .value_at(Rational::from(-1))
+            .as_f32()
+            .unwrap();
+        let right_x = self
+            .right_wall
+            .value_at(Rational::from(-1))
+            .as_f32()
+            .unwrap();
+        let y_top_above_x_axis_l = self
+            .left_wall
+            .critical_points
+            .first()
+            .copied()
+            .and_then(Rational::as_f32)
+            .unwrap_or(0.0);
+        let y_top_above_x_axis_r = self
+            .right_wall
+            .critical_points
+            .first()
+            .copied()
+            .and_then(Rational::as_f32)
+            .unwrap_or(0.0);
+        let y_top_above_x_axis = y_top_above_x_axis_l.max(y_top_above_x_axis_r);
+
+        let x_axis_position_y = y_top_above_x_axis;
+        canvas.line(
+            scale
+                * V2f {
+                    x: -left_x,
+                    y: x_axis_position_y,
+                },
+            scale
+                * V2f {
+                    x: -right_x + padding * 2.0,
+                    y: x_axis_position_y,
+                },
+            C::thin_line_weight(),
+            Color::LIGHT_GRAY,
+        );
+
+        if left_x >= 0.0 && right_x <= 0.0 {
+            let y_axis_position_x = padding;
+            canvas.line(
+                scale
+                    * V2f {
+                        x: y_axis_position_x,
+                        y: -1.0,
+                    },
+                scale
+                    * V2f {
+                        x: y_axis_position_x,
+                        y: y_top_above_x_axis + padding * 2.0 + mast_height,
+                    },
+                C::thin_line_weight(),
+                Color::LIGHT_GRAY,
+            );
+        }
+
+        let mut draw_trajectory = |trajectory: &Trajectory, side: Player| {
+            let mut prev_x = -trajectory.mast_x_intercept().as_f32().unwrap();
+            let mut prev_y = y_top_above_x_axis;
+
+            // TODO: Inject points for y=0 if do not exist
+            for (point_idx, this_y_r) in trajectory
+                .critical_points
+                .iter()
+                .copied()
+                .chain(std::iter::once(Rational::from(-1)))
+                .enumerate()
+            {
+                let this_x_r = trajectory.value_at(this_y_r);
+
+                let this_x = -this_x_r.as_f32().unwrap();
+                let this_y = this_y_r.as_f32().unwrap();
+
+                let prev_point = scale
+                    * V2f {
+                        x: prev_x + padding,
+                        y: y_top_above_x_axis - 1.0 + padding + mast_height - prev_y,
+                    };
+                let this_point = scale
+                    * V2f {
+                        x: this_x + padding,
+                        y: y_top_above_x_axis - 1.0 + padding + mast_height - this_y,
+                    };
+
+                // TODO: Better heuristic if top-most point should be on the left or right
+                if point_idx > 0 || matches!(side, Player::Right) {
+                    let alignment = match side {
+                        Player::Left => TextAlignment::Left,
+                        Player::Right => TextAlignment::Right,
+                    };
+                    canvas.text(
+                        this_point,
+                        format_args!("({this_x_r}, {this_y_r})"),
+                        alignment,
+                        Color::BLACK,
+                    );
+                }
+
+                canvas.line(prev_point, this_point, C::thick_line_weight(), Color::BLACK);
+
+                prev_x = this_x;
+                prev_y = this_y;
+            }
+        };
+
+        draw_trajectory(&self.left_wall, Player::Left);
+        draw_trajectory(&self.right_wall, Player::Right);
+
+        let mast_x = -self.left_wall.mast_x_intercept().as_f32().unwrap();
+        let mast_y = y_top_above_x_axis;
+        canvas.line(
+            scale
+                * V2f {
+                    x: mast_x + padding,
+                    y: y_top_above_x_axis - 1.0 + padding + mast_height - mast_y,
+                },
+            scale
+                * V2f {
+                    x: mast_x + padding,
+                    y: y_top_above_x_axis - 1.0 + padding - mast_y,
+                },
+            C::thick_line_weight(),
+            Color::BLACK,
+        );
+        canvas.line(
+            scale
+                * V2f {
+                    x: mast_x + padding + 0.2,
+                    y: y_top_above_x_axis - 1.0 + padding - mast_y + 0.2,
+                },
+            scale
+                * V2f {
+                    x: mast_x + padding,
+                    y: y_top_above_x_axis - 1.0 + padding - mast_y,
+                },
+            C::thick_line_weight(),
+            Color::BLACK,
+        );
+        canvas.line(
+            scale
+                * V2f {
+                    x: mast_x + padding - 0.2,
+                    y: y_top_above_x_axis - 1.0 + padding - mast_y + 0.2,
+                },
+            scale
+                * V2f {
+                    x: mast_x + padding,
+                    y: y_top_above_x_axis - 1.0 + padding - mast_y,
+                },
+            C::thick_line_weight(),
+            Color::BLACK,
+        );
+    }
+
+    /// Measure thermograph with scale (length of one thermograph unit)
+    pub fn required_canvas_scaled<C>(&self, scale: f32) -> BoundingBox
+    where
+        C: Canvas,
+    {
+        let padding = 0.5;
+        let mast_height = 0.5;
+
+        let left_x = self.left_wall.value_at(Rational::from(-1));
+        let right_x = self.right_wall.value_at(Rational::from(-1));
+        let y_top_above_x_axis_l = self
+            .left_wall
+            .critical_points
+            .first()
+            .copied()
+            .and_then(Rational::as_f32)
+            .unwrap_or(0.0);
+        let y_top_above_x_axis_r = self
+            .right_wall
+            .critical_points
+            .first()
+            .copied()
+            .and_then(Rational::as_f32)
+            .unwrap_or(0.0);
+        let y_top_above_x_axis = y_top_above_x_axis_l.max(y_top_above_x_axis_r);
+
+        BoundingBox {
+            top_left: scale
+                * V2f {
+                    x: -left_x.as_f32().unwrap(),
+                    y: y_top_above_x_axis + padding * 2.0 + mast_height,
+                },
+            bottom_right: scale
+                * V2f {
+                    x: -right_x.as_f32().unwrap() + padding * 2.0,
+                    y: -1.0,
+                },
+        }
+    }
+}
+
+impl Draw for Thermograph {
+    fn draw<C>(&self, canvas: &mut C)
+    where
+        C: Canvas,
+    {
+        self.draw_scaled(canvas, 64.0)
+    }
+
+    fn required_canvas<C>(&self) -> BoundingBox
+    where
+        C: Canvas,
+    {
+        self.required_canvas_scaled::<C>(64.0)
     }
 }
 

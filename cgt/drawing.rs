@@ -2,6 +2,8 @@
 
 //! Drawing module
 
+use std::fmt::Arguments;
+
 use crate::{graph::VertexIndex, numeric::v2f::V2f};
 
 pub mod svg;
@@ -97,6 +99,13 @@ pub enum Tile {
     },
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum TextAlignment {
+    Left,
+    Center,
+    Right,
+}
+
 /// Anything that can be used for drawing
 pub trait Canvas {
     fn rect(&mut self, position: V2f, size: V2f, color: Color);
@@ -104,6 +113,8 @@ pub trait Canvas {
     fn circle(&mut self, position: V2f, radius: f32, color: Color);
 
     fn line(&mut self, start: V2f, end: V2f, weight: f32, color: Color);
+
+    fn text(&mut self, position: V2f, text: Arguments<'_>, alignment: TextAlignment, color: Color);
 
     fn large_char(&mut self, letter: char, position: V2f, color: Color);
 
@@ -271,7 +282,10 @@ pub struct BoundingBox {
 
 impl BoundingBox {
     pub fn size(self) -> V2f {
-        self.bottom_right - self.top_left
+        V2f {
+            x: self.bottom_right.x - self.top_left.x,
+            y: self.top_left.y - self.bottom_right.y,
+        }
     }
 }
 

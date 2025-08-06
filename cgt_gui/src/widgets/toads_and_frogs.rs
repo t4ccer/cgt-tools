@@ -98,7 +98,8 @@ impl IsCgtWindow for TitledWindow<ToadsAndFrogsWindow> {
 
                 ui.spacing();
 
-                let mut canvas = imgui::Canvas::new(ui, &draw_list, ctx.large_font_id);
+                let mut canvas =
+                    imgui::Canvas::new(ui, &draw_list, ctx.large_font_id, &mut self.scratch_buffer);
                 self.content.game.draw(&mut canvas);
                 if let Some((x, _)) = canvas.clicked_tile(&self.content.game.grid()) {
                     let grid_x = x as usize;
@@ -182,7 +183,13 @@ impl IsCgtWindow for TitledWindow<ToadsAndFrogsWindow> {
                 // Section: Right of grid
                 ui.next_column();
 
-                widgets::game_details!(self, ui, draw_list);
+                widgets::game_details(
+                    self.content.details.as_ref(),
+                    &mut self.scratch_buffer,
+                    ui,
+                    &draw_list,
+                    ctx.large_font_id,
+                );
 
                 if new_width > width {
                     self.content.game.row_mut().push(Tile::Empty);

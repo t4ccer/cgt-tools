@@ -186,7 +186,8 @@ impl IsCgtWindow for TitledWindow<SkiJumpsWindow> {
                     grid_start_pos.y,
                 ]);
 
-                let mut canvas = imgui::Canvas::new(ui, &draw_list, ctx.large_font_id);
+                let mut canvas =
+                    imgui::Canvas::new(ui, &draw_list, ctx.large_font_id, &mut self.scratch_buffer);
                 self.content.game.draw(&mut canvas);
 
                 if matches!(editing_mode, GridEditingMode::MoveLeft) {
@@ -318,7 +319,13 @@ impl IsCgtWindow for TitledWindow<SkiJumpsWindow> {
                 // Section: Right of grid
                 ui.next_column();
 
-                widgets::game_details!(self, ui, draw_list);
+                widgets::game_details(
+                    self.content.details.as_ref(),
+                    &mut self.scratch_buffer,
+                    ui,
+                    &draw_list,
+                    ctx.large_font_id,
+                );
 
                 // SAFETY: We're fine because we're not pushing any style changes
                 let pad_x = unsafe { ui.style().window_padding[0] };

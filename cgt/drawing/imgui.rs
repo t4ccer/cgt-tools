@@ -6,6 +6,9 @@ use crate::{
     numeric::v2f::V2f,
 };
 use imgui::{DrawListMut, FontId};
+use std::fmt::Write;
+
+use super::TextAlignment;
 
 // TODO: Move cursor to the bottom after drawing?
 
@@ -16,6 +19,7 @@ pub struct Canvas<'ui> {
     large_font_id: FontId,
     clicked_position: Option<V2f>,
     pressed_position: Option<V2f>,
+    scratch_buffer: &'ui mut String,
 }
 
 impl<'ui> Canvas<'ui> {
@@ -23,6 +27,7 @@ impl<'ui> Canvas<'ui> {
         ui: &'ui imgui::Ui,
         draw_list: &'ui DrawListMut<'ui>,
         large_font_id: FontId,
+        scratch_buffer: &'ui mut String,
     ) -> Self {
         Self {
             start_position: V2f::from(ui.cursor_screen_pos()),
@@ -31,6 +36,7 @@ impl<'ui> Canvas<'ui> {
             large_font_id,
             clicked_position: None,
             pressed_position: None,
+            scratch_buffer,
         }
     }
 
@@ -122,6 +128,43 @@ impl drawing::Canvas for Canvas<'_> {
             .build();
     }
 
+    fn text(
+        &mut self,
+        position: V2f,
+        content: std::fmt::Arguments<'_>,
+        alignment: drawing::TextAlignment,
+        color: Color,
+    ) {
+        self.scratch_buffer.clear();
+        write!(self.scratch_buffer, "{}", content).unwrap();
+        let size = V2f::from(self.ui.calc_text_size(&self.scratch_buffer));
+        let position = match alignment {
+            TextAlignment::Left => {
+                self.start_position + position
+                    - V2f {
+                        x: 0.0,
+                        y: size.y * 0.5,
+                    }
+            }
+            TextAlignment::Center => {
+                self.start_position + position
+                    - V2f {
+                        x: size.x * 0.5,
+                        y: size.y * 0.5,
+                    }
+            }
+            TextAlignment::Right => {
+                self.start_position + position
+                    - V2f {
+                        x: size.x,
+                        y: size.y * 0.5,
+                    }
+            }
+        };
+        self.draw_list
+            .add_text(position, color, &self.scratch_buffer);
+    }
+
     fn large_char(&mut self, letter: char, position: V2f, color: Color) {
         let _large_font = self.ui.push_font(self.large_font_id);
         let mut buf: [u8; 4] = [0; 4];
@@ -180,14 +223,6 @@ impl drawing::Canvas for Canvas<'_> {
             .build();
     }
 
-    fn tile_size() -> V2f {
-        V2f { x: 64.0, y: 64.0 }
-    }
-
-    fn thick_line_weight() -> f32 {
-        2.0
-    }
-
     fn vertex(&mut self, position: V2f, color: Color, idx: VertexIndex) {
         let radius = Self::vertex_radius();
 
@@ -216,5 +251,13 @@ impl drawing::Canvas for Canvas<'_> {
 
         self.circle(position, radius, Color::BLACK);
         self.circle(position, radius - 1.0, self.faded(color));
+    }
+
+    fn tile_size() -> V2f {
+        V2f { x: 64.0, y: 64.0 }
+    }
+
+    fn thick_line_weight() -> f32 {
+        2.0
     }
 }

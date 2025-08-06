@@ -293,7 +293,8 @@ impl IsCgtWindow for TitledWindow<DigraphPlacementWindow> {
                     .then(|| V2f::from(ui.io().mouse_pos) - graph_area_position);
                 ui.set_cursor_screen_pos(graph_area_position);
 
-                let mut canvas = imgui::Canvas::new(ui, &draw_list, ctx.large_font_id);
+                let mut canvas =
+                    imgui::Canvas::new(ui, &draw_list, ctx.large_font_id, &mut self.scratch_buffer);
                 self.content.game.draw(&mut canvas);
 
                 let pressed = canvas.pressed_vertex(&self.content.game.graph);
@@ -413,7 +414,13 @@ impl IsCgtWindow for TitledWindow<DigraphPlacementWindow> {
                 }
 
                 ui.next_column();
-                widgets::game_details!(self, ui, draw_list);
+                widgets::game_details(
+                    self.content.details.as_ref(),
+                    &mut self.scratch_buffer,
+                    ui,
+                    &draw_list,
+                    ctx.large_font_id,
+                );
 
                 if is_dirty {
                     self.content.details = None;

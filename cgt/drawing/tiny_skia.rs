@@ -16,8 +16,12 @@ pub struct Canvas {
 impl Canvas {
     pub fn new(viewport: BoundingBox) -> Canvas {
         let size = viewport.size();
+        let offset = V2f {
+            x: -viewport.top_left.x,
+            y: -viewport.bottom_right.y,
+        };
         Canvas {
-            offset: -viewport.top_left,
+            offset,
             pixmap: tiny_skia::Pixmap::new(size.x as u32, size.y as u32).unwrap(),
         }
     }
@@ -72,6 +76,16 @@ impl super::Canvas for Canvas {
             tiny_skia::Transform::identity(),
             None,
         );
+    }
+
+    fn text(
+        &mut self,
+        _position: V2f,
+        _text: std::fmt::Arguments<'_>,
+        _alignment: super::TextAlignment,
+        _color: Color,
+    ) {
+        // TODO: Not implemented to not crash the whole renderer
     }
 
     fn large_char(&mut self, _letter: char, _position: V2f, _color: Color) {

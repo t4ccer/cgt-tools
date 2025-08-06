@@ -83,7 +83,13 @@ impl IsCgtWindow for TitledWindow<CanonicalFormWindow> {
                     );
                 }
 
-                widgets::game_details!(self, ui, draw_list);
+                widgets::game_details(
+                    self.content.details.as_ref(),
+                    &mut self.scratch_buffer,
+                    ui,
+                    &draw_list,
+                    ctx.large_font_id,
+                );
             });
     }
 

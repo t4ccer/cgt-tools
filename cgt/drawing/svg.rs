@@ -1,7 +1,7 @@
 //! Canvas that can draw to SVG
 
 use crate::{
-    drawing::{BoundingBox, Color},
+    drawing::{BoundingBox, Color, TextAlignment},
     numeric::v2f::V2f,
 };
 use core::fmt::Write;
@@ -107,8 +107,11 @@ impl<'buf, 'tag> Tag<'buf, 'tag, Open> {
 }
 
 impl Tag<'_, '_, Content> {
-    fn content(&mut self, value: &str) {
-        self.buffer.push_str(value);
+    fn content<T>(&mut self, value: &T)
+    where
+        T: Display,
+    {
+        write!(self.buffer, "{}", value).unwrap();
     }
 }
 
@@ -122,9 +125,9 @@ impl Canvas {
             buffer: format!(
                 "<svg viewBox=\"{} {} {} {}\">",
                 viewport.top_left.x,
-                viewport.top_left.y,
+                viewport.bottom_right.y,
                 viewport.bottom_right.x - viewport.top_left.x,
-                viewport.bottom_right.y - viewport.top_left.y
+                viewport.top_left.y - viewport.bottom_right.y,
             ),
         }
     }
@@ -187,6 +190,32 @@ impl crate::drawing::Canvas for Canvas {
         line.attribute("stroke", Rgba(color));
     }
 
+    fn text(
+        &mut self,
+        position: V2f,
+        content: std::fmt::Arguments<'_>,
+        alignment: super::TextAlignment,
+        color: Color,
+    ) {
+        let mut text = self.tag("text");
+        text.attribute("x", position.x);
+        text.attribute("y", position.y);
+        text.attribute(
+            "text-anchor",
+            match alignment {
+                TextAlignment::Left => "start",
+                TextAlignment::Center => "middle",
+                TextAlignment::Right => "end",
+            },
+        );
+        text.attribute("dominant-baseline", "central");
+        text.attribute("font-size", "13px");
+        text.attribute("fill", Rgba(color));
+
+        let mut text = text.finish_attributes();
+        text.content(&content);
+    }
+
     fn large_char(&mut self, letter: char, position: V2f, color: Color) {
         let tile_size = Self::tile_size();
 
@@ -201,7 +230,7 @@ impl crate::drawing::Canvas for Canvas {
         let mut text = text.finish_attributes();
         let mut buf = [0u8; 4];
         let content = letter.encode_utf8(&mut buf);
-        text.content(content);
+        text.content(&content);
     }
 
     fn tile_size() -> V2f {

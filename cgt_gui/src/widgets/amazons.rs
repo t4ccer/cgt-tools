@@ -135,7 +135,8 @@ impl IsCgtWindow for TitledWindow<AmazonsWindow> {
                 widgets::grid_size_selector(ui, &mut new_width, &mut new_height);
                 ui.spacing();
 
-                let mut canvas = imgui::Canvas::new(ui, &draw_list, ctx.large_font_id);
+                let mut canvas =
+                    imgui::Canvas::new(ui, &draw_list, ctx.large_font_id, &mut self.scratch_buffer);
                 self.content.game.draw(&mut canvas);
                 if let Some((x, y)) = canvas.clicked_tile(self.content.game.grid()) {
                     match Edit::from(self.content.editing_mode.get()) {
@@ -234,8 +235,13 @@ impl IsCgtWindow for TitledWindow<AmazonsWindow> {
 
                 // Section: Right of grid
                 ui.next_column();
-
-                widgets::game_details!(self, ui, draw_list);
+                widgets::game_details(
+                    self.content.details.as_ref(),
+                    &mut self.scratch_buffer,
+                    ui,
+                    &draw_list,
+                    ctx.large_font_id,
+                );
 
                 // SAFETY: We're fine because we're not pushing any style changes
                 let pad_x = unsafe { ui.style().window_padding[0] };
