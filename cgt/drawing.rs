@@ -235,14 +235,14 @@ pub trait Canvas {
     }
 
     fn vertex(&mut self, position: V2f, color: Color, _idx: VertexIndex) {
-        let radius = Self::node_radius();
+        let radius = Self::vertex_radius();
         self.circle(position, radius, Color::BLACK);
         self.circle(position, radius - 1.0, color);
     }
 
     fn tile_size() -> V2f;
 
-    fn node_radius() -> f32 {
+    fn vertex_radius() -> f32 {
         // FIXME: Remove default
         Self::tile_size().x * 0.25
     }

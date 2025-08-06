@@ -115,10 +115,10 @@ impl SnortWindow {
 
     pub fn reposition_circle(&mut self) {
         let circle = CircleEdge {
-            circle_radius: imgui::Canvas::node_radius()
+            circle_radius: imgui::Canvas::vertex_radius()
                 * (self.game.graph.size() as f32 + 4.0)
                 * 0.5,
-            vertex_radius: imgui::Canvas::node_radius(),
+            vertex_radius: imgui::Canvas::vertex_radius(),
         };
         circle.layout(&mut self.game.graph);
     }
@@ -137,17 +137,17 @@ impl SnortWindow {
                     iterations: 1 << 14,
                     bounds: Some((
                         V2f {
-                            x: imgui::Canvas::node_radius(),
-                            y: imgui::Canvas::node_radius(),
+                            x: imgui::Canvas::vertex_radius(),
+                            y: imgui::Canvas::vertex_radius(),
                         },
                         V2f {
                             x: f32::max(
-                                imgui::Canvas::node_radius(),
-                                imgui::Canvas::node_radius().mul_add(-2.0, graph_panel_size.x),
+                                imgui::Canvas::vertex_radius(),
+                                imgui::Canvas::vertex_radius().mul_add(-2.0, graph_panel_size.x),
                             ),
                             y: f32::max(
-                                imgui::Canvas::node_radius(),
-                                imgui::Canvas::node_radius().mul_add(-2.0, graph_panel_size.y),
+                                imgui::Canvas::vertex_radius(),
+                                imgui::Canvas::vertex_radius().mul_add(-2.0, graph_panel_size.y),
                             ),
                         },
                     )),

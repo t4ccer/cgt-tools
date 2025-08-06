@@ -68,7 +68,10 @@ impl<'ui> Canvas<'ui> {
     {
         for vertex_idx in graph.vertex_indices() {
             let vertex_position: V2f = *graph.get_vertex(vertex_idx).get_inner();
-            if position.inside_circle(vertex_position, <Canvas as drawing::Canvas>::node_radius()) {
+            if position.inside_circle(
+                vertex_position,
+                <Canvas as drawing::Canvas>::vertex_radius(),
+            ) {
                 return Some(vertex_idx);
             }
         }
@@ -186,7 +189,7 @@ impl drawing::Canvas for Canvas<'_> {
     }
 
     fn vertex(&mut self, position: V2f, color: Color, idx: VertexIndex) {
-        let radius = Self::node_radius();
+        let radius = Self::vertex_radius();
 
         let _tile_id = self.ui.push_id_usize(idx.index);
 

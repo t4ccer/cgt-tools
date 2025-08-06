@@ -146,17 +146,64 @@ pub trait Graph<V>: Sized {
         V: Has<V2f>,
         C: Canvas,
     {
-        // TODO: Move up graph drawing code to Graph trait
+        let radius = C::vertex_radius();
+        let arrow_head_size = radius * 0.3;
+
         for this_vertex_idx in self.vertex_indices() {
             let this_position: V2f = *self.get_vertex(this_vertex_idx).get_inner();
-            for adjacent_vertex_id in self.adjacent_to(this_vertex_idx) {
-                let adjacent_position: V2f = *self.get_vertex(adjacent_vertex_id).get_inner();
-                canvas.line(
-                    this_position,
-                    adjacent_position,
-                    C::thin_line_weight(),
-                    Color::BLACK,
-                );
+            for adjacent_vertex_idx in self.adjacent_to(this_vertex_idx) {
+                let adjacent_both_ways = self.are_adjacent(adjacent_vertex_idx, this_vertex_idx);
+                if !adjacent_both_ways || this_vertex_idx < adjacent_vertex_idx {
+                    let adjacent_position = *self.get_vertex(adjacent_vertex_idx).get_inner();
+                    let direction = V2f::direction(this_position, adjacent_position);
+                    let edge_start_pos = this_position + direction * radius;
+                    let edge_end_pos = adjacent_position - direction * radius;
+
+                    if V2f::distance(this_position, adjacent_position) < 2.0 * radius {
+                        continue;
+                    }
+
+                    canvas.line(
+                        edge_start_pos,
+                        edge_end_pos,
+                        C::thin_line_weight(),
+                        Color::BLACK,
+                    );
+
+                    // If connection is both ways then we do not draw arrow heads
+                    if !adjacent_both_ways {
+                        canvas.line(
+                            edge_end_pos,
+                            V2f {
+                                x: direction.y.mul_add(
+                                    arrow_head_size,
+                                    direction.x.mul_add(-arrow_head_size, edge_end_pos.x),
+                                ),
+                                y: direction.x.mul_add(
+                                    -arrow_head_size,
+                                    direction.y.mul_add(-arrow_head_size, edge_end_pos.y),
+                                ),
+                            },
+                            C::thin_line_weight(),
+                            Color::BLACK,
+                        );
+                        canvas.line(
+                            edge_end_pos,
+                            V2f {
+                                x: direction.y.mul_add(
+                                    -arrow_head_size,
+                                    direction.x.mul_add(-arrow_head_size, edge_end_pos.x),
+                                ),
+                                y: direction.x.mul_add(
+                                    arrow_head_size,
+                                    direction.y.mul_add(-arrow_head_size, edge_end_pos.y),
+                                ),
+                            },
+                            C::thin_line_weight(),
+                            Color::BLACK,
+                        );
+                    }
+                }
             }
         }
 
@@ -183,7 +230,7 @@ pub trait Graph<V>: Sized {
             };
         }
 
-        let r = C::node_radius();
+        let r = C::vertex_radius();
         self.vertex_indices()
             .map(|idx| *self.get_vertex(idx).get_inner())
             .fold(
