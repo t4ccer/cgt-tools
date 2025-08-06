@@ -24,3 +24,19 @@ impl<T> Has<T> for T {
         self
     }
 }
+
+/// Generate boilerplate for Has trait
+#[macro_export]
+macro_rules! impl_has {
+    ($ty:ident -> $getter:ident -> $res:ident) => {
+        impl Has<$res> for $ty {
+            fn get_inner(&self) -> &$res {
+                &self.$getter
+            }
+
+            fn get_inner_mut(&mut self) -> &mut $res {
+                &mut self.$getter
+            }
+        }
+    };
+}

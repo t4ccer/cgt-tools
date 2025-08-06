@@ -12,6 +12,7 @@ use cgt::{
         Graph, VertexIndex,
     },
     has::Has,
+    impl_has,
     numeric::v2f::V2f,
     short::partizan::games::snort::{Snort, VertexColor, VertexKind},
 };
@@ -42,20 +43,6 @@ imgui_enum! {
 pub struct PositionedVertex {
     kind: VertexKind,
     position: V2f,
-}
-
-macro_rules! impl_has {
-    ($ty:ident -> $getter:ident -> $res:ident) => {
-        impl Has<$res> for $ty {
-            fn get_inner(&self) -> &$res {
-                &self.$getter
-            }
-
-            fn get_inner_mut(&mut self) -> &mut $res {
-                &mut self.$getter
-            }
-        }
-    };
 }
 
 impl_has!(PositionedVertex -> kind -> VertexKind);

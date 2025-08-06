@@ -12,6 +12,7 @@ use cgt::{
         Graph, VertexIndex,
     },
     has::Has,
+    impl_has,
     numeric::v2f::V2f,
     short::partizan::games::digraph_placement::{DigraphPlacement, VertexColor},
 };
@@ -58,25 +59,8 @@ struct PositionedVertex {
     position: V2f,
 }
 
-impl Has<VertexColor> for PositionedVertex {
-    fn get_inner(&self) -> &VertexColor {
-        &self.color
-    }
-
-    fn get_inner_mut(&mut self) -> &mut VertexColor {
-        &mut self.color
-    }
-}
-
-impl Has<V2f> for PositionedVertex {
-    fn get_inner(&self) -> &V2f {
-        &self.position
-    }
-
-    fn get_inner_mut(&mut self) -> &mut V2f {
-        &mut self.position
-    }
-}
+impl_has!(PositionedVertex -> color -> VertexColor);
+impl_has!(PositionedVertex -> position -> V2f);
 
 #[derive(Debug, Clone)]
 pub struct DigraphPlacementWindow {
