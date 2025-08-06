@@ -1,4 +1,5 @@
 use cgt::{
+    drawing::{svg, tiny_skia, Draw},
     numeric::{rational::Rational, v2f::V2f},
     short::partizan::{thermograph::Thermograph, trajectory::Trajectory},
 };
@@ -337,3 +338,25 @@ macro_rules! game_details {
 }
 
 pub(crate) use game_details;
+
+pub fn save_button<Game>(ui: &Ui, game: &Game)
+where
+    Game: Draw,
+{
+    // TODO: Popups for file path
+    if let Some(_save_menu) = ui.begin_menu("Save") {
+        if ui.menu_item("as SVG") {
+            let canvas_size = game.required_canvas::<svg::Canvas>();
+            let mut canvas = svg::Canvas::new(canvas_size);
+            game.draw(&mut canvas);
+            eprintln!("{}", canvas.to_svg());
+        };
+        if ui.menu_item("as PNG") {
+            let canvas_size = game.required_canvas::<tiny_skia::Canvas>();
+            let mut canvas = tiny_skia::Canvas::new(canvas_size);
+            game.draw(&mut canvas);
+            let mut f = std::fs::File::create("out.png").unwrap();
+            std::io::Write::write_all(&mut f, &canvas.to_png()).unwrap();
+        };
+    }
+}

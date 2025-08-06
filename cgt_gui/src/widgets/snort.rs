@@ -1,11 +1,11 @@
 use crate::{
     imgui_enum, impl_titled_window,
-    widgets::{self, canonical_form::CanonicalFormWindow},
+    widgets::{self, canonical_form::CanonicalFormWindow, save_button},
     Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow, UpdateKind,
 };
 use ::imgui::{ComboBoxFlags, Condition, Ui};
 use cgt::{
-    drawing::{imgui, svg, tiny_skia, Canvas, Color, Draw},
+    drawing::{imgui, Canvas, Color, Draw},
     graph::{
         adjacency_matrix::undirected::UndirectedGraph,
         layout::{CircleEdge, SpringEmbedder},
@@ -210,23 +210,7 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                             }
                         }
                     }
-                    if let Some(_save_menu) = ui.begin_menu("Save") {
-                        // TODO: Popups for file path
-                        if ui.menu_item("as SVG") {
-                            let canvas_size = self.content.game.required_canvas::<svg::Canvas>();
-                            let mut canvas = svg::Canvas::new(canvas_size);
-                            self.content.game.draw(&mut canvas);
-                            eprintln!("{}", canvas.to_svg());
-                        };
-                        if ui.menu_item("as PNG") {
-                            let canvas_size =
-                                self.content.game.required_canvas::<tiny_skia::Canvas>();
-                            let mut canvas = tiny_skia::Canvas::new(canvas_size);
-                            self.content.game.draw(&mut canvas);
-                            let mut f = std::fs::File::create("out.png").unwrap();
-                            std::io::Write::write_all(&mut f, &canvas.to_png()).unwrap();
-                        };
-                    }
+                    save_button(ui, &self.content.game);
                 }
 
                 ui.columns(2, "columns", true);

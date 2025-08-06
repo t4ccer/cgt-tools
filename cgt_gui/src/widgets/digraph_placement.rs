@@ -1,6 +1,6 @@
 use crate::{
     imgui_enum, impl_titled_window,
-    widgets::{self, canonical_form::CanonicalFormWindow},
+    widgets::{self, canonical_form::CanonicalFormWindow, save_button},
     Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow, UpdateKind,
 };
 use ::imgui::{ComboBoxFlags, Condition, Ui};
@@ -233,6 +233,7 @@ impl IsCgtWindow for TitledWindow<DigraphPlacementWindow> {
                             }
                         }
                     }
+                    save_button(ui, &self.content.game);
                 }
 
                 ui.columns(2, "columns", true);
