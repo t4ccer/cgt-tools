@@ -3,8 +3,8 @@ use anyhow::{Context, Result};
 use cgt::{
     genetic_algorithm::{Algorithm, GeneticAlgorithm, Scored},
     graph::{
-        adjacency_matrix::undirected::{self, UndirectedGraph},
         Graph, VertexIndex,
+        adjacency_matrix::undirected::{self, UndirectedGraph},
     },
     numeric::rational::Rational,
     short::partizan::{
@@ -14,7 +14,7 @@ use cgt::{
     },
 };
 use clap::{self, Parser};
-use rand::{seq::SliceRandom, Rng};
+use rand::{Rng, seq::IndexedRandom};
 use std::{
     cmp::min,
     fs::File,
@@ -75,23 +75,23 @@ impl SnortTemperatureDegreeDifference {
     ) {
         // Mutate vertices
         if position.graph.size() > 1 {
-            let mutation_roll: f32 = rng.gen();
+            let mutation_roll: f32 = rng.random();
             if mutation_roll < mutation_rate {
                 let to_remove = VertexIndex {
-                    index: rng.gen_range(0..position.graph.size()),
+                    index: rng.random_range(0..position.graph.size()),
                 };
                 position.graph.remove_vertex(to_remove);
             }
         }
         // TODO: Check for max size
         // if position.graph.size()
-        let mutation_roll: f32 = rng.gen();
+        let mutation_roll: f32 = rng.random();
         if mutation_roll < mutation_rate {
             position
                 .graph
                 .add_vertex(VertexKind::Single(VertexColor::Empty));
             let another_vertex = VertexIndex {
-                index: rng.gen_range(0..position.graph.size() - 1),
+                index: rng.random_range(0..position.graph.size() - 1),
             };
             position.graph.connect(
                 VertexIndex {
@@ -109,7 +109,7 @@ impl SnortTemperatureDegreeDifference {
                     continue;
                 }
 
-                let mutation_roll: f32 = rng.gen();
+                let mutation_roll: f32 = rng.random();
                 if mutation_roll < mutation_rate {
                     position
                         .graph
@@ -125,7 +125,7 @@ impl SnortTemperatureDegreeDifference {
             VertexColor::TintRight,
         ];
         for index in position.graph.vertex_indices() {
-            let mutation_roll: f32 = rng.gen();
+            let mutation_roll: f32 = rng.random();
             if mutation_roll < mutation_rate {
                 *position.graph.get_vertex_mut(index) =
                     VertexKind::Single(*available_colors.choose(rng).unwrap());
@@ -151,13 +151,13 @@ impl Algorithm<Snort<VertexKind, UndirectedGraph<VertexKind>>, Rational>
         rhs: &Snort<VertexKind, UndirectedGraph<VertexKind>>,
         _rng: &mut rand::rngs::ThreadRng,
     ) -> Snort<VertexKind, UndirectedGraph<VertexKind>> {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
         let mut positions = [lhs, rhs];
         positions.sort_by_key(|pos| pos.graph.size());
         let [smaller, larger] = positions;
 
-        let new_size = rng.gen_range(1..=larger.graph.size());
+        let new_size = rng.random_range(1..=larger.graph.size());
         let mut new_graph =
             undirected::UndirectedGraph::empty(&vec![
                 VertexKind::Single(VertexColor::Empty);
@@ -214,7 +214,7 @@ impl Algorithm<Snort<VertexKind, UndirectedGraph<VertexKind>>, Rational>
         &self,
         rng: &mut rand::rngs::ThreadRng,
     ) -> Snort<VertexKind, UndirectedGraph<VertexKind>> {
-        let graph_size = rng.gen_range(1..=self.max_graph_vertices);
+        let graph_size = rng.random_range(1..=self.max_graph_vertices);
         let graph = undirected::UndirectedGraph::empty(&vec![
             VertexKind::Single(VertexColor::Empty);
             graph_size

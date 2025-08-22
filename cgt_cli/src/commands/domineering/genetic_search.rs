@@ -2,10 +2,10 @@ use crate::{
     commands::domineering::common::DomineeringResult,
     io::{FileOrStderr, FileOrStdout},
 };
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use cgt::{
     genetic_algorithm::{Algorithm, GeneticAlgorithm},
-    grid::{small_bit_grid::SmallBitGrid, BitTile, FiniteGrid, Grid},
+    grid::{BitTile, FiniteGrid, Grid, small_bit_grid::SmallBitGrid},
     numeric::dyadic_rational_number::DyadicRationalNumber,
     short::partizan::{
         games::domineering::{Domineering, Tile},
@@ -62,7 +62,7 @@ impl Algorithm<Domineering, DyadicRationalNumber> for DomineeringHighTemperature
     fn mutate(&self, object: &mut Domineering, rng: &mut rand::rngs::ThreadRng) {
         for y in 0..object.grid().height() {
             for x in 0..object.grid().width() {
-                if rng.gen::<f32>() <= self.mutation_rate {
+                if rng.random::<f32>() <= self.mutation_rate {
                     let old = object.grid().get(x, y);
                     let new = match old {
                         Tile::Empty => Tile::Taken,
@@ -80,7 +80,7 @@ impl Algorithm<Domineering, DyadicRationalNumber> for DomineeringHighTemperature
         rhs: &Domineering,
         rng: &mut rand::rngs::ThreadRng,
     ) -> Domineering {
-        let mid_point = rng.gen_range(0..(lhs.grid().height() * lhs.grid().width()));
+        let mid_point = rng.random_range(0..(lhs.grid().height() * lhs.grid().width()));
 
         let mut new = *lhs;
         for y in 0..new.grid().height() {
@@ -119,7 +119,7 @@ impl Algorithm<Domineering, DyadicRationalNumber> for DomineeringHighTemperature
         for y in 0..new.grid().height() {
             for x in 0..new.grid().width() {
                 new.grid_mut()
-                    .set(x, y, Tile::bool_to_tile(rng.gen_bool(0.5)));
+                    .set(x, y, Tile::bool_to_tile(rng.random_bool(0.5)));
             }
         }
 

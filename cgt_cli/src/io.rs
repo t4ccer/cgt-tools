@@ -36,7 +36,7 @@ macro_rules! define_output_file_or_std {
                 F: FnOnce(&'a str) -> io::Result<File>,
             {
                 match self {
-                    Self::FilePath(ref fp) => Ok($writer::File(f(fp)?)),
+                    Self::FilePath(fp) => Ok($writer::File(f(fp)?)),
                     Self::$std_enum => Ok($writer::$std_enum($std_mk())),
                 }
             }
@@ -130,7 +130,7 @@ macro_rules! define_input_file_or_std {
                 F: FnOnce(&'a str) -> io::Result<File>,
             {
                 match self {
-                    Self::FilePath(ref fp) => Ok($reader::File(f(fp)?)),
+                    Self::FilePath(fp) => Ok($reader::File(f(fp)?)),
                     Self::$std_enum => Ok($reader::$std_enum($std_mk())),
                 }
             }

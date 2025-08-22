@@ -1,6 +1,6 @@
 //! Utilities for genetic search
 
-use rand::{rngs::ThreadRng, seq::SliceRandom};
+use rand::{rngs::ThreadRng, seq::IndexedRandom};
 use std::num::NonZeroUsize;
 
 #[derive(Clone, Copy, Debug)]
@@ -47,7 +47,7 @@ where
 {
     /// Create new instance with given population size and random population
     pub fn new(size: NonZeroUsize, algorithm: Alg) -> Self {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let specimen = (0..size.get())
             .map(|_| algorithm.random(&mut rng))
             .collect::<Vec<_>>();
@@ -58,7 +58,7 @@ where
     /// Like [`Self::new`] but will use initial populaiton. If initial population is smaller than
     /// generation size rest will be filled with random objects
     pub fn with_specimen(mut specimen: Vec<Object>, size: NonZeroUsize, algorithm: Alg) -> Self {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let to_generate = size.get().saturating_sub(specimen.len());
         specimen.extend((0..to_generate).map(|_| algorithm.random(&mut rng)));
         let specimen = specimen
@@ -93,7 +93,7 @@ where
     }
 
     fn cross(&mut self) {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let generation_size = self.specimen.len();
         let mid_point = generation_size / 2;
         let mut new_specimen = Vec::with_capacity(generation_size);
