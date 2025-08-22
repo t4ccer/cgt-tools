@@ -3,7 +3,9 @@ use ::imgui::{DrawListMut, FontId, ImColor32, Ui};
 use cgt::{
     drawing::{Draw, imgui, svg, tiny_skia},
     numeric::v2f::V2f,
+    short::partizan::thermograph::Thermograph,
 };
+use std::time::SystemTime;
 
 pub mod amazons;
 pub mod canonical_form;
@@ -82,24 +84,51 @@ pub fn game_details<'ui>(
     }
 }
 
-pub fn save_button<Game>(ui: &Ui, game: &Game)
+pub fn save_button<Game>(ui: &Ui, prefix: &str, game: &Game, thermograph: Option<&Thermograph>)
 where
     Game: Draw,
 {
     // TODO: Popups for file path
     if let Some(_save_menu) = ui.begin_menu("Save") {
         if ui.menu_item("as SVG") {
+            let now = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .map_or(0, |duration| duration.as_secs());
+
             let canvas_size = game.required_canvas::<svg::Canvas>();
             let mut canvas = svg::Canvas::new(canvas_size);
             game.draw(&mut canvas);
-            eprintln!("{}", canvas.to_svg());
+            let mut f = std::fs::File::create(format!("{}_{}.svg", prefix, now)).unwrap();
+            std::io::Write::write_all(&mut f, canvas.to_svg().as_bytes()).unwrap();
+
+            if let Some(thermograph) = thermograph {
+                let canvas_size = thermograph.required_canvas::<svg::Canvas>();
+                let mut canvas = svg::Canvas::new(canvas_size);
+                thermograph.draw(&mut canvas);
+                let mut f =
+                    std::fs::File::create(format!("{}_thermograph_{}.svg", prefix, now)).unwrap();
+                std::io::Write::write_all(&mut f, canvas.to_svg().as_bytes()).unwrap();
+            }
         };
         if ui.menu_item("as PNG") {
+            let now = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .map_or(0, |duration| duration.as_secs());
+
             let canvas_size = game.required_canvas::<tiny_skia::Canvas>();
             let mut canvas = tiny_skia::Canvas::new(canvas_size);
             game.draw(&mut canvas);
-            let mut f = std::fs::File::create("out.png").unwrap();
+            let mut f = std::fs::File::create(format!("{}_{}.png", prefix, now)).unwrap();
             std::io::Write::write_all(&mut f, &canvas.to_png()).unwrap();
+
+            if let Some(thermograph) = thermograph {
+                let canvas_size = thermograph.required_canvas::<tiny_skia::Canvas>();
+                let mut canvas = tiny_skia::Canvas::new(canvas_size);
+                thermograph.draw(&mut canvas);
+                let mut f =
+                    std::fs::File::create(format!("{}_thermograph_{}.png", prefix, now)).unwrap();
+                std::io::Write::write_all(&mut f, &canvas.to_png()).unwrap();
+            }
         };
     }
 }

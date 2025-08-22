@@ -197,7 +197,12 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                             }
                         }
                     }
-                    save_button(ui, &self.content.game);
+                    save_button(
+                        ui,
+                        "snort",
+                        &self.content.game,
+                        self.content.details.as_ref().map(|d| &d.thermograph),
+                    );
                 }
 
                 ui.columns(2, "columns", true);

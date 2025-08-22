@@ -244,7 +244,12 @@ impl IsCgtWindow for TitledWindow<DigraphPlacementWindow> {
                             }
                         }
                     }
-                    save_button(ui, &self.content.game);
+                    save_button(
+                        ui,
+                        "digraph_placement",
+                        &self.content.game,
+                        self.content.details.as_ref().map(|d| &d.thermograph),
+                    );
                 }
 
                 ui.columns(2, "columns", true);
