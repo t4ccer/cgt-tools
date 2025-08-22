@@ -90,7 +90,7 @@ macro_rules! impl_py_partizan_game {
 }
 
 #[pymodule]
-fn cgt_py(_py: Python, m: &PyModule) -> PyResult<()> {
+fn cgt_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     macro_rules! add_class {
         ($class:ident) => {
             m.add_class::<$class>()?

@@ -10,26 +10,28 @@ crate::wrap_struct!(Rational, PyRational, "Rational", Clone);
 #[pymethods]
 impl PyRational {
     #[new]
-    fn py_new(numerator: &PyAny, denominator: Option<u32>) -> PyResult<Self> {
-        if let Ok(numerator) = numerator.extract::<i64>() {
-            match denominator {
-                None => Ok(Self::from(Rational::from(numerator))),
-                Some(denominator) => Ok(Self::from(Rational::new(numerator, denominator))),
+    fn py_new(numerator: Py<PyAny>, denominator: Option<u32>) -> PyResult<Self> {
+        Python::with_gil(|gil| {
+            if let Ok(numerator) = numerator.extract::<i64>(gil) {
+                match denominator {
+                    None => Ok(Self::from(Rational::from(numerator))),
+                    Some(denominator) => Ok(Self::from(Rational::new(numerator, denominator))),
+                }
+            } else if let Ok(string) = numerator.extract::<&str>(gil) {
+                Rational::from_str(string)
+                    .map_err(|err| {
+                        PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                            "Could not parse Rational: {}",
+                            err
+                        ))
+                    })
+                    .map(Self::from)
+            } else {
+                Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "Could not convert to Rational.",
+                ))
             }
-        } else if let Ok(string) = numerator.extract::<&str>() {
-            Rational::from_str(string)
-                .map_err(|err| {
-                    PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                        "Could not parse Rational: {}",
-                        err
-                    ))
-                })
-                .map(Self::from)
-        } else {
-            Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                "Could not convert to Rational.",
-            ))
-        }
+        })
     }
 
     fn __repr__(&self) -> String {

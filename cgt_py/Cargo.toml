@@ -16,5 +16,5 @@ name = "cgt_py"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = "0.20"
+pyo3 = "0.25"
 cgt = { path = "../." }

@@ -11,25 +11,27 @@ crate::wrap_struct!(CanonicalForm, PyCanonicalForm, "CanonicalForm", Clone);
 #[pymethods]
 impl PyCanonicalForm {
     #[new]
-    fn py_new(value: &PyAny) -> PyResult<Self> {
-        if let Ok(integer) = value.extract::<i64>() {
-            return Ok(Self::from(CanonicalForm::new_integer(integer)));
-        } else if let Ok(string) = value.extract::<&str>() {
-            match CanonicalForm::from_str(string) {
-                Ok(cf) => return Ok(Self::from(cf)),
-                Err(_) => {
-                    return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                        "Could not parse CanonicalForm. Invalid input format.",
-                    ));
+    fn py_new(value: Py<PyAny>) -> PyResult<Self> {
+        Python::with_gil(|gil| {
+            if let Ok(integer) = value.extract::<i64>(gil) {
+                return Ok(Self::from(CanonicalForm::new_integer(integer)));
+            } else if let Ok(string) = value.extract::<&str>(gil) {
+                match CanonicalForm::from_str(string) {
+                    Ok(cf) => return Ok(Self::from(cf)),
+                    Err(_) => {
+                        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                            "Could not parse CanonicalForm. Invalid input format.",
+                        ));
+                    }
                 }
+            } else if let Ok(canonical_form) = value.extract::<PyCanonicalForm>(gil) {
+                return Ok(canonical_form);
             }
-        } else if let Ok(canonical_form) = value.extract::<PyCanonicalForm>() {
-            return Ok(canonical_form);
-        }
 
-        Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-            "Could not convert to CanonicalForm. Expected integer or string.",
-        ))
+            Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "Could not convert to CanonicalForm. Expected integer or string.",
+            ))
+        })
     }
 
     fn __repr__(&self) -> String {
