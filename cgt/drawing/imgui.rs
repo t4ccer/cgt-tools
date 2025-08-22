@@ -18,7 +18,7 @@ pub struct Canvas<'ui> {
     draw_list: &'ui DrawListMut<'ui>,
     large_font_id: FontId,
     clicked_position: Option<V2f>,
-    pressed_position: Option<V2f>,
+    pressed_vertex: Option<VertexIndex>,
     scratch_buffer: &'ui mut String,
 }
 
@@ -35,7 +35,7 @@ impl<'ui> Canvas<'ui> {
             draw_list,
             large_font_id,
             clicked_position: None,
-            pressed_position: None,
+            pressed_vertex: None,
             scratch_buffer,
         }
     }
@@ -57,13 +57,8 @@ impl<'ui> Canvas<'ui> {
             .and_then(|clicked_pos| self.vertex_at_position(clicked_pos, graph))
     }
 
-    pub fn pressed_vertex<G, V>(&self, graph: &G) -> Option<VertexIndex>
-    where
-        V: Has<V2f>,
-        G: Graph<V>,
-    {
-        self.pressed_position
-            .and_then(|clicked_pos| self.vertex_at_position(clicked_pos, graph))
+    pub const fn pressed_vertex(&self) -> Option<VertexIndex> {
+        self.pressed_vertex
     }
 
     // TODO: Move to graph
@@ -226,7 +221,7 @@ impl drawing::Canvas for Canvas<'_> {
     fn vertex(&mut self, position: V2f, color: Color, idx: VertexIndex) {
         let radius = Self::vertex_radius();
 
-        let _tile_id = self.ui.push_id_usize(idx.index);
+        let _vertex_id = self.ui.push_id_usize(idx.index);
 
         self.ui.set_cursor_screen_pos(
             self.start_position + position
@@ -246,7 +241,7 @@ impl drawing::Canvas for Canvas<'_> {
         }
 
         if self.ui.is_item_active() {
-            self.pressed_position = Some(position);
+            self.pressed_vertex = Some(idx);
         }
 
         self.circle(position, radius, Color::BLACK);

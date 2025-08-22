@@ -253,7 +253,7 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                     imgui::Canvas::new(ui, &draw_list, ctx.large_font_id, &mut self.scratch_buffer);
                 self.content.game.draw(&mut canvas);
 
-                let pressed = canvas.pressed_vertex(&self.content.game.graph);
+                let pressed = canvas.pressed_vertex();
                 let clicked = canvas.clicked_vertex(&self.content.game.graph);
                 match self.content.editing_mode.get() {
                     GraphEditingMode::DragVertex => {
