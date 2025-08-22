@@ -68,7 +68,7 @@ impl VertexKind {
 
     #[inline]
     /// Get mutable color of the vertex
-    pub fn color_mut(&mut self) -> &mut VertexColor {
+    pub const fn color_mut(&mut self) -> &mut VertexColor {
         match self {
             Self::Single(color) | Self::Cluster(color, _) => color,
         }

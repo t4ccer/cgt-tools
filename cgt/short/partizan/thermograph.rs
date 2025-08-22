@@ -488,8 +488,8 @@ impl Thermograph {
     where
         C: Canvas,
     {
-        let padding = 0.5;
-        let mast_height = 0.5;
+        let padding: f32 = 0.5;
+        let mast_height: f32 = 0.5;
 
         let left_x = self
             .left_wall
@@ -526,7 +526,7 @@ impl Thermograph {
                 },
             scale
                 * V2f {
-                    x: -right_x + padding * 2.0,
+                    x: padding.mul_add(2.0, -right_x),
                     y: x_axis_position_y,
                 },
             C::thin_line_weight(),
@@ -544,7 +544,7 @@ impl Thermograph {
                 scale
                     * V2f {
                         x: y_axis_position_x,
-                        y: y_top_above_x_axis + padding * 2.0 + mast_height,
+                        y: padding.mul_add(2.0, y_top_above_x_axis) + mast_height,
                     },
                 C::thin_line_weight(),
                 Color::LIGHT_GRAY,
@@ -654,8 +654,8 @@ impl Thermograph {
     where
         C: Canvas,
     {
-        let padding = 0.5;
-        let mast_height = 0.5;
+        let padding: f32 = 0.5;
+        let mast_height: f32 = 0.5;
 
         let left_x = self.left_wall.value_at(Rational::from(-1));
         let right_x = self.right_wall.value_at(Rational::from(-1));
@@ -683,8 +683,8 @@ impl Thermograph {
                 },
             bottom_right: scale
                 * V2f {
-                    x: -right_x.as_f32().unwrap() + padding * 2.0,
-                    y: y_top_above_x_axis + padding * 2.0 + mast_height,
+                    x: padding.mul_add(2.0, -right_x.as_f32().unwrap()),
+                    y: padding.mul_add(2.0, y_top_above_x_axis) + mast_height,
                 },
         }
     }
@@ -695,7 +695,7 @@ impl Draw for Thermograph {
     where
         C: Canvas,
     {
-        self.draw_scaled(canvas, 64.0)
+        self.draw_scaled(canvas, 64.0);
     }
 
     fn required_canvas<C>(&self) -> BoundingBox

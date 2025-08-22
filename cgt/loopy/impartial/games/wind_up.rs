@@ -94,7 +94,7 @@ impl WindUp {
                         UnresolvedVertex::Resolved(Vertex::Value(g)) => for_mex.push(*g),
                         UnresolvedVertex::Unresolved
                         | UnresolvedVertex::Resolved(Vertex::Loop(_)) => continue 'inner,
-                    };
+                    }
                 }
 
                 let g = Nimber::mex(for_mex);
@@ -231,7 +231,7 @@ impl WindUp {
 
     /// Get the `n` component of `WindUp(n, {...})`
     #[inline]
-    pub fn n(&self) -> u32 {
+    pub const fn n(&self) -> u32 {
         self.graph.len() as u32
     }
 }

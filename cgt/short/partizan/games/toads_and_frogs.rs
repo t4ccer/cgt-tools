@@ -47,12 +47,12 @@ impl ToadsAndFrogs {
     }
 
     /// Get game row
-    pub fn row(&mut self) -> &Vec<Tile> {
+    pub const fn row(&mut self) -> &Vec<Tile> {
         &self.tiles
     }
 
     /// Get game row
-    pub fn row_mut(&mut self) -> &mut Vec<Tile> {
+    pub const fn row_mut(&mut self) -> &mut Vec<Tile> {
         &mut self.tiles
     }
 

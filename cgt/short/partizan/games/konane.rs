@@ -64,7 +64,7 @@ where
 
     /// Get underlying grid mutably
     #[inline]
-    pub fn grid_mut(&mut self) -> &mut G {
+    pub const fn grid_mut(&mut self) -> &mut G {
         &mut self.grid
     }
 }

@@ -66,7 +66,7 @@ impl Interner {
 
     /// Intern new game from avaliable moves
     pub fn new_moves(&self, mut moves: Box<[LeftDeadEnd]>) -> LeftDeadEnd {
-        if moves.len() == 0 {
+        if moves.is_empty() {
             LeftDeadEnd::new_integer(0)
         } else if moves.len() == 1 && moves[0].to_integer().is_some() {
             LeftDeadEnd::new_integer(moves[0].to_integer().unwrap() + 1)
@@ -421,12 +421,10 @@ impl Interner {
             }
         }
 
-        let res = self.into_moves(lhs).all(|left_option| {
+        self.into_moves(lhs).all(|left_option| {
             self.into_moves(rhs)
                 .any(|right_option| self.ge(left_option, right_option))
-        });
-
-        res
+        })
     }
 
     /// Check if game is less than or equal to other game

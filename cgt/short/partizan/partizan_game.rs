@@ -136,8 +136,8 @@ pub trait PartizanGame: Sized + Clone + Hash + Send + Sync + Eq {
             .into_iter()
             .filter(|m| {
                 let move_game_form = m.canonical_form(transposition_table);
-                let res = moves.left.iter().any(|k| k <= &move_game_form);
-                res
+
+                moves.left.iter().any(|k| k <= &move_game_form)
             })
             .collect::<Vec<_>>()
     }
@@ -154,8 +154,8 @@ pub trait PartizanGame: Sized + Clone + Hash + Send + Sync + Eq {
             .into_iter()
             .filter(|m| {
                 let move_game_form = m.canonical_form(transposition_table);
-                let res = moves.right.iter().any(|k| k >= &move_game_form);
-                res
+
+                moves.right.iter().any(|k| k >= &move_game_form)
             })
             .collect::<Vec<_>>()
     }

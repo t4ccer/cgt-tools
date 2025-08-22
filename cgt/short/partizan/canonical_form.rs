@@ -1219,7 +1219,7 @@ impl CanonicalForm {
             if nus.is_nimber() {
                 return Nimber::from(nus.nimber().value() + 1);
             }
-        };
+        }
 
         let moves = self.to_moves();
         moves
