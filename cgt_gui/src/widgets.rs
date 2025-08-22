@@ -89,46 +89,38 @@ where
     Game: Draw,
 {
     // TODO: Popups for file path
+
+    macro_rules! save_using_canvas {
+        ($canvas:ident, $extension:literal, canvas $(. $finalizer:ident ())*) => {
+            let now = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .map_or(0, |duration| duration.as_secs());
+
+            let canvas_size = game.required_canvas::<$canvas::Canvas>();
+            let mut canvas = $canvas::Canvas::new(canvas_size);
+            game.draw(&mut canvas);
+            let mut f =
+                std::fs::File::create(format!("{}_{}.{}", prefix, now, $extension)).unwrap();
+            std::io::Write::write_all(&mut f, canvas$(. $finalizer ())*).unwrap();
+
+            if let Some(thermograph) = thermograph {
+                let canvas_size = thermograph.required_canvas::<$canvas::Canvas>();
+                let mut canvas = $canvas::Canvas::new(canvas_size);
+                thermograph.draw(&mut canvas);
+                let mut f =
+                    std::fs::File::create(format!("{}_thermograph_{}.{}", prefix, now, $extension))
+                        .unwrap();
+                std::io::Write::write_all(&mut f, canvas$(. $finalizer ())*).unwrap();
+            }
+        };
+    }
+
     if let Some(_save_menu) = ui.begin_menu("Save") {
         if ui.menu_item("as SVG") {
-            let now = SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .map_or(0, |duration| duration.as_secs());
-
-            let canvas_size = game.required_canvas::<svg::Canvas>();
-            let mut canvas = svg::Canvas::new(canvas_size);
-            game.draw(&mut canvas);
-            let mut f = std::fs::File::create(format!("{}_{}.svg", prefix, now)).unwrap();
-            std::io::Write::write_all(&mut f, canvas.to_svg().as_bytes()).unwrap();
-
-            if let Some(thermograph) = thermograph {
-                let canvas_size = thermograph.required_canvas::<svg::Canvas>();
-                let mut canvas = svg::Canvas::new(canvas_size);
-                thermograph.draw(&mut canvas);
-                let mut f =
-                    std::fs::File::create(format!("{}_thermograph_{}.svg", prefix, now)).unwrap();
-                std::io::Write::write_all(&mut f, canvas.to_svg().as_bytes()).unwrap();
-            }
+            save_using_canvas!(svg, "svg", canvas.to_svg().as_bytes());
         }
         if ui.menu_item("as PNG") {
-            let now = SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .map_or(0, |duration| duration.as_secs());
-
-            let canvas_size = game.required_canvas::<tiny_skia::Canvas>();
-            let mut canvas = tiny_skia::Canvas::new(canvas_size);
-            game.draw(&mut canvas);
-            let mut f = std::fs::File::create(format!("{}_{}.png", prefix, now)).unwrap();
-            std::io::Write::write_all(&mut f, &canvas.to_png()).unwrap();
-
-            if let Some(thermograph) = thermograph {
-                let canvas_size = thermograph.required_canvas::<tiny_skia::Canvas>();
-                let mut canvas = tiny_skia::Canvas::new(canvas_size);
-                thermograph.draw(&mut canvas);
-                let mut f =
-                    std::fs::File::create(format!("{}_thermograph_{}.png", prefix, now)).unwrap();
-                std::io::Write::write_all(&mut f, &canvas.to_png()).unwrap();
-            }
+            save_using_canvas!(tiny_skia, "png", canvas.to_png().as_ref());
         }
     }
 }
