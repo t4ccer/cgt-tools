@@ -104,7 +104,7 @@ impl IsCgtWindow for TitledWindow<SkiJumpsWindow> {
                             let w = self.content.clone();
                             ctx.new_windows
                                 .push(Box::new(TitledWindow::without_title(w)));
-                        };
+                        }
                         if ui.menu_item("Canonical Form") {
                             if let Some(details) = self.content.details.clone() {
                                 let w = CanonicalFormWindow::with_details(details);
@@ -261,31 +261,32 @@ impl IsCgtWindow for TitledWindow<SkiJumpsWindow> {
                             self.content.game.available_right_moves()
                         };
 
-                        if let Some(legal_move) =
-                            available_moves.into_iter().find_map(|available_move| {
-                                match available_move {
-                                    Move::SlideOff {
-                                        from: (move_x, move_y),
-                                    } => ((move_x, move_y) == (start_x, start_y)
+                        if let Some(legal_move) = available_moves.into_iter().find(
+                            |available_move| match available_move {
+                                Move::SlideOff {
+                                    from: (move_x, move_y),
+                                } => {
+                                    (*move_x, *move_y) == (start_x, start_y)
                                         && slide_off_y
-                                            .is_some_and(|slide_off_y: u8| slide_off_y == move_y))
-                                    .then_some(available_move),
-                                    Move::Slide {
-                                        from: (move_x, move_y),
-                                        to_x: move_to_x,
-                                    } => ((move_x, move_y) == (start_x, start_y)
-                                        && move_target
-                                            .is_some_and(|target| target == (move_to_x, move_y)))
-                                    .then_some(available_move),
-                                    Move::Jump {
-                                        from: (move_x, move_y),
-                                    } => ((move_x, move_y) == (start_x, start_y)
-                                        && move_target
-                                            .is_some_and(|target| target == (move_x, move_y + 2)))
-                                    .then_some(available_move),
+                                            .is_some_and(|slide_off_y: u8| slide_off_y == *move_y)
                                 }
-                            })
-                        {
+                                Move::Slide {
+                                    from: (move_x, move_y),
+                                    to_x: move_to_x,
+                                } => {
+                                    (*move_x, *move_y) == (start_x, start_y)
+                                        && move_target
+                                            .is_some_and(|target| target == (*move_to_x, *move_y))
+                                }
+                                Move::Jump {
+                                    from: (move_x, move_y),
+                                } => {
+                                    (*move_x, *move_y) == (start_x, start_y)
+                                        && move_target
+                                            .is_some_and(|target| target == (*move_x, move_y + 2))
+                                }
+                            },
+                        ) {
                             self.content.game = self.content.game.move_in(legal_move);
                             if self.content.alternating_moves {
                                 if matches!(editing_mode, GridEditingMode::MoveLeft) {
@@ -297,7 +298,7 @@ impl IsCgtWindow for TitledWindow<SkiJumpsWindow> {
                                 }
                             }
                             is_dirty = true;
-                        };
+                        }
 
                         self.content.initial_position = None;
                     }

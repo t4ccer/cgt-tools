@@ -109,7 +109,7 @@ where
                     std::fs::File::create(format!("{}_thermograph_{}.svg", prefix, now)).unwrap();
                 std::io::Write::write_all(&mut f, canvas.to_svg().as_bytes()).unwrap();
             }
-        };
+        }
         if ui.menu_item("as PNG") {
             let now = SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
@@ -129,6 +129,6 @@ where
                     std::fs::File::create(format!("{}_thermograph_{}.png", prefix, now)).unwrap();
                 std::io::Write::write_all(&mut f, &canvas.to_png()).unwrap();
             }
-        };
+        }
     }
 }

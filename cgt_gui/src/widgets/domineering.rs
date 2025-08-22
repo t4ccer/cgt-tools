@@ -54,7 +54,7 @@ impl IsCgtWindow for TitledWindow<DomineeringWindow> {
                             let w = self.content.clone();
                             ctx.new_windows
                                 .push(Box::new(TitledWindow::without_title(w)));
-                        };
+                        }
                         if ui.menu_item("Canonical Form") {
                             if let Some(details) = self.content.details.clone() {
                                 let w = CanonicalFormWindow::with_details(details);
@@ -67,7 +67,7 @@ impl IsCgtWindow for TitledWindow<DomineeringWindow> {
                     if let Some(_new_menu) = ui.begin_menu("Save") {
                         if ui.menu_item("Dump Tikz") {
                             println!("{}", self.content.game.to_latex());
-                        };
+                        }
                     }
                 }
 
@@ -84,7 +84,7 @@ impl IsCgtWindow for TitledWindow<DomineeringWindow> {
                     let flipped = self.content.game.grid().get(x, y).flip();
                     self.content.game.grid_mut().set(x, y, flipped);
                     is_dirty = true;
-                };
+                }
 
                 if new_width != width || new_height != height {
                     is_dirty = true;

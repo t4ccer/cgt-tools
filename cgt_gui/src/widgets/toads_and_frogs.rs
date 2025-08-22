@@ -65,7 +65,7 @@ impl IsCgtWindow for TitledWindow<ToadsAndFrogsWindow> {
                             let w = self.content.clone();
                             ctx.new_windows
                                 .push(Box::new(TitledWindow::without_title(w)));
-                        };
+                        }
                         if ui.menu_item("Canonical Form") {
                             if let Some(details) = self.content.details.clone() {
                                 let w = CanonicalFormWindow::with_details(details);

@@ -49,7 +49,7 @@ impl IsCgtWindow for TitledWindow<CanonicalFormWindow> {
                             let w = self.content.clone();
                             ctx.new_windows
                                 .push(Box::new(TitledWindow::without_title(w)));
-                        };
+                        }
                     }
 
                     if let Some(_transform_menu) = ui.begin_menu("Transform") {
@@ -59,7 +59,7 @@ impl IsCgtWindow for TitledWindow<CanonicalFormWindow> {
                             );
                             self.content.value_input =
                                 self.content.details.canonical_form.to_string();
-                        };
+                        }
                     }
                 }
 
