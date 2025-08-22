@@ -679,12 +679,12 @@ impl Thermograph {
             top_left: scale
                 * V2f {
                     x: -left_x.as_f32().unwrap(),
-                    y: y_top_above_x_axis + padding * 2.0 + mast_height,
+                    y: -1.0,
                 },
             bottom_right: scale
                 * V2f {
                     x: -right_x.as_f32().unwrap() + padding * 2.0,
-                    y: -1.0,
+                    y: y_top_above_x_axis + padding * 2.0 + mast_height,
                 },
         }
     }

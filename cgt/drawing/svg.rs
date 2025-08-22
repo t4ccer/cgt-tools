@@ -121,13 +121,11 @@ pub struct Canvas {
 
 impl Canvas {
     pub fn new(viewport: BoundingBox) -> Self {
+        let size = viewport.size();
         Self {
             buffer: format!(
                 "<svg viewBox=\"{} {} {} {}\">",
-                viewport.top_left.x,
-                viewport.bottom_right.y,
-                viewport.bottom_right.x - viewport.top_left.x,
-                viewport.top_left.y - viewport.bottom_right.y,
+                viewport.top_left.x, viewport.top_left.y, size.x, size.y
             ),
         }
     }

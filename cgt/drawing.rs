@@ -283,8 +283,8 @@ pub struct BoundingBox {
 impl BoundingBox {
     pub fn size(self) -> V2f {
         V2f {
-            x: self.bottom_right.x - self.top_left.x,
-            y: self.top_left.y - self.bottom_right.y,
+            x: f32::abs(self.bottom_right.x - self.top_left.x),
+            y: f32::abs(self.bottom_right.y - self.top_left.y),
         }
     }
 }

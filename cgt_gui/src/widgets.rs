@@ -72,10 +72,7 @@ pub fn game_details<'ui>(
         let thermograph_box = details
             .thermograph
             .required_canvas_scaled::<imgui::Canvas>(thermograph_scale);
-        ui.set_cursor_pos(V2f {
-            x: cursor_pos.x - thermograph_box.top_left.x,
-            y: cursor_pos.y - thermograph_box.bottom_right.y,
-        });
+        ui.set_cursor_pos(cursor_pos - thermograph_box.top_left);
         let mut canvas = imgui::Canvas::new(ui, draw_list, large_font_id, scratch_buffer);
         details
             .thermograph

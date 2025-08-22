@@ -16,10 +16,7 @@ pub struct Canvas {
 impl Canvas {
     pub fn new(viewport: BoundingBox) -> Canvas {
         let size = viewport.size();
-        let offset = V2f {
-            x: -viewport.top_left.x,
-            y: -viewport.bottom_right.y,
-        };
+        let offset = -viewport.top_left;
         Canvas {
             offset,
             pixmap: tiny_skia::Pixmap::new(size.x as u32, size.y as u32).unwrap(),
