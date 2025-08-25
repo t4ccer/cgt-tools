@@ -483,6 +483,24 @@ impl Thermograph {
         }
     }
 
+    fn y_top_above_x_axis(&self) -> f32 {
+        let y_top_above_x_axis_l = self
+            .left_wall
+            .critical_points
+            .first()
+            .copied()
+            .and_then(Rational::as_f32)
+            .unwrap_or(0.0);
+        let y_top_above_x_axis_r = self
+            .right_wall
+            .critical_points
+            .first()
+            .copied()
+            .and_then(Rational::as_f32)
+            .unwrap_or(0.0);
+        y_top_above_x_axis_l.max(y_top_above_x_axis_r)
+    }
+
     /// Draw thermograph with scale (length of one thermograph unit)
     pub fn draw_scaled<C>(&self, canvas: &mut C, scale: f32)
     where
@@ -501,33 +519,18 @@ impl Thermograph {
             .value_at(Rational::from(-1))
             .as_f32()
             .unwrap();
-        let y_top_above_x_axis_l = self
-            .left_wall
-            .critical_points
-            .first()
-            .copied()
-            .and_then(Rational::as_f32)
-            .unwrap_or(0.0);
-        let y_top_above_x_axis_r = self
-            .right_wall
-            .critical_points
-            .first()
-            .copied()
-            .and_then(Rational::as_f32)
-            .unwrap_or(0.0);
-        let y_top_above_x_axis = y_top_above_x_axis_l.max(y_top_above_x_axis_r);
+        let y_top_above_x_axis = self.y_top_above_x_axis();
 
-        let x_axis_position_y = y_top_above_x_axis;
         canvas.line(
             scale
                 * V2f {
                     x: -left_x,
-                    y: x_axis_position_y,
+                    y: y_top_above_x_axis,
                 },
             scale
                 * V2f {
                     x: padding.mul_add(2.0, -right_x),
-                    y: x_axis_position_y,
+                    y: y_top_above_x_axis,
                 },
             C::thin_line_weight(),
             Color::LIGHT_GRAY,
@@ -659,21 +662,7 @@ impl Thermograph {
 
         let left_x = self.left_wall.value_at(Rational::from(-1));
         let right_x = self.right_wall.value_at(Rational::from(-1));
-        let y_top_above_x_axis_l = self
-            .left_wall
-            .critical_points
-            .first()
-            .copied()
-            .and_then(Rational::as_f32)
-            .unwrap_or(0.0);
-        let y_top_above_x_axis_r = self
-            .right_wall
-            .critical_points
-            .first()
-            .copied()
-            .and_then(Rational::as_f32)
-            .unwrap_or(0.0);
-        let y_top_above_x_axis = y_top_above_x_axis_l.max(y_top_above_x_axis_r);
+        let y_top_above_x_axis = self.y_top_above_x_axis();
 
         BoundingBox {
             top_left: scale
