@@ -11,6 +11,7 @@ use std::{
     cmp::Ordering,
     fmt::{self, Display, Write},
     hash::Hash,
+    iter::Sum,
 };
 
 /// A number-up-star game position that is a sum of a number, up and, nimber.
@@ -1421,6 +1422,18 @@ impl Display for CanonicalForm {
 }
 
 impl_from_str_via_parser!(CanonicalForm);
+
+impl Sum for CanonicalForm {
+    fn sum<I: Iterator<Item = CanonicalForm>>(iter: I) -> CanonicalForm {
+        iter.fold(CanonicalForm::new_integer(0), |acc, v| acc + v)
+    }
+}
+
+impl<'a> Sum<&'a CanonicalForm> for CanonicalForm {
+    fn sum<I: Iterator<Item = &'a CanonicalForm>>(iter: I) -> CanonicalForm {
+        iter.fold(CanonicalForm::new_integer(0), |acc, v| acc + v)
+    }
+}
 
 #[cfg(test)]
 mod tests {
