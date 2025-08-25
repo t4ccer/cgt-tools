@@ -293,14 +293,12 @@ impl Display for Nus {
             write!(f, "{}", self.number())?;
         }
 
-        if self.up_multiple() == 1 {
-            write!(f, "^")?;
-        } else if self.up_multiple() == -1 {
-            write!(f, "v")?;
-        } else if self.up_multiple() > 0 {
-            write!(f, "^{}", self.up_multiple())?;
-        } else if self.up_multiple() < 0 {
-            write!(f, "v{}", self.up_multiple().abs())?;
+        match self.up_multiple() {
+            1 => write!(f, "^")?,
+            -1 => write!(f, "v")?,
+            n if n > 0 => write!(f, "^{}", n)?,
+            n if n < 0 => write!(f, "v{}", -n)?,
+            _ => {}
         }
 
         if self.nimber() != Nimber::from(0) {

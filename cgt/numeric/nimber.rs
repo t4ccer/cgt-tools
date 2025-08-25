@@ -57,12 +57,10 @@ impl_op_ex!(-|lhs: &Nimber| -> Nimber { *lhs });
 
 impl Display for Nimber {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.0 == 0 {
-            write!(f, "0")
-        } else if self.0 == 1 {
-            write!(f, "*")
-        } else {
-            write!(f, "*{}", self.0)
+        match self.0 {
+            0 => write!(f, "0"),
+            1 => write!(f, "*"),
+            n => write!(f, "*{}", n),
         }
     }
 }
