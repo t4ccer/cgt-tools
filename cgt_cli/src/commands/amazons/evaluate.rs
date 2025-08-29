@@ -14,6 +14,7 @@ pub struct Args {
     position: String,
 }
 
+#[allow(clippy::needless_pass_by_value)]
 pub fn run(args: Args) -> Result<()> {
     let pos: Amazons = Amazons::from_str(&args.position)
         .ok()

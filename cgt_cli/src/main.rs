@@ -1,4 +1,4 @@
-use crate::commands::*;
+use crate::commands::Args;
 use anyhow::Result;
 use clap::Parser;
 

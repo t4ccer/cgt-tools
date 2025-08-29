@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use cgt::short::partizan::canonical_form::CanonicalForm;
-use clap::{arg, Parser};
+use clap::{Parser, arg};
 use std::{fmt::Write, str::FromStr};
 
 /// Sum multiple canonical forms
@@ -11,6 +11,7 @@ pub struct Args {
     games: Vec<String>,
 }
 
+#[allow(clippy::needless_pass_by_value)]
 pub fn run(args: Args) -> Result<()> {
     let mut result = CanonicalForm::new_integer(0);
     let mut buf = String::new();

@@ -6,7 +6,7 @@ use itertools::Itertools;
 use rayon::iter::{ParallelBridge, ParallelIterator};
 use std::{
     io::{BufWriter, Write},
-    sync::{atomic::AtomicU64, Mutex},
+    sync::{Mutex, atomic::AtomicU64},
 };
 
 #[derive(Debug, Clone, Parser)]
@@ -24,6 +24,7 @@ pub struct Args {
     output: FileOrStdout,
 }
 
+#[allow(clippy::needless_pass_by_value)]
 pub fn run(args: Args) -> Result<()> {
     if let Some(threads) = args.threads {
         rayon::ThreadPoolBuilder::new()
@@ -101,8 +102,10 @@ fn analyze_left_dead_end(interner: &Interner, g: LeftDeadEnd) -> String {
     }
 
     if atoms.len() != 1 {
+        use std::fmt::Write;
+
         b.push_str(" !!! HERE !!! ");
-        b.push_str(&format!("{atoms:?}"));
+        write!(b, "{atoms:?}").unwrap();
     }
 
     b.push('\n');
@@ -123,7 +126,7 @@ struct ProgressLogger<'c> {
 }
 
 impl ProgressLogger<'_> {
-    pub fn new(counter: &AtomicU64, total: u64) -> ProgressLogger<'_> {
+    pub const fn new(counter: &AtomicU64, total: u64) -> ProgressLogger<'_> {
         ProgressLogger { counter, total }
     }
 }

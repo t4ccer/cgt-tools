@@ -1,7 +1,7 @@
 use super::common::DomineeringResult;
 use anyhow::{Context, Result};
 use cgt::{
-    grid::{small_bit_grid::SmallBitGrid, FiniteGrid},
+    grid::{FiniteGrid, small_bit_grid::SmallBitGrid},
     numeric::rational::Rational,
     short::partizan::games::domineering::{self, Domineering},
 };
@@ -9,7 +9,7 @@ use clap::Parser;
 use std::{
     collections::HashSet,
     fs::File,
-    io::{stdin, stdout, BufReader, BufWriter, Read, Write},
+    io::{BufReader, BufWriter, Read, Write, stdin, stdout},
     num::NonZeroU32,
     str::FromStr,
 };
@@ -57,6 +57,7 @@ pub struct Args {
     include_rotations: bool,
 }
 
+#[allow(clippy::needless_pass_by_value)]
 pub fn run(args: Args) -> Result<()> {
     let input: BufReader<Box<dyn Read>> = if args.in_file == "-" {
         BufReader::new(Box::new(stdin()))
@@ -79,7 +80,8 @@ pub fn run(args: Args) -> Result<()> {
     let input = serde_json::de::Deserializer::from_reader(input)
         .into_iter::<DomineeringResult>()
         .map(|line| {
-            line.context("Could not parse JSON '{line}'")
+            line.map_err(anyhow::Error::new)
+                .context("Could not parse JSON")
                 .and_then(|r| DomineeringEntry::new(&r))
         })
         .collect::<Result<Vec<_>, _>>()?;
@@ -173,7 +175,7 @@ pub fn run(args: Args) -> Result<()> {
                     }),
                     entry.temperature
                 )?;
-            };
+            }
         }
         writeln!(output, "\\\\")?;
     }

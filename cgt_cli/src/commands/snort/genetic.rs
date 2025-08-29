@@ -68,7 +68,6 @@ struct SnortTemperatureDegreeDifference {
 
 impl SnortTemperatureDegreeDifference {
     fn mutate_with_rate(
-        &self,
         position: &mut Snort<VertexKind, UndirectedGraph<VertexKind>>,
         rng: &mut rand::rngs::ThreadRng,
         mutation_rate: f32,
@@ -142,7 +141,7 @@ impl Algorithm<Snort<VertexKind, UndirectedGraph<VertexKind>>, Rational>
         position: &mut Snort<VertexKind, UndirectedGraph<VertexKind>>,
         rng: &mut rand::rngs::ThreadRng,
     ) {
-        self.mutate_with_rate(position, rng, self.mutation_rate);
+        Self::mutate_with_rate(position, rng, self.mutation_rate);
     }
 
     fn cross(
@@ -220,7 +219,7 @@ impl Algorithm<Snort<VertexKind, UndirectedGraph<VertexKind>>, Rational>
             graph_size
         ]);
         let mut position = Snort::new(graph);
-        self.mutate_with_rate(&mut position, rng, 1.0);
+        Self::mutate_with_rate(&mut position, rng, 1.0);
         position
     }
 }
@@ -287,6 +286,7 @@ fn seed_positions() -> Vec<Snort<VertexKind, UndirectedGraph<VertexKind>>> {
     vec![pos_1, pos_2]
 }
 
+#[allow(clippy::needless_pass_by_value)]
 pub fn run(args: Args) -> Result<()> {
     let alg = SnortTemperatureDegreeDifference {
         transposition_table: ParallelTranspositionTable::new(),
@@ -310,7 +310,7 @@ pub fn run(args: Args) -> Result<()> {
     loop {
         if args
             .generation_limit
-            .map_or(false, |limit| alg.generation() >= limit)
+            .is_some_and(|limit| alg.generation() >= limit)
         {
             break;
         }

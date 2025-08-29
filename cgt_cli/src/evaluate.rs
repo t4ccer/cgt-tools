@@ -29,6 +29,7 @@ pub struct Args {
     output_png: Option<FileOrStdout>,
 }
 
+#[allow(clippy::needless_pass_by_value)]
 pub fn run<Game>(args: Args) -> Result<()>
 where
     Game: FromStr + Draw + PartizanGame,

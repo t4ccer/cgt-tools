@@ -1,8 +1,8 @@
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use cgt::loopy::impartial::games::wind_up::WindUp;
 use clap::{self, Parser};
 
-/// Evaluate all positions of WindUp game in a given graph size range.
+/// Evaluate all positions of `WindUp` game in a given graph size range.
 #[derive(Parser, Debug)]
 pub struct Args {
     /// Comma separated list of values in the subtraction set
@@ -18,6 +18,7 @@ pub struct Args {
     end_n: u32,
 }
 
+#[allow(clippy::needless_pass_by_value)]
 pub fn run(args: Args) -> Result<()> {
     if args.moves.is_empty() {
         bail!("Subtraction set cannot be empty. Use --moves a,b,... to specify it.");

@@ -1,7 +1,7 @@
 use cgt::misere::left_dead_end::interned::{Interner, LeftDeadEnd};
 use itertools::Itertools;
 
-pub(crate) fn to_all_factorizations(
+pub fn to_all_factorizations(
     interner: &Interner,
     game: LeftDeadEnd,
 ) -> Vec<Vec<LeftDeadEnd>> {

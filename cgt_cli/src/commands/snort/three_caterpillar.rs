@@ -17,6 +17,7 @@ pub struct Args {
     no_graphviz: bool,
 }
 
+#[allow(clippy::needless_pass_by_value)]
 pub fn run(args: Args) -> Result<()> {
     let position = Snort::new_three_caterpillar(args.n);
 

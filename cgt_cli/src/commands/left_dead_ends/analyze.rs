@@ -4,7 +4,6 @@ use cgt::{misere::left_dead_end::interned::Interner, parsing::Parser};
 use rayon::iter::{ParallelBridge, ParallelIterator};
 use std::{
     io::{BufRead, BufReader, BufWriter, Write},
-    ops::DerefMut,
     sync::Mutex,
 };
 
@@ -39,6 +38,7 @@ struct Log {
     good_option_to_atom: bool,
 }
 
+#[allow(clippy::needless_pass_by_value)]
 pub fn run(args: Args) -> Result<()> {
     if let Some(threads) = args.threads {
         rayon::ThreadPoolBuilder::new()
@@ -67,7 +67,7 @@ pub fn run(args: Args) -> Result<()> {
             // Parses only first factorization but no non-unique factorization is known anyway
             let parse = || {
                 let p = Parser::new(&line);
-                let (p, g) = interner.parse(p)?;
+                let (p, summed) = interner.parse(p)?;
                 let p = p.trim_whitespace();
                 let p = p.parse_ascii_char('=')?;
                 let p = p.trim_whitespace();
@@ -80,7 +80,7 @@ pub fn run(args: Args) -> Result<()> {
                 let p = p.parse_ascii_char('+')?;
                 let p = p.trim_whitespace();
                 let (_, c) = interner.parse(p)?;
-                Some((a, b, c, g))
+                Some((a, b, c, summed))
             };
             let (a, b, c, g) =
                 parse().with_context(|| format!("Could not parse input line: `{}`", line))?;
@@ -103,12 +103,14 @@ pub fn run(args: Args) -> Result<()> {
                 good_option_to_atom: interner.into_moves(g).any(|h| interner.is_atom(h)),
             };
 
-            let mut output = output.lock().ok().context("Output lock is poisoned")?;
-            serde_json::ser::to_writer(output.deref_mut(), &log)
-                .context("Could not write jsonl line")?;
-            output
-                .write_all(b"\n")
-                .context("Could not write jsonl line")?;
+            {
+                let mut output = output.lock().ok().context("Output lock is poisoned")?;
+                serde_json::ser::to_writer(&mut *output, &log)
+                    .context("Could not write jsonl line")?;
+                output
+                    .write_all(b"\n")
+                    .context("Could not write jsonl line")?;
+            }
 
             Ok(())
         })?;

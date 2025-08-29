@@ -186,7 +186,7 @@ fn render_snort(
         .success()
     {
         bail!("Graphviz failed");
-    };
+    }
 
     Ok(())
 }

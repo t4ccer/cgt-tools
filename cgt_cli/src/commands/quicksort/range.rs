@@ -60,6 +60,7 @@ macro_rules! handle_variant {
     }};
 }
 
+#[allow(clippy::needless_pass_by_value, clippy::unnecessary_wraps)]
 pub fn run(args: Args) -> Result<()> {
     for max_value in args.start_range..=args.end_range {
         let sorted_range = (1..=max_value).collect::<Vec<u32>>();

@@ -1,7 +1,7 @@
 use crate::io::FileOrStdout;
 use anyhow::{Context, Result};
 use cgt::{
-    drawing::{svg, tiny_skia, Draw},
+    drawing::{Draw, svg, tiny_skia},
     short::partizan::canonical_form::CanonicalForm,
 };
 use clap::Parser;
@@ -27,6 +27,7 @@ pub struct Args {
     output_png: Option<FileOrStdout>,
 }
 
+#[allow(clippy::needless_pass_by_value)]
 pub fn run(args: Args) -> Result<()> {
     let canonical_form = CanonicalForm::from_str(&args.position).expect("Could not parse position");
     let thermograph = canonical_form.thermograph();

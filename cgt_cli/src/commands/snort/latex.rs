@@ -2,7 +2,7 @@ use crate::{
     commands::snort::common::Log,
     io::{FileOrStdin, FileOrStdout},
 };
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use cgt::numeric::rational::Rational;
 use clap::Parser;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
@@ -10,8 +10,8 @@ use std::{
     io::{BufReader, BufWriter, Write},
     process::{Command, Stdio},
     sync::{
-        atomic::{AtomicUsize, Ordering},
         Mutex,
+        atomic::{AtomicUsize, Ordering},
     },
 };
 
@@ -53,6 +53,7 @@ pub struct Args {
     fitness_lower_bound: Option<Rational>,
 }
 
+#[allow(clippy::needless_pass_by_value)]
 pub fn run(args: Args) -> Result<()> {
     let input = BufReader::new(args.in_file.open().context("Could not open input file")?);
     let mut output = BufWriter::new(args.out_file.open().context("Could not open output file")?);
@@ -76,9 +77,7 @@ pub fn run(args: Args) -> Result<()> {
         {
             if args
                 .fitness_lower_bound
-                .map_or(false, |fitness_lower_bound| {
-                    position.score < fitness_lower_bound
-                })
+                .is_some_and(|fitness_lower_bound| position.score < fitness_lower_bound)
             {
                 return Ok(());
             }
@@ -114,14 +113,14 @@ pub fn run(args: Args) -> Result<()> {
                 .success()
             {
                 bail!("Graphviz failed");
-            };
+            }
 
-            let mut es = entries.lock().unwrap();
-            es.push((position, temperature, degree, out_image_name));
+            let mut entries = entries.lock().unwrap();
+            entries.push((position, temperature, degree, out_image_name));
         }
         Ok(())
     })?;
-    let mut entries = entries.lock().unwrap();
+    let mut entries = entries.into_inner().unwrap();
 
     // preamble
     writeln!(output, "{{")?;
@@ -174,7 +173,7 @@ pub fn run(args: Args) -> Result<()> {
                     "\\includegraphics[width={}]{{{}}} & ${}$ & ${}$ & ${}$ ",
                     args.image_width, entry.3, entry.1, entry.2, entry.0.score
                 )?;
-            };
+            }
         }
         writeln!(output, "\\\\")?;
     }

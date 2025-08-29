@@ -11,6 +11,9 @@ homepage = "https://github.com/t4ccer/cgt-tools"
 keywords = ["cgt"]
 categories = ["mathematics", "science"]
 
+[lints]
+workspace = true
+
 [dependencies]
 anyhow = "1.0"
 clap = { version = "4.5", features = ["derive"] }

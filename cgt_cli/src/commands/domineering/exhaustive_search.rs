@@ -1,6 +1,6 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use cgt::{
-    grid::{small_bit_grid::SmallBitGrid, FiniteGrid},
+    grid::{FiniteGrid, small_bit_grid::SmallBitGrid},
     numeric::dyadic_rational_number::DyadicRationalNumber,
     short::partizan::{
         games::domineering,
@@ -13,7 +13,7 @@ use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use std::{
     fs::File,
     io::{self, BufWriter, Write},
-    sync::{atomic::AtomicU64, Arc, Mutex},
+    sync::{Arc, Mutex, atomic::AtomicU64},
     thread, time,
 };
 
@@ -119,10 +119,7 @@ pub fn run(args: Args) -> Result<()> {
     let grid_tiles = args.width * args.height;
 
     let max_last_id: u64 = 1 << grid_tiles;
-    let last_id: u64 = match args.last_id {
-        None => max_last_id,
-        Some(last_id) => last_id,
-    };
+    let last_id: u64 = args.last_id.unwrap_or(max_last_id);
 
     if last_id > max_last_id {
         bail!(
@@ -142,10 +139,9 @@ pub fn run(args: Args) -> Result<()> {
         File::create(&args.output_path).with_context(|| "Could not open output file")?;
     let progress_tracker = Arc::new(ProgressTracker::new(args, output_file));
 
-    let progress_tracker_cpy = progress_tracker.clone();
-
     let progress_pid = if progress_tracker.args.progress_interval != 0 {
-        Some(thread::spawn(move || progress_report(progress_tracker_cpy)))
+        let progress_tracker = progress_tracker.clone();
+        Some(thread::spawn(move || progress_report(&progress_tracker)))
     } else {
         None
     };
@@ -190,13 +186,10 @@ pub fn run(args: Args) -> Result<()> {
 
             let thermograph = match progress_tracker.args.thermograph_method {
                 ThermographMethod::CanonicalForm => {
-                    let canonical_form = {
-                        if let Some(ref transposition_table) = transposition_table {
-                            grid.canonical_form(transposition_table)
-                        } else {
-                            grid.canonical_form(&NoTranspositionTable::new())
-                        }
-                    };
+                    let canonical_form = transposition_table.as_ref().map_or_else(
+                        || grid.canonical_form(&NoTranspositionTable::new()),
+                        |transposition_table| grid.canonical_form(transposition_table),
+                    );
                     canonical_form.thermograph()
                 }
                 ThermographMethod::Direct => grid.thermograph_direct(),
@@ -226,7 +219,7 @@ pub fn run(args: Args) -> Result<()> {
             }
         });
     if let Some(pid) = progress_pid {
-        pid.join().unwrap()
+        pid.join().unwrap();
     }
 
     Ok(())
@@ -241,13 +234,10 @@ fn zero_padded(to_pad: u128, max_size: u128) -> String {
     format!("{zeros_padding}{to_pad}")
 }
 
-fn progress_report(progress_tracker: Arc<ProgressTracker>) {
+fn progress_report(progress_tracker: &ProgressTracker) {
     let grid_tiles = progress_tracker.args.width * progress_tracker.args.height;
     let max_last_id: u64 = 1 << grid_tiles;
-    let last_id: u64 = match progress_tracker.args.last_id {
-        None => max_last_id,
-        Some(last_id) => last_id,
-    };
+    let last_id: u64 = progress_tracker.args.last_id.unwrap_or(max_last_id);
     let total_iterations = last_id - progress_tracker.args.start_id;
     let stderr = io::stderr();
 
@@ -270,7 +260,7 @@ fn progress_report(progress_tracker: Arc<ProgressTracker>) {
                 progress_tracker
                     .args
                     .temperature_threshold
-                    .unwrap_or(DyadicRationalNumber::from(-1))
+                    .unwrap_or(DyadicRationalNumber::new(-1, 0))
             )
         } else {
             format!("{}", progress_tracker.highest_temp.lock().unwrap().clone())
