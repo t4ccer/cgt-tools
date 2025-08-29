@@ -6,7 +6,7 @@ use crate::{
     short::partizan::canonical_form::{CanonicalForm, Hash, Moves},
 };
 use auto_ops::impl_op_ex;
-use std::fmt::Display;
+use std::{fmt::Display, iter::FusedIterator};
 
 /// A number-up-star game position that is a sum of a number, up and, nimber.
 #[derive(Debug, Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -447,6 +447,8 @@ impl ExactSizeIterator for LeftMovesIter {
     }
 }
 
+impl FusedIterator for LeftMovesIter {}
+
 /// Iterator over right moves
 ///
 /// Can be created by the [`Nus::right_moves`] method
@@ -577,3 +579,5 @@ impl ExactSizeIterator for RightMovesIter {
         }
     }
 }
+
+impl FusedIterator for RightMovesIter {}

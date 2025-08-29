@@ -13,6 +13,7 @@ use std::{
     cmp::Ordering,
     fmt::{self, Display, Write},
     hash::Hash,
+    iter::FusedIterator,
     iter::Sum,
 };
 
@@ -1167,6 +1168,8 @@ where
     }
 }
 
+impl<'a, I> FusedIterator for MovesIterInner<'a, I> where I: Iterator<Item = Nus> + FusedIterator {}
+
 macro_rules! impl_moves_iter {
     ($(#[$attr:meta])* $name:ident) => {
         $(#[$attr])*
@@ -1199,6 +1202,8 @@ macro_rules! impl_moves_iter {
                 self.inner.len()
             }
         }
+
+        impl<'a> FusedIterator for $name<'_> {}
     };
 }
 
