@@ -1260,6 +1260,7 @@ mod tests {
             assert_eq!(left_vec, left_iter);
 
             let moves = nus.to_moves();
+            assert_eq!(moves.left.len(), nus.left_moves().count(), "{nus}");
             assert_eq!(moves.left, left_iter);
         }
 
@@ -1280,6 +1281,7 @@ mod tests {
             assert_eq!(right_vec, right_iter);
 
             let moves = nus.to_moves();
+            assert_eq!(moves.right.len(), nus.right_moves().count());
             assert_eq!(moves.right, right_iter);
         }
 

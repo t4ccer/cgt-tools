@@ -544,6 +544,38 @@ impl Iterator for LeftMovesIter {
             _ => None,
         }
     }
+
+    #[allow(clippy::if_same_then_else)] // for clarity
+    fn count(self) -> usize {
+        let nimber = self.nus.nimber();
+        if !self.nus.is_number() && self.nus.up_multiple() == 0 {
+            return nimber.value() as usize - self.idx;
+        }
+
+        match self.idx {
+            0 => {
+                if self.nus.is_number() {
+                    if self.nus.number() == DyadicRationalNumber::from(0) {
+                        0
+                    } else if let Some(integer) = self.nus.number().to_integer() {
+                        usize::from(integer >= 0)
+                    } else {
+                        1
+                    }
+                } else if self.nus.up_multiple() == 1 && self.nus.nimber() == Nimber::from(1) {
+                    2
+                } else if self.nus.up_multiple() == -1 && self.nus.nimber() == Nimber::from(1) {
+                    1
+                } else if self.nus.up_multiple() > 0 {
+                    1
+                } else {
+                    1
+                }
+            }
+            1 => usize::from(self.nus.up_multiple() == 1 && self.nus.nimber() == Nimber::from(1)),
+            _ => 0,
+        }
+    }
 }
 
 /// Iterator over right moves
@@ -630,6 +662,38 @@ impl Iterator for RightMovesIter {
                 }
             }
             _ => None,
+        }
+    }
+
+    #[allow(clippy::if_same_then_else)] // for clarity
+    fn count(self) -> usize {
+        let nimber = self.nus.nimber();
+        if !self.nus.is_number() && self.nus.up_multiple() == 0 {
+            return nimber.value() as usize - self.idx;
+        }
+
+        match self.idx {
+            0 => {
+                if self.nus.is_number() {
+                    if self.nus.number() == DyadicRationalNumber::from(0) {
+                        0
+                    } else if let Some(integer) = self.nus.number().to_integer() {
+                        usize::from(integer < 0)
+                    } else {
+                        1
+                    }
+                } else if self.nus.up_multiple() == 1 && self.nus.nimber() == Nimber::from(1) {
+                    1
+                } else if self.nus.up_multiple() == -1 && self.nus.nimber() == Nimber::from(1) {
+                    2
+                } else if self.nus.up_multiple() > 0 {
+                    1
+                } else {
+                    1
+                }
+            }
+            1 => usize::from(self.nus.up_multiple() == 1 && self.nus.nimber() == Nimber::from(1)),
+            _ => 0,
         }
     }
 }
