@@ -46,17 +46,16 @@ pub trait PartizanGame: Sized + Clone + Hash + Send + Sync + Eq {
             return Thermograph::with_mast(Rational::from(0));
         }
 
-        let mut left_scaffold = Trajectory::new_constant(Rational::NegativeInfinity);
-        let mut right_scaffold = Trajectory::new_constant(Rational::PositiveInfinity);
-
-        for left_move in &left_moves {
-            left_scaffold = left_scaffold.max(&left_move.thermograph_direct().right_wall);
-        }
-        for right_move in &right_moves {
-            right_scaffold = right_scaffold.min(&right_move.thermograph_direct().left_wall);
-        }
-
+        let mut left_scaffold = left_moves.into_iter().fold(
+            Trajectory::new_constant(Rational::NegativeInfinity),
+            |scaffold, left_move| scaffold.max(&left_move.thermograph_direct().right_wall),
+        );
         left_scaffold.tilt(Rational::from(-1));
+
+        let mut right_scaffold = right_moves.into_iter().fold(
+            Trajectory::new_constant(Rational::PositiveInfinity),
+            |scaffold, right_move| scaffold.min(&right_move.thermograph_direct().left_wall),
+        );
         right_scaffold.tilt(Rational::from(1));
 
         Thermograph::thermographic_intersection(left_scaffold, right_scaffold)
