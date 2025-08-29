@@ -1234,6 +1234,12 @@ mod tests {
 
     #[test]
     fn nus_moves_nus_roundtrip() {
+        fn test_impl(nus: Nus) {
+            let moves = nus.to_moves();
+            let nus_from_moves = moves.to_nus().expect("Should be a NUS");
+            assert_eq!(nus, nus_from_moves, "Should be equal");
+        }
+
         // We really need to stress test it to hit all branches.
         // Confirmed with
         // cargo tarpaulin --out html -- short::partizan::canonical_form::tests --nocapture
@@ -1242,13 +1248,47 @@ mod tests {
             .max_tests(tests)
             .min_tests_passed(tests)
             .tests(tests);
-        qc.quickcheck(nus_moves_nus_roundtrip_impl as fn(Nus));
+        qc.quickcheck(test_impl as fn(Nus));
     }
 
-    fn nus_moves_nus_roundtrip_impl(nus: Nus) {
-        let moves = nus.to_moves();
-        let nus_from_moves = moves.to_nus().expect("Should be a NUS");
-        assert_eq!(nus, nus_from_moves, "Should be equal");
+    #[test]
+    fn nus_left_moves_iter() {
+        fn test_impl(nus: Nus) {
+            let left_vec = nus.to_left_moves();
+            let left_iter: Vec<CanonicalForm> =
+                nus.left_moves().map(CanonicalForm::new_nus).collect();
+            assert_eq!(left_vec, left_iter);
+
+            let moves = nus.to_moves();
+            assert_eq!(moves.left, left_iter);
+        }
+
+        let tests = 50_000;
+        let mut qc = QuickCheck::new()
+            .max_tests(tests)
+            .min_tests_passed(tests)
+            .tests(tests);
+        qc.quickcheck(test_impl as fn(Nus));
+    }
+
+    #[test]
+    fn nus_right_moves_iter() {
+        fn test_impl(nus: Nus) {
+            let right_vec = nus.to_right_moves();
+            let right_iter: Vec<CanonicalForm> =
+                nus.right_moves().map(CanonicalForm::new_nus).collect();
+            assert_eq!(right_vec, right_iter);
+
+            let moves = nus.to_moves();
+            assert_eq!(moves.right, right_iter);
+        }
+
+        let tests = 50_000;
+        let mut qc = QuickCheck::new()
+            .max_tests(tests)
+            .min_tests_passed(tests)
+            .tests(tests);
+        qc.quickcheck(test_impl as fn(Nus));
     }
 
     fn arbitrary_sign<T>(n: T, g: &mut Gen) -> T

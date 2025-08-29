@@ -97,7 +97,7 @@ impl Nus {
 
             if let Some(integer) = self.number().to_integer() {
                 let sign = if integer >= 0 { 1 } else { -1 };
-                let prev = CanonicalForm::new_nus(Self::new_integer(integer - sign));
+                let prev = CanonicalForm::new_nus(Nus::new_integer(integer - sign));
 
                 if integer >= 0 {
                     return Moves {
@@ -112,8 +112,8 @@ impl Nus {
                 }
             } else {
                 let rational = self.number();
-                let left_move = CanonicalForm::new_nus(Self::new_number(rational.step(-1)));
-                let right_move = CanonicalForm::new_nus(Self::new_number(rational.step(1)));
+                let left_move = CanonicalForm::new_nus(Nus::new_number(rational.step(-1)));
+                let right_move = CanonicalForm::new_nus(Nus::new_number(rational.step(1)));
                 return Moves {
                     left: vec![left_move],
                     right: vec![right_move],
@@ -128,7 +128,7 @@ impl Nus {
 
             let mut moves = Moves::empty();
             for i in 0..nimber.value() {
-                let new_nus = Self {
+                let new_nus = Nus {
                     number: rational,
                     up_multiple: 0,
                     nimber: Nimber::from(i),
@@ -140,7 +140,7 @@ impl Nus {
         }
 
         // Case: number-up-star
-        let number_move = Self::new_number(self.number());
+        let number_move = Nus::new_number(self.number());
 
         let sign = if self.up_multiple() >= 0 { 1 } else { -1 };
         let prev_up = self.up_multiple() - sign;
@@ -150,7 +150,7 @@ impl Nus {
 
         if self.up_multiple() == 1 && self.nimber() == Nimber::from(1) {
             // Special case: n^*
-            let star_move = CanonicalForm::new_nus(Self {
+            let star_move = CanonicalForm::new_nus(Nus {
                 number: self.number(),
                 up_multiple: 0,
                 nimber: Nimber::from(1),
@@ -161,7 +161,7 @@ impl Nus {
             };
         } else if self.up_multiple() == -1 && self.nimber() == Nimber::from(1) {
             // Special case: nv*
-            let star_move = CanonicalForm::new_nus(Self {
+            let star_move = CanonicalForm::new_nus(Nus {
                 number: self.number(),
                 up_multiple: 0,
                 nimber: Nimber::from(1),
@@ -171,7 +171,7 @@ impl Nus {
                 right: vec![CanonicalForm::new_nus(number_move), star_move],
             };
         } else if self.up_multiple() > 0 {
-            let prev_nus = CanonicalForm::new_nus(Self {
+            let prev_nus = CanonicalForm::new_nus(Nus {
                 number: self.number(),
                 up_multiple: prev_up,
                 nimber: Nimber::from(prev_nimber),
@@ -181,7 +181,7 @@ impl Nus {
                 right: vec![prev_nus],
             };
         } else {
-            let prev_nus = CanonicalForm::new_nus(Self {
+            let prev_nus = CanonicalForm::new_nus(Nus {
                 number: self.number(),
                 up_multiple: prev_up,
                 nimber: Nimber::from(prev_nimber),
@@ -205,7 +205,7 @@ impl Nus {
 
             if let Some(integer) = self.number().to_integer() {
                 let sign = if integer >= 0 { 1 } else { -1 };
-                let prev = CanonicalForm::new_nus(Self::new_integer(integer - sign));
+                let prev = CanonicalForm::new_nus(Nus::new_integer(integer - sign));
 
                 if integer >= 0 {
                     return vec![prev];
@@ -214,7 +214,7 @@ impl Nus {
                 }
             } else {
                 let rational = self.number();
-                let left_move = CanonicalForm::new_nus(Self::new_number(rational.step(-1)));
+                let left_move = CanonicalForm::new_nus(Nus::new_number(rational.step(-1)));
                 return vec![left_move];
             }
         }
@@ -226,7 +226,7 @@ impl Nus {
 
             let mut left = Vec::with_capacity(nimber.value() as usize);
             for i in 0..nimber.value() {
-                let new_nus = Self {
+                let new_nus = Nus {
                     number: rational,
                     up_multiple: 0,
                     nimber: Nimber::from(i),
@@ -237,7 +237,7 @@ impl Nus {
         }
 
         // Case: number-up-star
-        let number_move = Self::new_number(self.number());
+        let number_move = Nus::new_number(self.number());
 
         let sign = if self.up_multiple() >= 0 { 1 } else { -1 };
         let prev_up = self.up_multiple() - sign;
@@ -246,7 +246,7 @@ impl Nus {
 
         if self.up_multiple() == 1 && self.nimber() == Nimber::from(1) {
             // Special case: n^*
-            let star_move = CanonicalForm::new_nus(Self {
+            let star_move = CanonicalForm::new_nus(Nus {
                 number: self.number(),
                 up_multiple: 0,
                 nimber: Nimber::from(1),
@@ -258,7 +258,7 @@ impl Nus {
         } else if self.up_multiple() > 0 {
             vec![CanonicalForm::new_nus(number_move)]
         } else {
-            let prev_nus = CanonicalForm::new_nus(Self {
+            let prev_nus = CanonicalForm::new_nus(Nus {
                 number: self.number(),
                 up_multiple: prev_up,
                 nimber: Nimber::from(prev_nimber),
@@ -277,7 +277,7 @@ impl Nus {
 
             if let Some(integer) = self.number().to_integer() {
                 let sign = if integer >= 0 { 1 } else { -1 };
-                let prev = CanonicalForm::new_nus(Self::new_integer(integer - sign));
+                let prev = CanonicalForm::new_nus(Nus::new_integer(integer - sign));
 
                 if integer >= 0 {
                     return vec![];
@@ -286,7 +286,7 @@ impl Nus {
                 }
             } else {
                 let rational = self.number();
-                let right_move = CanonicalForm::new_nus(Self::new_number(rational.step(1)));
+                let right_move = CanonicalForm::new_nus(Nus::new_number(rational.step(1)));
                 return vec![right_move];
             }
         }
@@ -298,7 +298,7 @@ impl Nus {
 
             let mut right = Vec::with_capacity(nimber.value() as usize);
             for i in 0..nimber.value() {
-                let new_nus = Self {
+                let new_nus = Nus {
                     number: rational,
                     up_multiple: 0,
                     nimber: Nimber::from(i),
@@ -309,7 +309,7 @@ impl Nus {
         }
 
         // Case: number-up-star
-        let number_move = Self::new_number(self.number());
+        let number_move = Nus::new_number(self.number());
 
         let sign = if self.up_multiple() >= 0 { 1 } else { -1 };
         let prev_up = self.up_multiple() - sign;
@@ -321,14 +321,14 @@ impl Nus {
             vec![CanonicalForm::new_nus(number_move)]
         } else if self.up_multiple() == -1 && self.nimber() == Nimber::from(1) {
             // Special case: nv*
-            let star_move = CanonicalForm::new_nus(Self {
+            let star_move = CanonicalForm::new_nus(Nus {
                 number: self.number(),
                 up_multiple: 0,
                 nimber: Nimber::from(1),
             });
             vec![CanonicalForm::new_nus(number_move), star_move]
         } else if self.up_multiple() > 0 {
-            let prev_nus = CanonicalForm::new_nus(Self {
+            let prev_nus = CanonicalForm::new_nus(Nus {
                 number: self.number(),
                 up_multiple: prev_up,
                 nimber: Nimber::from(prev_nimber),
@@ -337,6 +337,16 @@ impl Nus {
         } else {
             vec![CanonicalForm::new_nus(number_move)]
         }
+    }
+
+    /// Get left moves
+    pub const fn left_moves(self) -> LeftMovesIter {
+        LeftMovesIter { nus: self, idx: 0 }
+    }
+
+    /// Get right moves
+    pub const fn right_moves(self) -> RightMovesIter {
+        RightMovesIter { nus: self, idx: 0 }
     }
 
     /// Parse nus from string, using notation without pluses between number, up, and star components
@@ -444,5 +454,182 @@ impl Display for Nus {
         }
 
         Ok(())
+    }
+}
+
+/// Iterator over left moves
+///
+/// Can be created by the [`Nus::left_moves`] method
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct LeftMovesIter {
+    nus: Nus,
+    idx: usize,
+}
+
+impl Iterator for LeftMovesIter {
+    type Item = Nus;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let number_move = Nus::new_number(self.nus.number());
+
+        let sign = if self.nus.up_multiple() >= 0 { 1 } else { -1 };
+        let prev_up = self.nus.up_multiple() - sign;
+        let up_parity: u32 = (self.nus.up_multiple() & 1) as u32;
+        let prev_nimber = self.nus.nimber().value() ^ up_parity ^ (prev_up as u32 & 1);
+
+        // Case: number + nimber but no up/down
+        let nimber = self.nus.nimber();
+        if self.nus.up_multiple() == 0 && self.idx < nimber.value() as usize {
+            let new_nus = Nus {
+                number: self.nus.number(),
+                up_multiple: 0,
+                nimber: Nimber::from(self.idx as u32),
+            };
+            self.idx += 1;
+            return Some(new_nus);
+        }
+
+        match self.idx {
+            0 => {
+                self.idx += 1;
+
+                // Case: Just a number
+                if self.nus.is_number() {
+                    if self.nus.number() == DyadicRationalNumber::from(0) {
+                        None
+                    } else if let Some(integer) = self.nus.number().to_integer() {
+                        let sign = if integer >= 0 { 1 } else { -1 };
+                        let prev = Nus::new_integer(integer - sign);
+
+                        if integer >= 0 { Some(prev) } else { None }
+                    } else {
+                        let rational = self.nus.number();
+                        let left_move = Nus::new_number(rational.step(-1));
+                        Some(left_move)
+                    }
+                }
+                // Case: number-up-star
+                else if self.nus.up_multiple() == 1 && self.nus.nimber() == Nimber::from(1) {
+                    // Special case: n^*
+                    Some(number_move)
+                } else if (self.nus.up_multiple() == -1 && self.nus.nimber() == Nimber::from(1))
+                    || self.nus.up_multiple() > 0
+                {
+                    // Special case: nv*
+                    Some(number_move)
+                } else {
+                    let prev_nus = Nus {
+                        number: self.nus.number(),
+                        up_multiple: prev_up,
+                        nimber: Nimber::from(prev_nimber),
+                    };
+                    Some(prev_nus)
+                }
+            }
+            1 => {
+                self.idx += 1;
+
+                // Special case: n^*
+                if self.nus.up_multiple() == 1 && self.nus.nimber() == Nimber::from(1) {
+                    let star_move = Nus {
+                        number: self.nus.number(),
+                        up_multiple: 0,
+                        nimber: Nimber::from(1),
+                    };
+                    Some(star_move)
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
+}
+
+/// Iterator over right moves
+///
+/// Can be created by the [`Nus::right_moves`] method
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct RightMovesIter {
+    nus: Nus,
+    idx: usize,
+}
+
+impl Iterator for RightMovesIter {
+    type Item = Nus;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let number_move = Nus::new_number(self.nus.number());
+
+        let sign = if self.nus.up_multiple() >= 0 { 1 } else { -1 };
+        let prev_up = self.nus.up_multiple() - sign;
+        let up_parity: u32 = (self.nus.up_multiple() & 1) as u32;
+        let prev_nimber = self.nus.nimber().value() ^ up_parity ^ (prev_up as u32 & 1);
+
+        // Case: number + nimber but no up/down
+        let nimber = self.nus.nimber();
+        if self.nus.up_multiple() == 0 && self.idx < nimber.value() as usize {
+            let new_nus = Nus {
+                number: self.nus.number(),
+                up_multiple: 0,
+                nimber: Nimber::from(self.idx as u32),
+            };
+            self.idx += 1;
+            return Some(new_nus);
+        }
+
+        match self.idx {
+            0 => {
+                self.idx += 1;
+
+                // Case: Just a number
+                if self.nus.is_number() {
+                    if self.nus.number() == DyadicRationalNumber::from(0) {
+                        None
+                    } else if let Some(integer) = self.nus.number().to_integer() {
+                        let sign = if integer >= 0 { 1 } else { -1 };
+                        let prev = Nus::new_integer(integer - sign);
+
+                        if integer >= 0 { None } else { Some(prev) }
+                    } else {
+                        let rational = self.nus.number();
+                        let right_move = Nus::new_number(rational.step(1));
+                        Some(right_move)
+                    }
+                }
+                // Case: number-up-star
+                else if (self.nus.up_multiple() == 1 || self.nus.up_multiple() == -1)
+                    && self.nus.nimber() == Nimber::from(1)
+                {
+                    // Special case: n^*
+                    Some(number_move)
+                } else if self.nus.up_multiple() > 0 {
+                    let prev_nus = Nus {
+                        number: self.nus.number(),
+                        up_multiple: prev_up,
+                        nimber: Nimber::from(prev_nimber),
+                    };
+                    Some(prev_nus)
+                } else {
+                    Some(number_move)
+                }
+            }
+            1 => {
+                self.idx += 1;
+
+                // Special case: n^*
+                if self.nus.up_multiple() == -1 && self.nus.nimber() == Nimber::from(1) {
+                    let star_move = Nus {
+                        number: self.nus.number(),
+                        up_multiple: 0,
+                        nimber: Nimber::from(1),
+                    };
+                    Some(star_move)
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
     }
 }
