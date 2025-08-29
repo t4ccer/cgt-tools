@@ -270,8 +270,8 @@ impl Moves {
             }
         }
 
-        for l_move in game.to_left_moves().iter() {
-            if Self::geq_arrays(l_move, left_moves, right_moves) {
+        for l_move in game.left_moves() {
+            if Self::geq_arrays(&l_move, left_moves, right_moves) {
                 return false;
             }
         }
@@ -290,8 +290,8 @@ impl Moves {
             }
         }
 
-        for r_move in game.to_right_moves().iter() {
-            if Self::leq_arrays(r_move, left_moves, right_moves) {
+        for r_move in game.right_moves() {
+            if Self::leq_arrays(&r_move, left_moves, right_moves) {
                 return false;
             }
         }
@@ -318,19 +318,20 @@ impl Moves {
                 }
                 Some(g) => g.clone(),
             };
-            for g_lr in g_l.to_right_moves().iter() {
-                if Self::leq_arrays(g_lr, &left_moves, &right_moves) {
-                    let g_lr_moves = g_lr.to_left_moves();
+            for g_lr in g_l.right_moves() {
+                if Self::leq_arrays(&g_lr, &left_moves, &right_moves) {
+                    let g_lr_moves = g_lr.left_moves();
                     let mut new_left_moves: Vec<Option<CanonicalForm>> =
-                        vec![None; left_moves.len() + g_lr_moves.len() - 1];
+                        vec![None; left_moves.len() + g_lr_moves.clone().count() - 1];
                     new_left_moves[..(i as usize)].clone_from_slice(&left_moves[..(i as usize)]);
                     new_left_moves[(i as usize)..(left_moves.len() - 1)]
                         .clone_from_slice(&left_moves[(i as usize + 1)..]);
-                    for (k, g_lrl) in g_lr_moves.iter().enumerate() {
-                        if left_moves.contains(&Some(g_lrl.clone())) {
+                    for (k, g_lrl) in g_lr_moves.enumerate() {
+                        let g_lrl = Some(g_lrl.into_owned());
+                        if left_moves.contains(&g_lrl) {
                             new_left_moves[left_moves.len() + k - 1] = None;
                         } else {
-                            new_left_moves[left_moves.len() + k - 1] = Some(g_lrl.clone());
+                            new_left_moves[left_moves.len() + k - 1] = g_lrl;
                         }
                     }
                     left_moves = new_left_moves;
@@ -365,19 +366,20 @@ impl Moves {
                 }
                 Some(game) => game.clone(),
             };
-            for g_rl in g_r.to_left_moves().iter() {
-                if Self::geq_arrays(g_rl, &left_moves, &right_moves) {
-                    let g_rl_moves = g_rl.to_right_moves();
+            for g_rl in g_r.left_moves() {
+                if Self::geq_arrays(&g_rl, &left_moves, &right_moves) {
+                    let g_rl_moves = g_rl.right_moves();
                     let mut new_right_moves: Vec<Option<CanonicalForm>> =
-                        vec![None; right_moves.len() + g_rl_moves.len() - 1];
+                        vec![None; right_moves.len() + g_rl_moves.clone().count() - 1];
                     new_right_moves[..(i as usize)].clone_from_slice(&right_moves[..(i as usize)]);
                     new_right_moves[(i as usize)..(right_moves.len() - 1)]
                         .clone_from_slice(&right_moves[(i as usize + 1)..]);
-                    for (k, g_rlr) in g_rl_moves.iter().enumerate() {
-                        if right_moves.contains(&Some(g_rlr.clone())) {
+                    for (k, g_rlr) in g_rl_moves.enumerate() {
+                        let g_rlr = Some(g_rlr.into_owned());
+                        if right_moves.contains(&g_rlr) {
                             new_right_moves[right_moves.len() + k - 1] = None;
                         } else {
-                            new_right_moves[right_moves.len() + k - 1] = Some(g_rlr.clone());
+                            new_right_moves[right_moves.len() + k - 1] = g_rlr;
                         }
                     }
                     right_moves = new_right_moves;
@@ -603,21 +605,19 @@ impl CanonicalForm {
         let mut moves = Moves::empty();
 
         if !g.is_number() {
-            let g_moves = g.to_moves();
-            for g_l in &g_moves.left {
-                moves.left.push(Self::construct_sum(g_l, h));
+            for g_l in g.left_moves() {
+                moves.left.push(Self::construct_sum(&g_l, h));
             }
-            for g_r in &g_moves.right {
-                moves.right.push(Self::construct_sum(g_r, h));
+            for g_r in g.right_moves() {
+                moves.right.push(Self::construct_sum(&g_r, h));
             }
         }
         if !h.is_number() {
-            let h_moves = h.to_moves();
-            for h_l in &h_moves.left {
-                moves.left.push(Self::construct_sum(g, h_l));
+            for h_l in h.left_moves() {
+                moves.left.push(Self::construct_sum(g, &h_l));
             }
-            for h_r in &h_moves.right {
-                moves.right.push(Self::construct_sum(g, h_r));
+            for h_r in h.right_moves() {
+                moves.right.push(Self::construct_sum(g, &h_r));
             }
         }
 
@@ -658,19 +658,27 @@ impl CanonicalForm {
         }
     }
 
-    /// Get left moves from a canonical form
-    pub fn to_left_moves(&self) -> Cow<'_, [CanonicalForm]> {
-        match &self.inner {
-            CanonicalFormInner::Nus(nus) => Cow::Owned(nus.to_left_moves()),
-            CanonicalFormInner::Moves(moves) => Cow::Borrowed(&moves.left),
+    /// Get iterator over left moves from a canonical form
+    pub fn left_moves(&self) -> LeftMovesIter<'_> {
+        LeftMovesIter {
+            inner: match &self.inner {
+                CanonicalFormInner::Nus(nus) => LeftMovesIterInner::Nus(nus.left_moves()),
+                CanonicalFormInner::Moves(moves) => {
+                    LeftMovesIterInner::Moves(moves.left.as_slice().iter())
+                }
+            },
         }
     }
 
-    /// Get right moves from a canonical form
-    pub fn to_right_moves(&self) -> Cow<'_, [CanonicalForm]> {
-        match &self.inner {
-            CanonicalFormInner::Nus(nus) => Cow::Owned(nus.to_right_moves()),
-            CanonicalFormInner::Moves(moves) => Cow::Borrowed(&moves.right),
+    /// Get iterator over right moves from a canonical form
+    pub fn right_moves(&self) -> RightMovesIter<'_> {
+        RightMovesIter {
+            inner: match &self.inner {
+                CanonicalFormInner::Nus(nus) => RightMovesIterInner::Nus(nus.right_moves()),
+                CanonicalFormInner::Moves(moves) => {
+                    RightMovesIterInner::Moves(moves.right.as_slice().iter())
+                }
+            },
         }
     }
 
@@ -743,18 +751,16 @@ impl CanonicalForm {
         }
 
         if !lhs_game.is_number() {
-            let lhs_game_moves = lhs_game.to_moves();
-            for lhs_l in &lhs_game_moves.left {
-                if Self::leq(rhs_game, lhs_l) {
+            for lhs_l in lhs_game.left_moves() {
+                if Self::leq(rhs_game, &lhs_l) {
                     return false;
                 }
             }
         }
 
         if !rhs_game.is_number() {
-            let rhs_game_moves = rhs_game.to_moves();
-            for rhs_r in &rhs_game_moves.right {
-                if Self::leq(rhs_r, lhs_game) {
+            for rhs_r in rhs_game.right_moves() {
+                if Self::leq(&rhs_r, lhs_game) {
                     return false;
                 }
             }
@@ -822,10 +828,8 @@ impl CanonicalForm {
             return number;
         }
 
-        self.to_moves()
-            .left
-            .iter()
-            .map(Self::right_stop)
+        self.left_moves()
+            .map(|gl| gl.right_stop())
             .max()
             .expect("Not a number so must have moves")
     }
@@ -836,10 +840,8 @@ impl CanonicalForm {
             return number;
         }
 
-        self.to_moves()
-            .right
-            .iter()
-            .map(Self::left_stop)
+        self.right_moves()
+            .map(|gr| gr.left_stop())
             .max()
             .expect("Not a number so must have moves")
     }
@@ -881,15 +883,13 @@ impl CanonicalForm {
 
         let temperature_game = Self::new_dyadic(temperature);
 
-        let moves = self.to_moves();
-
-        let mut new_left_moves = Vec::with_capacity(moves.left.len());
-        for left_move in moves.left {
+        let mut new_left_moves = Vec::with_capacity(self.left_moves().count());
+        for left_move in self.left_moves() {
             new_left_moves.push(left_move.cool(temperature) - &temperature_game);
         }
 
-        let mut new_right_moves = Vec::with_capacity(moves.right.len());
-        for right_move in moves.right {
+        let mut new_right_moves = Vec::with_capacity(self.right_moves().count());
+        for right_move in self.right_moves() {
             new_right_moves.push(right_move.cool(temperature) + &temperature_game);
         }
 
@@ -913,15 +913,13 @@ impl CanonicalForm {
             }
         }
 
-        let moves = self.to_moves();
-
-        let mut new_left_moves = Vec::with_capacity(moves.left.len());
-        for left_move in moves.left {
+        let mut new_left_moves = Vec::with_capacity(self.left_moves().count());
+        for left_move in self.left_moves() {
             new_left_moves.push(left_move.heat(temperature) + temperature);
         }
 
-        let mut new_right_moves = Vec::with_capacity(moves.right.len());
-        for right_move in moves.right {
+        let mut new_right_moves = Vec::with_capacity(self.right_moves().count());
+        for right_move in self.right_moves() {
             new_right_moves.push(right_move.heat(temperature) - temperature);
         }
 
@@ -943,12 +941,9 @@ impl CanonicalForm {
             }
         }
 
-        let moves = self.to_moves();
-        moves
-            .left
-            .iter()
-            .chain(moves.right.iter())
-            .map(Self::far_star)
+        self.left_moves()
+            .chain(self.right_moves())
+            .map(|g| g.far_star())
             .max()
             .unwrap_or(Nimber::from(1))
     }
@@ -1035,18 +1030,9 @@ impl CanonicalForm {
             }
         }
 
-        let moves = self.to_moves();
         CanonicalForm::new_from_moves(Moves {
-            left: moves
-                .left
-                .iter()
-                .map(CanonicalForm::star_projection)
-                .collect(),
-            right: moves
-                .right
-                .iter()
-                .map(CanonicalForm::star_projection)
-                .collect(),
+            left: self.left_moves().map(|gl| gl.star_projection()).collect(),
+            right: self.right_moves().map(|gr| gr.star_projection()).collect(),
         })
     }
 
@@ -1065,22 +1051,17 @@ impl CanonicalForm {
             return Some(Temper::Even);
         }
 
-        let moves = self.to_moves();
-        if moves
-            .left
-            .iter()
-            .chain(moves.right.iter())
-            .all(|m| CanonicalForm::temper(m).is_some_and(|temper| matches!(temper, Temper::Even)))
-        {
+        if self.left_moves().chain(self.right_moves()).all(|m| {
+            m.temper()
+                .is_some_and(|temper| matches!(temper, Temper::Even))
+        }) {
             return Some(Temper::Odd);
         }
 
-        if moves
-            .left
-            .iter()
-            .chain(moves.right.iter())
-            .all(|m| CanonicalForm::temper(m).is_some_and(|temper| matches!(temper, Temper::Odd)))
-        {
+        if self.left_moves().chain(self.right_moves()).all(|m| {
+            m.temper()
+                .is_some_and(|temper| matches!(temper, Temper::Odd))
+        }) {
             return Some(Temper::Even);
         }
 
@@ -1153,6 +1134,70 @@ impl Sum for CanonicalForm {
 impl<'a> Sum<&'a CanonicalForm> for CanonicalForm {
     fn sum<I: Iterator<Item = &'a CanonicalForm>>(iter: I) -> CanonicalForm {
         iter.fold(CanonicalForm::new_integer(0), |acc, v| acc + v)
+    }
+}
+
+#[derive(Debug, Clone)]
+enum LeftMovesIterInner<'a> {
+    Moves(core::slice::Iter<'a, CanonicalForm>),
+    Nus(nus::LeftMovesIter),
+}
+
+/// Iterator over form's left moves
+#[derive(Debug, Clone)]
+pub struct LeftMovesIter<'a> {
+    inner: LeftMovesIterInner<'a>,
+}
+
+impl<'a> Iterator for LeftMovesIter<'a> {
+    type Item = Cow<'a, CanonicalForm>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match &mut self.inner {
+            LeftMovesIterInner::Moves(iter) => iter.next().map(Cow::Borrowed),
+            LeftMovesIterInner::Nus(iter) => iter
+                .next()
+                .map(|nus| Cow::Owned(CanonicalForm::new_nus(nus))),
+        }
+    }
+
+    fn count(self) -> usize {
+        match self.inner {
+            LeftMovesIterInner::Moves(iter) => iter.count(),
+            LeftMovesIterInner::Nus(iter) => iter.count(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+enum RightMovesIterInner<'a> {
+    Moves(core::slice::Iter<'a, CanonicalForm>),
+    Nus(nus::RightMovesIter),
+}
+
+/// Iterator over form's right moves
+#[derive(Debug, Clone)]
+pub struct RightMovesIter<'a> {
+    inner: RightMovesIterInner<'a>,
+}
+
+impl<'a> Iterator for RightMovesIter<'a> {
+    type Item = Cow<'a, CanonicalForm>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match &mut self.inner {
+            RightMovesIterInner::Moves(iter) => iter.next().map(Cow::Borrowed),
+            RightMovesIterInner::Nus(iter) => iter
+                .next()
+                .map(|nus| Cow::Owned(CanonicalForm::new_nus(nus))),
+        }
+    }
+
+    fn count(self) -> usize {
+        match self.inner {
+            RightMovesIterInner::Moves(iter) => iter.count(),
+            RightMovesIterInner::Nus(iter) => iter.count(),
+        }
     }
 }
 
@@ -1254,11 +1299,8 @@ mod tests {
     #[test]
     fn nus_left_moves_iter() {
         fn test_impl(nus: Nus) {
-            let left_vec = nus.to_left_moves();
             let left_iter: Vec<CanonicalForm> =
                 nus.left_moves().map(CanonicalForm::new_nus).collect();
-            assert_eq!(left_vec, left_iter);
-
             let moves = nus.to_moves();
             assert_eq!(moves.left.len(), nus.left_moves().count(), "{nus}");
             assert_eq!(moves.left, left_iter);
@@ -1275,11 +1317,8 @@ mod tests {
     #[test]
     fn nus_right_moves_iter() {
         fn test_impl(nus: Nus) {
-            let right_vec = nus.to_right_moves();
             let right_iter: Vec<CanonicalForm> =
                 nus.right_moves().map(CanonicalForm::new_nus).collect();
-            assert_eq!(right_vec, right_iter);
-
             let moves = nus.to_moves();
             assert_eq!(moves.right.len(), nus.right_moves().count());
             assert_eq!(moves.right, right_iter);
@@ -1671,10 +1710,16 @@ mod tests {
         let cf = CanonicalForm::from_str("{{3/2*|1/2}|{0|-3},{-1*,{-1/2|-1*}|-5/2}}").unwrap();
         let moves = cf.to_moves();
 
-        let left: &[CanonicalForm] = &cf.to_left_moves();
+        let left: &[CanonicalForm] = &cf
+            .left_moves()
+            .map(|cf| cf.into_owned())
+            .collect::<Vec<_>>();
         assert_eq!(moves.left.as_slice(), left);
 
-        let right: &[CanonicalForm] = &cf.to_right_moves();
+        let right: &[CanonicalForm] = &cf
+            .right_moves()
+            .map(|cf| cf.into_owned())
+            .collect::<Vec<_>>();
         assert_eq!(moves.right.as_slice(), right);
     }
 }
