@@ -220,11 +220,11 @@ impl Thermograph {
                     &right_scaffold.x_intercepts[(next_cp_right + 1) as usize],
                 );
 
-                // debug_assert_eq!(
-                //     left_scaffold.value_at(&crossover_point),
-                //     right_scaffold.value_at(&crossover_point),
-                //     "Invalid crossover point"
-                // );
+                debug_assert_eq!(
+                    left_scaffold.value_at(crossover_point),
+                    right_scaffold.value_at(crossover_point),
+                    "Invalid crossover point"
+                );
 
                 Trajectory::extend_trajectory(
                     true,
