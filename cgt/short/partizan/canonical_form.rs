@@ -1742,4 +1742,40 @@ mod tests {
             .collect::<Vec<_>>();
         assert_eq!(moves.right.as_slice(), right);
     }
+
+    #[test]
+    fn moves_len_down_star() {
+        let cf = CanonicalForm::from_str("v*").unwrap();
+        let moves = cf.to_moves();
+
+        let mut left = cf.left_moves();
+        let mut right = cf.right_moves();
+
+        assert_eq!(left.len(), moves.left.len());
+        assert_eq!(right.len(), moves.right.len());
+
+        let _ = left.next().unwrap();
+        let _ = right.next().unwrap();
+
+        assert_eq!(left.len(), moves.left.len() - 1);
+        assert_eq!(right.len(), moves.right.len() - 1);
+    }
+
+    #[test]
+    fn moves_len_up_star() {
+        let cf = CanonicalForm::from_str("^*").unwrap();
+        let moves = cf.to_moves();
+
+        let mut left = cf.left_moves();
+        let mut right = cf.right_moves();
+
+        assert_eq!(left.len(), moves.left.len());
+        assert_eq!(right.len(), moves.right.len());
+
+        let _ = left.next().unwrap();
+        let _ = right.next().unwrap();
+
+        assert_eq!(left.len(), moves.left.len() - 1);
+        assert_eq!(right.len(), moves.right.len() - 1);
+    }
 }

@@ -574,7 +574,7 @@ impl ExactSizeIterator for RightMovesIter {
                     1
                 }
             }
-            1 => usize::from(self.nus.up_multiple() == 1 && self.nus.nimber() == Nimber::from(1)),
+            1 => usize::from(self.nus.up_multiple() == -1 && self.nus.nimber() == Nimber::from(1)),
             _ => 0,
         }
     }
