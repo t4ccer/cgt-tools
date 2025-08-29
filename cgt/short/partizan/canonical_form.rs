@@ -299,7 +299,7 @@ impl Moves {
         true
     }
 
-    fn bypass_reversible_moves_l(&self) -> Self {
+    fn bypass_reversible_moves_l(&self) -> Vec<CanonicalForm> {
         let mut i: i64 = 0;
 
         let mut left_moves: Vec<Option<CanonicalForm>> =
@@ -342,13 +342,11 @@ impl Moves {
 
             i += 1;
         }
-        Self {
-            left: left_moves.iter().flatten().cloned().collect(),
-            right: self.right.clone(),
-        }
+
+        left_moves.iter().flatten().cloned().collect()
     }
 
-    fn bypass_reversible_moves_r(&self) -> Self {
+    fn bypass_reversible_moves_r(&self) -> Vec<CanonicalForm> {
         let mut i: i64 = 0;
 
         let left_moves: Vec<Option<CanonicalForm>> = self.left.iter().cloned().map(Some).collect();
@@ -390,18 +388,16 @@ impl Moves {
 
             i += 1;
         }
-        Self {
-            left: self.left.clone(),
-            right: right_moves.iter().flatten().cloned().collect(),
-        }
+
+        right_moves.iter().flatten().cloned().collect()
     }
 
     fn canonicalize(&self) -> Self {
-        let moves = self.bypass_reversible_moves_l();
-        let moves = moves.bypass_reversible_moves_r();
+        let left = self.bypass_reversible_moves_l();
+        let left = Self::eliminate_dominated_moves(&left, true);
 
-        let left = Self::eliminate_dominated_moves(&moves.left, true);
-        let right = Self::eliminate_dominated_moves(&moves.right, false);
+        let right = self.bypass_reversible_moves_r();
+        let right = Self::eliminate_dominated_moves(&right, false);
 
         Self { left, right }
     }
@@ -458,7 +454,7 @@ impl Moves {
     /// `{a,b,...|c,d,...}`
     ///
     /// ` ^^^^^^^`
-    fn parse_list2(mut p: Parser<'_>) -> Option<(Parser<'_>, Vec<CanonicalForm>)> {
+    fn parse_list(mut p: Parser<'_>) -> Option<(Parser<'_>, Vec<CanonicalForm>)> {
         let mut acc = Vec::new();
         loop {
             match lexeme!(p, CanonicalForm::parse) {
@@ -480,9 +476,9 @@ impl Moves {
 
     fn parse(p: Parser<'_>) -> Option<(Parser<'_>, Moves)> {
         let p = try_option!(p.parse_ascii_char('{'));
-        let (p, left) = try_option!(Moves::parse_list2(p));
+        let (p, left) = try_option!(Moves::parse_list(p));
         let p = try_option!(p.parse_ascii_char('|'));
-        let (p, right) = try_option!(Moves::parse_list2(p));
+        let (p, right) = try_option!(Moves::parse_list(p));
         let p = try_option!(p.parse_ascii_char('}'));
         let moves = Self { left, right };
         Some((p, moves))
