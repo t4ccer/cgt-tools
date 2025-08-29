@@ -313,6 +313,8 @@ impl Display for Nus {
     }
 }
 
+// TODO: DoubleEndedIterator
+
 /// Iterator over left moves
 ///
 /// Can be created by the [`Nus::left_moves`] method
@@ -401,8 +403,19 @@ impl Iterator for LeftMovesIter {
         }
     }
 
-    #[allow(clippy::if_same_then_else)] // for clarity
     fn count(self) -> usize {
+        self.len()
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len = self.len();
+        (len, Some(len))
+    }
+}
+
+impl ExactSizeIterator for LeftMovesIter {
+    #[allow(clippy::if_same_then_else)] // for clarity
+    fn len(&self) -> usize {
         let nimber = self.nus.nimber();
         if !self.nus.is_number() && self.nus.up_multiple() == 0 {
             return nimber.value() as usize - self.idx;
@@ -431,11 +444,6 @@ impl Iterator for LeftMovesIter {
             1 => usize::from(self.nus.up_multiple() == 1 && self.nus.nimber() == Nimber::from(1)),
             _ => 0,
         }
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        let len = self.count();
-        (len, Some(len))
     }
 }
 
@@ -526,8 +534,19 @@ impl Iterator for RightMovesIter {
         }
     }
 
-    #[allow(clippy::if_same_then_else)] // for clarity
     fn count(self) -> usize {
+        self.len()
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len = self.len();
+        (len, Some(len))
+    }
+}
+
+impl ExactSizeIterator for RightMovesIter {
+    #[allow(clippy::if_same_then_else)] // for clarity
+    fn len(&self) -> usize {
         let nimber = self.nus.nimber();
         if !self.nus.is_number() && self.nus.up_multiple() == 0 {
             return nimber.value() as usize - self.idx;
@@ -556,10 +575,5 @@ impl Iterator for RightMovesIter {
             1 => usize::from(self.nus.up_multiple() == 1 && self.nus.nimber() == Nimber::from(1)),
             _ => 0,
         }
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        let len = self.count();
-        (len, Some(len))
     }
 }

@@ -322,7 +322,7 @@ impl Moves {
                 if Self::leq_arrays(&g_lr, &left_moves, &right_moves) {
                     let g_lr_moves = g_lr.left_moves();
                     let mut new_left_moves: Vec<Option<CanonicalForm>> =
-                        vec![None; left_moves.len() + g_lr_moves.clone().count() - 1];
+                        vec![None; left_moves.len() + g_lr_moves.clone().len() - 1];
                     new_left_moves[..(i as usize)].clone_from_slice(&left_moves[..(i as usize)]);
                     new_left_moves[(i as usize)..(left_moves.len() - 1)]
                         .clone_from_slice(&left_moves[(i as usize + 1)..]);
@@ -368,7 +368,7 @@ impl Moves {
                 if Self::geq_arrays(&g_rl, &left_moves, &right_moves) {
                     let g_rl_moves = g_rl.right_moves();
                     let mut new_right_moves: Vec<Option<CanonicalForm>> =
-                        vec![None; right_moves.len() + g_rl_moves.clone().count() - 1];
+                        vec![None; right_moves.len() + g_rl_moves.len() - 1];
                     new_right_moves[..(i as usize)].clone_from_slice(&right_moves[..(i as usize)]);
                     new_right_moves[(i as usize)..(right_moves.len() - 1)]
                         .clone_from_slice(&right_moves[(i as usize + 1)..]);
@@ -862,12 +862,12 @@ impl CanonicalForm {
 
         let temperature_game = Self::new_dyadic(temperature);
 
-        let mut new_left_moves = Vec::with_capacity(self.left_moves().count());
+        let mut new_left_moves = Vec::with_capacity(self.left_moves().len());
         for left_move in self.left_moves() {
             new_left_moves.push(left_move.cool(temperature) - &temperature_game);
         }
 
-        let mut new_right_moves = Vec::with_capacity(self.right_moves().count());
+        let mut new_right_moves = Vec::with_capacity(self.right_moves().len());
         for right_move in self.right_moves() {
             new_right_moves.push(right_move.cool(temperature) + &temperature_game);
         }
@@ -892,12 +892,12 @@ impl CanonicalForm {
             }
         }
 
-        let mut new_left_moves = Vec::with_capacity(self.left_moves().count());
+        let mut new_left_moves = Vec::with_capacity(self.left_moves().len());
         for left_move in self.left_moves() {
             new_left_moves.push(left_move.heat(temperature) + temperature);
         }
 
-        let mut new_right_moves = Vec::with_capacity(self.right_moves().count());
+        let mut new_right_moves = Vec::with_capacity(self.right_moves().len());
         for right_move in self.right_moves() {
             new_right_moves.push(right_move.heat(temperature) - temperature);
         }
@@ -1155,6 +1155,18 @@ where
     }
 }
 
+impl<'a, I> ExactSizeIterator for MovesIterInner<'a, I>
+where
+    I: Iterator<Item = Nus> + ExactSizeIterator,
+{
+    fn len(&self) -> usize {
+        match self {
+            MovesIterInner::Moves(iter) => iter.len(),
+            MovesIterInner::Nus(iter) => iter.len(),
+        }
+    }
+}
+
 macro_rules! impl_moves_iter {
     ($(#[$attr:meta])* $name:ident) => {
         $(#[$attr])*
@@ -1179,6 +1191,12 @@ macro_rules! impl_moves_iter {
             #[inline]
             fn size_hint(&self) -> (usize, Option<usize>) {
                 self.inner.size_hint()
+            }
+        }
+
+        impl ExactSizeIterator for $name<'_> {
+            fn len(&self) -> usize {
+                self.inner.len()
             }
         }
     };
