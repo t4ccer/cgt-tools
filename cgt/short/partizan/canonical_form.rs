@@ -1145,6 +1145,14 @@ where
             MovesIterInner::Nus(iter) => iter.count(),
         }
     }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        match self {
+            MovesIterInner::Moves(iter) => iter.size_hint(),
+            MovesIterInner::Nus(iter) => iter.size_hint(),
+        }
+    }
 }
 
 macro_rules! impl_moves_iter {
@@ -1166,6 +1174,11 @@ macro_rules! impl_moves_iter {
             #[inline]
             fn count(self) -> usize {
                 self.inner.count()
+            }
+
+            #[inline]
+            fn size_hint(&self) -> (usize, Option<usize>) {
+                self.inner.size_hint()
             }
         }
     };

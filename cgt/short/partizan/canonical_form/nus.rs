@@ -432,6 +432,11 @@ impl Iterator for LeftMovesIter {
             _ => 0,
         }
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len = self.count();
+        (len, Some(len))
+    }
 }
 
 /// Iterator over right moves
@@ -551,5 +556,10 @@ impl Iterator for RightMovesIter {
             1 => usize::from(self.nus.up_multiple() == 1 && self.nus.nimber() == Nimber::from(1)),
             _ => 0,
         }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len = self.count();
+        (len, Some(len))
     }
 }
