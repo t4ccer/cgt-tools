@@ -8,6 +8,7 @@ use crate::{
 };
 use auto_ops::impl_op_ex;
 use std::{
+    borrow::Cow,
     cmp::Ordering,
     fmt::{self, Display, Write},
     hash::Hash,
@@ -199,6 +200,150 @@ impl Nus {
         }
 
         moves
+    }
+
+    // TODO: Have iterators for these
+    fn to_left_moves(self) -> Vec<CanonicalForm> {
+        // Case: Just a number
+        if self.is_number() {
+            if self.number() == DyadicRationalNumber::from(0) {
+                return vec![];
+            }
+
+            if let Some(integer) = self.number().to_integer() {
+                let sign = if integer >= 0 { 1 } else { -1 };
+                let prev = CanonicalForm::new_nus(Self::new_integer(integer - sign));
+
+                if integer >= 0 {
+                    return vec![prev];
+                } else if sign < 0 {
+                    return vec![];
+                }
+            } else {
+                let rational = self.number();
+                let left_move = CanonicalForm::new_nus(Self::new_number(rational.step(-1)));
+                return vec![left_move];
+            }
+        }
+
+        // Case: number + nimber but no up/down
+        if self.up_multiple() == 0 {
+            let rational = self.number();
+            let nimber = self.nimber();
+
+            let mut left = Vec::with_capacity(nimber.value() as usize);
+            for i in 0..nimber.value() {
+                let new_nus = Self {
+                    number: rational,
+                    up_multiple: 0,
+                    nimber: Nimber::from(i),
+                };
+                left.push(CanonicalForm::new_nus(new_nus));
+            }
+            return left;
+        }
+
+        // Case: number-up-star
+        let number_move = Self::new_number(self.number());
+
+        let sign = if self.up_multiple() >= 0 { 1 } else { -1 };
+        let prev_up = self.up_multiple() - sign;
+        let up_parity: u32 = (self.up_multiple() & 1) as u32;
+        let prev_nimber = self.nimber().value() ^ up_parity ^ (prev_up as u32 & 1);
+
+        if self.up_multiple() == 1 && self.nimber() == Nimber::from(1) {
+            // Special case: n^*
+            let star_move = CanonicalForm::new_nus(Self {
+                number: self.number(),
+                up_multiple: 0,
+                nimber: Nimber::from(1),
+            });
+            vec![CanonicalForm::new_nus(number_move), star_move]
+        } else if self.up_multiple() == -1 && self.nimber() == Nimber::from(1) {
+            // Special case: nv*
+            vec![CanonicalForm::new_nus(number_move)]
+        } else if self.up_multiple() > 0 {
+            vec![CanonicalForm::new_nus(number_move)]
+        } else {
+            let prev_nus = CanonicalForm::new_nus(Self {
+                number: self.number(),
+                up_multiple: prev_up,
+                nimber: Nimber::from(prev_nimber),
+            });
+            vec![prev_nus]
+        }
+    }
+
+    // TODO: Have iterators for these
+    fn to_right_moves(self) -> Vec<CanonicalForm> {
+        // Case: Just a number
+        if self.is_number() {
+            if self.number() == DyadicRationalNumber::from(0) {
+                return vec![];
+            }
+
+            if let Some(integer) = self.number().to_integer() {
+                let sign = if integer >= 0 { 1 } else { -1 };
+                let prev = CanonicalForm::new_nus(Self::new_integer(integer - sign));
+
+                if integer >= 0 {
+                    return vec![];
+                } else if sign < 0 {
+                    return vec![prev];
+                }
+            } else {
+                let rational = self.number();
+                let right_move = CanonicalForm::new_nus(Self::new_number(rational.step(1)));
+                return vec![right_move];
+            }
+        }
+
+        // Case: number + nimber but no up/down
+        if self.up_multiple() == 0 {
+            let rational = self.number();
+            let nimber = self.nimber();
+
+            let mut right = Vec::with_capacity(nimber.value() as usize);
+            for i in 0..nimber.value() {
+                let new_nus = Self {
+                    number: rational,
+                    up_multiple: 0,
+                    nimber: Nimber::from(i),
+                };
+                right.push(CanonicalForm::new_nus(new_nus));
+            }
+            return right;
+        }
+
+        // Case: number-up-star
+        let number_move = Self::new_number(self.number());
+
+        let sign = if self.up_multiple() >= 0 { 1 } else { -1 };
+        let prev_up = self.up_multiple() - sign;
+        let up_parity: u32 = (self.up_multiple() & 1) as u32;
+        let prev_nimber = self.nimber().value() ^ up_parity ^ (prev_up as u32 & 1);
+
+        if self.up_multiple() == 1 && self.nimber() == Nimber::from(1) {
+            // Special case: n^*
+            vec![CanonicalForm::new_nus(number_move)]
+        } else if self.up_multiple() == -1 && self.nimber() == Nimber::from(1) {
+            // Special case: nv*
+            let star_move = CanonicalForm::new_nus(Self {
+                number: self.number(),
+                up_multiple: 0,
+                nimber: Nimber::from(1),
+            });
+            vec![CanonicalForm::new_nus(number_move), star_move]
+        } else if self.up_multiple() > 0 {
+            let prev_nus = CanonicalForm::new_nus(Self {
+                number: self.number(),
+                up_multiple: prev_up,
+                nimber: Nimber::from(prev_nimber),
+            });
+            vec![prev_nus]
+        } else {
+            vec![CanonicalForm::new_nus(number_move)]
+        }
     }
 
     /// Parse nus from string, using notation without pluses between number, up, and star components
@@ -561,8 +706,7 @@ impl Moves {
             }
         }
 
-        let game_moves = game.to_moves();
-        for l_move in &game_moves.left {
+        for l_move in game.to_left_moves().iter() {
             if Self::geq_arrays(l_move, left_moves, right_moves) {
                 return false;
             }
@@ -582,8 +726,7 @@ impl Moves {
             }
         }
 
-        let game_moves = game.to_moves();
-        for r_move in &game_moves.right {
+        for r_move in game.to_right_moves().iter() {
             if Self::leq_arrays(r_move, left_moves, right_moves) {
                 return false;
             }
@@ -611,15 +754,15 @@ impl Moves {
                 }
                 Some(g) => g.clone(),
             };
-            for g_lr in g_l.to_moves().right {
-                if Self::leq_arrays(&g_lr, &left_moves, &right_moves) {
-                    let g_lr_moves = g_lr.to_moves();
+            for g_lr in g_l.to_right_moves().iter() {
+                if Self::leq_arrays(g_lr, &left_moves, &right_moves) {
+                    let g_lr_moves = g_lr.to_left_moves();
                     let mut new_left_moves: Vec<Option<CanonicalForm>> =
-                        vec![None; left_moves.len() + g_lr_moves.left.len() - 1];
+                        vec![None; left_moves.len() + g_lr_moves.len() - 1];
                     new_left_moves[..(i as usize)].clone_from_slice(&left_moves[..(i as usize)]);
                     new_left_moves[(i as usize)..(left_moves.len() - 1)]
                         .clone_from_slice(&left_moves[(i as usize + 1)..]);
-                    for (k, g_lrl) in g_lr_moves.left.iter().enumerate() {
+                    for (k, g_lrl) in g_lr_moves.iter().enumerate() {
                         if left_moves.contains(&Some(g_lrl.clone())) {
                             new_left_moves[left_moves.len() + k - 1] = None;
                         } else {
@@ -658,15 +801,15 @@ impl Moves {
                 }
                 Some(game) => game.clone(),
             };
-            for g_rl in g_r.to_moves().left {
-                if Self::geq_arrays(&g_rl, &left_moves, &right_moves) {
-                    let g_rl_moves = g_rl.to_moves();
+            for g_rl in g_r.to_left_moves().iter() {
+                if Self::geq_arrays(g_rl, &left_moves, &right_moves) {
+                    let g_rl_moves = g_rl.to_right_moves();
                     let mut new_right_moves: Vec<Option<CanonicalForm>> =
-                        vec![None; right_moves.len() + g_rl_moves.right.len() - 1];
+                        vec![None; right_moves.len() + g_rl_moves.len() - 1];
                     new_right_moves[..(i as usize)].clone_from_slice(&right_moves[..(i as usize)]);
                     new_right_moves[(i as usize)..(right_moves.len() - 1)]
                         .clone_from_slice(&right_moves[(i as usize + 1)..]);
-                    for (k, g_rlr) in g_rl_moves.right.iter().enumerate() {
+                    for (k, g_rlr) in g_rl_moves.iter().enumerate() {
                         if right_moves.contains(&Some(g_rlr.clone())) {
                             new_right_moves[right_moves.len() + k - 1] = None;
                         } else {
@@ -948,6 +1091,22 @@ impl CanonicalForm {
         match &self.inner {
             CanonicalFormInner::Nus(nus) => nus.to_moves(),
             CanonicalFormInner::Moves(moves) => moves.clone(),
+        }
+    }
+
+    /// Get left moves from a canonical form
+    pub fn to_left_moves(&self) -> Cow<'_, [CanonicalForm]> {
+        match &self.inner {
+            CanonicalFormInner::Nus(nus) => Cow::Owned(nus.to_left_moves()),
+            CanonicalFormInner::Moves(moves) => Cow::Borrowed(&moves.left),
+        }
+    }
+
+    /// Get right moves from a canonical form
+    pub fn to_right_moves(&self) -> Cow<'_, [CanonicalForm]> {
+        match &self.inner {
+            CanonicalFormInner::Nus(nus) => Cow::Owned(nus.to_right_moves()),
+            CanonicalFormInner::Moves(moves) => Cow::Borrowed(&moves.right),
         }
     }
 
@@ -1899,5 +2058,17 @@ mod tests {
 
         let cf = CanonicalForm::from_str("{2|1,{*|0}}").unwrap();
         assert_eq!(cf.temper(), None);
+    }
+
+    #[test]
+    fn to_moves() {
+        let cf = CanonicalForm::from_str("{{3/2*|1/2}|{0|-3},{-1*,{-1/2|-1*}|-5/2}}").unwrap();
+        let moves = cf.to_moves();
+
+        let left: &[CanonicalForm] = &cf.to_left_moves();
+        assert_eq!(moves.left.as_slice(), left);
+
+        let right: &[CanonicalForm] = &cf.to_right_moves();
+        assert_eq!(moves.right.as_slice(), right);
     }
 }
