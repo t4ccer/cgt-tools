@@ -180,8 +180,19 @@ impl Trajectory {
         self.minmax::<false>(other)
     }
 
-    #[allow(clippy::useless_let_if_seq, clippy::cognitive_complexity)]
     fn minmax<const MAX: bool>(&self, other: &Self) -> Self {
+        #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+        enum PointOwner {
+            Other,
+            Any,
+            This,
+        }
+
+        struct CriticalPoint {
+            owner: PointOwner,
+            value: Rational,
+        }
+
         let max_multiplier = if MAX { -1 } else { 1 };
         // We scan down through the critical points.  We keep track of which
         // trajectory was dominant at the previous critical point:
@@ -198,46 +209,50 @@ impl Trajectory {
         // equal, it's the one with the lower mast x-intercept. Note that if either mast is
         // infinite, then we consider only the x-intercepts, *not* the slopes.
 
-        let mut dominant_at_previous_critical_point = 0;
-        if !self.is_infinite() && !other.is_infinite() {
-            dominant_at_previous_critical_point =
-                max_multiplier * self.slopes[0].cmp(&other.slopes[0]) as i32;
-        }
-        if dominant_at_previous_critical_point == 0 {
-            dominant_at_previous_critical_point =
-                max_multiplier * self.x_intercepts[0].cmp(&other.x_intercepts[0]) as i32;
-        }
+        let mut dominant_at_previous_critical_point = if !self.is_infinite() && !other.is_infinite()
+        {
+            max_multiplier * self.slopes[0].cmp(&other.slopes[0]) as i32
+        } else {
+            0
+        };
 
         loop {
-            let current_critical_point_owner;
-            let current_critical_point: Rational;
-
-            if next_critical_point_self == self.critical_points.len()
+            let current_critical_point = if next_critical_point_self == self.critical_points.len()
                 && next_critical_point_other == other.critical_points.len()
             {
-                current_critical_point_owner = 0;
-                current_critical_point = Rational::from(-1);
+                CriticalPoint {
+                    owner: PointOwner::Any,
+                    value: Rational::from(-1),
+                }
             } else {
-                if next_critical_point_self == self.critical_points.len() {
-                    current_critical_point_owner = 1;
+                let owner = if next_critical_point_self == self.critical_points.len() {
+                    PointOwner::This
                 } else if next_critical_point_other == other.critical_points.len() {
-                    current_critical_point_owner = -1;
+                    PointOwner::Other
                 } else {
-                    current_critical_point_owner = other.critical_points[next_critical_point_other]
+                    match other.critical_points[next_critical_point_other]
                         .cmp(&self.critical_points[next_critical_point_self])
-                        as i32;
+                    {
+                        Ordering::Less => PointOwner::Other,
+                        Ordering::Equal => PointOwner::Any,
+                        Ordering::Greater => PointOwner::This,
+                    }
+                };
+
+                CriticalPoint {
+                    owner,
+                    value: if owner <= PointOwner::Any {
+                        self.critical_points[next_critical_point_self]
+                    } else {
+                        other.critical_points[next_critical_point_other]
+                    },
                 }
-                current_critical_point = if current_critical_point_owner <= 0 {
-                    self.critical_points[next_critical_point_self]
-                } else {
-                    other.critical_points[next_critical_point_other]
-                }
-            }
+            };
 
             let dominant_at_current_critical_point = max_multiplier
                 * (self
-                    .value_at(current_critical_point)
-                    .cmp(&other.value_at(current_critical_point)) as i32);
+                    .value_at(current_critical_point.value)
+                    .cmp(&other.value_at(current_critical_point.value)) as i32);
 
             if (dominant_at_current_critical_point < 0 && dominant_at_previous_critical_point > 0)
                 || (dominant_at_current_critical_point > 0
@@ -264,21 +279,25 @@ impl Trajectory {
                 });
             }
 
-            if current_critical_point == Rational::from(-1) {
+            if current_critical_point.value == Rational::from(-1) {
                 break;
             }
 
             // Now we need to determine whether `current_critical_point` is a critical point
             // of the new trajectory.  There are several ways this can happen:
 
-            if dominant_at_current_critical_point < 0 && current_critical_point_owner <= 0 {
+            if dominant_at_current_critical_point < 0
+                && current_critical_point.owner <= PointOwner::Any
+            {
                 // This trajectory is dominant at `current_critical_point` and its slope changes there.
-                new_critical_points.push(current_critical_point);
+                new_critical_points.push(current_critical_point.value);
                 new_slopes.push(self.slopes[next_critical_point_self]);
                 new_x_intercepts.push(self.x_intercepts[next_critical_point_self]);
-            } else if dominant_at_current_critical_point > 0 && current_critical_point_owner >= 0 {
+            } else if dominant_at_current_critical_point > 0
+                && current_critical_point.owner >= PointOwner::Any
+            {
                 // `other` is dominant at `current_critical_point` and its slope changes there.
-                new_critical_points.push(current_critical_point);
+                new_critical_points.push(current_critical_point.value);
                 new_slopes.push(other.slopes[next_critical_point_other]);
                 new_x_intercepts.push(other.x_intercepts[next_critical_point_other]);
             } else if dominant_at_current_critical_point == 0 {
@@ -296,17 +315,18 @@ impl Trajectory {
                     } else {
                         other.slopes[next_critical_point_other]
                     };
-                let self_slope_below_current_critical_point = if current_critical_point_owner <= 0 {
-                    self.slopes[next_critical_point_self + 1]
-                } else {
-                    self.slopes[next_critical_point_self]
-                };
-                let other_slope_below_current_critical_point = if current_critical_point_owner >= 0
-                {
-                    other.slopes[next_critical_point_other + 1]
-                } else {
-                    other.slopes[next_critical_point_other]
-                };
+                let self_slope_below_current_critical_point =
+                    if current_critical_point.owner <= PointOwner::Any {
+                        self.slopes[next_critical_point_self + 1]
+                    } else {
+                        self.slopes[next_critical_point_self]
+                    };
+                let other_slope_below_current_critical_point =
+                    if current_critical_point.owner >= PointOwner::Any {
+                        other.slopes[next_critical_point_other + 1]
+                    } else {
+                        other.slopes[next_critical_point_other]
+                    };
 
                 let slope_below_current_critical_point = if MAX {
                     self_slope_below_current_critical_point
@@ -316,7 +336,7 @@ impl Trajectory {
                         .max(other_slope_below_current_critical_point)
                 };
                 if slope_above_current_critical_point != slope_below_current_critical_point {
-                    new_critical_points.push(current_critical_point);
+                    new_critical_points.push(current_critical_point.value);
                     new_slopes.push(slope_above_current_critical_point);
                     new_x_intercepts.push(if dominant_slope_above_current_critical_point < 0 {
                         self.x_intercepts[next_critical_point_self]
@@ -326,10 +346,10 @@ impl Trajectory {
                 }
             }
 
-            if current_critical_point_owner <= 0 {
+            if current_critical_point.owner <= PointOwner::Any {
                 next_critical_point_self += 1;
             }
-            if current_critical_point_owner >= 0 {
+            if current_critical_point.owner >= PointOwner::Any {
                 next_critical_point_other += 1;
             }
 
