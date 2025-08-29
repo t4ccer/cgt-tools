@@ -775,7 +775,7 @@ impl CanonicalForm {
             CanonicalFormInner::Nus(nus) => {
                 if let Some(nus_integer) = nus.number().to_integer() {
                     if nus.is_number() {
-                        return Thermograph::with_mast(Rational::new(nus_integer, 1));
+                        return Thermograph::with_mast(Rational::new_integer(nus_integer));
                     }
                 }
 

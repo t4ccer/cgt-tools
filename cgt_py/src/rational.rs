@@ -15,7 +15,12 @@ impl PyRational {
             if let Ok(numerator) = numerator.extract::<i64>(gil) {
                 match denominator {
                     None => Ok(Self::from(Rational::from(numerator))),
-                    Some(denominator) => Ok(Self::from(Rational::new(numerator, denominator))),
+                    Some(denominator) => match Rational::new_fraction(numerator, denominator) {
+                        Some(rational) => Ok(Self::from(rational)),
+                        None => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                            "Invalid Rational",
+                        )),
+                    },
                 }
             } else if let Ok(string) = numerator.extract::<&str>(gil) {
                 Rational::from_str(string)

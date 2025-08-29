@@ -184,7 +184,7 @@ impl DyadicRationalNumber {
     /// # Panics
     /// - If denominator is too large to fit in [`Rational`]
     pub const fn to_rational(self) -> Rational {
-        Rational::new(self.numerator(), self.denominator().unwrap() as u32)
+        Rational::new_fraction(self.numerator(), self.denominator().unwrap() as u32).unwrap()
     }
 }
 

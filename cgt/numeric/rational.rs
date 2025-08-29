@@ -28,10 +28,20 @@ impl Rational {
     /// Create a new rational. Panics if denominator is zero.
     // TODO: Make it return option
     #[inline]
-    pub const fn new(numerator: i64, denominator: u32) -> Self {
-        assert!(denominator != 0);
+    pub const fn new_fraction(numerator: i64, denominator: u32) -> Option<Rational> {
+        if denominator == 0 {
+            return None;
+        }
         let g = gcd(numerator, denominator as i64).abs();
-        Self::Value(Rational64::new_raw(numerator / g, denominator as i64 / g))
+        Some(Rational::Value(Rational64::new_raw(
+            numerator / g,
+            denominator as i64 / g,
+        )))
+    }
+
+    /// Create a new integer value
+    pub const fn new_integer(value: i64) -> Rational {
+        Rational::Value(Rational64::new_raw(value, 1))
     }
 
     /// Check if value is infinite
@@ -46,10 +56,12 @@ impl Rational {
         match p.parse_ascii_char('/') {
             Some(p) => {
                 let (p, denominator) = try_option!(lexeme!(p, Parser::parse_u32));
-                let rational = Rational::new(numerator, denominator);
-                Some((p, rational))
+                match Rational::new_fraction(numerator, denominator) {
+                    None => None,
+                    Some(rational) => Some((p, rational)),
+                }
             }
-            _ => Some((p, Rational::new(numerator, 1))),
+            _ => Some((p, Rational::new_integer(numerator))),
         }
     }
 
