@@ -4,7 +4,7 @@ use crate::{
     display,
     numeric::{dyadic_rational_number::DyadicRationalNumber, nimber::Nimber, rational::Rational},
     parsing::{Parser, impl_from_str_via_parser, lexeme, try_option},
-    short::partizan::{thermograph::Thermograph, trajectory::Trajectory},
+    short::partizan::thermograph::Thermograph,
 };
 use auto_ops::impl_op_ex;
 use nus::Nus;
@@ -769,7 +769,9 @@ impl CanonicalForm {
     /// left and right scaffolds
     pub fn thermograph(&self) -> Thermograph {
         match self.inner {
-            CanonicalFormInner::Moves(_) => self.thermograph_of_moves(),
+            CanonicalFormInner::Moves(_) => {
+                Thermograph::with_moves(self.left_moves(), self.right_moves())
+            }
             CanonicalFormInner::Nus(nus) => {
                 if let Some(nus_integer) = nus.number().to_integer() {
                     if nus.is_number() {
@@ -786,34 +788,17 @@ impl CanonicalForm {
                         up_multiple: 0,
                         nimber: Nimber::from(nus.nimber().value().cmp(&0) as u32), // signum(nus.nimber)
                     });
-                    new_game.thermograph_of_moves()
+                    Thermograph::with_moves(new_game.left_moves(), new_game.right_moves())
                 } else {
                     let new_game = Self::new_nus(Nus {
                         number: nus.number(),
                         up_multiple: nus.up_multiple().cmp(&0) as i32, // signum(nus.up_multiple)
                         nimber: Nimber::from(0),
                     });
-                    new_game.thermograph_of_moves()
+                    Thermograph::with_moves(new_game.left_moves(), new_game.right_moves())
                 }
             }
         }
-    }
-
-    fn thermograph_of_moves(&self) -> Thermograph {
-        let mut left_scaffold = Trajectory::new_constant(Rational::NegativeInfinity);
-        let mut right_scaffold = Trajectory::new_constant(Rational::PositiveInfinity);
-
-        for left_move in self.left_moves() {
-            left_scaffold = left_scaffold.max(&left_move.thermograph().right_wall);
-        }
-        for right_move in self.right_moves() {
-            right_scaffold = right_scaffold.min(&right_move.thermograph().left_wall);
-        }
-
-        left_scaffold.tilt(Rational::from(-1));
-        right_scaffold.tilt(Rational::from(1));
-
-        Thermograph::thermographic_intersection(left_scaffold, right_scaffold)
     }
 
     /// The number reached when Left plays first.

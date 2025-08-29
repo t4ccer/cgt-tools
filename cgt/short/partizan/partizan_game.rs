@@ -5,7 +5,6 @@ use crate::{
     short::partizan::{
         canonical_form::{CanonicalForm, Moves},
         thermograph::Thermograph,
-        trajectory::Trajectory,
         transposition_table::TranspositionTable,
     },
 };
@@ -46,19 +45,14 @@ pub trait PartizanGame: Sized + Clone + Hash + Send + Sync + Eq {
             return Thermograph::with_mast(Rational::from(0));
         }
 
-        let mut left_scaffold = left_moves.into_iter().fold(
-            Trajectory::new_constant(Rational::NegativeInfinity),
-            |scaffold, left_move| scaffold.max(&left_move.thermograph_direct().right_wall),
-        );
-        left_scaffold.tilt(Rational::from(-1));
-
-        let mut right_scaffold = right_moves.into_iter().fold(
-            Trajectory::new_constant(Rational::PositiveInfinity),
-            |scaffold, right_move| scaffold.min(&right_move.thermograph_direct().left_wall),
-        );
-        right_scaffold.tilt(Rational::from(1));
-
-        Thermograph::thermographic_intersection(left_scaffold, right_scaffold)
+        Thermograph::with_trajectories(
+            left_moves
+                .into_iter()
+                .map(|left_move| left_move.thermograph_direct().right_wall),
+            right_moves
+                .into_iter()
+                .map(|right_move| right_move.thermograph_direct().left_wall),
+        )
     }
 
     /// Handle special cases when computing canonical form doesn't have to compute all moves.

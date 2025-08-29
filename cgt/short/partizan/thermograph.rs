@@ -4,10 +4,10 @@ use crate::{
     display,
     drawing::{BoundingBox, Canvas, Color, Draw, TextAlignment},
     numeric::{dyadic_rational_number::DyadicRationalNumber, rational::Rational, v2f::V2f},
-    short::partizan::{Player, trajectory::Trajectory},
+    short::partizan::{Player, canonical_form::CanonicalForm, trajectory::Trajectory},
 };
 use core::fmt;
-use std::{cmp::Ordering, fmt::Display};
+use std::{cmp::Ordering, fmt::Display, ops::Deref};
 
 /// See [thermograph](self) header
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
@@ -28,6 +28,47 @@ impl Thermograph {
             left_wall: t.clone(),
             right_wall: t,
         }
+    }
+
+    /// Construct thermograph from left and right moves
+    pub fn with_moves<LeftIter, LeftItem, RightIter, RightItem>(
+        left_moves: LeftIter,
+        right_moves: RightIter,
+    ) -> Thermograph
+    where
+        LeftIter: Iterator<Item = LeftItem>,
+        LeftItem: Deref<Target = CanonicalForm>,
+        RightIter: Iterator<Item = RightItem>,
+        RightItem: Deref<Target = CanonicalForm>,
+    {
+        Thermograph::with_trajectories(
+            left_moves.map(|left_move| left_move.thermograph().right_wall),
+            right_moves.map(|right_move| right_move.thermograph().left_wall),
+        )
+    }
+
+    /// Construct thermograph from left and right trajectories
+    pub fn with_trajectories<LeftIter, RightIter>(
+        left_moves: LeftIter,
+        right_moves: RightIter,
+    ) -> Thermograph
+    where
+        LeftIter: Iterator<Item = Trajectory>,
+        RightIter: Iterator<Item = Trajectory>,
+    {
+        let mut left_scaffold = left_moves.fold(
+            Trajectory::new_constant(Rational::NegativeInfinity),
+            |left_scaffold, left_move| left_scaffold.max(&left_move),
+        );
+        left_scaffold.tilt(Rational::from(-1));
+
+        let mut right_scaffold = right_moves.fold(
+            Trajectory::new_constant(Rational::PositiveInfinity),
+            |right_scaffold, right_move| right_scaffold.min(&right_move),
+        );
+        right_scaffold.tilt(Rational::from(1));
+
+        Thermograph::thermographic_intersection(left_scaffold, right_scaffold)
     }
 
     /// Get the temperature of the thermograph where both scaffolds merge into a mast
