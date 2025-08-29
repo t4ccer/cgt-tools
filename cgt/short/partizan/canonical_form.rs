@@ -402,23 +402,6 @@ impl Moves {
         Self { left, right }
     }
 
-    fn thermograph(&self) -> Thermograph {
-        let mut left_scaffold = Trajectory::new_constant(Rational::NegativeInfinity);
-        let mut right_scaffold = Trajectory::new_constant(Rational::PositiveInfinity);
-
-        for left_move in &self.left {
-            left_scaffold = left_scaffold.max(&CanonicalForm::thermograph(left_move).right_wall);
-        }
-        for right_move in &self.right {
-            right_scaffold = right_scaffold.min(&CanonicalForm::thermograph(right_move).left_wall);
-        }
-
-        left_scaffold.tilt(Rational::from(-1));
-        right_scaffold.tilt(Rational::from(1));
-
-        Thermograph::thermographic_intersection(left_scaffold, right_scaffold)
-    }
-
     /// Print moves with NUS unwrapped using `{G^L | G^R}` notation
     #[allow(clippy::missing_errors_doc)]
     pub fn print_deep(&self, f: &mut impl Write) -> fmt::Result {
@@ -778,7 +761,7 @@ impl CanonicalForm {
                     DyadicRationalNumber::from(0)
                 }
             }
-            CanonicalFormInner::Moves(ref moves) => moves.thermograph().temperature(),
+            CanonicalFormInner::Moves(_) => self.thermograph().temperature(),
         }
     }
 
@@ -786,7 +769,7 @@ impl CanonicalForm {
     /// left and right scaffolds
     pub fn thermograph(&self) -> Thermograph {
         match self.inner {
-            CanonicalFormInner::Moves(ref moves) => moves.thermograph(),
+            CanonicalFormInner::Moves(_) => self.thermograph_of_moves(),
             CanonicalFormInner::Nus(nus) => {
                 if let Some(nus_integer) = nus.number().to_integer() {
                     if nus.is_number() {
@@ -803,19 +786,34 @@ impl CanonicalForm {
                         up_multiple: 0,
                         nimber: Nimber::from(nus.nimber().value().cmp(&0) as u32), // signum(nus.nimber)
                     });
-                    let new_game_moves = new_game.to_moves();
-                    new_game_moves.thermograph()
+                    new_game.thermograph_of_moves()
                 } else {
                     let new_game = Self::new_nus(Nus {
                         number: nus.number(),
                         up_multiple: nus.up_multiple().cmp(&0) as i32, // signum(nus.up_multiple)
                         nimber: Nimber::from(0),
                     });
-                    let new_game_moves = new_game.to_moves();
-                    new_game_moves.thermograph()
+                    new_game.thermograph_of_moves()
                 }
             }
         }
+    }
+
+    fn thermograph_of_moves(&self) -> Thermograph {
+        let mut left_scaffold = Trajectory::new_constant(Rational::NegativeInfinity);
+        let mut right_scaffold = Trajectory::new_constant(Rational::PositiveInfinity);
+
+        for left_move in self.left_moves() {
+            left_scaffold = left_scaffold.max(&left_move.thermograph().right_wall);
+        }
+        for right_move in self.right_moves() {
+            right_scaffold = right_scaffold.min(&right_move.thermograph().left_wall);
+        }
+
+        left_scaffold.tilt(Rational::from(-1));
+        right_scaffold.tilt(Rational::from(1));
+
+        Thermograph::thermographic_intersection(left_scaffold, right_scaffold)
     }
 
     /// The number reached when Left plays first.
@@ -853,8 +851,8 @@ impl CanonicalForm {
     pub fn mean(&self) -> DyadicRationalNumber {
         match self.inner {
             CanonicalFormInner::Nus(nus) => nus.number(),
-            CanonicalFormInner::Moves(ref moves) => {
-                let mast = moves.thermograph().get_mast();
+            CanonicalFormInner::Moves(_) => {
+                let mast = self.thermograph().get_mast();
                 DyadicRationalNumber::from_rational(mast)
                     .expect("Thermograph mast to have a finite dyadic value")
             }
