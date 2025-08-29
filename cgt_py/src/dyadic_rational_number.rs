@@ -15,10 +15,10 @@ crate::wrap_struct!(
 #[pymethods]
 impl PyDyadicRationalNumber {
     #[new]
-    fn py_new(numerator: Py<PyAny>, denominator: Option<u32>) -> PyResult<Self> {
+    fn py_new(numerator: Py<PyAny>, denominator_exponent: Option<u32>) -> PyResult<Self> {
         Python::with_gil(|gil| {
             if let Ok(numerator) = numerator.extract::<i64>(gil) {
-                match denominator {
+                match denominator_exponent {
                     None => Ok(Self::from(DyadicRationalNumber::from(numerator))),
                     Some(denominator_exponent) => Ok(Self::from(DyadicRationalNumber::new(
                         numerator,
@@ -29,21 +29,21 @@ impl PyDyadicRationalNumber {
                 DyadicRationalNumber::from_str(string)
                     .map_err(|err| {
                         PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                            "Could not parse Rational: {}",
+                            "Could not parse DyadicRationalNumber: {}",
                             err
                         ))
                     })
                     .map(Self::from)
             } else {
                 Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                    "Could not convert to Rational.",
+                    "Could not convert to DyadicRationalNumber.",
                 ))
             }
         })
     }
 
     fn __repr__(&self) -> String {
-        format!("Rational('{}')", self.inner)
+        format!("DyadicRationalNumber('{}')", self.inner)
     }
 
     fn __add__(&self, other: &Self) -> Self {
