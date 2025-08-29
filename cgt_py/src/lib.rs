@@ -58,6 +58,7 @@ macro_rules! impl_py_partizan_game {
                 $py_tt::default()
             }
 
+            #[pyo3(signature = (transposition_table = None))]
             fn canonical_form(&self, transposition_table: Option<&$py_tt>) -> PyCanonicalForm {
                 match transposition_table {
                     Some(transposition_table) => {

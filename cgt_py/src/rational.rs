@@ -10,6 +10,7 @@ crate::wrap_struct!(Rational, PyRational, "Rational", Clone);
 #[pymethods]
 impl PyRational {
     #[new]
+    #[pyo3(signature = (numerator, denominator = None))]
     fn py_new(numerator: Py<PyAny>, denominator: Option<u32>) -> PyResult<Self> {
         Python::with_gil(|gil| {
             if let Ok(numerator) = numerator.extract::<i64>(gil) {

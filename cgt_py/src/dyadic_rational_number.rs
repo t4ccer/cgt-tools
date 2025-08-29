@@ -15,6 +15,7 @@ crate::wrap_struct!(
 #[pymethods]
 impl PyDyadicRationalNumber {
     #[new]
+    #[pyo3(signature = (numerator, denominator_exponent = None))]
     fn py_new(numerator: Py<PyAny>, denominator_exponent: Option<u32>) -> PyResult<Self> {
         Python::with_gil(|gil| {
             if let Ok(numerator) = numerator.extract::<i64>(gil) {
