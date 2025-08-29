@@ -641,9 +641,9 @@ impl CanonicalForm {
     pub fn left_moves(&self) -> LeftMovesIter<'_> {
         LeftMovesIter {
             inner: match &self.inner {
-                CanonicalFormInner::Nus(nus) => LeftMovesIterInner::Nus(nus.left_moves()),
+                CanonicalFormInner::Nus(nus) => MovesIterInner::Nus(nus.left_moves()),
                 CanonicalFormInner::Moves(moves) => {
-                    LeftMovesIterInner::Moves(moves.left.as_slice().iter())
+                    MovesIterInner::Moves(moves.left.as_slice().iter())
                 }
             },
         }
@@ -653,9 +653,9 @@ impl CanonicalForm {
     pub fn right_moves(&self) -> RightMovesIter<'_> {
         RightMovesIter {
             inner: match &self.inner {
-                CanonicalFormInner::Nus(nus) => RightMovesIterInner::Nus(nus.right_moves()),
+                CanonicalFormInner::Nus(nus) => MovesIterInner::Nus(nus.right_moves()),
                 CanonicalFormInner::Moves(moves) => {
-                    RightMovesIterInner::Moves(moves.right.as_slice().iter())
+                    MovesIterInner::Moves(moves.right.as_slice().iter())
                 }
             },
         }
@@ -1132,67 +1132,72 @@ impl<'a> Sum<&'a CanonicalForm> for CanonicalForm {
 }
 
 #[derive(Debug, Clone)]
-enum LeftMovesIterInner<'a> {
+enum MovesIterInner<'a, I> {
     Moves(core::slice::Iter<'a, CanonicalForm>),
-    Nus(nus::LeftMovesIter),
+    Nus(I),
 }
 
-/// Iterator over form's left moves
-#[derive(Debug, Clone)]
-pub struct LeftMovesIter<'a> {
-    inner: LeftMovesIterInner<'a>,
-}
-
-impl<'a> Iterator for LeftMovesIter<'a> {
+impl<'a, I> Iterator for MovesIterInner<'a, I>
+where
+    I: Iterator<Item = Nus>,
+{
     type Item = Cow<'a, CanonicalForm>;
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        match &mut self.inner {
-            LeftMovesIterInner::Moves(iter) => iter.next().map(Cow::Borrowed),
-            LeftMovesIterInner::Nus(iter) => iter
+        match self {
+            MovesIterInner::Moves(iter) => iter.next().map(Cow::Borrowed),
+            MovesIterInner::Nus(iter) => iter
                 .next()
                 .map(|nus| Cow::Owned(CanonicalForm::new_nus(nus))),
         }
     }
 
+    #[inline]
     fn count(self) -> usize {
-        match self.inner {
-            LeftMovesIterInner::Moves(iter) => iter.count(),
-            LeftMovesIterInner::Nus(iter) => iter.count(),
+        match self {
+            MovesIterInner::Moves(iter) => iter.count(),
+            MovesIterInner::Nus(iter) => iter.count(),
         }
     }
 }
 
-#[derive(Debug, Clone)]
-enum RightMovesIterInner<'a> {
-    Moves(core::slice::Iter<'a, CanonicalForm>),
-    Nus(nus::RightMovesIter),
+macro_rules! impl_moves_iter {
+    ($(#[$attr:meta])* $name:ident) => {
+        $(#[$attr])*
+        #[derive(Debug, Clone)]
+        pub struct $name<'a> {
+            inner: MovesIterInner<'a, nus::$name>,
+        }
+
+        impl<'a> Iterator for $name<'a> {
+            type Item = Cow<'a, CanonicalForm>;
+
+            #[inline]
+            fn next(&mut self) -> Option<Self::Item> {
+                self.inner.next()
+            }
+
+            #[inline]
+            fn count(self) -> usize {
+                self.inner.count()
+            }
+        }
+    };
 }
 
-/// Iterator over form's right moves
-#[derive(Debug, Clone)]
-pub struct RightMovesIter<'a> {
-    inner: RightMovesIterInner<'a>,
+impl_moves_iter! {
+    /// Iterator over form's left moves
+    ///
+    /// Can be created by the [`CanonicalForm::left_moves`] method
+    LeftMovesIter
 }
 
-impl<'a> Iterator for RightMovesIter<'a> {
-    type Item = Cow<'a, CanonicalForm>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match &mut self.inner {
-            RightMovesIterInner::Moves(iter) => iter.next().map(Cow::Borrowed),
-            RightMovesIterInner::Nus(iter) => iter
-                .next()
-                .map(|nus| Cow::Owned(CanonicalForm::new_nus(nus))),
-        }
-    }
-
-    fn count(self) -> usize {
-        match self.inner {
-            RightMovesIterInner::Moves(iter) => iter.count(),
-            RightMovesIterInner::Nus(iter) => iter.count(),
-        }
-    }
+impl_moves_iter! {
+    /// Iterator over form's right moves
+    ///
+    /// Can be created by the [`CanonicalForm::right_moves`] method
+    RightMovesIter
 }
 
 #[cfg(test)]
