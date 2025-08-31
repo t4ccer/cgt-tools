@@ -3,7 +3,7 @@
 use rand::{rngs::ThreadRng, seq::IndexedRandom};
 use std::num::NonZeroUsize;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 /// Object with score attached
 pub struct Scored<Object, Score> {
@@ -33,6 +33,7 @@ pub trait Algorithm<Object, Score> {
 }
 
 /// Genetic algorithm runner
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct GeneticAlgorithm<Alg, Object, Score> {
     specimen: Vec<Scored<Object, Score>>,
     generation: usize,

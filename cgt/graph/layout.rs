@@ -3,6 +3,7 @@
 use crate::{graph::Graph, has::Has, numeric::v2f::V2f};
 use std::f32::consts::PI;
 
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct SpringEmbedder {
     pub cooling_rate: f32,
     pub c_attractive: f32,
@@ -75,6 +76,7 @@ impl SpringEmbedder {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct CircleEdge {
     pub circle_radius: f32,
     pub vertex_radius: f32,

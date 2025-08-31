@@ -115,6 +115,7 @@ impl Tag<'_, '_, Content> {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Canvas {
     buffer: String,
 }

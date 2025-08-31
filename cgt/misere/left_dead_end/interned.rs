@@ -43,6 +43,7 @@ impl LeftDeadEnd {
 /// Left Dead End Interner
 ///
 /// Interner acts as a storage of Left Dead Ends. It stores only games that are not integers
+#[derive(Debug)]
 pub struct Interner {
     /// Storage of game moves
     games: AppendOnlyVec<Box<[LeftDeadEnd]>>,

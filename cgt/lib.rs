@@ -6,6 +6,7 @@
 //! [calculations on canonical forms](crate::short::partizan::canonical_form::CanonicalForm)
 
 #![warn(missing_docs)]
+#![warn(missing_debug_implementations)]
 
 pub mod drawing;
 pub mod genetic_algorithm;

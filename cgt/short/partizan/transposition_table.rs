@@ -3,7 +3,7 @@
 use crate::short::partizan::canonical_form::CanonicalForm;
 use append_only_vec::AppendOnlyVec;
 use dashmap::DashMap;
-use std::{hash::Hash, marker::PhantomData};
+use std::{fmt::Debug, hash::Hash, marker::PhantomData};
 
 /// Interface of a transposition table
 pub trait TranspositionTable<G> {
@@ -41,6 +41,25 @@ where
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.positions.is_empty()
+    }
+}
+
+impl<G> Debug for ParallelTranspositionTable<G>
+where
+    G: Debug + Hash + Eq,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let ParallelTranspositionTable {
+            values,
+            positions,
+            known_values,
+        } = self;
+
+        f.debug_struct("ParallelTranspositionTable")
+            .field("values", values)
+            .field("positions", positions)
+            .field("known_values", known_values)
+            .finish()
     }
 }
 
@@ -84,6 +103,7 @@ where
 }
 
 /// Dummy transposition table that does not store anythning
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct NoTranspositionTable<G>(PhantomData<G>);
 
 impl<G> NoTranspositionTable<G> {

@@ -8,7 +8,7 @@ use crate::graph::{
 };
 
 /// Undirected graph, implements [`Graph`] trait
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct UndirectedGraph<V>(directed::DirectedGraph<V>);
 
@@ -134,6 +134,7 @@ where
 }
 
 /// Iterator over graph edges, constructed with [`Graph::edges`].
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct EdgesIter<'graph, V> {
     u: VertexIndex,
     v: VertexIndex,
