@@ -7,7 +7,7 @@ use std::{fmt::Display, marker::PhantomData, str::FromStr};
 type GridBits = u64;
 
 /// A grid with up to 64 tiles holding a single bit of information.
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SmallBitGrid<T> {
     /// Grid width

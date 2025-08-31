@@ -3,7 +3,7 @@
 use crate::grid::{FiniteGrid, Grid};
 
 /// Grid with arbitrary finite size
-#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct VecGrid<T> {
     width: u8,

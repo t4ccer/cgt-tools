@@ -9,7 +9,7 @@ use auto_ops::impl_op_ex;
 use std::{fmt::Display, iter::FusedIterator};
 
 /// A number-up-star game position that is a sum of a number, up and, nimber.
-#[derive(Debug, Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Nus {
     pub(crate) number: DyadicRationalNumber,
     pub(crate) up_multiple: i32,

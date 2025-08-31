@@ -7,7 +7,7 @@ use std::fmt::Display;
 ///
 /// Addition is overloaded to Nim sum.
 #[repr(transparent)]
-#[derive(Debug, Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Nimber(u32);
 

@@ -13,7 +13,7 @@ use std::{collections::VecDeque, fmt::Write, hash::Hash, marker::PhantomData, nu
 
 /// Color of Snort vertex. Note that we are taking tinting apporach rather than direct tracking
 /// of adjacent colors.
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(
     feature = "serde",
     derive(serde_repr::Serialize_repr, serde_repr::Deserialize_repr)
@@ -46,7 +46,7 @@ impl TryFrom<u8> for VertexColor {
 
 /// Type of vertex (or group of them) in the graph. We abstract over vertices to support efficient
 /// calculations of positions with star-like structure
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum VertexKind {
     /// Single graph vertex
@@ -84,7 +84,7 @@ impl VertexKind {
 }
 
 /// Position of a [snort](self) game
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Snort<V, G>
 where

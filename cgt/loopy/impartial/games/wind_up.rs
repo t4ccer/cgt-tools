@@ -10,7 +10,7 @@ use crate::{
 use std::{collections::HashSet, fmt::Display};
 
 /// Modular subtraction game
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct WindUp {
     graph: Vec<Vertex>,

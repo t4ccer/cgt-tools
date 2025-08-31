@@ -14,7 +14,7 @@ use cgt_derive::Tile;
 use std::{fmt::Display, hash::Hash, str::FromStr};
 
 /// Tile in the game of Fission
-#[derive(Debug, Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Tile)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Tile)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Tile {
     /// Empty tile without stones
@@ -32,7 +32,7 @@ pub enum Tile {
 }
 
 /// Game of Fission
-#[derive(Debug, Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Fission<G = VecGrid<Tile>> {
     grid: G,

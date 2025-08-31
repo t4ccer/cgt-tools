@@ -4,7 +4,7 @@ use crate::{display, numeric::nimber::Nimber};
 use std::fmt::Display;
 
 /// Vertex set used during graph orbiting
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum UnresolvedVertex {
     /// Vertex that is equal to some finite nimber or a loop.
@@ -15,7 +15,7 @@ pub enum UnresolvedVertex {
 }
 
 /// Value of graph vertex - finite or infinite
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Vertex {
     /// Vertex that is equal to some finite nimber.

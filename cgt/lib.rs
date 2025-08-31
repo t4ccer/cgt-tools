@@ -7,6 +7,7 @@
 
 #![warn(missing_docs)]
 #![warn(missing_debug_implementations)]
+#![warn(missing_copy_implementations)]
 
 pub mod drawing;
 pub mod genetic_algorithm;

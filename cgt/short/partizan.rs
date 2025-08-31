@@ -7,7 +7,7 @@ pub mod thermograph;
 pub mod trajectory;
 pub mod transposition_table;
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[allow(missing_docs)]
 pub enum Player {
     Left,

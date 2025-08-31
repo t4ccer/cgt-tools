@@ -20,7 +20,7 @@ use std::{
 pub mod nus;
 
 /// Left and Right moves from a given position
-#[derive(Debug, Hash, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Moves {
     /// Left player's moves
     pub left: Vec<CanonicalForm>,
@@ -484,7 +484,7 @@ impl_from_str_via_parser!(Moves);
 
 /// A game `G` even-tempered if, no matter how `G` is played, the first player will have the move
 /// when `G` reaches a number.
-#[derive(Debug, Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Temper {
     /// `G` is even-tempered if `G` a number, or every option of `G` is odd-tempered
@@ -498,7 +498,7 @@ pub enum Temper {
 ///
 /// Note that ordering is defined structurally for the sake of data structures. For proper partial
 /// ordering see instance for [`CanonicalForm`].
-#[derive(Debug, Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 enum CanonicalFormInner {
     /// Number Up Star sum
@@ -510,7 +510,7 @@ enum CanonicalFormInner {
 
 /// Canonical game form
 #[repr(transparent)]
-#[derive(Debug, Hash, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct CanonicalForm {
     inner: CanonicalFormInner,
 }

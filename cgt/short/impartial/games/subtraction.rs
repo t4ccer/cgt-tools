@@ -5,7 +5,7 @@ use std::fmt::Display;
 use crate::{display, numeric::nimber::Nimber};
 
 /// Subtraction game played on an arbitrary finite subtraction set
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Sub {
     // Invariant: sorted
@@ -48,7 +48,7 @@ impl Sub {
 }
 
 /// Grundy Sequence of [Sub] iterator using Grundy scale method.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct GrundySequence {
     /// The underlying subtraction game ruleset

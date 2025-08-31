@@ -9,7 +9,7 @@ use cgt_derive::Tile;
 use std::{fmt::Display, hash::Hash, str::FromStr};
 
 /// Tile in the game of Amazons
-#[derive(Debug, Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Tile)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Tile)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Tile {
     /// Empty tile without stones
@@ -46,7 +46,7 @@ impl From<Player> for Tile {
 }
 
 /// Game of Amazons
-#[derive(Debug, Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Amazons<G = VecGrid<Tile>> {
     grid: G,

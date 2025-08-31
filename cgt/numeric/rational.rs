@@ -12,7 +12,7 @@ use std::{
 use std::str::FromStr;
 
 /// Infinite rational number.
-#[derive(Debug, Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Rational {
     /// Negative infnity, smaller than all other values
     NegativeInfinity,

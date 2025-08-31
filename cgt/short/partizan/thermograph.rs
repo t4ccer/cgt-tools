@@ -10,7 +10,7 @@ use core::fmt;
 use std::{cmp::Ordering, fmt::Display};
 
 /// See [thermograph](self) header
-#[derive(Debug, Hash, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Thermograph {
     /// Left wall of the thermograph
@@ -58,13 +58,13 @@ impl Thermograph {
     {
         let mut left_scaffold = left_moves.fold(
             Trajectory::new_constant(Rational::NegativeInfinity),
-            |left_scaffold, left_move| left_scaffold.max(&left_move),
+            |left_scaffold, left_move| Trajectory::max(&left_scaffold, &left_move),
         );
         left_scaffold.tilt(Rational::from(-1));
 
         let mut right_scaffold = right_moves.fold(
             Trajectory::new_constant(Rational::PositiveInfinity),
-            |right_scaffold, right_move| right_scaffold.min(&right_move),
+            |right_scaffold, right_move| Trajectory::min(&right_scaffold, &right_move),
         );
         right_scaffold.tilt(Rational::from(1));
 

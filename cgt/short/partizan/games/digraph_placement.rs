@@ -13,7 +13,7 @@ use crate::{
 };
 
 /// Vertex color of Digraph Placement Game
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum VertexColor {
     /// Blue vertex where only Left can move
@@ -43,7 +43,7 @@ impl VertexColor {
 }
 
 /// Digraph Placement Game
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DigraphPlacement<V, G> {
     /// Underlying game graph

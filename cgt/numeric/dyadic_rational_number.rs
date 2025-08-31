@@ -11,7 +11,7 @@ use std::{
 };
 
 /// Number in form `n/2^m`
-#[derive(Debug, Hash, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct DyadicRationalNumber {
     numerator: i64,
     denominator_exponent: u32,

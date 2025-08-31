@@ -12,7 +12,7 @@ use core::hash::Hash;
 use std::{fmt::Display, str::FromStr};
 
 /// Tile on a Domineering grid
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Tile)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Tile)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Tile {
     /// Tile where domino can be placed
@@ -32,7 +32,7 @@ impl Tile {
 }
 
 /// A Domineering position on a rectengular grid.
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Domineering<G = SmallBitGrid<Tile>> {
     grid: G,

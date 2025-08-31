@@ -11,7 +11,7 @@ use crate::{
 use cgt_derive::Tile;
 
 /// Color of dominoes
-#[derive(Debug, Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Tile)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Tile)]
 pub enum Tile {
     /// Blue domino
     #[tile(char('x'), bool(true))]
@@ -23,7 +23,7 @@ pub enum Tile {
 }
 
 /// Game of Toppling Dominoes
-#[derive(Debug, Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TopplingDominoes {
     rows: Vec<SmallBitGrid<Tile>>,

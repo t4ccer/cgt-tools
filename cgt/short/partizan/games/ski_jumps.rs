@@ -18,7 +18,7 @@ use cgt_derive::Tile;
 use std::{fmt::Display, hash::Hash, str::FromStr};
 
 /// Ski Jumps game grid tile
-#[derive(Debug, Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Tile)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Tile)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Tile {
     /// Empty tile, without skiers
@@ -44,7 +44,7 @@ pub enum Tile {
 
 // NOTE: Consider caching positions of left and right skiers to avoid quadratic loops
 /// Ski Jumps game
-#[derive(Debug, Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SkiJumps<G = VecGrid<Tile>> {
     grid: G,
@@ -73,7 +73,7 @@ where
 /// Move that player can make
 ///
 /// This is used for both players but the behaviour depends on the skier at the initial tile
-#[derive(Debug, Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Move {
     /// Slide off the grid
     SlideOff {
