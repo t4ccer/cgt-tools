@@ -7,7 +7,7 @@ use crate::{
     short::partizan::{Player, canonical_form::CanonicalForm, trajectory::Trajectory},
 };
 use core::fmt;
-use std::{cmp::Ordering, fmt::Display, ops::Deref};
+use std::{cmp::Ordering, fmt::Display};
 
 /// See [thermograph](self) header
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
@@ -37,13 +37,13 @@ impl Thermograph {
     ) -> Thermograph
     where
         LeftIter: Iterator<Item = LeftItem>,
-        LeftItem: Deref<Target = CanonicalForm>,
+        LeftItem: AsRef<CanonicalForm>,
         RightIter: Iterator<Item = RightItem>,
-        RightItem: Deref<Target = CanonicalForm>,
+        RightItem: AsRef<CanonicalForm>,
     {
         Thermograph::with_trajectories(
-            left_moves.map(|left_move| left_move.thermograph().right_wall),
-            right_moves.map(|right_move| right_move.thermograph().left_wall),
+            left_moves.map(|left_move| left_move.as_ref().thermograph().right_wall),
+            right_moves.map(|right_move| right_move.as_ref().thermograph().left_wall),
         )
     }
 
