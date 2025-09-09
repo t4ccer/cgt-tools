@@ -329,7 +329,7 @@ impl Display for Nus {
 /// Iterator over left moves
 ///
 /// Can be created by the [`Nus::left_moves`] method
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct LeftMovesIter {
     nus: Nus,
     idx: usize,
@@ -467,7 +467,7 @@ impl FusedIterator for LeftMovesIter {}
 /// Iterator over right moves
 ///
 /// Can be created by the [`Nus::right_moves`] method
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct RightMovesIter {
     nus: Nus,
     idx: usize,

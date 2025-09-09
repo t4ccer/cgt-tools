@@ -497,7 +497,7 @@ impl Interner {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct MovesIter<'a> {
     game: Option<LeftDeadEnd>,
     i: usize,
