@@ -4,7 +4,7 @@ use crate::{
     display,
     numeric::{dyadic_rational_number::DyadicRationalNumber, nimber::Nimber, rational::Rational},
     parsing::{Parser, impl_from_str_via_parser, lexeme, try_option},
-    short::partizan::thermograph::Thermograph,
+    short::partizan::{Player, thermograph::Thermograph},
 };
 use auto_ops::impl_op_ex;
 use nus::Nus;
@@ -223,10 +223,7 @@ impl Moves {
     }
 
     // TODO: Rewrite it to work on mutable vec and not clone
-    fn eliminate_dominated_moves(
-        moves: &[CanonicalForm],
-        eliminate_smaller_moves: bool,
-    ) -> Vec<CanonicalForm> {
+    fn eliminate_dominated_moves(moves: &[CanonicalForm], player: Player) -> Vec<CanonicalForm> {
         let mut moves: Vec<Option<CanonicalForm>> = moves.iter().cloned().map(Some).collect();
 
         'outer: for i in 0..moves.len() {
@@ -239,23 +236,25 @@ impl Moves {
                 };
 
                 // Split from ifs because borrow checker is sad
-                let remove_i = (eliminate_smaller_moves && move_i <= move_j)
-                    || (!eliminate_smaller_moves && move_j <= move_i);
-
-                let remove_j = (eliminate_smaller_moves && move_j <= move_i)
-                    || (!eliminate_smaller_moves && move_i <= move_j);
+                let remove_i = match player {
+                    Player::Left => move_i <= move_j,
+                    Player::Right => move_j <= move_i,
+                };
+                let remove_j = match player {
+                    Player::Left => move_j <= move_i,
+                    Player::Right => move_i <= move_j,
+                };
 
                 if remove_i {
                     moves[i] = None;
                 }
-
                 if remove_j {
                     moves[j] = None;
                 }
             }
         }
 
-        moves.iter().flatten().cloned().collect()
+        moves.into_iter().flatten().collect()
     }
 
     /// Return false if `H <= GL` for some left option `GL` of `G` or `HR <= G` for some right
@@ -401,10 +400,10 @@ impl Moves {
 
     fn canonicalize(&self) -> Self {
         let left = self.bypass_reversible_moves_l();
-        let left = Self::eliminate_dominated_moves(&left, true);
+        let left = Self::eliminate_dominated_moves(&left, Player::Left);
 
         let right = self.bypass_reversible_moves_r();
-        let right = Self::eliminate_dominated_moves(&right, false);
+        let right = Self::eliminate_dominated_moves(&right, Player::Right);
 
         Self { left, right }
     }
