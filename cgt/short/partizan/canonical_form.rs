@@ -328,10 +328,13 @@ impl Moves {
                     new_left_moves[(i as usize)..(left_moves.len() - 1)]
                         .clone_from_slice(&left_moves[(i as usize + 1)..]);
                     for (k, g_lrl) in g_lr_moves.enumerate() {
-                        let g_lrl = Some(g_lrl.into_owned());
-                        if left_moves.contains(&g_lrl) {
+                        if left_moves
+                            .iter()
+                            .any(|gl| gl.as_ref().is_some_and(|gl| *gl == *g_lrl))
+                        {
                             new_left_moves[left_moves.len() + k - 1] = None;
                         } else {
+                            let g_lrl = Some(g_lrl.into_owned());
                             new_left_moves[left_moves.len() + k - 1] = g_lrl;
                         }
                     }
@@ -344,7 +347,7 @@ impl Moves {
             i += 1;
         }
 
-        left_moves.iter().flatten().cloned().collect()
+        left_moves.into_iter().flatten().collect()
     }
 
     fn bypass_reversible_moves_r(&self) -> Vec<CanonicalForm> {
@@ -374,10 +377,13 @@ impl Moves {
                     new_right_moves[(i as usize)..(right_moves.len() - 1)]
                         .clone_from_slice(&right_moves[(i as usize + 1)..]);
                     for (k, g_rlr) in g_rl_moves.enumerate() {
-                        let g_rlr = Some(g_rlr.into_owned());
-                        if right_moves.contains(&g_rlr) {
+                        if right_moves
+                            .iter()
+                            .any(|gr| gr.as_ref().is_some_and(|gr| *gr == *g_rlr))
+                        {
                             new_right_moves[right_moves.len() + k - 1] = None;
                         } else {
+                            let g_rlr = Some(g_rlr.into_owned());
                             new_right_moves[right_moves.len() + k - 1] = g_rlr;
                         }
                     }
@@ -390,7 +396,7 @@ impl Moves {
             i += 1;
         }
 
-        right_moves.iter().flatten().cloned().collect()
+        right_moves.into_iter().flatten().collect()
     }
 
     fn canonicalize(&self) -> Self {
