@@ -205,6 +205,17 @@ impl Nus {
         RightMovesIter { nus: self, idx: 0 }
     }
 
+    #[cfg(test)]
+    pub(crate) fn moves(
+        self,
+        player: crate::short::partizan::Player,
+    ) -> Box<dyn Iterator<Item = Nus>> {
+        match player {
+            crate::short::partizan::Player::Left => Box::new(self.left_moves()),
+            crate::short::partizan::Player::Right => Box::new(self.right_moves()),
+        }
+    }
+
     /// Parse nus from string, using notation without pluses between number, up, and star components
     ///
     /// Pattern: `\d*([v^]\d*)?(\*\d*)`
