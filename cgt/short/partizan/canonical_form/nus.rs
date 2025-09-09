@@ -8,6 +8,8 @@ use crate::{
 use auto_ops::impl_op_ex;
 use std::{fmt::Display, iter::FusedIterator};
 
+// TODO: Introduce NusInner (or NusTotalCmp) and remove naive cmp traits
+
 /// A number-up-star game position that is a sum of a number, up and, nimber.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Nus {
