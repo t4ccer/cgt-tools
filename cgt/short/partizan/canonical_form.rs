@@ -11,7 +11,7 @@ use nus::Nus;
 use std::{
     borrow::Cow,
     cmp::Ordering,
-    fmt::{self, Display, Write},
+    fmt::{self, Display},
     hash::Hash,
     iter::FusedIterator,
     iter::Sum,
@@ -21,12 +21,12 @@ pub mod nus;
 
 /// Left and Right moves from a given position
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Moves {
+struct Moves {
     /// Left player's moves
-    pub left: Vec<CanonicalForm>,
+    left: Vec<CanonicalForm>,
 
     /// Right player's moves
-    pub right: Vec<CanonicalForm>,
+    right: Vec<CanonicalForm>,
 }
 
 impl PartialOrd for Moves {
@@ -76,7 +76,7 @@ impl Moves {
     /// It is an alias of [`CanonicalForm::new_from_moves`]
     #[inline]
     pub fn canonical_form(self) -> CanonicalForm {
-        CanonicalForm::new_from_moves(self)
+        CanonicalForm::new_from_moves(self.left, self.right)
     }
 
     /// Try converting moves to NUS. Returns [None] if moves do not form a NUS
@@ -403,36 +403,6 @@ impl Moves {
         Self { left, right }
     }
 
-    /// Print moves with NUS unwrapped using `{G^L | G^R}` notation
-    #[allow(clippy::missing_errors_doc)]
-    pub fn print_deep(&self, f: &mut impl Write) -> fmt::Result {
-        display::braces(f, |f| {
-            for (idx, l) in self.left.iter().enumerate() {
-                if idx != 0 {
-                    write!(f, ",")?;
-                }
-                Self::print_deep(&l.to_moves(), f)?;
-            }
-            write!(f, "|")?;
-            for (idx, r) in self.right.iter().enumerate() {
-                if idx != 0 {
-                    write!(f, ",")?;
-                }
-                Self::print_deep(&r.to_moves(), f)?;
-            }
-            Ok(())
-        })
-    }
-
-    /// Print moves to string with NUS unwrapped using `{G^L | G^R}` notation
-    // Write to `String` never panics
-    #[allow(clippy::missing_panics_doc)]
-    pub fn print_deep_to_str(&self) -> String {
-        let mut buf = String::new();
-        Self::print_deep(self, &mut buf).unwrap();
-        buf
-    }
-
     /// Parse comma-separated games, ie. the underlined part:
     ///
     /// `{a,b,...|c,d,...}`
@@ -601,7 +571,7 @@ impl CanonicalForm {
             }
         }
 
-        Self::new_from_moves(moves)
+        Self::new_from_moves(moves.left, moves.right)
     }
 
     /// VERY INTERNAL
@@ -618,7 +588,8 @@ impl CanonicalForm {
     }
 
     /// Safe function to construct a game from possible moves
-    pub fn new_from_moves(mut moves: Moves) -> Self {
+    pub fn new_from_moves(left: Vec<CanonicalForm>, right: Vec<CanonicalForm>) -> Self {
+        let mut moves = Moves { left, right };
         moves.eliminate_duplicates();
         moves = moves.canonicalize();
 
@@ -628,14 +599,6 @@ impl CanonicalForm {
     #[inline]
     const fn from_inner(inner: CanonicalFormInner) -> Self {
         Self { inner }
-    }
-
-    /// Get left and right moves from a canonical form
-    pub fn to_moves(&self) -> Moves {
-        match &self.inner {
-            CanonicalFormInner::Nus(nus) => nus.to_moves(),
-            CanonicalFormInner::Moves(moves) => moves.clone(),
-        }
     }
 
     /// Get iterator over left moves from a canonical form
@@ -947,7 +910,8 @@ impl CanonicalForm {
                         .map(|right_move| right_move.atomic_weight() + Self::new_integer(2))
                         .collect::<Vec<_>>(),
                 };
-                let new_game = Self::new_from_moves(new_moves.clone());
+                let new_game =
+                    Self::new_from_moves(new_moves.left.clone(), new_moves.right.clone());
 
                 let CanonicalFormInner::Nus(new_nus) = new_game.inner else {
                     return new_game;
@@ -1010,10 +974,10 @@ impl CanonicalForm {
             }
         }
 
-        CanonicalForm::new_from_moves(Moves {
-            left: self.left_moves().map(|gl| gl.star_projection()).collect(),
-            right: self.right_moves().map(|gr| gr.star_projection()).collect(),
-        })
+        CanonicalForm::new_from_moves(
+            self.left_moves().map(|gl| gl.star_projection()).collect(),
+            self.right_moves().map(|gr| gr.star_projection()).collect(),
+        )
     }
 
     /// A reduced canonical form of `G` is `\bar{G}`, such that `\bar{G} = \bar{H}`
@@ -1054,8 +1018,8 @@ impl CanonicalForm {
         match lexeme!(p, Nus::parse) {
             Some((p, nus)) => Some((p, CanonicalForm::new_nus(nus))),
             None => {
-                let (p, moves) = try_option!(lexeme!(p, Moves::parse));
-                Some((p, CanonicalForm::new_from_moves(moves)))
+                let (p, Moves { left, right }) = try_option!(lexeme!(p, Moves::parse));
+                Some((p, CanonicalForm::new_from_moves(left, right)))
             }
         }
     }
@@ -1245,12 +1209,6 @@ mod tests {
     fn constructs_integers() {
         let eight = CanonicalForm::new_integer(8);
         assert_eq!(&eight.to_string(), "8");
-        let eight_moves = eight.to_moves();
-        assert_eq!(&eight_moves.to_string(), "{7|}");
-        assert_eq!(
-            &eight_moves.print_deep_to_str(),
-            "{{{{{{{{{|}|}|}|}|}|}|}|}|}"
-        );
 
         let minus_forty_two = CanonicalForm::new_integer(-42);
         assert_eq!(&minus_forty_two.to_string(), "-42");
@@ -1270,14 +1228,9 @@ mod tests {
     fn constructs_nimbers() {
         let star = CanonicalForm::new_nus(Nus::new_nimber(Nimber::from(1)));
         assert_eq!(&star.to_string(), "*");
-        let star_moves = star.to_moves();
-        assert_eq!(&star_moves.to_string(), "{0|0}");
-        assert_eq!(&star_moves.print_deep_to_str(), "{{|}|{|}}");
 
         let star_three = CanonicalForm::new_nus(Nus::new_nimber(Nimber::from(3)));
         assert_eq!(&star_three.to_string(), "*3");
-        let star_three_moves = star_three.to_moves();
-        assert_eq!(star_three_moves.to_string(), "{0, *, *2|0, *, *2}");
 
         let one_star_two = CanonicalForm::new_nus(Nus {
             number: DyadicRationalNumber::from(1),
@@ -1285,8 +1238,6 @@ mod tests {
             nimber: (Nimber::from(2)),
         });
         assert_eq!(&one_star_two.to_string(), "1*2");
-        let one_star_two_moves = one_star_two.to_moves();
-        assert_eq!(&one_star_two_moves.to_string(), "{1, 1*|1, 1*}");
     }
 
     #[test]
@@ -1338,24 +1289,6 @@ mod tests {
     }
 
     #[test]
-    fn gets_moves() {
-        let down_moves = CanonicalForm::new_nus(Nus::from_str("v").unwrap()).to_moves();
-        assert_eq!(down_moves.to_string(), "{*|0}");
-        assert_eq!(&down_moves.print_deep_to_str(), "{{{|}|{|}}|{|}}");
-
-        let up_moves = CanonicalForm::new_nus(Nus::from_str("^").unwrap()).to_moves();
-        assert_eq!(&up_moves.to_string(), "{0|*}");
-        assert_eq!(up_moves.print_deep_to_str(), "{{|}|{{|}|{|}}}");
-
-        let moves = Moves {
-            left: vec![CanonicalForm::new_nus(Nus::from_str("v").unwrap())],
-            right: vec![CanonicalForm::new_nus(Nus::from_str("-2").unwrap())],
-        };
-        assert_eq!(&moves.to_string(), "{v|-2}");
-        assert_eq!(&moves.print_deep_to_str(), "{{{{|}|{|}}|{|}}|{|{|{|}}}}");
-    }
-
-    #[test]
     fn simplifies_moves() {
         let one = CanonicalForm::new_nus(Nus::from_str("1").unwrap());
         let star = CanonicalForm::new_nus(Nus::from_str("*").unwrap());
@@ -1364,23 +1297,16 @@ mod tests {
             left: vec![one],
             right: vec![star],
         };
-        let left_id = CanonicalForm::new_from_moves(moves_l);
+        let left_id = CanonicalForm::new_from_moves(moves_l.left, moves_l.right);
         assert_eq!(&left_id.to_string(), "{1|*}");
 
         let weird = Moves {
             left: vec![CanonicalForm::new_nus(Nus::from_str("1v2*").unwrap())],
             right: vec![CanonicalForm::new_nus(Nus::from_str("1").unwrap())],
         };
-        let weird = CanonicalForm::new_from_moves(weird);
+        let weird = CanonicalForm::new_from_moves(weird.left, weird.right);
         assert_eq!(&weird.to_string(), "1v3");
-        let weird_moves = weird.to_moves();
-        assert_eq!(&weird_moves.to_string(), "{1v2*|1}");
-        assert_eq!(&weird_moves.left[0].to_string(), "1v2*");
-        assert_eq!(&weird_moves.left[0].to_moves().to_string(), "{1v|1}");
-        assert_eq!(
-            &weird_moves.print_deep_to_str(),
-            "{{{{{{|}|}|{{|}|}}|{{|}|}}|{{|}|}}|{{|}|}}"
-        );
+        assert_eq!(&weird.left_moves().nth(0).unwrap().to_string(), "1v2*");
 
         // Another case:
 
@@ -1388,27 +1314,15 @@ mod tests {
             left: vec![CanonicalForm::new_nus(Nus::from_str("^").unwrap())],
             right: vec![CanonicalForm::new_nus(Nus::from_str("-2").unwrap())],
         };
-        let weird_right = CanonicalForm::new_from_moves(weird_right);
+        let weird_right = CanonicalForm::new_from_moves(weird_right.left, weird_right.right);
         assert_eq!(&weird_right.to_string(), "{^|-2}");
-        let weird_right_moves = weird_right.to_moves();
-        assert_eq!(&weird_right_moves.to_string(), "{^|-2}");
-        assert_eq!(
-            &weird_right_moves.print_deep_to_str(),
-            "{{{|}|{{|}|{|}}}|{|{|{|}}}}"
-        );
 
         let weird = Moves {
             left: vec![],
             right: vec![weird_right],
         };
-        assert_ne!(
-            &Moves::print_deep_to_str(&weird.canonicalize()),
-            "{|{{{|}|{{|}|{|}}}|{|{|{|}}}}}"
-        );
         assert_eq!(&weird.canonicalize().to_string(), "{|}");
-        let weird = CanonicalForm::new_from_moves(weird);
-        let weird_moves = weird.to_moves();
-        assert_eq!(&weird_moves.to_string(), "{|}");
+        let weird = CanonicalForm::new_from_moves(weird.left, weird.right);
         assert_eq!(&weird.to_string(), "0");
     }
 
@@ -1417,14 +1331,8 @@ mod tests {
         let zero = CanonicalForm::new_integer(0);
         let one = CanonicalForm::new_integer(1);
 
-        let one_zero = CanonicalForm::new_from_moves(Moves {
-            left: vec![one.clone()],
-            right: vec![zero.clone()],
-        });
-        let zero_one = CanonicalForm::new_from_moves(Moves {
-            left: vec![zero],
-            right: vec![one],
-        });
+        let one_zero = CanonicalForm::new_from_moves(vec![one.clone()], vec![zero.clone()]);
+        let zero_one = CanonicalForm::new_from_moves(vec![zero], vec![one]);
 
         let sum = one_zero + zero_one;
         assert_eq!(&sum.to_string(), "{3/2|1/2}");
@@ -1435,11 +1343,7 @@ mod tests {
         let one = CanonicalForm::new_integer(1);
         let negative_one = CanonicalForm::new_integer(-1);
 
-        let moves = Moves {
-            left: vec![one],
-            right: vec![negative_one],
-        };
-        let g = CanonicalForm::new_from_moves(moves);
+        let g = CanonicalForm::new_from_moves(vec![one], vec![negative_one]);
         assert_eq!(g.temperature(), DyadicRationalNumber::from(1));
     }
 
@@ -1605,59 +1509,5 @@ mod tests {
 
         let cf = CanonicalForm::from_str("{2|1,{*|0}}").unwrap();
         assert_eq!(cf.temper(), None);
-    }
-
-    #[test]
-    fn to_moves() {
-        let cf = CanonicalForm::from_str("{{3/2*|1/2}|{0|-3},{-1*,{-1/2|-1*}|-5/2}}").unwrap();
-        let moves = cf.to_moves();
-
-        let left: &[CanonicalForm] = &cf
-            .left_moves()
-            .map(|cf| cf.into_owned())
-            .collect::<Vec<_>>();
-        assert_eq!(moves.left.as_slice(), left);
-
-        let right: &[CanonicalForm] = &cf
-            .right_moves()
-            .map(|cf| cf.into_owned())
-            .collect::<Vec<_>>();
-        assert_eq!(moves.right.as_slice(), right);
-    }
-
-    #[test]
-    fn moves_len_down_star() {
-        let cf = CanonicalForm::from_str("v*").unwrap();
-        let moves = cf.to_moves();
-
-        let mut left = cf.left_moves();
-        let mut right = cf.right_moves();
-
-        assert_eq!(left.len(), moves.left.len());
-        assert_eq!(right.len(), moves.right.len());
-
-        let _ = left.next().unwrap();
-        let _ = right.next().unwrap();
-
-        assert_eq!(left.len(), moves.left.len() - 1);
-        assert_eq!(right.len(), moves.right.len() - 1);
-    }
-
-    #[test]
-    fn moves_len_up_star() {
-        let cf = CanonicalForm::from_str("^*").unwrap();
-        let moves = cf.to_moves();
-
-        let mut left = cf.left_moves();
-        let mut right = cf.right_moves();
-
-        assert_eq!(left.len(), moves.left.len());
-        assert_eq!(right.len(), moves.right.len());
-
-        let _ = left.next().unwrap();
-        let _ = right.next().unwrap();
-
-        assert_eq!(left.len(), moves.left.len() - 1);
-        assert_eq!(right.len(), moves.right.len() - 1);
     }
 }

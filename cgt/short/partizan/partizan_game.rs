@@ -3,8 +3,7 @@
 use crate::{
     numeric::rational::Rational,
     short::partizan::{
-        canonical_form::{CanonicalForm, Moves},
-        thermograph::Thermograph,
+        canonical_form::CanonicalForm, thermograph::Thermograph,
         transposition_table::TranspositionTable,
     },
 };
@@ -93,16 +92,13 @@ pub trait PartizanGame: Sized + Clone + Hash + Send + Sync + Eq {
                         #[cfg(not(feature = "rayon"))]
                         let right = position.right_moves().into_iter();
 
-                        let moves = Moves {
-                            left: left
-                                .map(|o| o.canonical_form(transposition_table))
-                                .collect(),
-                            right: right
-                                .map(|o| o.canonical_form(transposition_table))
-                                .collect(),
-                        };
-
-                        CanonicalForm::new_from_moves(moves)
+                        let left = left
+                            .map(|o| o.canonical_form(transposition_table))
+                            .collect();
+                        let right = right
+                            .map(|o| o.canonical_form(transposition_table))
+                            .collect();
+                        CanonicalForm::new_from_moves(left, right)
                     })
             })
             .sum();

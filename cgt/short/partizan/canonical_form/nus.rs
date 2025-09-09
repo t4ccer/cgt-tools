@@ -3,7 +3,7 @@
 use crate::{
     numeric::{dyadic_rational_number::DyadicRationalNumber, nimber::Nimber},
     parsing::{Parser, impl_from_str_via_parser, lexeme},
-    short::partizan::canonical_form::{CanonicalForm, Hash, Moves},
+    short::partizan::canonical_form::Hash,
 };
 use auto_ops::impl_op_ex;
 use std::{fmt::Display, iter::FusedIterator};
@@ -85,116 +85,6 @@ impl Nus {
     #[inline]
     pub const fn is_nimber(self) -> bool {
         self.number().eq_integer(0) && self.up_multiple() == 0
-    }
-
-    pub(crate) fn to_moves(self) -> Moves {
-        // Case: Just a number
-        if self.is_number() {
-            if self.number() == DyadicRationalNumber::from(0) {
-                return Moves {
-                    left: vec![],
-                    right: vec![],
-                };
-            }
-
-            if let Some(integer) = self.number().to_integer() {
-                let sign = if integer >= 0 { 1 } else { -1 };
-                let prev = CanonicalForm::new_nus(Nus::new_integer(integer - sign));
-
-                if integer >= 0 {
-                    return Moves {
-                        left: vec![prev],
-                        right: vec![],
-                    };
-                } else if sign < 0 {
-                    return Moves {
-                        left: vec![],
-                        right: vec![prev],
-                    };
-                }
-            } else {
-                let rational = self.number();
-                let left_move = CanonicalForm::new_nus(Nus::new_number(rational.step(-1)));
-                let right_move = CanonicalForm::new_nus(Nus::new_number(rational.step(1)));
-                return Moves {
-                    left: vec![left_move],
-                    right: vec![right_move],
-                };
-            }
-        }
-
-        // Case: number + nimber but no up/down
-        if self.up_multiple() == 0 {
-            let rational = self.number();
-            let nimber = self.nimber();
-
-            let mut moves = Moves::empty();
-            for i in 0..nimber.value() {
-                let new_nus = Nus {
-                    number: rational,
-                    up_multiple: 0,
-                    nimber: Nimber::from(i),
-                };
-                moves.left.push(CanonicalForm::new_nus(new_nus));
-                moves.right.push(CanonicalForm::new_nus(new_nus));
-            }
-            return moves;
-        }
-
-        // Case: number-up-star
-        let number_move = Nus::new_number(self.number());
-
-        let sign = if self.up_multiple() >= 0 { 1 } else { -1 };
-        let prev_up = self.up_multiple() - sign;
-        let up_parity: u32 = (self.up_multiple() & 1) as u32;
-        let prev_nimber = self.nimber().value() ^ up_parity ^ (prev_up as u32 & 1);
-        let moves;
-
-        if self.up_multiple() == 1 && self.nimber() == Nimber::from(1) {
-            // Special case: n^*
-            let star_move = CanonicalForm::new_nus(Nus {
-                number: self.number(),
-                up_multiple: 0,
-                nimber: Nimber::from(1),
-            });
-            moves = Moves {
-                left: vec![CanonicalForm::new_nus(number_move), star_move],
-                right: vec![CanonicalForm::new_nus(number_move)],
-            };
-        } else if self.up_multiple() == -1 && self.nimber() == Nimber::from(1) {
-            // Special case: nv*
-            let star_move = CanonicalForm::new_nus(Nus {
-                number: self.number(),
-                up_multiple: 0,
-                nimber: Nimber::from(1),
-            });
-            moves = Moves {
-                left: vec![CanonicalForm::new_nus(number_move)],
-                right: vec![CanonicalForm::new_nus(number_move), star_move],
-            };
-        } else if self.up_multiple() > 0 {
-            let prev_nus = CanonicalForm::new_nus(Nus {
-                number: self.number(),
-                up_multiple: prev_up,
-                nimber: Nimber::from(prev_nimber),
-            });
-            moves = Moves {
-                left: vec![CanonicalForm::new_nus(number_move)],
-                right: vec![prev_nus],
-            };
-        } else {
-            let prev_nus = CanonicalForm::new_nus(Nus {
-                number: self.number(),
-                up_multiple: prev_up,
-                nimber: Nimber::from(prev_nimber),
-            });
-            moves = Moves {
-                left: vec![prev_nus],
-                right: vec![CanonicalForm::new_nus(number_move)],
-            };
-        }
-
-        moves
     }
 
     /// Get left moves
@@ -606,7 +496,10 @@ impl FusedIterator for RightMovesIter {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::short::partizan::Player;
+    use crate::short::partizan::{
+        Player,
+        canonical_form::{CanonicalForm, Moves},
+    };
     use quickcheck::{Arbitrary, Gen, QuickCheck};
     use std::{ops::Neg, str::FromStr};
 
@@ -721,7 +614,10 @@ mod tests {
     #[test]
     fn nus_to_moves_to_nus_roundtrip() {
         fn test_impl(nus: Nus) {
-            let moves = nus.to_moves();
+            let moves = Moves {
+                left: nus.left_moves().map(CanonicalForm::new_nus).collect(),
+                right: nus.right_moves().map(CanonicalForm::new_nus).collect(),
+            };
             let nus_from_moves = moves.to_nus().expect("Should be a NUS");
             assert_eq!(nus, nus_from_moves, "Should be equal");
         }
@@ -730,42 +626,6 @@ mod tests {
         // Confirmed with
         // cargo tarpaulin --out html -- short::partizan::canonical_form::tests --nocapture
         let tests = 250_000;
-        let mut qc = QuickCheck::new()
-            .max_tests(tests)
-            .min_tests_passed(tests)
-            .tests(tests);
-        qc.quickcheck(test_impl as fn(Nus));
-    }
-
-    #[test]
-    fn left_moves_eq_iter() {
-        fn test_impl(nus: Nus) {
-            let left_iter: Vec<CanonicalForm> =
-                nus.left_moves().map(CanonicalForm::new_nus).collect();
-            let moves = nus.to_moves();
-            assert_eq!(moves.left.len(), nus.left_moves().count(), "{nus}");
-            assert_eq!(moves.left, left_iter);
-        }
-
-        let tests = 50_000;
-        let mut qc = QuickCheck::new()
-            .max_tests(tests)
-            .min_tests_passed(tests)
-            .tests(tests);
-        qc.quickcheck(test_impl as fn(Nus));
-    }
-
-    #[test]
-    fn right_moves_eq_iter() {
-        fn test_impl(nus: Nus) {
-            let right_iter: Vec<CanonicalForm> =
-                nus.right_moves().map(CanonicalForm::new_nus).collect();
-            let moves = nus.to_moves();
-            assert_eq!(moves.right.len(), nus.right_moves().count());
-            assert_eq!(moves.right, right_iter);
-        }
-
-        let tests = 50_000;
         let mut qc = QuickCheck::new()
             .max_tests(tests)
             .min_tests_passed(tests)
