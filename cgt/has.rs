@@ -26,10 +26,22 @@ impl<T> Has<T> for T {
 }
 
 /// Generate boilerplate for Has trait
+///
+/// # Examples
+/// ```rust
+/// # use cgt::impl_has;
+/// struct Foo;
+/// struct Bar {
+///     foo: Foo,
+///     bar: u32,
+/// }
+///
+/// impl_has!(Bar -> foo -> Foo);
+/// ```
 #[macro_export]
 macro_rules! impl_has {
     ($ty:ident -> $getter:ident -> $res:ident) => {
-        impl Has<$res> for $ty {
+        impl $crate::has::Has<$res> for $ty {
             fn get_inner(&self) -> &$res {
                 &self.$getter
             }
