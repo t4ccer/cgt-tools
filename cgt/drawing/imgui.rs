@@ -12,6 +12,7 @@ use super::TextAlignment;
 
 // TODO: Move cursor to the bottom after drawing?
 
+#[allow(missing_debug_implementations)]
 pub struct Canvas<'ui> {
     start_position: V2f,
     ui: &'ui imgui::Ui,

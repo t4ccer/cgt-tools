@@ -8,6 +8,7 @@ use crate::{
 };
 use tiny_skia;
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct Canvas {
     offset: V2f,
     pixmap: tiny_skia::Pixmap,
