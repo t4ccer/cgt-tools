@@ -330,11 +330,6 @@ impl Iterator for LeftMovesIter {
     fn next(&mut self) -> Option<Self::Item> {
         let number_move = Nus::new_number(self.nus.number());
 
-        let sign = if self.nus.up_multiple() >= 0 { 1 } else { -1 };
-        let prev_up = self.nus.up_multiple() - sign;
-        let up_parity: u32 = (self.nus.up_multiple() & 1) as u32;
-        let prev_nimber = self.nus.nimber().value() ^ up_parity ^ (prev_up as u32 & 1);
-
         // Case: number + nimber but no up/down
         let nimber = self.nus.nimber();
         if self.nus.up_multiple() == 0 && self.idx < nimber.value() as usize {
@@ -376,6 +371,10 @@ impl Iterator for LeftMovesIter {
                     // Special case: nv*
                     Some(number_move)
                 } else {
+                    let sign = if self.nus.up_multiple() >= 0 { 1 } else { -1 };
+                    let prev_up = self.nus.up_multiple() - sign;
+                    let up_parity: u32 = (self.nus.up_multiple() & 1) as u32;
+                    let prev_nimber = self.nus.nimber().value() ^ up_parity ^ (prev_up as u32 & 1);
                     let prev_nus = Nus {
                         number: self.nus.number(),
                         up_multiple: prev_up,
@@ -464,11 +463,6 @@ impl Iterator for RightMovesIter {
     fn next(&mut self) -> Option<Self::Item> {
         let number_move = Nus::new_number(self.nus.number());
 
-        let sign = if self.nus.up_multiple() >= 0 { 1 } else { -1 };
-        let prev_up = self.nus.up_multiple() - sign;
-        let up_parity: u32 = (self.nus.up_multiple() & 1) as u32;
-        let prev_nimber = self.nus.nimber().value() ^ up_parity ^ (prev_up as u32 & 1);
-
         // Case: number + nimber but no up/down
         let nimber = self.nus.nimber();
         if self.nus.up_multiple() == 0 && self.idx < nimber.value() as usize {
@@ -507,6 +501,10 @@ impl Iterator for RightMovesIter {
                     // Special case: n^*
                     Some(number_move)
                 } else if self.nus.up_multiple() > 0 {
+                    let sign = if self.nus.up_multiple() >= 0 { 1 } else { -1 };
+                    let prev_up = self.nus.up_multiple() - sign;
+                    let up_parity: u32 = (self.nus.up_multiple() & 1) as u32;
+                    let prev_nimber = self.nus.nimber().value() ^ up_parity ^ (prev_up as u32 & 1);
                     let prev_nus = Nus {
                         number: self.nus.number(),
                         up_multiple: prev_up,
