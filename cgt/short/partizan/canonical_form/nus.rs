@@ -421,6 +421,11 @@ impl Iterator for LeftMovesIter {
         let len = self.len();
         (len, Some(len))
     }
+
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        self.idx += n;
+        self.next()
+    }
 }
 
 impl ExactSizeIterator for LeftMovesIter {
@@ -553,6 +558,11 @@ impl Iterator for RightMovesIter {
         let len = self.len();
         (len, Some(len))
     }
+
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        self.idx += n;
+        self.next()
+    }
 }
 
 impl ExactSizeIterator for RightMovesIter {
@@ -594,6 +604,7 @@ impl FusedIterator for RightMovesIter {}
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::short::partizan::Player;
     use quickcheck::{Arbitrary, Gen, QuickCheck};
     use std::{ops::Neg, str::FromStr};
 
@@ -758,5 +769,29 @@ mod tests {
             .min_tests_passed(tests)
             .tests(tests);
         qc.quickcheck(test_impl as fn(Nus));
+    }
+
+    #[test]
+    fn moves_iter_nth() {
+        fn test_impl(nus: Nus, player: Player, idx: usize) -> bool {
+            let manual = {
+                let mut manual_iter = nus.moves(player);
+                for _ in 0..idx {
+                    if manual_iter.next().is_none() {
+                        break;
+                    }
+                }
+                manual_iter.next()
+            };
+            let fast = nus.moves(player).nth(idx);
+            manual == fast
+        }
+
+        let tests = 50_000;
+        let mut qc = QuickCheck::new()
+            .max_tests(tests)
+            .min_tests_passed(tests)
+            .tests(tests);
+        qc.quickcheck(test_impl as fn(Nus, Player, usize) -> bool);
     }
 }

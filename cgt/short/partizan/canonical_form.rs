@@ -1154,6 +1154,16 @@ where
             MovesIterInner::Nus(iter) => iter.size_hint(),
         }
     }
+
+    #[inline]
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        match self {
+            MovesIterInner::Moves(iter) => iter.nth(n).map(Cow::Borrowed),
+            MovesIterInner::Nus(iter) => iter
+                .nth(n)
+                .map(|nus| Cow::Owned(CanonicalForm::new_nus(nus))),
+        }
+    }
 }
 
 impl<'a, I> ExactSizeIterator for MovesIterInner<'a, I>
@@ -1194,6 +1204,11 @@ macro_rules! impl_moves_iter {
             #[inline]
             fn size_hint(&self) -> (usize, Option<usize>) {
                 self.inner.size_hint()
+            }
+
+            #[inline]
+            fn nth(&mut self, n: usize) -> Option<Self::Item> {
+                self.inner.nth(n)
             }
         }
 
