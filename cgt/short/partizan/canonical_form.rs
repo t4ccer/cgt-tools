@@ -1087,59 +1087,57 @@ enum MovesIterInner<'a, I> {
     Nus(I),
 }
 
+macro_rules! dispatch_moves_iter {
+    ($fname:ident (&mut self $(, $arg_name:ident: $arg_ty:ty)* $(,)?) -> Option<Self::Item>) => {
+        #[inline]
+        fn $fname(&mut self $(, $arg_name: $arg_ty)*) -> Option<Self::Item> {
+            match self {
+                MovesIterInner::Moves(iter) => iter.$fname($($arg_name,)?)
+                    .map(Cow::Borrowed),
+                MovesIterInner::Nus(iter) => iter.$fname($($arg_name,)?)
+                    .map(|nus| Cow::Owned(CanonicalForm::new_nus(nus))),
+            }
+        }
+    };
+
+    ($fname:ident (self $(, $arg_name:ident: $arg_ty:ty)* $(,)?) -> $ret:tt) => {
+        #[inline]
+        fn $fname(self $(, $arg_name: $arg_ty)*) -> $ret {
+            match self {
+                MovesIterInner::Moves(iter) => iter.$fname($($arg_name,)?),
+                MovesIterInner::Nus(iter) => iter.$fname($($arg_name,)?),
+            }
+        }
+    };
+
+    ($fname:ident (&self $(, $arg_name:ident: $arg_ty:ty)* $(,)?) -> $ret:tt) => {
+        #[inline]
+        fn $fname(&self $(, $arg_name: $arg_ty)*) -> $ret {
+            match self {
+                MovesIterInner::Moves(iter) => iter.$fname($($arg_name,)?),
+                MovesIterInner::Nus(iter) => iter.$fname($($arg_name,)?),
+            }
+        }
+    };
+}
+
 impl<'a, I> Iterator for MovesIterInner<'a, I>
 where
     I: Iterator<Item = Nus>,
 {
     type Item = Cow<'a, CanonicalForm>;
 
-    #[inline]
-    fn next(&mut self) -> Option<Self::Item> {
-        match self {
-            MovesIterInner::Moves(iter) => iter.next().map(Cow::Borrowed),
-            MovesIterInner::Nus(iter) => iter
-                .next()
-                .map(|nus| Cow::Owned(CanonicalForm::new_nus(nus))),
-        }
-    }
-
-    #[inline]
-    fn count(self) -> usize {
-        match self {
-            MovesIterInner::Moves(iter) => iter.count(),
-            MovesIterInner::Nus(iter) => iter.count(),
-        }
-    }
-
-    #[inline]
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        match self {
-            MovesIterInner::Moves(iter) => iter.size_hint(),
-            MovesIterInner::Nus(iter) => iter.size_hint(),
-        }
-    }
-
-    #[inline]
-    fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        match self {
-            MovesIterInner::Moves(iter) => iter.nth(n).map(Cow::Borrowed),
-            MovesIterInner::Nus(iter) => iter
-                .nth(n)
-                .map(|nus| Cow::Owned(CanonicalForm::new_nus(nus))),
-        }
-    }
+    dispatch_moves_iter!(next(&mut self) -> Option<Self::Item>);
+    dispatch_moves_iter!(nth(&mut self, n: usize) -> Option<Self::Item>);
+    dispatch_moves_iter!(size_hint(&self) -> (usize, Option<usize>));
+    dispatch_moves_iter!(count(self) -> usize);
 }
 
 impl<I> ExactSizeIterator for MovesIterInner<'_, I>
 where
     I: Iterator<Item = Nus> + ExactSizeIterator,
 {
-    fn len(&self) -> usize {
-        match self {
-            MovesIterInner::Moves(iter) => iter.len(),
-            MovesIterInner::Nus(iter) => iter.len(),
-        }
-    }
+    dispatch_moves_iter!(len(&self) -> usize);
 }
 
 impl<I> FusedIterator for MovesIterInner<'_, I> where I: Iterator<Item = Nus> + FusedIterator {}
@@ -1177,6 +1175,7 @@ macro_rules! impl_moves_iter {
         }
 
         impl ExactSizeIterator for $name<'_> {
+            #[inline]
             fn len(&self) -> usize {
                 self.inner.len()
             }

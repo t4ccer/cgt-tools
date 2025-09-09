@@ -216,6 +216,27 @@ impl Display for Nus {
     }
 }
 
+macro_rules! impl_shared_methods {
+    () => {
+        #[inline]
+        fn count(self) -> usize {
+            self.len()
+        }
+
+        #[inline]
+        fn size_hint(&self) -> (usize, Option<usize>) {
+            let len = self.len();
+            (len, Some(len))
+        }
+
+        #[inline]
+        fn nth(&mut self, n: usize) -> Option<Self::Item> {
+            self.idx += n;
+            self.next()
+        }
+    };
+}
+
 // TODO: DoubleEndedIterator
 
 /// Iterator over left moves
@@ -305,19 +326,7 @@ impl Iterator for LeftMovesIter {
         }
     }
 
-    fn count(self) -> usize {
-        self.len()
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        let len = self.len();
-        (len, Some(len))
-    }
-
-    fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        self.idx += n;
-        self.next()
-    }
+    impl_shared_methods!();
 }
 
 impl ExactSizeIterator for LeftMovesIter {
@@ -442,19 +451,7 @@ impl Iterator for RightMovesIter {
         }
     }
 
-    fn count(self) -> usize {
-        self.len()
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        let len = self.len();
-        (len, Some(len))
-    }
-
-    fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        self.idx += n;
-        self.next()
-    }
+    impl_shared_methods!();
 }
 
 impl ExactSizeIterator for RightMovesIter {
@@ -624,7 +621,7 @@ mod tests {
 
         // We really need to stress test it to hit all branches.
         // Confirmed with
-        // cargo tarpaulin --out html -- short::partizan::canonical_form::tests --nocapture
+        // cargo tarpaulin --out html -- short::partizan::canonical_form::nus::tests --nocapture
         let tests = 250_000;
         let mut qc = QuickCheck::new()
             .max_tests(tests)
