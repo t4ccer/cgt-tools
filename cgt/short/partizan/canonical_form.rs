@@ -1100,6 +1100,18 @@ macro_rules! dispatch_moves_iter {
         }
     };
 
+    ($fname:ident (self $(, $arg_name:ident: $arg_ty:ty)* $(,)?) -> Option<Self::Item>) => {
+        #[inline]
+        fn $fname(self $(, $arg_name: $arg_ty)*) -> Option<Self::Item> {
+            match self {
+                MovesIterInner::Moves(iter) => iter.$fname($($arg_name,)?)
+                    .map(Cow::Borrowed),
+                MovesIterInner::Nus(iter) => iter.$fname($($arg_name,)?)
+                    .map(|nus| Cow::Owned(CanonicalForm::new_nus(nus))),
+            }
+        }
+    };
+
     ($fname:ident (self $(, $arg_name:ident: $arg_ty:ty)* $(,)?) -> $ret:tt) => {
         #[inline]
         fn $fname(self $(, $arg_name: $arg_ty)*) -> $ret {
@@ -1131,6 +1143,7 @@ where
     dispatch_moves_iter!(nth(&mut self, n: usize) -> Option<Self::Item>);
     dispatch_moves_iter!(size_hint(&self) -> (usize, Option<usize>));
     dispatch_moves_iter!(count(self) -> usize);
+    dispatch_moves_iter!(last(self) -> Option<Self::Item>);
 }
 
 impl<I> ExactSizeIterator for MovesIterInner<'_, I>
@@ -1171,6 +1184,11 @@ macro_rules! impl_moves_iter {
             #[inline]
             fn nth(&mut self, n: usize) -> Option<Self::Item> {
                 self.inner.nth(n)
+            }
+
+            #[inline]
+            fn last(self) -> Option<Self::Item> {
+                self.inner.last()
             }
         }
 

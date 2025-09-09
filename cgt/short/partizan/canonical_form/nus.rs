@@ -234,6 +234,15 @@ macro_rules! impl_shared_methods {
             self.idx += n;
             self.next()
         }
+
+        #[inline]
+        fn last(mut self) -> Option<Self::Item>
+        where
+            Self: Sized,
+        {
+            self.idx -= self.len();
+            self.next()
+        }
     };
 }
 
@@ -643,6 +652,33 @@ mod tests {
                 manual_iter.next()
             };
             let fast = nus.moves(player).nth(idx);
+            manual == fast
+        }
+
+        let tests = 50_000;
+        let mut qc = QuickCheck::new()
+            .max_tests(tests)
+            .min_tests_passed(tests)
+            .tests(tests);
+        qc.quickcheck(test_impl as fn(Nus, Player, usize) -> bool);
+    }
+
+    #[test]
+    fn moves_iter_last() {
+        fn test_impl(nus: Nus, player: Player, to_skip: usize) -> bool {
+            let manual = {
+                let mut manual_iter = nus.moves(player).skip(to_skip);
+                let mut last = None;
+                loop {
+                    let this = manual_iter.next();
+                    if this.is_none() {
+                        break;
+                    }
+                    last = this;
+                }
+                last
+            };
+            let fast = nus.moves(player).skip(to_skip).last();
             manual == fast
         }
 
