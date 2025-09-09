@@ -1166,7 +1166,7 @@ where
     }
 }
 
-impl<'a, I> ExactSizeIterator for MovesIterInner<'a, I>
+impl<I> ExactSizeIterator for MovesIterInner<'_, I>
 where
     I: Iterator<Item = Nus> + ExactSizeIterator,
 {
@@ -1178,7 +1178,7 @@ where
     }
 }
 
-impl<'a, I> FusedIterator for MovesIterInner<'a, I> where I: Iterator<Item = Nus> + FusedIterator {}
+impl<I> FusedIterator for MovesIterInner<'_, I> where I: Iterator<Item = Nus> + FusedIterator {}
 
 macro_rules! impl_moves_iter {
     ($(#[$attr:meta])* $name:ident) => {
