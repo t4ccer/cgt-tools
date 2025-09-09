@@ -13,3 +13,19 @@ pub enum Player {
     Left,
     Right,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use quickcheck::{Arbitrary, Gen};
+
+    impl Arbitrary for Player {
+        fn arbitrary(g: &mut Gen) -> Self {
+            if Arbitrary::arbitrary(g) {
+                Player::Left
+            } else {
+                Player::Right
+            }
+        }
+    }
+}
