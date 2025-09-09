@@ -661,6 +661,37 @@ mod tests {
                 nimber: Nimber::new(arbitrary_mod!(1000, g)),
             }
         }
+
+        fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
+            let this = *self;
+            Box::new(
+                this.number
+                    .denominator_exponent()
+                    .shrink()
+                    .map(move |denominator_exponent| Nus {
+                        number: DyadicRationalNumber::new(
+                            this.number().numerator(),
+                            denominator_exponent,
+                        ),
+                        ..this
+                    })
+                    .chain(this.number.numerator().shrink().map(move |numerator| Nus {
+                        number: DyadicRationalNumber::new(
+                            numerator,
+                            this.number().denominator_exponent(),
+                        ),
+                        ..this
+                    }))
+                    .chain(this.up_multiple().shrink().map(move |up_multiple| Nus {
+                        up_multiple,
+                        ..this
+                    }))
+                    .chain(this.nimber().value().shrink().map(move |nimber| Nus {
+                        nimber: Nimber::new(nimber),
+                        ..this
+                    })),
+            )
+        }
     }
 
     #[test]
