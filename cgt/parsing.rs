@@ -89,6 +89,8 @@ impl<'s> Parser<'s> {
                 [b'\t' | b'\n' | b'\r' | b' ', rest @ ..] => bs = rest,
                 _ => {
                     return Parser {
+                        // SAFETY: We chopped off an ascii char so the rest of the input
+                        // must be valid utf8
                         input: unsafe { core::str::from_utf8_unchecked(bs) },
                     };
                 }
@@ -99,8 +101,10 @@ impl<'s> Parser<'s> {
     /// Parse one ascii char if input is non-empty
     pub const fn parse_any_ascii_char(self) -> Option<(Parser<'s>, char)> {
         match self.input.as_bytes() {
-            [b, rest @ ..] => Some((
+            [b, rest @ ..] if b.is_ascii() => Some((
                 Parser {
+                    // SAFETY: We chopped off an ascii char so the rest of the input
+                    // must be valid utf8
                     input: unsafe { core::str::from_utf8_unchecked(rest) },
                 },
                 *b as char,
@@ -165,6 +169,8 @@ impl<'s> Parser<'s> {
 
                     return Some((
                         Parser {
+                            // SAFETY: We are chopping off only ascii chars so the rest of the input
+                            // must be valid utf8
                             input: unsafe { core::str::from_utf8_unchecked(bs) },
                         },
                         acc,
@@ -210,6 +216,8 @@ impl<'s> Parser<'s> {
 
                     return Some((
                         Parser {
+                            // SAFETY: We are chopping off only ascii chars so the rest of the input
+                            // must be valid utf8
                             input: unsafe { core::str::from_utf8_unchecked(bs) },
                         },
                         acc,

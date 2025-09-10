@@ -96,6 +96,8 @@ impl<'buf, 'tag> Tag<'buf, 'tag, Open> {
     fn finish_attributes(self) -> Tag<'buf, 'tag, Content> {
         self.buffer.push('>');
         let tag: &'tag str = self.tag_name;
+        // HACK: We need to re-tag without running drop code
+        // SAFETY: self.buffer is a vaild `&'buf mut String`
         let buffer: &'buf mut String = unsafe { &mut *{ std::ptr::from_mut(self.buffer) } };
         let _ = ManuallyDrop::new(self);
         Tag {
