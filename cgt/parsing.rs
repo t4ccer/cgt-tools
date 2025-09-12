@@ -89,9 +89,13 @@ impl<'s> Parser<'s> {
                 [b'\t' | b'\n' | b'\r' | b' ', rest @ ..] => bs = rest,
                 _ => {
                     return Parser {
-                        // SAFETY: We chopped off an ascii char so the rest of the input
-                        // must be valid utf8
-                        input: unsafe { core::str::from_utf8_unchecked(bs) },
+                        input: {
+                            // const-hack
+                            match core::str::from_utf8(bs) {
+                                Ok(input) => input,
+                                Err(_) => unreachable!(),
+                            }
+                        },
                     };
                 }
             }
@@ -103,9 +107,11 @@ impl<'s> Parser<'s> {
         match self.input.as_bytes() {
             [b, rest @ ..] if b.is_ascii() => Some((
                 Parser {
-                    // SAFETY: We chopped off an ascii char so the rest of the input
-                    // must be valid utf8
-                    input: unsafe { core::str::from_utf8_unchecked(rest) },
+                    // const-hack
+                    input: match core::str::from_utf8(rest) {
+                        Ok(input) => input,
+                        Err(_) => unreachable!(),
+                    },
                 },
                 *b as char,
             )),
@@ -169,9 +175,11 @@ impl<'s> Parser<'s> {
 
                     return Some((
                         Parser {
-                            // SAFETY: We are chopping off only ascii chars so the rest of the input
-                            // must be valid utf8
-                            input: unsafe { core::str::from_utf8_unchecked(bs) },
+                            // const-hack
+                            input: match core::str::from_utf8(bs) {
+                                Ok(input) => input,
+                                Err(_) => unreachable!(),
+                            },
                         },
                         acc,
                     ));
@@ -216,9 +224,11 @@ impl<'s> Parser<'s> {
 
                     return Some((
                         Parser {
-                            // SAFETY: We are chopping off only ascii chars so the rest of the input
-                            // must be valid utf8
-                            input: unsafe { core::str::from_utf8_unchecked(bs) },
+                            // const-hack
+                            input: match core::str::from_utf8(bs) {
+                                Ok(input) => input,
+                                Err(_) => unreachable!(),
+                            },
                         },
                         acc,
                     ));
