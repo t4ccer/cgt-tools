@@ -286,7 +286,9 @@ impl IsCgtWindow for TitledWindow<DigraphPlacementWindow> {
                 if matches!(
                     self.content.editing_mode.get(),
                     GraphEditingMode::AddVertex
-                        | GraphEditingMode::AddEdge if self.content.edge_creates_vertex
+                ) || matches!(
+                    self.content.editing_mode.get(),
+                    GraphEditingMode::AddEdge if self.content.edge_creates_vertex
                 ) {
                     self.content.new_vertex_color.combo(
                         ui,
