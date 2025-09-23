@@ -277,6 +277,7 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                                 .get_vertex_mut(clicked)
                                 .get_inner_mut();
                             *clicked_vertex.color_mut() = VertexColor::TintLeft;
+                            is_dirty = true;
                         }
                     }
                     GraphEditingMode::TintVertexRed => {
@@ -288,6 +289,7 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                                 .get_vertex_mut(clicked)
                                 .get_inner_mut();
                             *clicked_vertex.color_mut() = VertexColor::TintRight;
+                            is_dirty = true;
                         }
                     }
                     GraphEditingMode::TintVertexNone => {
@@ -299,6 +301,7 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                                 .get_vertex_mut(clicked)
                                 .get_inner_mut();
                             *clicked_vertex.color_mut() = VertexColor::Empty;
+                            is_dirty = true;
                         }
                     }
                     GraphEditingMode::MoveLeft => {
