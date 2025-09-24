@@ -5,7 +5,10 @@ use cgt::{
     numeric::v2f::V2f,
     short::partizan::thermograph::Thermograph,
 };
-use std::time::SystemTime;
+use std::{
+    ops::{Deref, DerefMut},
+    time::SystemTime,
+};
 
 pub mod amazons;
 pub mod canonical_form;
@@ -122,5 +125,62 @@ where
         if ui.menu_item("as PNG") {
             save_using_canvas!(tiny_skia, "png", canvas.to_png().as_ref());
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct AccessTracker<T> {
+    value: T,
+    modified: bool,
+}
+
+impl<T> AccessTracker<T> {
+    #[inline(always)]
+    pub(crate) fn new(value: T) -> Self {
+        Self {
+            value,
+            modified: true,
+        }
+    }
+
+    #[inline(always)]
+    pub(crate) fn clear_flag(&mut self) -> bool {
+        let was_modified = self.modified;
+        self.modified = false;
+        was_modified
+    }
+
+    #[inline(always)]
+    pub(crate) fn get(&self) -> &T {
+        &self.value
+    }
+
+    #[inline(always)]
+    pub(crate) fn get_mut_untracked(&mut self) -> &mut T {
+        &mut self.value
+    }
+}
+
+impl<T> From<T> for AccessTracker<T> {
+    #[inline(always)]
+    fn from(value: T) -> Self {
+        AccessTracker::new(value)
+    }
+}
+
+impl<T> Deref for AccessTracker<T> {
+    type Target = T;
+
+    #[inline(always)]
+    fn deref(&self) -> &Self::Target {
+        &self.value
+    }
+}
+
+impl<T> DerefMut for AccessTracker<T> {
+    #[inline(always)]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.modified = true;
+        &mut self.value
     }
 }

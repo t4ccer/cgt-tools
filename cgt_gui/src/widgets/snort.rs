@@ -1,7 +1,7 @@
 use crate::{
     Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow, UpdateKind, imgui_enum,
     impl_titled_window,
-    widgets::{self, canonical_form::CanonicalFormWindow, save_button},
+    widgets::{self, AccessTracker, canonical_form::CanonicalFormWindow, save_button},
 };
 use ::imgui::{ComboBoxFlags, Condition, Ui};
 use cgt::{
@@ -16,7 +16,7 @@ use cgt::{
     numeric::v2f::V2f,
     short::partizan::games::snort::{Snort, VertexColor, VertexKind},
 };
-use std::fmt::Write;
+use std::{fmt::Write, ops::Deref};
 
 imgui_enum! {
     GraphEditingMode {
@@ -50,7 +50,7 @@ impl_has!(PositionedVertex -> position -> V2f);
 
 #[derive(Debug, Clone)]
 pub struct SnortWindow {
-    game: Snort<PositionedVertex, UndirectedGraph<PositionedVertex>>,
+    game: AccessTracker<Snort<PositionedVertex, UndirectedGraph<PositionedVertex>>>,
     reposition_option_selected: RawOf<RepositionMode>,
     editing_mode: RawOf<GraphEditingMode>,
     alternating_moves: bool,
@@ -63,7 +63,7 @@ impl SnortWindow {
     pub fn new() -> SnortWindow {
         SnortWindow {
             // caterpillar C(4, 3, 4)
-            game: Snort::new(UndirectedGraph::from_edges(
+            game: AccessTracker::new(Snort::new(UndirectedGraph::from_edges(
                 &[
                     // left
                     (VertexIndex { index: 0 }, VertexIndex { index: 4 }),
@@ -90,7 +90,7 @@ impl SnortWindow {
                     };
                     14
                 ],
-            )),
+            ))),
             reposition_option_selected: RawOf::new(RepositionMode::SpringEmbedder),
             editing_mode: RawOf::new(GraphEditingMode::DragVertex),
             alternating_moves: true,
@@ -107,7 +107,7 @@ impl SnortWindow {
                 * 0.5,
             vertex_radius: imgui::Canvas::vertex_radius(),
         };
-        circle.layout(&mut self.game.graph);
+        circle.layout(&mut self.game.get_mut_untracked().graph);
     }
 
     pub fn reposition(&mut self, graph_panel_size: V2f) {
@@ -139,7 +139,7 @@ impl SnortWindow {
                         },
                     )),
                 };
-                spring_embedder.layout(&mut self.game.graph);
+                spring_embedder.layout(&mut self.game.get_mut_untracked().graph);
             }
         }
     }
@@ -171,7 +171,6 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
 
     fn draw(&mut self, ui: &Ui, ctx: &mut GuiContext) {
         let mut should_reposition = false;
-        let mut is_dirty = false;
 
         ui.window(&self.title)
             .position(ui.io().mouse_pos, Condition::Appearing)
@@ -200,7 +199,7 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                     save_button(
                         ui,
                         "snort",
-                        &self.content.game,
+                        self.content.game.deref(),
                         self.content.details.as_ref().map(|d| &d.thermograph),
                     );
                 }
@@ -217,8 +216,7 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                 should_reposition = ui.button("Reposition");
                 ui.same_line();
                 if ui.button("Clear") {
-                    self.content.game = Snort::new(UndirectedGraph::empty(&[]));
-                    is_dirty = true;
+                    *self.content.game = Snort::new(UndirectedGraph::empty(&[]));
                 }
 
                 self.content
@@ -262,6 +260,7 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                             let current_pos: &mut V2f = self
                                 .content
                                 .game
+                                .get_mut_untracked()
                                 .graph
                                 .get_vertex_mut(pressed)
                                 .get_inner_mut();
@@ -277,7 +276,6 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                                 .get_vertex_mut(clicked)
                                 .get_inner_mut();
                             *clicked_vertex.color_mut() = VertexColor::TintLeft;
-                            is_dirty = true;
                         }
                     }
                     GraphEditingMode::TintVertexRed => {
@@ -289,7 +287,6 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                                 .get_vertex_mut(clicked)
                                 .get_inner_mut();
                             *clicked_vertex.color_mut() = VertexColor::TintRight;
-                            is_dirty = true;
                         }
                     }
                     GraphEditingMode::TintVertexNone => {
@@ -301,7 +298,6 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                                 .get_vertex_mut(clicked)
                                 .get_inner_mut();
                             *clicked_vertex.color_mut() = VertexColor::Empty;
-                            is_dirty = true;
                         }
                     }
                     GraphEditingMode::MoveLeft => {
@@ -312,12 +308,11 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                                 .available_moves_for::<{ VertexColor::TintLeft as u8 }>()
                                 .any(|available_vertex| available_vertex == clicked)
                             {
-                                self.content.game =
+                                *self.content.game =
                                     self.content
                                         .game
                                         .move_in_vertex::<{ VertexColor::TintLeft as u8 }>(clicked);
                                 self.content.editing_mode = RawOf::new(GraphEditingMode::MoveRight);
-                                is_dirty = true;
                             }
                         }
                     }
@@ -329,14 +324,13 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                                 .available_moves_for::<{ VertexColor::TintRight as u8 }>()
                                 .any(|available_vertex| available_vertex == clicked)
                             {
-                                self.content.game =
+                                *self.content.game =
                                     self.content
                                         .game
                                         .move_in_vertex::<{ VertexColor::TintRight as u8 }>(
                                             clicked,
                                         );
                                 self.content.editing_mode = RawOf::new(GraphEditingMode::MoveLeft);
-                                is_dirty = true;
                             }
                         }
                     }
@@ -346,13 +340,11 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                                 kind: VertexKind::Single(VertexColor::Empty),
                                 position: new_vertex_position,
                             });
-                            is_dirty = true;
                         }
                     }
                     GraphEditingMode::DeleteVertex => {
                         if let Some(clicked) = clicked {
                             self.content.game.graph.remove_vertex(clicked);
-                            is_dirty = true;
                         }
                     }
                     GraphEditingMode::AddEdge => {
@@ -372,19 +364,15 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                                 canvas.vertex_at_position(mouse_position, &self.content.game.graph)
                                 && start != end
                             {
-                                self.content.game.graph.connect(
-                                    start,
-                                    end,
-                                    !self.content.game.graph.are_adjacent(start, end),
-                                );
-                                is_dirty = true;
+                                let should_connect =
+                                    !self.content.game.graph.are_adjacent(start, end);
+                                self.content.game.graph.connect(start, end, should_connect);
                             } else if self.content.edge_creates_vertex {
                                 let end = self.content.game.graph.add_vertex(PositionedVertex {
                                     kind: VertexKind::Single(VertexColor::Empty),
                                     position: mouse_position,
                                 });
                                 self.content.game.graph.connect(start, end, true);
-                                is_dirty = true;
                             }
                         }
                     }
@@ -405,7 +393,7 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                     ctx.large_font_id,
                 );
 
-                if is_dirty {
+                if self.content.game.clear_flag() {
                     self.content.details = None;
                     let graph = self.content.game.graph.map(|v| v.kind);
                     ctx.schedule_task(

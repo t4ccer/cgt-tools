@@ -1,3 +1,11 @@
+use crate::{
+    Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow, imgui_enum,
+    impl_game_window, impl_titled_window,
+    widgets::{
+        self, AccessTracker, TILE_COLOR_EMPTY, TILE_COLOR_FILLED, TILE_SPACING,
+        canonical_form::CanonicalFormWindow, interactive_color,
+    },
+};
 use ::imgui::{ComboBoxFlags, Condition, Ui};
 use cgt::{
     drawing::{Canvas, Color, Draw, imgui},
@@ -9,15 +17,6 @@ use cgt::{
     },
 };
 use std::str::FromStr;
-
-use crate::{
-    Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow, imgui_enum,
-    impl_game_window, impl_titled_window,
-    widgets::{
-        self, TILE_COLOR_EMPTY, TILE_COLOR_FILLED, TILE_SPACING,
-        canonical_form::CanonicalFormWindow, interactive_color,
-    },
-};
 
 const OFF_BUTTON_SCALE: f32 = 0.3;
 
@@ -55,7 +54,7 @@ impl From<GridEditingMode> for Edit {
 
 #[derive(Debug, Clone)]
 pub struct SkiJumpsWindow {
-    game: SkiJumps,
+    game: AccessTracker<SkiJumps>,
     editing_mode: RawOf<GridEditingMode>,
     alternating_moves: bool,
 
@@ -67,7 +66,7 @@ pub struct SkiJumpsWindow {
 impl SkiJumpsWindow {
     pub fn new() -> SkiJumpsWindow {
         SkiJumpsWindow {
-            game: SkiJumps::from_str("L....|....R|.....").unwrap(),
+            game: AccessTracker::new(SkiJumps::from_str("L....|....R|.....").unwrap()),
             editing_mode: RawOf::new(GridEditingMode::ClearTile),
             alternating_moves: true,
             initial_position: None,
@@ -86,8 +85,6 @@ impl IsCgtWindow for TitledWindow<SkiJumpsWindow> {
 
         let mut new_width = width;
         let mut new_height = height;
-
-        let mut is_dirty = false;
 
         ui.window(&self.title)
             .position(ui.io().mouse_pos, Condition::Appearing)
@@ -213,7 +210,6 @@ impl IsCgtWindow for TitledWindow<SkiJumpsWindow> {
                         Edit::Place(tile) => {
                             if self.content.game.grid().get(x, y) != tile {
                                 self.content.game.grid_mut().set(x, y, tile);
-                                is_dirty = true;
                             }
                         }
                         Edit::Move(player) => match self.content.initial_position {
@@ -287,7 +283,7 @@ impl IsCgtWindow for TitledWindow<SkiJumpsWindow> {
                                 }
                             },
                         ) {
-                            self.content.game = self.content.game.move_in(legal_move);
+                            *self.content.game = self.content.game.move_in(legal_move);
                             if self.content.alternating_moves {
                                 if matches!(editing_mode, GridEditingMode::MoveLeft) {
                                     self.content.editing_mode =
@@ -297,7 +293,6 @@ impl IsCgtWindow for TitledWindow<SkiJumpsWindow> {
                                         RawOf::new(GridEditingMode::MoveLeft);
                                 }
                             }
-                            is_dirty = true;
                         }
 
                         self.content.initial_position = None;
@@ -305,7 +300,6 @@ impl IsCgtWindow for TitledWindow<SkiJumpsWindow> {
                 }
 
                 if new_width != width || new_height != height {
-                    is_dirty = true;
                     if let Some(mut new_grid) = VecGrid::filled(new_width, new_height, Tile::Empty)
                     {
                         for y in 0..height.min(new_height) {
@@ -330,7 +324,7 @@ impl IsCgtWindow for TitledWindow<SkiJumpsWindow> {
 
                 // SAFETY: We're fine because we're not pushing any style changes
                 let pad_x = unsafe { ui.style().window_padding[0] };
-                if is_dirty {
+                if self.content.game.clear_flag() {
                     self.content.details = None;
                     ui.set_column_width(
                         0,
@@ -344,7 +338,7 @@ impl IsCgtWindow for TitledWindow<SkiJumpsWindow> {
                         "Ski Jumps",
                         Task::EvalSkiJumps(EvalTask {
                             window: self.window_id,
-                            game: self.content.game.clone(),
+                            game: self.content.game.get().clone(),
                         }),
                     );
                 }

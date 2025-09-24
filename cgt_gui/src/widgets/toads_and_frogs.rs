@@ -1,7 +1,7 @@
 use crate::{
     Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow, imgui_enum,
     impl_game_window, impl_titled_window,
-    widgets::{self, canonical_form::CanonicalFormWindow},
+    widgets::{self, AccessTracker, canonical_form::CanonicalFormWindow},
 };
 use ::imgui::{ComboBoxFlags, Condition, Ui};
 use cgt::{
@@ -22,7 +22,7 @@ imgui_enum! {
 
 #[derive(Debug, Clone)]
 pub struct ToadsAndFrogsWindow {
-    game: ToadsAndFrogs,
+    game: AccessTracker<ToadsAndFrogs>,
     editing_mode: RawOf<GridEditingMode>,
     alternating_moves: bool,
     pub details: Option<Details>,
@@ -31,7 +31,7 @@ pub struct ToadsAndFrogsWindow {
 impl ToadsAndFrogsWindow {
     pub fn new() -> ToadsAndFrogsWindow {
         ToadsAndFrogsWindow {
-            game: ToadsAndFrogs::from_str("T.TF.").unwrap(),
+            game: AccessTracker::new(ToadsAndFrogs::from_str("T.TF.").unwrap()),
             editing_mode: RawOf::new(GridEditingMode::ClearTile),
             alternating_moves: true,
             details: None,
@@ -47,8 +47,6 @@ impl IsCgtWindow for TitledWindow<ToadsAndFrogsWindow> {
         let width = self.content.game.row().len();
 
         let mut new_width = width;
-
-        let mut is_dirty = false;
 
         ui.window(&self.title)
             .position(ui.io().mouse_pos, Condition::Appearing)
@@ -107,7 +105,6 @@ impl IsCgtWindow for TitledWindow<ToadsAndFrogsWindow> {
                     let mut place_tile = |tile| {
                         if self.content.game.row()[grid_x] != tile {
                             self.content.game.row_mut()[grid_x] = tile;
-                            is_dirty = true;
                         }
                     };
 
@@ -129,8 +126,6 @@ impl IsCgtWindow for TitledWindow<ToadsAndFrogsWindow> {
                                         self.content.editing_mode =
                                             RawOf::new(GridEditingMode::MoveRight);
                                     }
-
-                                    is_dirty = true;
                                 } else if grid_x + 2 < width
                                     && matches!(self.content.game.row()[grid_x + 1], Tile::Frog)
                                     && matches!(self.content.game.row()[grid_x + 2], Tile::Empty)
@@ -142,8 +137,6 @@ impl IsCgtWindow for TitledWindow<ToadsAndFrogsWindow> {
                                         self.content.editing_mode =
                                             RawOf::new(GridEditingMode::MoveRight);
                                     }
-
-                                    is_dirty = true;
                                 }
                             }
                         }
@@ -159,8 +152,6 @@ impl IsCgtWindow for TitledWindow<ToadsAndFrogsWindow> {
                                         self.content.editing_mode =
                                             RawOf::new(GridEditingMode::MoveLeft);
                                     }
-
-                                    is_dirty = true;
                                 } else if grid_x >= 2
                                     && matches!(self.content.game.row()[grid_x - 1], Tile::Toad)
                                     && matches!(self.content.game.row()[grid_x - 2], Tile::Empty)
@@ -172,8 +163,6 @@ impl IsCgtWindow for TitledWindow<ToadsAndFrogsWindow> {
                                         self.content.editing_mode =
                                             RawOf::new(GridEditingMode::MoveLeft);
                                     }
-
-                                    is_dirty = true;
                                 }
                             }
                         }
@@ -193,16 +182,14 @@ impl IsCgtWindow for TitledWindow<ToadsAndFrogsWindow> {
 
                 if new_width > width {
                     self.content.game.row_mut().push(Tile::Empty);
-                    is_dirty = true;
                 }
                 if new_width < width {
                     self.content.game.row_mut().pop();
-                    is_dirty = true;
                 }
 
                 // SAFETY: We're fine because we're not pushing any style changes
                 let pad_x = unsafe { ui.style().window_padding[0] };
-                if is_dirty {
+                if self.content.game.clear_flag() {
                     self.content.details = None;
                     ui.set_column_width(
                         0,
@@ -216,7 +203,7 @@ impl IsCgtWindow for TitledWindow<ToadsAndFrogsWindow> {
                         "Toads And Frogs",
                         Task::EvalToadsAndFrogs(EvalTask {
                             window: self.window_id,
-                            game: self.content.game.clone(),
+                            game: self.content.game.get().clone(),
                         }),
                     );
                 }

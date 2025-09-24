@@ -126,7 +126,7 @@ macro_rules! impl_game_window {
                 $title,
                 $crate::Task::$task_kind($crate::EvalTask {
                     window: self.window_id,
-                    game: self.content.game.clone(),
+                    game: self.content.game.get().clone(),
                 }),
             );
         }
@@ -134,7 +134,7 @@ macro_rules! impl_game_window {
         fn update(&mut self, update: $crate::UpdateKind) {
             match update {
                 $crate::UpdateKind::$update_kind(game, details) => {
-                    if self.content.game == game {
+                    if *self.content.game.get() == game {
                         self.content.details = Some(details);
                     }
                 }

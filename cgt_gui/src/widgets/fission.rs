@@ -1,3 +1,8 @@
+use crate::{
+    Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow, imgui_enum,
+    impl_game_window, impl_titled_window,
+    widgets::{self, AccessTracker, canonical_form::CanonicalFormWindow},
+};
 use ::imgui::{ComboBoxFlags, Condition, Ui};
 use cgt::{
     drawing::{Draw, imgui},
@@ -5,12 +10,6 @@ use cgt::{
     short::partizan::games::fission::{Fission, Tile},
 };
 use std::str::FromStr;
-
-use crate::{
-    Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow, imgui_enum,
-    impl_game_window, impl_titled_window,
-    widgets::{self, canonical_form::CanonicalFormWindow},
-};
 
 imgui_enum! {
     GridEditingMode {
@@ -24,7 +23,7 @@ imgui_enum! {
 
 #[derive(Debug, Clone)]
 pub struct FissionWindow {
-    game: Fission,
+    game: AccessTracker<Fission>,
     editing_mode: RawOf<GridEditingMode>,
     alternating_moves: bool,
     pub details: Option<Details>,
@@ -33,7 +32,7 @@ pub struct FissionWindow {
 impl FissionWindow {
     pub fn new() -> FissionWindow {
         FissionWindow {
-            game: Fission::from_str("....|..x.|....|....").unwrap(),
+            game: AccessTracker::new(Fission::from_str("....|..x.|....|....").unwrap()),
             editing_mode: RawOf::new(GridEditingMode::AddStone),
             alternating_moves: true,
             details: None,
@@ -51,8 +50,6 @@ impl IsCgtWindow for TitledWindow<FissionWindow> {
 
         let mut new_width = width;
         let mut new_height = height;
-
-        let mut is_dirty = false;
 
         ui.window(&self.title)
             .position(ui.io().mouse_pos, Condition::Appearing)
@@ -105,7 +102,6 @@ impl IsCgtWindow for TitledWindow<FissionWindow> {
                     let mut place_tile = |tile| {
                         if self.content.game.grid().get(x, y) != tile {
                             self.content.game.grid_mut().set(x, y, tile);
-                            is_dirty = true;
                         }
                     };
 
@@ -116,30 +112,27 @@ impl IsCgtWindow for TitledWindow<FissionWindow> {
                         GridEditingMode::MoveLeft => {
                             let moves = self.content.game.available_moves_left();
                             if moves.contains(&(x, y)) {
-                                self.content.game = self.content.game.move_in_left(x, y);
+                                *self.content.game = self.content.game.move_in_left(x, y);
                                 if self.content.alternating_moves {
                                     self.content.editing_mode =
                                         RawOf::new(GridEditingMode::MoveRight);
                                 }
-                                is_dirty = true;
                             }
                         }
                         GridEditingMode::MoveRight => {
                             let moves = self.content.game.available_moves_right();
                             if moves.contains(&(x, y)) {
-                                self.content.game = self.content.game.move_in_right(x, y);
+                                *self.content.game = self.content.game.move_in_right(x, y);
                                 if self.content.alternating_moves {
                                     self.content.editing_mode =
                                         RawOf::new(GridEditingMode::MoveLeft);
                                 }
-                                is_dirty = true;
                             }
                         }
                     }
                 }
 
                 if new_width != width || new_height != height {
-                    is_dirty = true;
                     if let Some(mut new_grid) = VecGrid::filled(new_width, new_height, Tile::Empty)
                     {
                         for y in 0..height.min(new_height) {
@@ -164,7 +157,7 @@ impl IsCgtWindow for TitledWindow<FissionWindow> {
 
                 // SAFETY: We're fine because we're not pushing any style changes
                 let pad_x = unsafe { ui.style().window_padding[0] };
-                if is_dirty {
+                if self.content.game.clear_flag() {
                     self.content.details = None;
                     ui.set_column_width(
                         0,
@@ -178,7 +171,7 @@ impl IsCgtWindow for TitledWindow<FissionWindow> {
                         "Fission",
                         Task::EvalFission(EvalTask {
                             window: self.window_id,
-                            game: self.content.game.clone(),
+                            game: self.content.game.get().clone(),
                         }),
                     );
                 }

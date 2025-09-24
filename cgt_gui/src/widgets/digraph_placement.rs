@@ -1,7 +1,7 @@
 use crate::{
     Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow, UpdateKind, imgui_enum,
     impl_titled_window,
-    widgets::{self, canonical_form::CanonicalFormWindow, save_button},
+    widgets::{self, AccessTracker, canonical_form::CanonicalFormWindow, save_button},
 };
 use ::imgui::{ComboBoxFlags, Condition, Ui};
 use cgt::{
@@ -91,7 +91,7 @@ impl_has!(PositionedVertex -> position -> V2f);
 
 #[derive(Debug, Clone)]
 pub struct DigraphPlacementWindow {
-    game: DigraphPlacement<PositionedVertex, DirectedGraph<PositionedVertex>>,
+    game: AccessTracker<DigraphPlacement<PositionedVertex, DirectedGraph<PositionedVertex>>>,
     reposition_option_selected: RawOf<RepositionMode>,
     new_vertex_color: RawOf<NewVertexColor>,
     editing_mode: RawOf<GraphEditingMode>,
@@ -104,7 +104,7 @@ pub struct DigraphPlacementWindow {
 impl DigraphPlacementWindow {
     pub fn new() -> DigraphPlacementWindow {
         DigraphPlacementWindow {
-            game: DigraphPlacement::new(DirectedGraph::from_edges(
+            game: AccessTracker::new(DigraphPlacement::new(DirectedGraph::from_edges(
                 &[
                     (VertexIndex { index: 1 }, VertexIndex { index: 0 }),
                     (VertexIndex { index: 2 }, VertexIndex { index: 0 }),
@@ -141,7 +141,7 @@ impl DigraphPlacementWindow {
                         position: V2f::ZERO,
                     },
                 ],
-            )),
+            ))),
             new_vertex_color: RawOf::new(NewVertexColor::Left),
             reposition_option_selected: RawOf::new(RepositionMode::SpringEmbedder),
             editing_mode: RawOf::new(GraphEditingMode::DragVertex),
@@ -159,7 +159,7 @@ impl DigraphPlacementWindow {
                 * 0.5,
             vertex_radius: imgui::Canvas::vertex_radius(),
         };
-        circle.layout(&mut self.game.graph);
+        circle.layout(&mut self.game.get_mut_untracked().graph);
     }
 
     pub fn reposition(&mut self, graph_panel_size: V2f) {
@@ -186,7 +186,7 @@ impl DigraphPlacementWindow {
                         },
                     )),
                 };
-                spring_embedder.layout(&mut self.game.graph);
+                spring_embedder.layout(&mut self.game.get_mut_untracked().graph);
             }
         }
     }
@@ -218,7 +218,6 @@ impl IsCgtWindow for TitledWindow<DigraphPlacementWindow> {
 
     fn draw(&mut self, ui: &Ui, ctx: &mut GuiContext) {
         let mut should_reposition = false;
-        let mut is_dirty = false;
 
         ui.window(&self.title)
             .position(ui.io().mouse_pos, Condition::Appearing)
@@ -247,7 +246,7 @@ impl IsCgtWindow for TitledWindow<DigraphPlacementWindow> {
                     save_button(
                         ui,
                         "digraph_placement",
-                        &self.content.game,
+                        self.content.game.get(),
                         self.content.details.as_ref().map(|d| &d.thermograph),
                     );
                 }
@@ -264,8 +263,7 @@ impl IsCgtWindow for TitledWindow<DigraphPlacementWindow> {
                 should_reposition = ui.button("Reposition");
                 ui.same_line();
                 if ui.button("Clear") {
-                    self.content.game = DigraphPlacement::new(DirectedGraph::empty(&[]));
-                    is_dirty = true;
+                    *self.content.game = DigraphPlacement::new(DirectedGraph::empty(&[]));
                 }
 
                 self.content
@@ -324,6 +322,7 @@ impl IsCgtWindow for TitledWindow<DigraphPlacementWindow> {
                             let current_pos: &mut V2f = self
                                 .content
                                 .game
+                                .get_mut_untracked()
                                 .graph
                                 .get_vertex_mut(pressed)
                                 .get_inner_mut();
@@ -339,7 +338,6 @@ impl IsCgtWindow for TitledWindow<DigraphPlacementWindow> {
                                 .get_vertex_mut(clicked)
                                 .get_inner_mut();
                             *current_color = VertexColor::from(player);
-                            is_dirty = true;
                         }
                     }
                     Edit::Move(player) => {
@@ -347,14 +345,13 @@ impl IsCgtWindow for TitledWindow<DigraphPlacementWindow> {
                             let clicked_color: &VertexColor =
                                 self.content.game.graph.get_vertex(clicked).get_inner();
                             if *clicked_color == VertexColor::from(player) {
-                                self.content.game = self.content.game.move_in_vertex(clicked);
+                                *self.content.game = self.content.game.move_in_vertex(clicked);
                                 if self.content.alternating_moves {
                                     self.content.editing_mode = RawOf::new(match player {
                                         Player::Left => GraphEditingMode::MoveRight,
                                         Player::Right => GraphEditingMode::MoveLeft,
                                     });
                                 }
-                                is_dirty = true;
                             }
                         }
                     }
@@ -364,13 +361,11 @@ impl IsCgtWindow for TitledWindow<DigraphPlacementWindow> {
                                 color: VertexColor::from(self.content.new_vertex_color),
                                 position: new_vertex_position,
                             });
-                            is_dirty = true;
                         }
                     }
                     Edit::DeleteVertex => {
                         if let Some(clicked) = clicked {
                             self.content.game.graph.remove_vertex(clicked);
-                            is_dirty = true;
                         }
                     }
                     Edit::AddEdge => {
@@ -378,7 +373,7 @@ impl IsCgtWindow for TitledWindow<DigraphPlacementWindow> {
                         if let Some(pressed) = pressed {
                             self.content.edge_start_vertex = Some(pressed);
                             let pressed_position: V2f =
-                                self.content.game.graph.get_vertex_mut(pressed).position;
+                                self.content.game.get().graph.get_vertex(pressed).position;
                             canvas.line(
                                 pressed_position,
                                 mouse_position,
@@ -390,19 +385,15 @@ impl IsCgtWindow for TitledWindow<DigraphPlacementWindow> {
                                 canvas.vertex_at_position(mouse_position, &self.content.game.graph)
                                 && start != end
                             {
-                                self.content.game.graph.connect(
-                                    start,
-                                    end,
-                                    !self.content.game.graph.are_adjacent(start, end),
-                                );
-                                is_dirty = true;
+                                let should_connect =
+                                    !self.content.game.graph.are_adjacent(start, end);
+                                self.content.game.graph.connect(start, end, should_connect);
                             } else if self.content.edge_creates_vertex {
                                 let end = self.content.game.graph.add_vertex(PositionedVertex {
                                     color: VertexColor::from(self.content.new_vertex_color),
                                     position: mouse_position,
                                 });
                                 self.content.game.graph.connect(start, end, true);
-                                is_dirty = true;
                             }
                         }
                     }
@@ -417,7 +408,7 @@ impl IsCgtWindow for TitledWindow<DigraphPlacementWindow> {
                     ctx.large_font_id,
                 );
 
-                if is_dirty {
+                if self.content.game.clear_flag() {
                     self.content.details = None;
                     let graph = self.content.game.graph.map(|v| v.color);
                     ctx.schedule_task(

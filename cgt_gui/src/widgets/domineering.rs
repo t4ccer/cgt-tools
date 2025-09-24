@@ -1,7 +1,7 @@
 use crate::{
     Details, EvalTask, GuiContext, IsCgtWindow, Task, TitledWindow, impl_game_window,
     impl_titled_window,
-    widgets::{self, canonical_form::CanonicalFormWindow},
+    widgets::{self, AccessTracker, canonical_form::CanonicalFormWindow},
 };
 use ::imgui::{Condition, Ui};
 use cgt::{
@@ -13,14 +13,16 @@ use std::str::FromStr;
 
 #[derive(Debug, Clone)]
 pub struct DomineeringWindow {
-    game: Domineering,
+    game: AccessTracker<Domineering>,
     pub details: Option<Details>,
 }
 
 impl DomineeringWindow {
     pub fn new() -> DomineeringWindow {
         DomineeringWindow {
-            game: Domineering::from_str(".#.##|...##|#....|#...#|###..").unwrap(),
+            game: AccessTracker::new(
+                Domineering::from_str(".#.##|...##|#....|#...#|###..").unwrap(),
+            ),
             details: None,
         }
     }
@@ -36,8 +38,6 @@ impl IsCgtWindow for TitledWindow<DomineeringWindow> {
 
         let mut new_width = width;
         let mut new_height = height;
-
-        let mut is_dirty = false;
 
         ui.window(&self.title)
             .position(ui.io().mouse_pos, Condition::Appearing)
@@ -83,11 +83,9 @@ impl IsCgtWindow for TitledWindow<DomineeringWindow> {
                 if let Some((x, y)) = canvas.clicked_tile(self.content.game.grid()) {
                     let flipped = self.content.game.grid().get(x, y).flip();
                     self.content.game.grid_mut().set(x, y, flipped);
-                    is_dirty = true;
                 }
 
                 if new_width != width || new_height != height {
-                    is_dirty = true;
                     if let Some(mut new_grid) =
                         SmallBitGrid::filled(new_width, new_height, Tile::Empty)
                     {
@@ -113,7 +111,7 @@ impl IsCgtWindow for TitledWindow<DomineeringWindow> {
 
                 // SAFETY: We're fine because we're not pushing any style changes
                 let pad_x = unsafe { ui.style().window_padding[0] };
-                if is_dirty {
+                if self.content.game.clear_flag() {
                     self.content.details = None;
                     ui.set_column_width(
                         0,
@@ -127,7 +125,7 @@ impl IsCgtWindow for TitledWindow<DomineeringWindow> {
                         "Domineering",
                         Task::EvalDomineering(EvalTask {
                             window: self.window_id,
-                            game: self.content.game,
+                            game: *self.content.game.get(),
                         }),
                     );
                 }

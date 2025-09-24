@@ -1,3 +1,8 @@
+use crate::{
+    Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow, imgui_enum,
+    impl_game_window, impl_titled_window,
+    widgets::{self, AccessTracker, canonical_form::CanonicalFormWindow},
+};
 use ::imgui::{ComboBoxFlags, Condition, Ui};
 use cgt::{
     drawing::{Canvas, Color, Draw, imgui},
@@ -8,12 +13,6 @@ use cgt::{
     },
 };
 use std::str::FromStr;
-
-use crate::{
-    Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow, imgui_enum,
-    impl_game_window, impl_titled_window,
-    widgets::{self, canonical_form::CanonicalFormWindow},
-};
 
 imgui_enum! {
     GridEditingMode {
@@ -54,7 +53,7 @@ enum PendingMove {
 
 #[derive(Debug, Clone)]
 pub struct AmazonsWindow {
-    game: Amazons,
+    game: AccessTracker<Amazons>,
     editing_mode: RawOf<GridEditingMode>,
     alternating_moves: bool,
     pending_move: PendingMove,
@@ -64,7 +63,7 @@ pub struct AmazonsWindow {
 impl AmazonsWindow {
     pub fn new() -> AmazonsWindow {
         AmazonsWindow {
-            game: Amazons::from_str("x..#|....|.#.o").unwrap(),
+            game: AccessTracker::new(Amazons::from_str("x..#|....|.#.o").unwrap()),
             editing_mode: RawOf::new(GridEditingMode::AddStone),
             alternating_moves: true,
             pending_move: PendingMove::None,
@@ -83,8 +82,6 @@ impl IsCgtWindow for TitledWindow<AmazonsWindow> {
 
         let mut new_width = width;
         let mut new_height = height;
-
-        let mut is_dirty = false;
 
         ui.window(&self.title)
             .position(ui.io().mouse_pos, Condition::Appearing)
@@ -143,7 +140,6 @@ impl IsCgtWindow for TitledWindow<AmazonsWindow> {
                         Edit::Place(tile) => {
                             if self.content.game.grid().get(x, y) != tile {
                                 self.content.game.grid_mut().set(x, y, tile);
-                                is_dirty = true;
                             }
                         }
                         Edit::Move(player) => {
@@ -171,7 +167,7 @@ impl IsCgtWindow for TitledWindow<AmazonsWindow> {
                                 }
                                 PendingMove::AmazonTargetSelected { amazon, target } => {
                                     let stone_target = (x, y);
-                                    let mut new_game = self.content.game.clone();
+                                    let mut new_game = self.content.game.get().clone();
                                     new_game.grid_mut().set(amazon.0, amazon.1, Tile::Empty);
                                     new_game.grid_mut().set(target.0, target.1, own_tile);
                                     new_game.grid_mut().set(
@@ -182,11 +178,10 @@ impl IsCgtWindow for TitledWindow<AmazonsWindow> {
                                     self.content.pending_move = PendingMove::None;
                                     let moves = self.content.game.moves_for(own_tile, false);
                                     if moves.contains(&new_game) {
-                                        self.content.game = new_game;
+                                        *self.content.game = new_game;
                                         if self.content.alternating_moves {
                                             self.content.editing_mode = RawOf::new(other_mode);
                                         }
-                                        is_dirty = true;
                                     }
                                 }
                             }
@@ -221,7 +216,6 @@ impl IsCgtWindow for TitledWindow<AmazonsWindow> {
                 }
 
                 if new_width != width || new_height != height {
-                    is_dirty = true;
                     if let Some(mut new_grid) = VecGrid::filled(new_width, new_height, Tile::Empty)
                     {
                         for y in 0..height.min(new_height) {
@@ -245,7 +239,7 @@ impl IsCgtWindow for TitledWindow<AmazonsWindow> {
 
                 // SAFETY: We're fine because we're not pushing any style changes
                 let pad_x = unsafe { ui.style().window_padding[0] };
-                if is_dirty {
+                if self.content.game.clear_flag() {
                     self.content.details = None;
                     ui.set_column_width(
                         0,
@@ -259,7 +253,7 @@ impl IsCgtWindow for TitledWindow<AmazonsWindow> {
                         "Amazons",
                         Task::EvalAmazons(EvalTask {
                             window: self.window_id,
-                            game: self.content.game.clone(),
+                            game: self.content.game.get().clone(),
                         }),
                     );
                 }

@@ -1,7 +1,7 @@
 use crate::{
     Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow, imgui_enum,
     impl_game_window, impl_titled_window,
-    widgets::{self, canonical_form::CanonicalFormWindow},
+    widgets::{self, AccessTracker, canonical_form::CanonicalFormWindow},
 };
 use ::imgui::{ComboBoxFlags, Condition, Ui};
 use cgt::{
@@ -53,7 +53,7 @@ enum PendingMove {
 
 #[derive(Debug, Clone)]
 pub struct KonaneWindow {
-    game: Konane,
+    game: AccessTracker<Konane>,
     editing_mode: RawOf<GridEditingMode>,
     alternating_moves: bool,
     pending_move: PendingMove,
@@ -63,7 +63,7 @@ pub struct KonaneWindow {
 impl KonaneWindow {
     pub fn new() -> KonaneWindow {
         KonaneWindow {
-            game: Konane::from_str("....|....|....").unwrap(),
+            game: AccessTracker::new(Konane::from_str("....|....|....").unwrap()),
             editing_mode: RawOf::new(GridEditingMode::AddBlocked),
             alternating_moves: true,
             pending_move: PendingMove::None,
@@ -82,8 +82,6 @@ impl IsCgtWindow for TitledWindow<KonaneWindow> {
 
         let mut new_width = width;
         let mut new_height = height;
-
-        let mut is_dirty = false;
 
         ui.window(&self.title)
             .position(ui.io().mouse_pos, Condition::Appearing)
@@ -142,7 +140,6 @@ impl IsCgtWindow for TitledWindow<KonaneWindow> {
                         Edit::Place(tile) => {
                             if self.content.game.grid().get(x, y) != tile {
                                 self.content.game.grid_mut().set(x, y, tile);
-                                is_dirty = true;
                             }
                         }
                         Edit::Move(player) => match self.content.pending_move {
@@ -197,7 +194,6 @@ impl IsCgtWindow for TitledWindow<KonaneWindow> {
                                             if self.content.alternating_moves {
                                                 self.content.editing_mode = RawOf::new(other_mode);
                                             }
-                                            is_dirty = true;
                                         }
                                     }
                                     Player::Right => {
@@ -207,7 +203,6 @@ impl IsCgtWindow for TitledWindow<KonaneWindow> {
                                             if self.content.alternating_moves {
                                                 self.content.editing_mode = RawOf::new(other_mode);
                                             }
-                                            is_dirty = true;
                                         }
                                     }
                                 }
@@ -232,7 +227,6 @@ impl IsCgtWindow for TitledWindow<KonaneWindow> {
                 }
 
                 if new_width != width || new_height != height {
-                    is_dirty = true;
                     if let Some(mut new_grid) = VecGrid::filled(new_width, new_height, Tile::Empty)
                     {
                         for y in 0..height.min(new_height) {
@@ -257,7 +251,7 @@ impl IsCgtWindow for TitledWindow<KonaneWindow> {
 
                 // SAFETY: We're fine because we're not pushing any style changes
                 let pad_x = unsafe { ui.style().window_padding[0] };
-                if is_dirty {
+                if self.content.game.clear_flag() {
                     self.content.details = None;
                     ui.set_column_width(
                         0,
@@ -271,7 +265,7 @@ impl IsCgtWindow for TitledWindow<KonaneWindow> {
                         "Konane",
                         Task::EvalKonane(EvalTask {
                             window: self.window_id,
-                            game: self.content.game.clone(),
+                            game: self.content.game.get().clone(),
                         }),
                     );
                 }
