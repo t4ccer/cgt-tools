@@ -20,7 +20,9 @@
     };
   };
   outputs = inputs @ {self, ...}:
-    inputs.flake-parts.lib.mkFlake {inherit inputs;} ({withSystem, ...}: {
+    inputs.flake-parts.lib.mkFlake {inherit inputs;} ({withSystem, ...}: let
+      version = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).package.version;
+    in {
       imports = [
         inputs.pre-commit-hooks-nix.flakeModule
         inputs.hercules-ci-effects.flakeModule
@@ -69,7 +71,7 @@
 
       hercules-ci.github-releases.files = [
         {
-          label = "cgt-tools-x86_64-windows.zip";
+          label = "cgt-tools-v${version}-x86_64-windows.zip";
           path = "${self.outputs.packages.x86_64-linux.cgt-tools-x86_64-windows-bundle}";
         }
       ];
@@ -149,13 +151,14 @@
           };
 
           cgt-tools-x86_64-windows-bundle =
-            pkgs.runCommand "cgt-tools-x86_64-windows.zip" {
+            pkgs.runCommand "cgt-tools-v${version}-x86_64-windows.zip" {
               nativeBuildInputs = [pkgs.zip];
             } ''
-              cp --no-preserve=all -vLr ${self'.packages.cgt-tools-x86_64-windows}/bin/ ./cgt-tools-x86_64-windows
-              cp --no-preserve=all ${./LICENSE} ./cgt-tools-x86_64-windows/LICENSE
-              zip -r cgt-tools-x86_64-windows.zip cgt-tools-x86_64-windows
-              mv cgt-tools-x86_64-windows.zip $out
+              cp --no-preserve=all -vLr ${self'.packages.cgt-tools-x86_64-windows}/bin/ ./cgt-tools-v${version}-x86_64-windows
+              cp --no-preserve=all ${./LICENSE} ./cgt-tools-v${version}-x86_64-windows/LICENSE
+              echo ${version} > ./cgt-tools-v${version}-x86_64-windows/VERSION
+              zip -r cgt-tools-v${version}-x86_64-windows.zip cgt-tools-v${version}-x86_64-windows
+              mv cgt-tools-v${version}-x86_64-windows.zip $out
             '';
 
           cgt-tools = mkCgtTools {
