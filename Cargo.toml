@@ -1,6 +1,6 @@
 [package]
 name = "cgt"
-version = "0.7.0"
+version = "0.8.0"
 edition = "2024"
 authors = ["Tomasz Maciosowski <t4ccer@gmail.com>"]
 license = "AGPL-3.0"
@@ -17,7 +17,7 @@ rust-version = "1.88"
 workspace = true
 
 [dependencies]
-cgt_derive = { version = "0.7.0", path = "./cgt_derive"}
+cgt_derive = { version = "0.8.0", path = "./cgt_derive"}
 ahash = "0.8"
 append-only-vec = "0.1"
 auto_ops = "0.3"

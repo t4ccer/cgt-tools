@@ -1,6 +1,6 @@
 [package]
 name = "cgt_py"
-version = "0.7.0"
+version = "0.8.0"
 edition = "2024"
 authors = ["Tomasz Maciosowski <t4ccer@gmail.com>"]
 license = "AGPL-3.0"
