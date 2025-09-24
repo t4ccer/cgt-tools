@@ -283,13 +283,12 @@ impl IsCgtWindow for TitledWindow<DigraphPlacementWindow> {
                     ui.checkbox("Add vertex", &mut self.content.edge_creates_vertex);
                 }
 
-                if matches!(
-                    self.content.editing_mode.get(),
-                    GraphEditingMode::AddVertex
-                ) || matches!(
-                    self.content.editing_mode.get(),
-                    GraphEditingMode::AddEdge if self.content.edge_creates_vertex
-                ) {
+                if matches!(self.content.editing_mode.get(), GraphEditingMode::AddVertex)
+                    || matches!(
+                        self.content.editing_mode.get(),
+                        GraphEditingMode::AddEdge if self.content.edge_creates_vertex
+                    )
+                {
                     self.content.new_vertex_color.combo(
                         ui,
                         "New Vertex Color",
