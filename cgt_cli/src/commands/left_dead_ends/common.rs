@@ -1,10 +1,10 @@
-use cgt::misere::left_dead_end::interned::{Interner, LeftDeadEnd};
+use cgt::misere::left_dead_end::{
+    LeftDeadEndContext,
+    interned::{Interner, LeftDeadEnd},
+};
 use itertools::Itertools;
 
-pub fn to_all_factorizations(
-    interner: &Interner,
-    game: LeftDeadEnd,
-) -> Vec<Vec<LeftDeadEnd>> {
+pub fn to_all_factorizations(interner: &Interner, game: &LeftDeadEnd) -> Vec<Vec<LeftDeadEnd>> {
     let fs = interner.factors(game);
     let mut acc: Vec<Vec<LeftDeadEnd>> = Vec::new();
 
@@ -12,16 +12,16 @@ pub fn to_all_factorizations(
         .into_iter()
         .filter(|&(f, c)| f != LeftDeadEnd::new_integer(0) && c != LeftDeadEnd::new_integer(0))
     {
-        let fs = if interner.is_atom(f) {
+        let fs = if interner.is_atom(&f) {
             vec![vec![f]]
         } else {
-            to_all_factorizations(interner, f)
+            to_all_factorizations(interner, &f)
         };
 
-        let cs = if interner.is_atom(c) {
+        let cs = if interner.is_atom(&c) {
             vec![vec![c]]
         } else {
-            to_all_factorizations(interner, c)
+            to_all_factorizations(interner, &c)
         };
 
         let res = fs

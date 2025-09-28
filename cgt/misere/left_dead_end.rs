@@ -6,9 +6,458 @@
 
 use crate::parsing::{Parser, impl_from_str_via_parser, lexeme, try_option};
 use auto_ops::impl_op_ex;
-use std::{cmp::Ordering, fmt::Display, mem::ManuallyDrop};
+use std::{cmp::Ordering, fmt, fmt::Display, mem::ManuallyDrop};
 
 pub mod interned;
+
+pub trait EmptyContxt: 'static {
+    const EMPTY: &'static Self;
+}
+
+pub trait LeftDeadEndContext {
+    type LeftDeadEnd: Clone;
+
+    fn new_integer(&self, integer: u32) -> Self::LeftDeadEnd;
+
+    fn new_moves(&self, g: Vec<Self::LeftDeadEnd>) -> Self::LeftDeadEnd;
+
+    fn moves(&self, g: &Self::LeftDeadEnd) -> impl ExactSizeIterator<Item = Self::LeftDeadEnd>;
+
+    fn to_integer(&self, g: &Self::LeftDeadEnd) -> Option<u32>;
+
+    fn total_cmp(&self, lhs: &Self::LeftDeadEnd, rhs: &Self::LeftDeadEnd) -> Ordering;
+
+    fn is_zero(&self, g: &Self::LeftDeadEnd) -> bool {
+        matches!(self.to_integer(g), Some(0))
+    }
+
+    fn birthday(&self, g: &Self::LeftDeadEnd) -> u32 {
+        self.to_integer(g)
+            .unwrap_or_else(|| self.moves(g).map(|g| self.birthday(&g)).max().unwrap_or(0) + 1)
+    }
+
+    fn game_ge(&self, lhs: &Self::LeftDeadEnd, rhs: &Self::LeftDeadEnd) -> bool {
+        if let Some(lhs) = self.to_integer(lhs) {
+            if lhs == 0 {
+                return self.is_zero(rhs);
+            }
+
+            // Optimization: If integers are not equal then they are incomparable
+            if let Some(rhs) = self.to_integer(rhs) {
+                return lhs == rhs;
+            }
+        }
+
+        self.moves(lhs).all(|left_option| {
+            self.moves(rhs)
+                .any(|right_option| self.game_ge(&left_option, &right_option))
+        })
+    }
+
+    fn game_cmp(&self, lhs: &Self::LeftDeadEnd, rhs: &Self::LeftDeadEnd) -> Option<Ordering> {
+        // Optimization: If integers are not equal then they are incomparable
+        if let Some(lhs) = self.to_integer(lhs) {
+            if let Some(rhs) = self.to_integer(rhs) {
+                if lhs == rhs {
+                    return Some(Ordering::Equal);
+                }
+
+                return None;
+            }
+        }
+
+        match (self.game_ge(lhs, rhs), self.game_ge(rhs, lhs)) {
+            (true, true) => Some(Ordering::Equal),
+            (true, false) => Some(Ordering::Greater),
+            (false, true) => Some(Ordering::Less),
+            (false, false) => None,
+        }
+    }
+
+    fn game_eq(&self, lhs: &Self::LeftDeadEnd, rhs: &Self::LeftDeadEnd) -> bool {
+        matches!(self.game_cmp(lhs, rhs), Some(Ordering::Equal))
+    }
+
+    fn new_sum(&self, lhs: &Self::LeftDeadEnd, rhs: &Self::LeftDeadEnd) -> Self::LeftDeadEnd {
+        // Optimization: 0 + g = g
+        if self.is_zero(lhs) {
+            return rhs.clone();
+        }
+
+        if self.is_zero(rhs) {
+            return lhs.clone();
+        }
+
+        let lhs_options = self.moves(lhs);
+        let rhs_options = self.moves(rhs);
+        let mut sum_options = Vec::with_capacity(lhs_options.len() + rhs_options.len());
+
+        for g in lhs_options {
+            sum_options.push(self.new_sum(&g, rhs));
+        }
+        for h in rhs_options {
+            sum_options.push(self.new_sum(lhs, &h));
+        }
+
+        self.new_moves(sum_options)
+    }
+
+    fn novel_factors_unordered(
+        &self,
+        g: &Self::LeftDeadEnd,
+    ) -> Vec<(Self::LeftDeadEnd, Self::LeftDeadEnd)> {
+        if self.is_zero(g) {
+            return Vec::new();
+        }
+
+        let mut factors_of_options = Vec::new();
+
+        let own_options = self.moves(g).collect::<Vec<_>>();
+
+        for option in &own_options {
+            factors_of_options.push(self.factors(option));
+        }
+
+        let mut novel_factors = Vec::new();
+
+        'outer: for (factor_of_first_option, _) in &factors_of_options[0] {
+            for factors_of_option in factors_of_options.iter().skip(1) {
+                if !factors_of_option
+                    .iter()
+                    .any(|(g, _)| self.game_eq(g, factor_of_first_option))
+                {
+                    continue 'outer;
+                }
+            }
+            novel_factors.push(factor_of_first_option);
+        }
+
+        let mut new_factors: Vec<(Self::LeftDeadEnd, Self::LeftDeadEnd)> = Vec::new();
+
+        for novel_factor in novel_factors {
+            let mut counterparts = Vec::new();
+
+            'outer: for (i, factors_of_option) in factors_of_options.iter().enumerate() {
+                for (factor_of_option, _) in factors_of_option {
+                    if self.game_eq(
+                        &self.new_sum(novel_factor, factor_of_option),
+                        &own_options[i],
+                    ) {
+                        counterparts.push(factor_of_option.clone());
+                        continue 'outer;
+                    }
+                }
+            }
+
+            let counterpart = self.new_moves(counterparts);
+            if self.game_eq(&(self.new_sum(novel_factor, &counterpart)), g) {
+                if !new_factors
+                    .iter()
+                    .any(|(g, _)| self.game_eq(g, novel_factor))
+                {
+                    new_factors.push((novel_factor.clone(), counterpart.clone()));
+                }
+
+                if !new_factors
+                    .iter()
+                    .any(|(g, _)| self.game_eq(g, &counterpart))
+                {
+                    new_factors.push((counterpart, novel_factor.clone()));
+                }
+            }
+        }
+
+        new_factors
+    }
+
+    fn non_novel_factors_unordered(
+        &self,
+        game: &Self::LeftDeadEnd,
+    ) -> Vec<(Self::LeftDeadEnd, Self::LeftDeadEnd)> {
+        let mut candidates = vec![];
+
+        for option in self.moves(game) {
+            let option_factors = self.factors(&option);
+            for (option_factor, _) in option_factors {
+                if !candidates.iter().any(|h| self.game_eq(h, &option_factor)) {
+                    candidates.push(option_factor);
+                }
+            }
+        }
+
+        let mut factors = vec![];
+
+        for i in 0..candidates.len() {
+            for j in i..candidates.len() {
+                if self.game_eq(&self.new_sum(&candidates[i], &candidates[j]), game) {
+                    factors.push((candidates[i].clone(), candidates[j].clone()));
+                    if i != j {
+                        factors.push((candidates[j].clone(), candidates[i].clone()));
+                    }
+                }
+            }
+        }
+
+        if !factors.iter().any(|(h, _)| self.game_eq(h, game)) {
+            factors.push((game.clone(), self.new_integer(0)));
+        }
+        if !factors
+            .iter()
+            .any(|(h, _)| self.game_eq(h, &self.new_integer(0)))
+        {
+            factors.push((self.new_integer(0), game.clone()));
+        }
+
+        factors
+    }
+
+    /// Get factors of the position
+    fn factors(&self, g: &Self::LeftDeadEnd) -> Vec<(Self::LeftDeadEnd, Self::LeftDeadEnd)> {
+        let mut factors = self.non_novel_factors_unordered(g);
+        for (novel_factor, f) in self.novel_factors_unordered(g) {
+            if !factors.iter().any(|(g, _)| self.game_eq(g, &novel_factor)) {
+                factors.push((novel_factor, f));
+            }
+        }
+
+        factors.sort_by(|(lhs_lhs, lhs_rhs), (rhs_lhs, rhs_rhs)| {
+            self.total_cmp(lhs_lhs, rhs_lhs)
+                .then_with(|| self.total_cmp(lhs_rhs, rhs_rhs))
+        });
+        factors
+    }
+
+    /// Check if the position is atom i.e. has only two factors
+    fn is_atom(&self, g: &Self::LeftDeadEnd) -> bool {
+        // Optimization: 1 is the only integer with two factors
+        if let Some(integer) = self.to_integer(g) {
+            return integer == 1;
+        }
+
+        self.factors(g).len() == 2
+    }
+
+    #[must_use]
+    fn canonical(&self, g: &Self::LeftDeadEnd) -> Self::LeftDeadEnd {
+        self.new_moves(self.moves(g).fold(Vec::new(), |mut acc, g| {
+            if !self
+                .moves(&g)
+                .any(|h| matches!(self.game_cmp(&h, &g), Some(Ordering::Less)))
+                && !acc.iter().any(|h| self.game_eq(h, &g))
+            {
+                acc.push(self.canonical(&g));
+            }
+            acc
+        }))
+    }
+
+    fn next_day(
+        &self,
+        day: impl IntoIterator<Item = Self::LeftDeadEnd>,
+    ) -> impl Iterator<Item = Self::LeftDeadEnd> {
+        use itertools::Itertools;
+
+        let mut seen = Vec::new();
+        day.into_iter()
+            .powerset()
+            .map(|moves| self.new_moves(moves))
+            .filter(move |g| {
+                if !seen.iter().any(|h| self.game_eq(h, &g)) {
+                    seen.push(g.clone());
+                    true
+                } else {
+                    false
+                }
+            })
+    }
+
+    fn parse<'p>(&self, parser: Parser<'p>) -> Option<(Parser<'p>, Self::LeftDeadEnd)> {
+        let parser = parser.trim_whitespace();
+        if let Some(parser) = parser.parse_ascii_char('{') {
+            let parser = parser.trim_whitespace();
+
+            let mut options = Vec::new();
+            let mut loop_parser = parser;
+            while let Some((parser, option)) = lexeme!(loop_parser, |p| self.parse(p)) {
+                loop_parser = parser;
+                options.push(option);
+
+                match loop_parser.parse_ascii_char(',') {
+                    Some(parser) => {
+                        loop_parser = parser.trim_whitespace();
+                    }
+                    None => break,
+                }
+            }
+            let parser = loop_parser.trim_whitespace();
+            let parser = try_option!(parser.parse_ascii_char('}'));
+            let parser = parser.trim_whitespace();
+            Some((parser, self.new_moves(options)))
+        } else {
+            let (parser, integer) = try_option!(lexeme!(parser, Parser::parse_u32));
+            Some((parser, self.new_integer(integer)))
+        }
+    }
+
+    fn new_from_string(&self, input: &str) -> Option<Self::LeftDeadEnd> {
+        use crate::parsing::Parser;
+
+        let p = Parser::new(input);
+        let (_, parsed) = self.parse(p)?;
+        Some(parsed)
+    }
+
+    /// Write game representation
+    #[allow(clippy::missing_errors_doc)]
+    fn display(&self, game: &Self::LeftDeadEnd, f: &mut impl fmt::Write) -> fmt::Result {
+        if let Some(integer) = self.to_integer(game) {
+            write!(f, "{}", integer)?;
+        } else {
+            write!(f, "{{")?;
+            for (idx, option) in self.moves(game).enumerate() {
+                if idx != 0 {
+                    write!(f, ", ")?;
+                }
+                self.display(&option, f)?;
+            }
+            write!(f, "}}")?;
+        }
+
+        Ok(())
+    }
+
+    /// Write game representation to new string
+    fn to_string(&self, game: &Self::LeftDeadEnd) -> String {
+        let mut buf = String::new();
+        self.display(game, &mut buf).unwrap();
+        buf
+    }
+
+    fn flexibility(&self, game: &Self::LeftDeadEnd) -> u32 {
+        if self.to_integer(game).is_some() {
+            0
+        } else {
+            self.moves(game)
+                .map(|g| self.flexibility(&g))
+                .max()
+                .map_or(0, |f| f + 1)
+        }
+    }
+
+    fn race(&self, game: &Self::LeftDeadEnd) -> u32 {
+        if self.is_zero(game) {
+            0
+        } else {
+            self.moves(game)
+                .map(|g| self.race(&g))
+                .min()
+                .map_or(0, |f| f + 1)
+        }
+    }
+}
+
+pub trait IsLeftDeadEnd<Context>: Sized
+where
+    Context: EmptyContxt + LeftDeadEndContext<LeftDeadEnd = Self>,
+{
+    fn new_integer(integer: u32) -> Self {
+        Context::EMPTY.new_integer(integer)
+    }
+
+    fn new_moves(moves: Vec<Self>) -> Self {
+        Context::EMPTY.new_moves(moves)
+    }
+
+    fn moves(&self) -> impl ExactSizeIterator<Item = Self> {
+        Context::EMPTY.moves(self)
+    }
+
+    fn to_integer(&self) -> Option<u32> {
+        Context::EMPTY.to_integer(self)
+    }
+
+    fn is_zero(&self) -> bool {
+        Context::EMPTY.is_zero(self)
+    }
+
+    fn birthday(&self) -> u32 {
+        Context::EMPTY.birthday(self)
+    }
+
+    fn flexibility(&self) -> u32 {
+        Context::EMPTY.flexibility(self)
+    }
+
+    fn race(&self) -> u32 {
+        Context::EMPTY.race(self)
+    }
+
+    fn factors(&self) -> Vec<(Self, Self)> {
+        Context::EMPTY.factors(self)
+    }
+
+    fn is_atom(&self) -> bool {
+        Context::EMPTY.is_atom(self)
+    }
+
+    #[must_use]
+    fn canonical(&self) -> Self {
+        Context::EMPTY.canonical(self)
+    }
+
+    fn next_day(day: impl IntoIterator<Item = Self>) -> impl Iterator<Item = Self> {
+        Context::EMPTY.next_day(day)
+    }
+
+    fn parse(parser: Parser<'_>) -> Option<(Parser<'_>, Self)> {
+        Context::EMPTY.parse(parser)
+    }
+}
+
+struct NoContext;
+
+impl LeftDeadEndContext for NoContext {
+    type LeftDeadEnd = LeftDeadEnd;
+
+    fn new_integer(&self, integer: u32) -> Self::LeftDeadEnd {
+        LeftDeadEnd {
+            inner: LeftDeadEndInner::Integer(integer),
+        }
+    }
+
+    fn new_moves(&self, g: Vec<Self::LeftDeadEnd>) -> Self::LeftDeadEnd {
+        let moves = LeftDeadEndInner::into_inner_vec(g);
+        LeftDeadEnd::normalize(LeftDeadEndInner::Moves(moves))
+    }
+
+    fn moves(&self, g: &Self::LeftDeadEnd) -> impl ExactSizeIterator<Item = Self::LeftDeadEnd> {
+        match g.clone().inner {
+            LeftDeadEndInner::Integer(0) => vec![].into_iter(),
+            LeftDeadEndInner::Integer(n) => vec![LeftDeadEnd {
+                inner: LeftDeadEndInner::Integer(n - 1),
+            }]
+            .into_iter(),
+            LeftDeadEndInner::Moves(moves) => LeftDeadEnd::from_inner_vec(moves).into_iter(),
+        }
+    }
+
+    fn to_integer(&self, g: &Self::LeftDeadEnd) -> Option<u32> {
+        match g.inner {
+            LeftDeadEndInner::Integer(n) => Some(n),
+            LeftDeadEndInner::Moves(_) => None,
+        }
+    }
+
+    fn total_cmp(&self, lhs: &Self::LeftDeadEnd, rhs: &Self::LeftDeadEnd) -> Ordering {
+        lhs.inner.cmp(&rhs.inner)
+    }
+}
+
+impl EmptyContxt for NoContext {
+    const EMPTY: &'static Self = &NoContext;
+}
+
+impl IsLeftDeadEnd<NoContext> for LeftDeadEnd {}
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 enum LeftDeadEndInner {
@@ -18,12 +467,12 @@ enum LeftDeadEndInner {
 
 impl Display for LeftDeadEndInner {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use crate::display::{braces, commas};
-
-        match self {
-            LeftDeadEndInner::Integer(n) => write!(f, "{}", n),
-            LeftDeadEndInner::Moves(moves) => braces(f, |f| commas(f, moves.as_slice())),
-        }
+        NoContext::EMPTY.display(
+            &LeftDeadEnd {
+                inner: self.clone(),
+            },
+            f,
+        )
     }
 }
 
@@ -65,184 +514,25 @@ impl PartialEq for LeftDeadEnd {
 
 impl PartialOrd for LeftDeadEnd {
     fn partial_cmp(&self, rhs: &Self) -> Option<Ordering> {
-        // Optimization: If integers are not equal then they are incomparable
-        if let Some(lhs) = self.to_integer() {
-            if let Some(rhs) = rhs.to_integer() {
-                if lhs == rhs {
-                    return Some(Ordering::Equal);
-                }
-
-                return None;
-            }
-        }
-
-        match (self >= rhs, self <= rhs) {
-            (true, true) => Some(Ordering::Equal),
-            (true, false) => Some(Ordering::Greater),
-            (false, true) => Some(Ordering::Less),
-            (false, false) => None,
-        }
+        NoContext::EMPTY.game_cmp(self, rhs)
     }
 
     fn ge(&self, rhs: &LeftDeadEnd) -> bool {
-        if let Some(lhs) = self.to_integer() {
-            if lhs == 0 {
-                return rhs.is_zero();
-            }
-
-            // Optimization: If integers are not equal then they are incomparable
-            if let Some(rhs) = rhs.to_integer() {
-                return lhs == rhs;
-            }
-        }
-
-        let rhs_options = rhs.clone().into_moves();
-        self.clone().into_moves().iter().all(|left_option| {
-            rhs_options
-                .iter()
-                .any(|right_option| left_option >= right_option)
-        })
+        NoContext::EMPTY.game_ge(self, rhs)
     }
 
     fn le(&self, rhs: &LeftDeadEnd) -> bool {
-        if let Some(rhs) = rhs.to_integer() {
-            if rhs == 0 {
-                return self.is_zero();
-            }
-
-            // Optimization: If integers are not equal then they are incomparable
-            if let Some(lhs) = self.to_integer() {
-                return lhs == rhs;
-            }
-        }
-
-        let lhs_options = self.clone().into_moves();
-        rhs.clone().into_moves().iter().all(|right_option| {
-            lhs_options
-                .iter()
-                .any(|left_option| left_option <= right_option)
-        })
+        NoContext::EMPTY.game_ge(rhs, self)
     }
 }
 
 impl_op_ex!(+|lhs: &LeftDeadEnd, rhs: &LeftDeadEnd| -> LeftDeadEnd {
-    LeftDeadEnd::new_sum(lhs, rhs)
+    NoContext::EMPTY.new_sum(lhs, rhs)
 });
 
 impl_from_str_via_parser!(LeftDeadEnd);
 
 impl LeftDeadEnd {
-    /// Construct new *non-positive* integer of given absolute value
-    #[inline(always)]
-    pub const fn new_integer(integer: u32) -> LeftDeadEnd {
-        LeftDeadEnd {
-            inner: LeftDeadEndInner::Integer(integer),
-        }
-    }
-
-    /// Convert to absolute value of integer, if is an integer
-    #[inline(always)]
-    pub const fn to_integer(&self) -> Option<u32> {
-        match self.inner {
-            LeftDeadEndInner::Integer(n) => Some(n),
-            LeftDeadEndInner::Moves(_) => None,
-        }
-    }
-
-    /// Construct new position from Right's moves
-    #[inline(always)]
-    pub fn new_moves(moves: Vec<LeftDeadEnd>) -> LeftDeadEnd {
-        let moves = LeftDeadEndInner::into_inner_vec(moves);
-        LeftDeadEnd::normalize(LeftDeadEndInner::Moves(moves))
-    }
-
-    /// Convert position into Right's moves
-    #[inline(always)]
-    pub fn into_moves(self) -> Vec<LeftDeadEnd> {
-        match self.inner {
-            LeftDeadEndInner::Integer(0) => vec![],
-            LeftDeadEndInner::Integer(n) => vec![LeftDeadEnd {
-                inner: LeftDeadEndInner::Integer(n - 1),
-            }],
-            LeftDeadEndInner::Moves(moves) => LeftDeadEnd::from_inner_vec(moves),
-        }
-    }
-
-    #[inline(always)]
-    const fn is_zero(&self) -> bool {
-        matches!(self.to_integer(), Some(0))
-    }
-
-    fn new_sum(lhs: &LeftDeadEnd, rhs: &LeftDeadEnd) -> LeftDeadEnd {
-        // Optimization: 0 + g = g
-        if lhs.is_zero() {
-            return rhs.clone();
-        }
-
-        if rhs.is_zero() {
-            return lhs.clone();
-        }
-
-        if let Some(lhs) = lhs.to_integer() {
-            if let Some(rhs) = rhs.to_integer() {
-                // Optimization: 1 + n = {n, {n - 1, {n - 2, {n - ..., {1, 1}}}}}
-                if lhs == 1 || rhs == 1 {
-                    let mut acc = LeftDeadEndInner::Moves(vec![
-                        LeftDeadEndInner::Integer(1),
-                        LeftDeadEndInner::Integer(1),
-                    ]);
-
-                    for i in 2..=(lhs.max(rhs)) {
-                        acc = LeftDeadEndInner::Moves(vec![LeftDeadEndInner::Integer(i), acc]);
-                    }
-
-                    return LeftDeadEnd { inner: acc };
-                }
-            }
-        }
-
-        let lhs_options = lhs.clone().into_moves();
-        let rhs_options = rhs.clone().into_moves();
-        let mut sum_options = Vec::with_capacity(lhs_options.len() + rhs_options.len());
-
-        for g in &lhs_options {
-            sum_options.push(g + rhs);
-        }
-        for h in &rhs_options {
-            sum_options.push(lhs + h);
-        }
-
-        LeftDeadEnd::new_moves(sum_options)
-    }
-
-    fn parse(parser: Parser<'_>) -> Option<(Parser<'_>, LeftDeadEnd)> {
-        let parser = parser.trim_whitespace();
-        if let Some(parser) = parser.parse_ascii_char('{') {
-            let parser = parser.trim_whitespace();
-
-            let mut options = Vec::new();
-            let mut loop_parser = parser;
-            while let Some((parser, option)) = lexeme!(loop_parser, LeftDeadEnd::parse) {
-                loop_parser = parser;
-                options.push(option);
-
-                match loop_parser.parse_ascii_char(',') {
-                    Some(parser) => {
-                        loop_parser = parser.trim_whitespace();
-                    }
-                    None => break,
-                }
-            }
-            let parser = loop_parser.trim_whitespace();
-            let parser = try_option!(parser.parse_ascii_char('}'));
-            let parser = parser.trim_whitespace();
-            Some((parser, LeftDeadEnd::new_moves(options)))
-        } else {
-            let (parser, integer) = try_option!(lexeme!(parser, Parser::parse_u32));
-            Some((parser, LeftDeadEnd::new_integer(integer)))
-        }
-    }
-
     #[inline(always)]
     fn from_inner_vec(moves: Vec<LeftDeadEndInner>) -> Vec<LeftDeadEnd> {
         let mut md = ManuallyDrop::new(moves);
@@ -277,203 +567,6 @@ impl LeftDeadEnd {
             }
         }
     }
-
-    /// Get novel factors of the position
-    pub fn novel_factors(&self) -> Vec<LeftDeadEnd> {
-        // Optimization: Factors of an integer are exactly all integers less than or equal to it
-        if let Some(integer) = self.to_integer() {
-            let mut res = Vec::with_capacity(integer as usize + 2);
-            for i in 0..=integer {
-                res.push(LeftDeadEnd::new_integer(i));
-            }
-            return res;
-        }
-
-        let mut novel_factors = LeftDeadEndInner::into_inner_vec(self.novel_factors_unordered());
-        novel_factors.sort();
-        LeftDeadEnd::from_inner_vec(novel_factors)
-    }
-
-    fn novel_factors_unordered(&self) -> Vec<LeftDeadEnd> {
-        // Optimization: Factors of an integer are exactly all integers less than or equal to it
-        if let Some(integer) = self.to_integer() {
-            let mut factors = Vec::with_capacity(integer as usize + 2);
-            for i in 0..=integer {
-                factors.push(LeftDeadEnd::new_integer(i));
-            }
-            return factors;
-        }
-
-        if self.is_zero() {
-            return Vec::new();
-        }
-
-        let mut factors_of_options = Vec::new();
-
-        let own_options = self.clone().into_moves();
-
-        for option in &own_options {
-            factors_of_options.push(option.factors());
-        }
-
-        let mut novel_factors = Vec::new();
-
-        'outer: for factor_of_first_option in &factors_of_options[0] {
-            for factors_of_option in factors_of_options.iter().skip(1) {
-                if !factors_of_option.contains(factor_of_first_option) {
-                    continue 'outer;
-                }
-            }
-            novel_factors.push(factor_of_first_option);
-        }
-
-        let mut new_factors = Vec::new();
-
-        for novel_factor in novel_factors {
-            let mut counterparts = Vec::new();
-
-            'outer: for (i, factors_of_option) in factors_of_options.iter().enumerate() {
-                for factor_of_option in factors_of_option {
-                    if novel_factor + factor_of_option == own_options[i] {
-                        counterparts.push(factor_of_option.clone());
-                        continue 'outer;
-                    }
-                }
-            }
-
-            let counterpart = LeftDeadEnd::new_moves(counterparts);
-            if &(novel_factor + &counterpart) == self {
-                if !new_factors.contains(novel_factor) {
-                    new_factors.push(novel_factor.clone());
-                }
-
-                if !new_factors.contains(&counterpart) {
-                    new_factors.push(counterpart);
-                }
-            }
-        }
-
-        new_factors
-    }
-
-    fn non_novel_factors_unordered(&self) -> Vec<LeftDeadEnd> {
-        // Optimization: Factors of an integer are exactly all integers less than or equal to it
-        if let Some(integer) = self.to_integer() {
-            let mut acc = Vec::with_capacity(integer as usize + 2);
-            for i in 0..=integer {
-                acc.push(LeftDeadEnd::new_integer(i));
-            }
-            return acc;
-        }
-
-        let mut candidates = vec![];
-
-        for option in self.clone().into_moves() {
-            let option_factors = option.factors();
-            for option_factor in option_factors {
-                if !candidates.contains(&option_factor) {
-                    candidates.push(option_factor);
-                }
-            }
-        }
-
-        let mut factors = vec![];
-
-        for i in 0..candidates.len() {
-            for j in i..candidates.len() {
-                if &candidates[i] + &candidates[j] == *self {
-                    factors.push(candidates[i].clone());
-                    if i != j {
-                        factors.push(candidates[j].clone());
-                    }
-                }
-            }
-        }
-
-        if !factors.contains(self) {
-            factors.push(self.clone());
-        }
-        if !factors.contains(&LeftDeadEnd::new_integer(0)) {
-            factors.push(LeftDeadEnd::new_integer(0));
-        }
-
-        factors
-    }
-
-    /// Get factors of the position
-    pub fn factors(&self) -> Vec<LeftDeadEnd> {
-        // Optimization: Factors of an integer are exactly all integers less than or equal to it
-        if let Some(integer) = self.to_integer() {
-            let mut acc = Vec::with_capacity(integer as usize + 2);
-            for i in 0..=integer {
-                acc.push(LeftDeadEnd::new_integer(i));
-            }
-            return acc;
-        }
-
-        let mut factors = self.non_novel_factors_unordered();
-        for novel_factor in self.novel_factors_unordered() {
-            if !factors.contains(&novel_factor) {
-                factors.push(novel_factor);
-            }
-        }
-
-        let mut factors = LeftDeadEndInner::into_inner_vec(factors);
-        factors.sort();
-        LeftDeadEnd::from_inner_vec(factors)
-    }
-
-    /// Get game's birthday (height of the game tree)
-    pub fn birthday(&self) -> u32 {
-        if let Some(n) = self.to_integer() {
-            return n;
-        }
-
-        self.clone()
-            .into_moves()
-            .iter()
-            .map(LeftDeadEnd::birthday)
-            .max()
-            .unwrap_or(0)
-            + 1
-    }
-
-    /// Check if the position is atom i.e. has only two factors
-    pub fn is_atom(&self) -> bool {
-        // Optimization: 1 is the only integer with two factors
-        if let Some(integer) = self.to_integer() {
-            return integer == 1;
-        }
-
-        self.factors().len() == 2
-    }
-
-    #[must_use]
-    pub fn canonical(&self) -> LeftDeadEnd {
-        LeftDeadEnd::new_moves(self.clone().into_moves().into_iter().fold(
-            Vec::new(),
-            |mut acc, g| {
-                if !self.clone().into_moves().into_iter().any(|h| h < g) && !acc.contains(&g) {
-                    acc.push(g.canonical());
-                }
-                acc
-            },
-        ))
-    }
-
-    pub fn next_day(day: Vec<LeftDeadEnd>) -> Vec<LeftDeadEnd> {
-        use itertools::Itertools;
-
-        day.into_iter()
-            .powerset()
-            .fold(Vec::new(), |mut seen, moves| {
-                let g = LeftDeadEnd::new_moves(moves);
-                if !seen.contains(&g) {
-                    seen.push(g);
-                }
-                seen
-            })
-    }
 }
 
 #[cfg(test)]
@@ -487,9 +580,9 @@ mod tests {
         let five = LeftDeadEnd::new_integer(5);
         assert_eq!(five.to_string(), "5");
 
-        let five_moves = five.into_moves();
+        let five_moves = five.moves();
         assert_eq!(
-            LeftDeadEnd::new_moves(five_moves),
+            LeftDeadEnd::new_moves(five_moves.collect()),
             LeftDeadEnd::new_integer(5)
         );
     }
@@ -600,7 +693,7 @@ mod tests {
     fn born_by_day() {
         let day0 = vec![LeftDeadEnd::new_integer(0)];
 
-        let day1 = LeftDeadEnd::next_day(day0);
+        let day1 = LeftDeadEnd::next_day(day0).collect::<Vec<_>>();
         assert_eq!(
             day1.iter()
                 .map(std::string::ToString::to_string)
@@ -608,7 +701,7 @@ mod tests {
             vec!["0", "1"],
         );
 
-        let day2 = LeftDeadEnd::next_day(day1);
+        let day2 = LeftDeadEnd::next_day(day1).collect::<Vec<_>>();
         assert_eq!(
             day2.iter()
                 .map(std::string::ToString::to_string)
@@ -616,11 +709,12 @@ mod tests {
             vec!["0", "1", "2", "{0, 1}"],
         );
 
-        let day3 = LeftDeadEnd::next_day(day2);
-        assert_eq!(day3.len(), 10);
+        let day3 = LeftDeadEnd::next_day(day2.clone());
+        assert_eq!(day3.count(), 10);
 
+        let day3 = LeftDeadEnd::next_day(day2);
         let day4 = LeftDeadEnd::next_day(day3);
-        assert_eq!(day4.len(), 52);
+        assert_eq!(day4.count(), 52);
     }
 
     #[test]
@@ -648,7 +742,7 @@ mod tests {
             three
                 .factors()
                 .iter()
-                .map(std::string::ToString::to_string)
+                .map(|(g, _)| g.to_string())
                 .collect::<Vec<String>>(),
             vec!["0", "1", "2", "3"],
         );

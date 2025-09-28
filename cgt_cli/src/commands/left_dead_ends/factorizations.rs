@@ -1,6 +1,9 @@
 use crate::{commands::left_dead_ends::common::to_all_factorizations, io::FileOrStdout};
 use anyhow::{Context, Result};
-use cgt::misere::left_dead_end::interned::{Interner, LeftDeadEnd};
+use cgt::misere::left_dead_end::{
+    LeftDeadEndContext,
+    interned::{Interner, LeftDeadEnd},
+};
 use clap::{self, Parser};
 use itertools::Itertools;
 use rayon::iter::{ParallelBridge, ParallelIterator};
@@ -55,25 +58,25 @@ pub fn run(args: Args) -> Result<()> {
         .for_each(|(a, b, c)| {
             let _logger = ProgressLogger::new(&current, total);
 
-            if !interner.is_atom(a) || !interner.is_atom(b) || !interner.is_atom(c) {
+            if !interner.is_atom(&a) || !interner.is_atom(&b) || !interner.is_atom(&c) {
                 return;
             }
 
-            let d = interner.new_sum(a, b);
-            let d = interner.new_sum(d, c);
-            let d = interner.canonical(d);
+            let d = interner.new_sum(&a, &b);
+            let d = interner.new_sum(&d, &c);
+            let d = interner.canonical(&d);
 
-            let birthday = interner.birthday(d);
+            let birthday = interner.birthday(&d);
 
             if !(args.from..=args.to).contains(&birthday) {
                 return;
             }
 
-            if interner.into_moves(d).count() <= 1 {
+            if interner.moves(&d).count() <= 1 {
                 return;
             }
 
-            let l = analyze_left_dead_end(&interner, d);
+            let l = analyze_left_dead_end(&interner, &d);
             output.lock().unwrap().write_all(l.as_bytes()).unwrap();
         });
 
@@ -83,7 +86,7 @@ pub fn run(args: Args) -> Result<()> {
     Ok(())
 }
 
-fn analyze_left_dead_end(interner: &Interner, g: LeftDeadEnd) -> String {
+fn analyze_left_dead_end(interner: &Interner, g: &LeftDeadEnd) -> String {
     let mut b = String::new();
     b.push_str(&interner.to_string(g));
     let atoms = to_all_factorizations(interner, g);
@@ -97,7 +100,7 @@ fn analyze_left_dead_end(interner: &Interner, g: LeftDeadEnd) -> String {
             if idx != 0 {
                 b.push('+');
             }
-            b.push_str(&interner.to_string(*f));
+            b.push_str(&interner.to_string(f));
         }
     }
 

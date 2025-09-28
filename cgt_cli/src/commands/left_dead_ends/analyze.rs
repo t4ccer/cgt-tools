@@ -1,6 +1,9 @@
 use crate::io::{FileOrStdin, FileOrStdout};
 use anyhow::{Context, Result};
-use cgt::{misere::left_dead_end::interned::Interner, parsing::Parser};
+use cgt::{
+    misere::left_dead_end::{LeftDeadEndContext, interned::Interner},
+    parsing::Parser,
+};
 use rayon::iter::{ParallelBridge, ParallelIterator};
 use std::{
     io::{BufRead, BufReader, BufWriter, Write},
@@ -91,16 +94,16 @@ pub fn run(args: Args) -> Result<()> {
                     birthday: interner.birthday(game),
                     race: interner.race(game),
                     flexibility: interner.flexibility(game),
-                    number_of_options: interner.into_moves(game).count() as u32,
+                    number_of_options: interner.moves(game).count() as u32,
                 }
             };
 
             let log = Log {
-                a: mk_game(a),
-                b: mk_game(b),
-                c: mk_game(c),
-                sum: mk_game(g),
-                good_option_to_atom: interner.into_moves(g).any(|h| interner.is_atom(h)),
+                a: mk_game(&a),
+                b: mk_game(&b),
+                c: mk_game(&c),
+                sum: mk_game(&g),
+                good_option_to_atom: interner.moves(&g).any(|h| interner.is_atom(&h)),
             };
 
             {
