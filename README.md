@@ -18,7 +18,7 @@ Some of the library features are exposed through CLI utility tool. See [CLI READ
 
 Available on [pypi](https://pypi.org/project/cgt-py)
 
-Python interface is inteded as a thin wrapper for interactive exploration using notebook software like [Jupyter](https://jupyter.org/) rather than exhaustive searches of large search spaces.
+Python interface is intended as a thin wrapper for interactive exploration using notebook software like [Jupyter](https://jupyter.org/) rather than exhaustive searches of large search spaces.
 
 ## Credits
 

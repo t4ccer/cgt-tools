@@ -104,7 +104,7 @@ impl DyadicRationalNumber {
         .normalized()
     }
 
-    /// Convert to intger if it's an integer
+    /// Convert to integer if it's an integer
     #[must_use]
     pub const fn to_integer(&self) -> Option<i64> {
         // exponent == 0 => denominator == 1 => It's an integer

@@ -16,7 +16,7 @@ pub struct Trajectory {
     /// 0 - vertical up
     pub slopes: Vec<Rational>,
 
-    /// x intecept for each critical point
+    /// x intercept for each critical point
     pub x_intercepts: Vec<Rational>,
 }
 
@@ -154,7 +154,7 @@ impl Trajectory {
             // So just set the critical point higher.
             debug_assert_eq!(new_x_intercept, &x_intercepts[slopes.len() - 1]);
             if upwards {
-                // You cannot inline it becasue borrow checker...
+                // You cannot inline it because borrow checker...
                 let last_idx = cps.len() - 1;
                 cps[last_idx] = *new_cp;
             }

@@ -76,12 +76,12 @@ macro_rules! lexeme {
 pub(crate) use lexeme;
 
 impl<'s> Parser<'s> {
-    /// Create new parser marking the beggining of the input
+    /// Create new parser marking the beginning of the input
     pub const fn new(input: &'s str) -> Parser<'s> {
         Parser { input }
     }
 
-    /// Remove whitespace from the beggining of the input
+    /// Remove whitespace from the beginning of the input
     pub const fn trim_whitespace(self) -> Parser<'s> {
         let mut bs = self.input.as_bytes();
         loop {

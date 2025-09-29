@@ -538,7 +538,7 @@ mod tests {
 
     #[test]
     fn parsing() {
-        parse_fail!(""); // this shoult NOT parse to 0
+        parse_fail!(""); // this should NOT parse to 0
         parse_fail!("42 foo");
         parse_roundtrip!("42");
         parse_roundtrip!("1/2");

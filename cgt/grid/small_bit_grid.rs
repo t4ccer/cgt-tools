@@ -120,7 +120,7 @@ where
         })
     }
 
-    /// Create a grid that correspondes to given size and "internal id".
+    /// Create a grid that corresponds to given size and "internal id".
     ///
     /// # Arguments
     ///

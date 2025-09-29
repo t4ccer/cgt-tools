@@ -1,4 +1,4 @@
-//! The game is played on a rectengular grid. Left places vertical dominoes, Right places
+//! The game is played on a rectangular grid. Left places vertical dominoes, Right places
 //! horizontal dominoes.
 
 extern crate alloc;
@@ -31,7 +31,7 @@ impl Tile {
     }
 }
 
-/// A Domineering position on a rectengular grid.
+/// A Domineering position on a rectangular grid.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Domineering<G = SmallBitGrid<Tile>> {

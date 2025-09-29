@@ -9,7 +9,7 @@ use std::str::FromStr;
 /// Evaluate a single Amazons position
 #[derive(Debug, Clone, Parser)]
 pub struct Args {
-    /// Amazons position to evalueate (e.g. '.x.|o#.|..#')
+    /// Amazons position to evaluate (e.g. '.x.|o#.|..#')
     #[arg(long)]
     position: String,
 }

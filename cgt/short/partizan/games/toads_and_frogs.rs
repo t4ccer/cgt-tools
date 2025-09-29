@@ -1,4 +1,4 @@
-//! Game of Toads and Frogs is played on a rectangular grid of squares, altough for simplification
+//! Game of Toads and Frogs is played on a rectangular grid of squares, although for simplification
 //! we will consider only a single row of squares, rectangular grids can be modeled as sums of row.
 //!
 //! Left player has trained Toads that can move one square to the right if it is empty, or jump over

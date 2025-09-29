@@ -3,7 +3,7 @@
 //! Fission is played with black stones on a square grid.
 //! On her turn, Left may select any stone, provided that tiles directly above and below are empty,
 //! remove that stone and put two stones in the empty tiles directly above and below.
-//! Similarly Right playes on sqares to the left and right instead.
+//! Similarly Right playes on squares to the left and right instead.
 
 use crate::{
     drawing::{self, BoundingBox, Canvas, Color, Draw},

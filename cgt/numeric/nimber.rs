@@ -44,7 +44,7 @@ impl From<u32> for Nimber {
     }
 }
 
-// xor is correct, that's how nimbers additon works
+// xor is correct, that's how nimbers addition works
 impl_op_ex!(+|lhs: &Nimber, rhs: &Nimber| -> Nimber { Nimber(lhs.0 ^ rhs.0) });
 impl_op_ex!(+=|lhs: &mut Nimber, rhs: &Nimber| { lhs.0 ^= rhs.0 });
 

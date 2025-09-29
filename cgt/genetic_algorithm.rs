@@ -56,7 +56,7 @@ where
         Self::with_specimen(specimen, size, algorithm)
     }
 
-    /// Like [`Self::new`] but will use initial populaiton. If initial population is smaller than
+    /// Like [`Self::new`] but will use initial populations. If initial population is smaller than
     /// generation size rest will be filled with random objects
     pub fn with_specimen(mut specimen: Vec<Object>, size: NonZeroUsize, algorithm: Alg) -> Self {
         let mut rng = rand::rng();

@@ -23,8 +23,8 @@ If using [nix](https://nixos.org/) everything comes in nix shell (`nix develop`)
 $ cargo run -r -p cgt_gui
 ```
 
-### Prebuilt bianries (Windows only)
+### Prebuilt binaries (Windows only)
 
-Discalimer: I've tested these only using wine, I don't have Windows machine.
+Disclaimer: I've tested these only using wine, I don't have Windows machine.
 
 Download zip archive from [releases page](https://github.com/t4ccer/cgt-tools/releases), unpack and run `cgt-gui.exe`. Do not move this file from the directory with .dll files, these are required at runtime.

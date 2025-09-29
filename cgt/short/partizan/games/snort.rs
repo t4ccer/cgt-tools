@@ -11,7 +11,7 @@ use crate::{
 };
 use std::{collections::VecDeque, fmt::Write, hash::Hash, marker::PhantomData, num::NonZeroU32};
 
-/// Color of Snort vertex. Note that we are taking tinting apporach rather than direct tracking
+/// Color of Snort vertex. Note that we are taking tinting approach rather than direct tracking
 /// of adjacent colors.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(
@@ -197,7 +197,7 @@ where
 
     /// Iterator over vertices where given player can move
     pub fn available_moves_for<const COLOR: u8>(&self) -> impl Iterator<Item = VertexIndex> + '_ {
-        // const ADT generics are unsable, so here we go
+        // const ADT generics are unstable, so here we go
         let own_tint_color: VertexColor = VertexColor::try_from(COLOR).unwrap();
         self.graph
             .vertex_indices()

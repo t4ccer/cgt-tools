@@ -72,7 +72,7 @@ impl Moves {
         self.right.dedup_by(|lhs, rhs| lhs.inner == rhs.inner);
     }
 
-    /// Construct a canoical form of arbitrary moves.
+    /// Construct a canonical form of arbitrary moves.
     /// It is an alias of [`CanonicalForm::new_from_moves`]
     #[inline]
     pub fn canonical_form(self) -> CanonicalForm {
@@ -897,7 +897,7 @@ impl CanonicalForm {
     }
 
     // FIXME: Handle cases when atomic weight does not exist
-    /// Atmoic weight of a position, sometimes called "uppitiness"
+    /// Atomic weight of a position, sometimes called "uppitiness"
     #[must_use]
     pub fn atomic_weight(&self) -> Self {
         match self.inner {
@@ -1432,7 +1432,7 @@ mod tests {
             );
             assert!(
                 left_stop >= right_stop,
-                "Left stop shold be geq than right stop"
+                "Left stop should be geq than right stop"
             );
         };
     }

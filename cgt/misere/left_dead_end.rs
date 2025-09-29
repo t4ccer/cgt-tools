@@ -10,7 +10,7 @@ use std::{cmp::Ordering, fmt, fmt::Display, mem::ManuallyDrop};
 
 pub mod interned;
 
-pub trait EmptyContxt: 'static {
+pub trait EmptyContext: 'static {
     const EMPTY: &'static Self;
 }
 
@@ -358,7 +358,7 @@ pub trait LeftDeadEndContext {
 
 pub trait IsLeftDeadEnd<Context>: Sized
 where
-    Context: EmptyContxt + LeftDeadEndContext<LeftDeadEnd = Self>,
+    Context: EmptyContext + LeftDeadEndContext<LeftDeadEnd = Self>,
 {
     fn new_integer(integer: u32) -> Self {
         Context::EMPTY.new_integer(integer)
@@ -453,7 +453,7 @@ impl LeftDeadEndContext for NoContext {
     }
 }
 
-impl EmptyContxt for NoContext {
+impl EmptyContext for NoContext {
     const EMPTY: &'static Self = &NoContext;
 }
 

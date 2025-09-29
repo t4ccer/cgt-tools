@@ -49,7 +49,7 @@ impl WindUp {
         // element is a zero if for every move to non-zero position there is a response move to zero
         for _ in 0..graph.len() {
             'inner: for idx in 1_i32..(graph.len() as i32) {
-                // Alredy visited and marked as zero
+                // Already visited and marked as zero
                 if !matches!(graph[idx as usize], UnresolvedVertex::Unresolved) {
                     continue;
                 }

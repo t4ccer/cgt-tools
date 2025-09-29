@@ -138,6 +138,13 @@
               enable = true;
               args = ["--style-edition=2024"];
             };
+            typos = {
+              enable = true;
+              settings.ignored-words = [
+                "nimber"
+                "numer" # `numerator` from `num-rational`
+              ];
+            };
           };
           tools = {
             rustfmt = lib.mkForce rustToolchain;

@@ -56,7 +56,7 @@ where
     V: Has<VertexColor> + Clone,
     G: Graph<V> + Clone,
 {
-    /// Create new Digraph Placement position from underyling graph
+    /// Create new Digraph Placement position from underlying graph
     pub const fn new(graph: G) -> Self {
         Self {
             graph,
