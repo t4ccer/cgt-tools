@@ -3,7 +3,7 @@
 use crate::{
     display,
     drawing::{Canvas, Color, TextAlignment},
-    graph::{Graph, VertexIndex},
+    graph::Graph,
     has::Has,
     numeric::v2f::V2f,
 };
@@ -99,20 +99,20 @@ where
             inner: tower_idx,
         }]);
         while let Some(v_idx) = queue.pop_first() {
-            // Dance around borrow checker
-            for adjacent_idx in (0..graph.size()).map(|index| VertexIndex { index }) {
+            for adjacent_idx in graph.vertex_indices() {
                 if !graph.are_adjacent(v_idx.inner, adjacent_idx) {
                     continue;
                 }
-                let d = v_idx.distance + 1;
-                if d < graph.get_vertex(adjacent_idx).get_inner().distances.inner[tower_no] {
-                    graph
-                        .get_vertex_mut(adjacent_idx)
-                        .get_inner_mut()
-                        .distances
-                        .inner[tower_no] = d;
+                let new_distance = v_idx.distance + 1;
+                let current_distance: &mut u32 = &mut graph
+                    .get_vertex_mut(adjacent_idx)
+                    .get_inner_mut()
+                    .distances
+                    .inner[tower_no];
+                if new_distance < *current_distance {
+                    *current_distance = new_distance;
                     queue.insert(WithDistance {
-                        distance: d,
+                        distance: new_distance,
                         inner: adjacent_idx,
                     });
                 }
