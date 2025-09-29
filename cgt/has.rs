@@ -40,7 +40,7 @@ impl<T> Has<T> for T {
 /// ```
 #[macro_export]
 macro_rules! impl_has {
-    ($ty:ident -> $getter:ident -> $res:ident) => {
+    ($ty:ident -> $getter:ident -> $res:ty) => {
         impl $crate::has::Has<$res> for $ty {
             fn get_inner(&self) -> &$res {
                 &self.$getter

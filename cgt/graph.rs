@@ -10,6 +10,7 @@ use crate::{
 
 pub mod adjacency_matrix;
 pub mod layout;
+pub mod resolving_set;
 
 /// Graph vertex. We assume that all graphs that we implement use 0-based indexing for their vertices
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -250,5 +251,13 @@ pub trait Graph<V>: Sized {
                     },
                 },
             )
+    }
+
+    /// Iterator over vertices
+    fn vertices<'a>(&'a self) -> impl Iterator<Item = &'a V>
+    where
+        V: 'a,
+    {
+        self.vertex_indices().map(|v| self.get_vertex(v))
     }
 }

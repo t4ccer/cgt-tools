@@ -1,8 +1,8 @@
 use crate::widgets::{
     amazons::AmazonsWindow, canonical_form::CanonicalFormWindow,
     digraph_placement::DigraphPlacementWindow, domineering::DomineeringWindow,
-    fission::FissionWindow, konane::KonaneWindow, ski_jumps::SkiJumpsWindow, snort::SnortWindow,
-    toads_and_frogs::ToadsAndFrogsWindow,
+    fission::FissionWindow, konane::KonaneWindow, resolving_set::ResolvingSetWindow,
+    ski_jumps::SkiJumpsWindow, snort::SnortWindow, toads_and_frogs::ToadsAndFrogsWindow,
 };
 use cgt::{
     graph::adjacency_matrix::{directed::DirectedGraph, undirected::UndirectedGraph},
@@ -570,6 +570,10 @@ fn main() {
                 }
                 if ui.menu_item("Digraph Placement") {
                     new_window!(DigraphPlacementWindow);
+                }
+                ui.separator();
+                if ui.menu_item("Resolving Set") {
+                    new_window!(ResolvingSetWindow);
                 }
             }
             if let Some(_debug_menu) = ui.begin_menu("Debug") {

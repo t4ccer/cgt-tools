@@ -16,6 +16,7 @@ pub mod digraph_placement;
 pub mod domineering;
 pub mod fission;
 pub mod konane;
+pub mod resolving_set;
 pub mod ski_jumps;
 pub mod snort;
 pub mod toads_and_frogs;
