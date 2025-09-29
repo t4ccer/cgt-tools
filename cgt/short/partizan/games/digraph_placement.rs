@@ -96,9 +96,17 @@ where
     where
         C: Canvas,
     {
-        self.graph.draw(canvas, |vertex| match vertex.get_inner() {
-            VertexColor::Left => drawing::Color::BLUE,
-            VertexColor::Right => drawing::Color::RED,
+        self.graph.draw(canvas, |canvas, vertex_index| {
+            let position: V2f = *self.graph.get_vertex(vertex_index).get_inner();
+            let color: VertexColor = *self.graph.get_vertex(vertex_index).get_inner();
+            canvas.vertex(
+                position,
+                match color {
+                    VertexColor::Left => drawing::Color::BLUE,
+                    VertexColor::Right => drawing::Color::RED,
+                },
+                vertex_index,
+            );
         });
     }
 

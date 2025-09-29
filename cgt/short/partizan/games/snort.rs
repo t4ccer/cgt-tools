@@ -374,12 +374,18 @@ where
     where
         C: Canvas,
     {
-        self.graph.draw(canvas, |vertex| {
-            match Has::<VertexKind>::get_inner(vertex).color() {
-                VertexColor::Empty => Color::LIGHT_GRAY,
-                VertexColor::TintLeft => Color::BLUE,
-                VertexColor::TintRight => Color::RED,
-            }
+        self.graph.draw(canvas, |canvas, vertex_index| {
+            let position: V2f = *self.graph.get_vertex(vertex_index).get_inner();
+            let kind: VertexKind = *self.graph.get_vertex(vertex_index).get_inner();
+            canvas.vertex(
+                position,
+                match kind.color() {
+                    VertexColor::Empty => Color::LIGHT_GRAY,
+                    VertexColor::TintLeft => Color::BLUE,
+                    VertexColor::TintRight => Color::RED,
+                },
+                vertex_index,
+            );
         });
     }
 

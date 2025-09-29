@@ -141,7 +141,7 @@ pub trait Graph<V>: Sized {
     fn get_vertex_mut(&mut self, vertex: VertexIndex) -> &mut V;
 
     /// Draw graph on existing canvas
-    fn draw<C>(&self, canvas: &mut C, mut get_vertex_color: impl FnMut(&V) -> Color)
+    fn draw<C>(&self, canvas: &mut C, mut draw_vertex: impl FnMut(&mut C, VertexIndex))
     where
         V: Has<V2f>,
         C: Canvas,
@@ -208,12 +208,7 @@ pub trait Graph<V>: Sized {
         }
 
         for this_vertex_idx in self.vertex_indices() {
-            let this_position: V2f = *self.get_vertex(this_vertex_idx).get_inner();
-            canvas.vertex(
-                this_position,
-                get_vertex_color(self.get_vertex(this_vertex_idx)),
-                this_vertex_idx,
-            );
+            draw_vertex(canvas, this_vertex_idx);
         }
     }
 
