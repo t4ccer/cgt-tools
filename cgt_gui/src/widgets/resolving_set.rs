@@ -15,13 +15,16 @@ use cgt::{
     impl_has,
     numeric::v2f::V2f,
 };
-use std::ops::{Deref, DerefMut};
+use std::ops::Deref;
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct Vertex {
     position: V2f,
     inner: resolving_set::Vertex,
 }
+
+impl_has!(Vertex -> position -> V2f);
+impl_has!(Vertex -> inner -> resolving_set::Vertex);
 
 impl Vertex {
     pub fn new(tower: Option<Tower>) -> Vertex {
@@ -31,9 +34,6 @@ impl Vertex {
         }
     }
 }
-
-impl_has!(Vertex -> position -> V2f);
-impl_has!(Vertex -> inner -> resolving_set::Vertex);
 
 imgui_enum! {
     GraphEditingMode {
@@ -52,31 +52,112 @@ imgui_enum! {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
+pub struct CodeVertex {
+    position: V2f,
+    inner: resolving_set::CodeVertex,
+}
+
+impl_has!(CodeVertex -> position -> V2f);
+impl_has!(CodeVertex -> inner -> resolving_set::CodeVertex);
+
+struct CodeGraphPanel {
+    graph: UndirectedGraph<CodeVertex>,
+    reposition_option_selected: RawOf<RepositionMode>,
+}
+
+impl CodeGraphPanel {
+    fn new<G, V>(graph: &G) -> CodeGraphPanel
+    where
+        G: Graph<V>,
+        V: Has<resolving_set::Vertex> + Clone,
+    {
+        let aux: UndirectedGraph<_> = resolving_set::one_bit_error_auxiliary_graph(graph);
+        CodeGraphPanel {
+            graph: aux.map(|v| CodeVertex {
+                inner: v.clone(),
+                position: V2f::ZERO,
+            }),
+            reposition_option_selected: RawOf::new(RepositionMode::SpringEmbedder),
+        }
+    }
+
+    fn reposition_circle(&mut self) {
+        let circle = CircleEdge {
+            circle_radius: imgui::Canvas::vertex_radius() * (self.graph.size() as f32 + 4.0) * 0.5,
+            vertex_radius: imgui::Canvas::vertex_radius(),
+        };
+        circle.layout(&mut self.graph);
+    }
+
+    fn reposition(&mut self, graph_panel_size: V2f) {
+        match self.reposition_option_selected.get() {
+            RepositionMode::Circle => {
+                self.reposition_circle();
+            }
+            RepositionMode::SpringEmbedder => {
+                let spring_embedder = SpringEmbedder {
+                    cooling_rate: 0.999,
+                    c_attractive: 1.0,
+                    c_repulsive: 350.0,
+                    ideal_spring_length: 75.0,
+                    iterations: 1 << 12,
+                    bounds: Some((
+                        V2f {
+                            x: imgui::Canvas::vertex_radius(),
+                            y: imgui::Canvas::vertex_radius(),
+                        },
+                        V2f {
+                            x: f32::max(
+                                imgui::Canvas::vertex_radius(),
+                                imgui::Canvas::vertex_radius().mul_add(-2.0, graph_panel_size.x),
+                            ),
+                            y: f32::max(
+                                imgui::Canvas::vertex_radius(),
+                                imgui::Canvas::vertex_radius().mul_add(-2.0, graph_panel_size.y),
+                            ),
+                        },
+                    )),
+                };
+                spring_embedder.layout(&mut self.graph);
+            }
+        }
+    }
+}
+
 pub struct ResolvingSetWindow {
     graph: AccessTracker<UndirectedGraph<Vertex>>,
     reposition_option_selected: RawOf<RepositionMode>,
     editing_mode: RawOf<GraphEditingMode>,
     edge_creates_vertex: bool,
     edge_start_vertex: Option<VertexIndex>,
+    code_graph: CodeGraphPanel,
 }
 
 impl ResolvingSetWindow {
     pub fn new() -> ResolvingSetWindow {
+        let graph = Graph::from_edges(
+            &[
+                (VertexIndex { index: 0 }, VertexIndex { index: 1 }),
+                (VertexIndex { index: 0 }, VertexIndex { index: 2 }),
+                (VertexIndex { index: 0 }, VertexIndex { index: 3 }),
+                (VertexIndex { index: 1 }, VertexIndex { index: 2 }),
+            ],
+            &[
+                Vertex::new(None),
+                Vertex::new(Some(Tower::Unrestricted)),
+                Vertex::new(None),
+                Vertex::new(None),
+            ],
+        );
+
+        let mut code_graph = CodeGraphPanel::new(&graph);
+        code_graph.reposition_circle();
+        code_graph.reposition(V2f { x: 350.0, y: 350.0 });
+
         ResolvingSetWindow {
-            graph: AccessTracker::new(Graph::from_edges(
-                &[
-                    (VertexIndex { index: 0 }, VertexIndex { index: 1 }),
-                    (VertexIndex { index: 0 }, VertexIndex { index: 2 }),
-                    (VertexIndex { index: 0 }, VertexIndex { index: 3 }),
-                    (VertexIndex { index: 1 }, VertexIndex { index: 2 }),
-                ],
-                &[
-                    Vertex::new(None),
-                    Vertex::new(Some(Tower::Unrestricted)),
-                    Vertex::new(None),
-                    Vertex::new(None),
-                ],
-            )),
+            code_graph,
+            graph: AccessTracker::new(graph),
             reposition_option_selected: RawOf::new(RepositionMode::SpringEmbedder),
             editing_mode: RawOf::new(GraphEditingMode::DragVertex),
             edge_creates_vertex: true,
@@ -131,7 +212,7 @@ impl IsCgtWindow for TitledWindow<ResolvingSetWindow> {
 
     fn initialize(&mut self, _ctx: &GuiContext) {
         self.content.reposition_circle();
-        self.content.reposition(V2f { x: 350.0, y: 400.0 });
+        self.content.reposition(V2f { x: 350.0, y: 350.0 });
     }
 
     fn draw(&mut self, ui: &Ui, ctx: &mut GuiContext) {
@@ -143,6 +224,14 @@ impl IsCgtWindow for TitledWindow<ResolvingSetWindow> {
             .opened(&mut self.is_open)
             .build(|| {
                 let draw_list = ui.get_window_draw_list();
+
+                if let Some(_menu_bar) = ui.begin_menu_bar() {
+                    if let Some(_new_menu) = ui.begin_menu("New") {
+                        if ui.menu_item("Duplicate") {}
+                    }
+                }
+
+                ui.columns(2, "columns", true);
 
                 let short_inputs = ui.push_item_width(200.0);
                 self.content.reposition_option_selected.combo(
@@ -199,12 +288,8 @@ impl IsCgtWindow for TitledWindow<ResolvingSetWindow> {
                     }
                     GraphEditingMode::AddRemoveTower => {
                         if let Some(clicked) = clicked {
-                            let vertex: &mut Vertex = self
-                                .content
-                                .graph
-                                .get_mut_untracked()
-                                .get_vertex_mut(clicked)
-                                .get_inner_mut();
+                            let vertex: &mut Vertex =
+                                self.content.graph.get_vertex_mut(clicked).get_inner_mut();
                             vertex.inner.set_tower(if vertex.inner.tower().is_some() {
                                 None
                             } else {
@@ -230,7 +315,7 @@ impl IsCgtWindow for TitledWindow<ResolvingSetWindow> {
                         if let Some(pressed) = pressed {
                             self.content.edge_start_vertex = Some(pressed);
                             let pressed_position: V2f =
-                                self.content.graph.get_vertex_mut(pressed).position;
+                                self.content.graph.get_vertex(pressed).position;
                             canvas.line(
                                 pressed_position,
                                 mouse_position,
@@ -254,13 +339,57 @@ impl IsCgtWindow for TitledWindow<ResolvingSetWindow> {
                         }
                     }
                 }
-
-                if self.content.graph.clear_flag() {
-                    resolving_set::label_distances(self.content.graph.deref_mut());
-                }
+                drop(canvas);
 
                 if should_reposition {
                     self.content.reposition(graph_area_size);
+                }
+
+                ui.next_column();
+                let aux_id = ui.push_id("aux");
+
+                let short_inputs = ui.push_item_width(200.0);
+                self.content.code_graph.reposition_option_selected.combo(
+                    ui,
+                    "##Reposition Mode",
+                    ComboBoxFlags::empty(),
+                );
+                ui.same_line();
+                let should_reposition = ui.button("Reposition");
+                short_inputs.end();
+
+                let graph_area_size = V2f {
+                    x: ui.current_column_width(),
+                    y: unsafe { ui.style().item_spacing[1] }
+                        .mul_add(-2.0, ui.window_size()[1] - ui.cursor_pos()[1]),
+                };
+
+                let mut canvas =
+                    imgui::Canvas::new(ui, &draw_list, ctx.large_font_id, &mut self.scratch_buffer);
+                resolving_set::draw_code_graph(&mut canvas, &self.content.code_graph.graph);
+                let pressed = canvas.pressed_vertex();
+                if let Some(pressed) = pressed {
+                    let delta = V2f::from(ui.io().mouse_delta);
+                    let current_pos: &mut V2f = self
+                        .content
+                        .code_graph
+                        .graph
+                        .get_vertex_mut(pressed)
+                        .get_inner_mut();
+                    *current_pos += delta;
+                }
+                drop(canvas);
+
+                if should_reposition {
+                    self.content.code_graph.reposition(graph_area_size);
+                }
+                drop(aux_id);
+
+                if self.content.graph.clear_flag() {
+                    resolving_set::label_distances(self.content.graph.get_mut_untracked());
+                    self.content.code_graph = CodeGraphPanel::new(self.content.graph.deref());
+                    self.content.code_graph.reposition_circle();
+                    self.content.code_graph.reposition(graph_area_size);
                 }
             });
     }

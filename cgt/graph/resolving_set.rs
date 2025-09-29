@@ -3,7 +3,7 @@
 use crate::{
     display,
     drawing::{Canvas, Color, TextAlignment},
-    graph::Graph,
+    graph::{Graph, VertexIndex},
     has::Has,
     numeric::v2f::V2f,
 };
@@ -121,6 +121,14 @@ where
         tower_no += 1;
     }
 
+    mark_duplicates(graph);
+}
+
+fn mark_duplicates<G, V>(graph: &mut G)
+where
+    G: Graph<V>,
+    V: Has<Vertex>,
+{
     let mut seen_distances = HashMap::new();
     for v in graph.vertices() {
         *seen_distances
@@ -180,5 +188,133 @@ where
                 text_color,
             );
         }
+    });
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct CodeVertex {
+    distances: Distances,
+    is_original: bool,
+    is_colliding: bool,
+}
+
+pub fn one_bit_error_auxiliary_graph<G1, V1, G2>(graph: &G1) -> G2
+where
+    G1: Graph<V1>,
+    V1: Has<Vertex>,
+    G2: Graph<CodeVertex>,
+{
+    let largest_distance: u32 = graph
+        .vertices()
+        .flat_map(|v| v.get_inner().distances.inner.iter().copied())
+        .max()
+        .unwrap_or(0);
+    let bit_length = size_of_val(&largest_distance) as u32 * 8 - largest_distance.leading_zeros();
+
+    let mut aux = G2::empty(&[]);
+    let mut vertices = HashMap::<Distances, VertexIndex>::new();
+    for v1_idx in graph.vertex_indices() {
+        let v1_real = graph.get_vertex(v1_idx);
+        let v1_aux = CodeVertex {
+            distances: v1_real.get_inner().distances.clone(),
+            is_original: true,
+            is_colliding: false,
+        };
+        let v1_aux_d = v1_aux.distances.clone();
+
+        let v1_aux_idx = *vertices
+            .entry(v1_aux.distances.clone())
+            .or_insert_with(|| aux.add_vertex(v1_aux));
+        aux.get_vertex_mut(v1_aux_idx).is_original = true;
+
+        for tower_idx in 0..v1_aux_d.inner.len() {
+            for bit_idx in 0..bit_length {
+                let mut v2_aux = CodeVertex {
+                    distances: v1_real.get_inner().distances.clone(),
+                    is_original: false,
+                    is_colliding: false,
+                };
+                v2_aux.distances.inner[tower_idx] ^= 1 << bit_idx;
+                let v2_idx = vertices
+                    .get(&v2_aux.get_inner().distances)
+                    .copied()
+                    .unwrap_or_else(|| {
+                        let v2_aux_d = v2_aux.distances.clone();
+                        let idx = aux.add_vertex(v2_aux);
+                        vertices.insert(v2_aux_d, idx);
+                        idx
+                    });
+                aux.connect(v1_aux_idx, v2_idx, true);
+            }
+        }
+    }
+
+    for v1_idx in aux.vertex_indices() {
+        if !aux.get_vertex(v1_idx).is_original {
+            continue;
+        }
+
+        for v2_idx in aux.vertex_indices() {
+            if !aux.are_adjacent(v1_idx, v2_idx) {
+                continue;
+            }
+
+            if aux.get_vertex(v2_idx).is_original {
+                aux.get_vertex_mut(v1_idx).is_colliding = true;
+                aux.get_vertex_mut(v2_idx).is_colliding = true;
+            }
+
+            for v3_idx in aux.vertex_indices() {
+                if !aux.are_adjacent(v2_idx, v3_idx) {
+                    continue;
+                }
+
+                if aux.get_vertex(v3_idx).is_original && v1_idx != v3_idx {
+                    aux.get_vertex_mut(v1_idx).is_colliding = true;
+                    aux.get_vertex_mut(v3_idx).is_colliding = true;
+                }
+            }
+        }
+    }
+
+    aux
+}
+
+pub fn draw_code_graph<G, V, C>(canvas: &mut C, graph: &G)
+where
+    G: Graph<V>,
+    V: Has<CodeVertex> + Has<V2f>,
+    C: Canvas,
+{
+    graph.draw(canvas, move |canvas, idx| {
+        let vertex: &CodeVertex = graph.get_vertex(idx).get_inner();
+        let vertex_position: V2f = *graph.get_vertex(idx).get_inner();
+        canvas.vertex(
+            vertex_position,
+            if vertex.is_original {
+                Color::DARK_GRAY
+            } else {
+                Color::LIGHT_GRAY
+            },
+            idx,
+        );
+
+        let text_position = vertex_position
+            + V2f {
+                x: 0.0,
+                y: C::vertex_radius(),
+            };
+        let text_color = if vertex.is_colliding {
+            Color::RED
+        } else {
+            Color::BLACK
+        };
+
+        canvas.text(
+            text_position,
+            format_args!("\n{}", vertex.distances),
+            TextAlignment::Center,
+            text_color,
+        );
     });
 }
