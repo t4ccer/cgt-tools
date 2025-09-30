@@ -47,7 +47,7 @@ impl std::fmt::Display for Distance {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-struct Distances {
+pub struct Distances {
     inner: Vec<Distance>,
 }
 
@@ -87,6 +87,14 @@ impl Vertex {
 
     pub fn set_tower(&mut self, tower: Option<Tower>) {
         self.tower = tower;
+    }
+
+    pub fn is_unique(&self) -> bool {
+        self.is_unique
+    }
+
+    pub fn distances(&self) -> &Distances {
+        &self.distances
     }
 }
 
@@ -222,6 +230,20 @@ pub struct CodeVertex {
     distances: Distances,
     is_original: bool,
     is_colliding: bool,
+}
+
+impl CodeVertex {
+    pub fn is_colliding(&self) -> bool {
+        self.is_colliding
+    }
+
+    pub fn distances(&self) -> &Distances {
+        &self.distances
+    }
+
+    pub fn is_original(&self) -> bool {
+        self.is_original
+    }
 }
 
 pub fn one_bit_error_auxiliary_graph<G1, V1, G2>(graph: &G1, finite_to_infinite_error: bool) -> G2

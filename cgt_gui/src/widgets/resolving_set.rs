@@ -15,7 +15,10 @@ use cgt::{
     impl_has,
     numeric::v2f::V2f,
 };
-use std::ops::{Deref, DerefMut};
+use std::{
+    collections::HashSet,
+    ops::{Deref, DerefMut},
+};
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct Vertex {
@@ -64,6 +67,7 @@ impl_has!(CodeVertex -> inner -> resolving_set::CodeVertex);
 struct CodeGraphPanel {
     graph: UndirectedGraph<CodeVertex>,
     reposition_option_selected: RawOf<RepositionMode>,
+    collisions: String,
 }
 
 impl CodeGraphPanel {
@@ -74,12 +78,28 @@ impl CodeGraphPanel {
     {
         let aux: UndirectedGraph<_> =
             resolving_set::one_bit_error_auxiliary_graph(graph, infinite_distances);
+
+        let mut collisions = String::from("Collisions: ");
+        for (idx, v) in aux
+            .vertices()
+            .filter(|v| v.is_colliding() && v.is_original())
+            .enumerate()
+        {
+            use std::fmt::Write;
+
+            if idx != 0 {
+                collisions.push_str(", ");
+            }
+            write!(collisions, "{}", v.distances()).unwrap();
+        }
+
         CodeGraphPanel {
             graph: aux.map(|v| CodeVertex {
                 inner: v.clone(),
                 position: V2f::ZERO,
             }),
             reposition_option_selected: RawOf::new(RepositionMode::SpringEmbedder),
+            collisions,
         }
     }
 
@@ -133,6 +153,7 @@ pub struct ResolvingSetWindow {
     add_edge_mode: AddEdgeMode,
     code_graph: CodeGraphPanel,
     infinite_distances: bool,
+    duplicates: String,
 }
 
 impl ResolvingSetWindow {
@@ -153,18 +174,22 @@ impl ResolvingSetWindow {
         );
 
         let infinite_distances = false;
-        let mut code_graph = CodeGraphPanel::new(&graph, infinite_distances);
-        code_graph.reposition_circle();
-        code_graph.reposition(V2f { x: 350.0, y: 350.0 });
+        let code_graph = CodeGraphPanel::new(&graph, infinite_distances);
 
-        ResolvingSetWindow {
+        let mut this = ResolvingSetWindow {
             graph: AccessTracker::new(graph),
             reposition_option_selected: RawOf::new(RepositionMode::SpringEmbedder),
             editing_mode: RawOf::new(GraphEditingMode::DragVertex),
             add_edge_mode: AddEdgeMode::new(),
             code_graph,
             infinite_distances,
-        }
+            duplicates: String::new(),
+        };
+
+        this.recompute();
+        this.code_graph.reposition(V2f { x: 350.0, y: 350.0 });
+
+        this
     }
 
     pub fn reposition_circle(&mut self) {
@@ -207,6 +232,30 @@ impl ResolvingSetWindow {
                 spring_embedder.layout(self.graph.get_mut_untracked());
             }
         }
+    }
+
+    fn recompute(&mut self) {
+        resolving_set::label_distances(self.graph.get_mut_untracked());
+
+        let mut seen = HashSet::new();
+        self.duplicates.clear();
+        self.duplicates.push_str("Duplicates: ");
+        for (idx, v) in self
+            .graph
+            .vertices()
+            .filter(|v| !v.inner.is_unique() && seen.insert(v.inner.distances()))
+            .enumerate()
+        {
+            use std::fmt::Write;
+
+            if idx != 0 {
+                self.duplicates.push_str(", ");
+            }
+            write!(self.duplicates, "{}", v.inner.distances()).unwrap();
+        }
+
+        self.code_graph = CodeGraphPanel::new(self.graph.deref(), self.infinite_distances);
+        self.code_graph.reposition_circle();
     }
 }
 impl IsCgtWindow for TitledWindow<ResolvingSetWindow> {
@@ -265,6 +314,8 @@ impl IsCgtWindow for TitledWindow<ResolvingSetWindow> {
                 }
 
                 short_inputs.end();
+
+                ui.text_wrapped(&self.content.duplicates);
 
                 let graph_area_position = V2f::from(ui.cursor_screen_pos());
                 let graph_area_size = V2f {
@@ -352,6 +403,8 @@ impl IsCgtWindow for TitledWindow<ResolvingSetWindow> {
                 let should_reposition = ui.button("Reposition");
                 short_inputs.end();
 
+                ui.text_wrapped(&self.content.code_graph.collisions);
+
                 let graph_area_size = V2f {
                     x: ui.current_column_width(),
                     y: unsafe { ui.style().item_spacing[1] }
@@ -380,12 +433,7 @@ impl IsCgtWindow for TitledWindow<ResolvingSetWindow> {
                 drop(aux_id);
 
                 if self.content.graph.clear_flag() {
-                    resolving_set::label_distances(self.content.graph.get_mut_untracked());
-                    self.content.code_graph = CodeGraphPanel::new(
-                        self.content.graph.deref(),
-                        self.content.infinite_distances,
-                    );
-                    self.content.code_graph.reposition_circle();
+                    self.content.recompute();
                     self.content.code_graph.reposition(graph_area_size);
                 }
             });
