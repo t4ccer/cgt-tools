@@ -15,7 +15,7 @@ use cgt::{
     impl_has,
     numeric::v2f::V2f,
 };
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct Vertex {
@@ -67,12 +67,13 @@ struct CodeGraphPanel {
 }
 
 impl CodeGraphPanel {
-    fn new<G, V>(graph: &G) -> CodeGraphPanel
+    fn new<G, V>(graph: &G, infinite_distances: bool) -> CodeGraphPanel
     where
         G: Graph<V>,
         V: Has<resolving_set::Vertex> + Clone,
     {
-        let aux: UndirectedGraph<_> = resolving_set::one_bit_error_auxiliary_graph(graph);
+        let aux: UndirectedGraph<_> =
+            resolving_set::one_bit_error_auxiliary_graph(graph, infinite_distances);
         CodeGraphPanel {
             graph: aux.map(|v| CodeVertex {
                 inner: v.clone(),
@@ -131,6 +132,7 @@ pub struct ResolvingSetWindow {
     editing_mode: RawOf<GraphEditingMode>,
     add_edge_mode: AddEdgeMode,
     code_graph: CodeGraphPanel,
+    infinite_distances: bool,
 }
 
 impl ResolvingSetWindow {
@@ -150,7 +152,8 @@ impl ResolvingSetWindow {
             ],
         );
 
-        let mut code_graph = CodeGraphPanel::new(&graph);
+        let infinite_distances = false;
+        let mut code_graph = CodeGraphPanel::new(&graph, infinite_distances);
         code_graph.reposition_circle();
         code_graph.reposition(V2f { x: 350.0, y: 350.0 });
 
@@ -160,6 +163,7 @@ impl ResolvingSetWindow {
             editing_mode: RawOf::new(GraphEditingMode::DragVertex),
             add_edge_mode: AddEdgeMode::new(),
             code_graph,
+            infinite_distances,
         }
     }
 
@@ -247,7 +251,6 @@ impl IsCgtWindow for TitledWindow<ResolvingSetWindow> {
                 self.content
                     .editing_mode
                     .combo(ui, "Edit Mode", ComboBoxFlags::HEIGHT_LARGE);
-                short_inputs.end();
 
                 if matches!(self.content.editing_mode.get(), GraphEditingMode::AddEdge) {
                     ui.same_line();
@@ -256,6 +259,12 @@ impl IsCgtWindow for TitledWindow<ResolvingSetWindow> {
                         &mut self.content.add_edge_mode.edge_creates_vertex,
                     );
                 }
+
+                if ui.checkbox("Infinite distances", &mut self.content.infinite_distances) {
+                    let _ = self.content.graph.deref_mut();
+                }
+
+                short_inputs.end();
 
                 let graph_area_position = V2f::from(ui.cursor_screen_pos());
                 let graph_area_size = V2f {
@@ -372,7 +381,10 @@ impl IsCgtWindow for TitledWindow<ResolvingSetWindow> {
 
                 if self.content.graph.clear_flag() {
                     resolving_set::label_distances(self.content.graph.get_mut_untracked());
-                    self.content.code_graph = CodeGraphPanel::new(self.content.graph.deref());
+                    self.content.code_graph = CodeGraphPanel::new(
+                        self.content.graph.deref(),
+                        self.content.infinite_distances,
+                    );
                     self.content.code_graph.reposition_circle();
                     self.content.code_graph.reposition(graph_area_size);
                 }
