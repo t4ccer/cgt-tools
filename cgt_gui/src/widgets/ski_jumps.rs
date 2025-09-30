@@ -1,8 +1,8 @@
 use crate::{
-    Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow, imgui_enum,
-    impl_game_window, impl_titled_window,
+    AccessTracker, Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow,
+    imgui_enum, impl_game_window, impl_titled_window,
     widgets::{
-        self, AccessTracker, TILE_COLOR_EMPTY, TILE_COLOR_FILLED, TILE_SPACING,
+        self, TILE_COLOR_EMPTY, TILE_COLOR_FILLED, TILE_SPACING,
         canonical_form::CanonicalFormWindow, interactive_color,
     },
 };
@@ -16,7 +16,7 @@ use cgt::{
         games::ski_jumps::{Move, SkiJumps, Tile},
     },
 };
-use std::str::FromStr;
+use std::{ops::Deref, str::FromStr};
 
 const OFF_BUTTON_SCALE: f32 = 0.3;
 
@@ -338,7 +338,7 @@ impl IsCgtWindow for TitledWindow<SkiJumpsWindow> {
                         "Ski Jumps",
                         Task::EvalSkiJumps(EvalTask {
                             window: self.window_id,
-                            game: self.content.game.get().clone(),
+                            game: self.content.game.deref().clone(),
                         }),
                     );
                 }

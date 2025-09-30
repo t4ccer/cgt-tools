@@ -1,7 +1,9 @@
 use crate::Details;
 use ::imgui::{DrawListMut, FontId, ImColor32, Ui};
 use cgt::{
-    drawing::{Draw, imgui, svg, tiny_skia},
+    drawing::{Canvas, Color, Draw, imgui, svg, tiny_skia},
+    graph::{Graph, VertexIndex},
+    has::Has,
     numeric::v2f::V2f,
     short::partizan::thermograph::Thermograph,
 };
@@ -129,59 +131,52 @@ where
     }
 }
 
-#[derive(Debug, Clone)]
-pub(crate) struct AccessTracker<T> {
-    value: T,
-    modified: bool,
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct AddEdgeMode {
+    pub edge_start_vertex: Option<VertexIndex>,
+    pub edge_creates_vertex: bool,
 }
 
-impl<T> AccessTracker<T> {
-    #[inline(always)]
-    pub(crate) fn new(value: T) -> Self {
-        Self {
-            value,
-            modified: true,
+impl AddEdgeMode {
+    pub fn new() -> AddEdgeMode {
+        AddEdgeMode {
+            edge_creates_vertex: true,
+            edge_start_vertex: None,
         }
     }
 
-    #[inline(always)]
-    pub(crate) fn clear_flag(&mut self) -> bool {
-        let was_modified = self.modified;
-        self.modified = false;
-        was_modified
-    }
-
-    #[inline(always)]
-    pub(crate) fn get(&self) -> &T {
-        &self.value
-    }
-
-    #[inline(always)]
-    pub(crate) fn get_mut_untracked(&mut self) -> &mut T {
-        &mut self.value
-    }
-}
-
-impl<T> From<T> for AccessTracker<T> {
-    #[inline(always)]
-    fn from(value: T) -> Self {
-        AccessTracker::new(value)
-    }
-}
-
-impl<T> Deref for AccessTracker<T> {
-    type Target = T;
-
-    #[inline(always)]
-    fn deref(&self) -> &Self::Target {
-        &self.value
-    }
-}
-
-impl<T> DerefMut for AccessTracker<T> {
-    #[inline(always)]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.modified = true;
-        &mut self.value
+    pub fn handle_update<G, V>(
+        &mut self,
+        mouse_pos: V2f,
+        graph_area_position: V2f,
+        canvas: &mut imgui::Canvas<'_>,
+        graph: &mut impl DerefMut<Target = G>,
+        mk_new_vertex: impl FnOnce(V2f) -> V,
+    ) where
+        G: Graph<V>,
+        V: Has<V2f>,
+    {
+        let mouse_position = mouse_pos - graph_area_position;
+        if let Some(pressed) = canvas.pressed_vertex() {
+            self.edge_start_vertex = Some(pressed);
+            let pressed_position: V2f = *graph.get_vertex(pressed).get_inner();
+            canvas.line(
+                pressed_position,
+                mouse_position,
+                imgui::Canvas::thin_line_weight(),
+                Color::BLACK,
+            );
+        } else if let Some(start) = self.edge_start_vertex.take() {
+            let graph_ref: &G = graph.deref();
+            if let Some(end) = canvas.vertex_at_position(mouse_position, graph_ref)
+                && start != end
+            {
+                let should_connect = !graph.are_adjacent(start, end);
+                graph.connect(start, end, should_connect);
+            } else if self.edge_creates_vertex {
+                let end = graph.add_vertex(mk_new_vertex(mouse_position));
+                graph.connect(start, end, true);
+            }
+        }
     }
 }

@@ -1,7 +1,7 @@
 use crate::{
-    Details, EvalTask, GuiContext, IsCgtWindow, Task, TitledWindow, impl_game_window,
-    impl_titled_window,
-    widgets::{self, AccessTracker, canonical_form::CanonicalFormWindow},
+    AccessTracker, Details, EvalTask, GuiContext, IsCgtWindow, Task, TitledWindow,
+    impl_game_window, impl_titled_window,
+    widgets::{self, canonical_form::CanonicalFormWindow},
 };
 use ::imgui::{Condition, Ui};
 use cgt::{
@@ -9,7 +9,7 @@ use cgt::{
     grid::{BitTile, FiniteGrid, Grid, small_bit_grid::SmallBitGrid},
     short::partizan::games::domineering::{Domineering, Tile},
 };
-use std::str::FromStr;
+use std::{ops::Deref, str::FromStr};
 
 #[derive(Debug, Clone)]
 pub struct DomineeringWindow {
@@ -125,7 +125,7 @@ impl IsCgtWindow for TitledWindow<DomineeringWindow> {
                         "Domineering",
                         Task::EvalDomineering(EvalTask {
                             window: self.window_id,
-                            game: *self.content.game.get(),
+                            game: *self.content.game.deref(),
                         }),
                     );
                 }

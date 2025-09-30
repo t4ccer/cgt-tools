@@ -1,7 +1,7 @@
 use crate::{
-    Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow, imgui_enum,
-    impl_game_window, impl_titled_window,
-    widgets::{self, AccessTracker, canonical_form::CanonicalFormWindow},
+    AccessTracker, Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow,
+    imgui_enum, impl_game_window, impl_titled_window,
+    widgets::{self, canonical_form::CanonicalFormWindow},
 };
 use ::imgui::{ComboBoxFlags, Condition, Ui};
 use cgt::{
@@ -12,7 +12,7 @@ use cgt::{
         games::amazons::{Amazons, Tile},
     },
 };
-use std::str::FromStr;
+use std::{ops::Deref, str::FromStr};
 
 imgui_enum! {
     GridEditingMode {
@@ -167,7 +167,7 @@ impl IsCgtWindow for TitledWindow<AmazonsWindow> {
                                 }
                                 PendingMove::AmazonTargetSelected { amazon, target } => {
                                     let stone_target = (x, y);
-                                    let mut new_game = self.content.game.get().clone();
+                                    let mut new_game = self.content.game.deref().clone();
                                     new_game.grid_mut().set(amazon.0, amazon.1, Tile::Empty);
                                     new_game.grid_mut().set(target.0, target.1, own_tile);
                                     new_game.grid_mut().set(
@@ -253,7 +253,7 @@ impl IsCgtWindow for TitledWindow<AmazonsWindow> {
                         "Amazons",
                         Task::EvalAmazons(EvalTask {
                             window: self.window_id,
-                            game: self.content.game.get().clone(),
+                            game: self.content.game.deref().clone(),
                         }),
                     );
                 }

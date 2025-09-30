@@ -1,7 +1,7 @@
 use crate::{
-    Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow, imgui_enum,
-    impl_game_window, impl_titled_window,
-    widgets::{self, AccessTracker, canonical_form::CanonicalFormWindow},
+    AccessTracker, Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow,
+    imgui_enum, impl_game_window, impl_titled_window,
+    widgets::{self, canonical_form::CanonicalFormWindow},
 };
 use ::imgui::{ComboBoxFlags, Condition, Ui};
 use cgt::{
@@ -9,7 +9,7 @@ use cgt::{
     grid::{FiniteGrid, Grid, vec_grid::VecGrid},
     short::partizan::games::fission::{Fission, Tile},
 };
-use std::str::FromStr;
+use std::{ops::Deref, str::FromStr};
 
 imgui_enum! {
     GridEditingMode {
@@ -171,7 +171,7 @@ impl IsCgtWindow for TitledWindow<FissionWindow> {
                         "Fission",
                         Task::EvalFission(EvalTask {
                             window: self.window_id,
-                            game: self.content.game.get().clone(),
+                            game: self.content.game.deref().clone(),
                         }),
                     );
                 }

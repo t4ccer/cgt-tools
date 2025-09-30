@@ -36,8 +36,11 @@ use std::{
     thread,
 };
 
+mod access_tracker;
 mod imgui_sdl2_boilerplate;
 mod widgets;
+
+pub(crate) use access_tracker::AccessTracker;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct WindowId(pub usize);
@@ -126,7 +129,7 @@ macro_rules! impl_game_window {
                 $title,
                 $crate::Task::$task_kind($crate::EvalTask {
                     window: self.window_id,
-                    game: self.content.game.get().clone(),
+                    game: self.content.game.deref().clone(),
                 }),
             );
         }
@@ -134,7 +137,7 @@ macro_rules! impl_game_window {
         fn update(&mut self, update: $crate::UpdateKind) {
             match update {
                 $crate::UpdateKind::$update_kind(game, details) => {
-                    if *self.content.game.get() == game {
+                    if *self.content.game == game {
                         self.content.details = Some(details);
                     }
                 }

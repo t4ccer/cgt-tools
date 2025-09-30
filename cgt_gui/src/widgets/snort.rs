@@ -1,11 +1,11 @@
 use crate::{
-    Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow, UpdateKind, imgui_enum,
-    impl_titled_window,
-    widgets::{self, AccessTracker, canonical_form::CanonicalFormWindow, save_button},
+    AccessTracker, Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow,
+    UpdateKind, imgui_enum, impl_titled_window,
+    widgets::{self, AddEdgeMode, canonical_form::CanonicalFormWindow, save_button},
 };
 use ::imgui::{ComboBoxFlags, Condition, Ui};
 use cgt::{
-    drawing::{Canvas, Color, Draw, imgui},
+    drawing::{Canvas, Draw, imgui},
     graph::{
         Graph, VertexIndex,
         adjacency_matrix::undirected::UndirectedGraph,
@@ -54,8 +54,7 @@ pub struct SnortWindow {
     reposition_option_selected: RawOf<RepositionMode>,
     editing_mode: RawOf<GraphEditingMode>,
     alternating_moves: bool,
-    edge_creates_vertex: bool,
-    edge_start_vertex: Option<VertexIndex>,
+    add_edge_mode: AddEdgeMode,
     details: Option<Details>,
 }
 
@@ -94,8 +93,7 @@ impl SnortWindow {
             reposition_option_selected: RawOf::new(RepositionMode::SpringEmbedder),
             editing_mode: RawOf::new(GraphEditingMode::DragVertex),
             alternating_moves: true,
-            edge_creates_vertex: true,
-            edge_start_vertex: None,
+            add_edge_mode: AddEdgeMode::new(),
             details: None,
         }
     }
@@ -232,7 +230,10 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                     ui.checkbox("Alternating", &mut self.content.alternating_moves);
                 } else if matches!(self.content.editing_mode.get(), GraphEditingMode::AddEdge) {
                     ui.same_line();
-                    ui.checkbox("Add vertex", &mut self.content.edge_creates_vertex);
+                    ui.checkbox(
+                        "Add vertex",
+                        &mut self.content.add_edge_mode.edge_creates_vertex,
+                    );
                 }
 
                 let graph_area_position = V2f::from(ui.cursor_screen_pos());
@@ -348,33 +349,16 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                         }
                     }
                     GraphEditingMode::AddEdge => {
-                        let mouse_position = V2f::from(ui.io().mouse_pos) - graph_area_position;
-                        if let Some(pressed) = pressed {
-                            self.content.edge_start_vertex = Some(pressed);
-                            let pressed_position: V2f =
-                                self.content.game.graph.get_vertex_mut(pressed).position;
-                            canvas.line(
-                                pressed_position,
-                                mouse_position,
-                                imgui::Canvas::thin_line_weight(),
-                                Color::BLACK,
-                            );
-                        } else if let Some(start) = self.content.edge_start_vertex.take() {
-                            if let Some(end) =
-                                canvas.vertex_at_position(mouse_position, &self.content.game.graph)
-                                && start != end
-                            {
-                                let should_connect =
-                                    !self.content.game.graph.are_adjacent(start, end);
-                                self.content.game.graph.connect(start, end, should_connect);
-                            } else if self.content.edge_creates_vertex {
-                                let end = self.content.game.graph.add_vertex(PositionedVertex {
-                                    kind: VertexKind::Single(VertexColor::Empty),
-                                    position: mouse_position,
-                                });
-                                self.content.game.graph.connect(start, end, true);
-                            }
-                        }
+                        self.content.add_edge_mode.handle_update(
+                            V2f::from(ui.io().mouse_pos),
+                            graph_area_position,
+                            &mut canvas,
+                            &mut self.content.game.map(|game| &mut game.graph),
+                            |position| PositionedVertex {
+                                kind: VertexKind::Single(VertexColor::Empty),
+                                position,
+                            },
+                        );
                     }
                 }
 

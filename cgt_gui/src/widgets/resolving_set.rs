@@ -1,10 +1,10 @@
 use crate::{
-    GuiContext, IsCgtWindow, RawOf, TitledWindow, UpdateKind, imgui_enum, impl_titled_window,
-    widgets::AccessTracker,
+    AccessTracker, GuiContext, IsCgtWindow, RawOf, TitledWindow, UpdateKind, imgui_enum,
+    impl_titled_window, widgets::AddEdgeMode,
 };
 use ::imgui::{ComboBoxFlags, Condition, Ui};
 use cgt::{
-    drawing::{Canvas, Color, imgui},
+    drawing::{Canvas, imgui},
     graph::{
         Graph, VertexIndex,
         adjacency_matrix::undirected::UndirectedGraph,
@@ -129,8 +129,7 @@ pub struct ResolvingSetWindow {
     graph: AccessTracker<UndirectedGraph<Vertex>>,
     reposition_option_selected: RawOf<RepositionMode>,
     editing_mode: RawOf<GraphEditingMode>,
-    edge_creates_vertex: bool,
-    edge_start_vertex: Option<VertexIndex>,
+    add_edge_mode: AddEdgeMode,
     code_graph: CodeGraphPanel,
 }
 
@@ -156,12 +155,11 @@ impl ResolvingSetWindow {
         code_graph.reposition(V2f { x: 350.0, y: 350.0 });
 
         ResolvingSetWindow {
-            code_graph,
             graph: AccessTracker::new(graph),
             reposition_option_selected: RawOf::new(RepositionMode::SpringEmbedder),
             editing_mode: RawOf::new(GraphEditingMode::DragVertex),
-            edge_creates_vertex: true,
-            edge_start_vertex: None,
+            add_edge_mode: AddEdgeMode::new(),
+            code_graph,
         }
     }
 
@@ -253,7 +251,10 @@ impl IsCgtWindow for TitledWindow<ResolvingSetWindow> {
 
                 if matches!(self.content.editing_mode.get(), GraphEditingMode::AddEdge) {
                     ui.same_line();
-                    ui.checkbox("Add vertex", &mut self.content.edge_creates_vertex);
+                    ui.checkbox(
+                        "Add vertex",
+                        &mut self.content.add_edge_mode.edge_creates_vertex,
+                    );
                 }
 
                 let graph_area_position = V2f::from(ui.cursor_screen_pos());
@@ -311,32 +312,16 @@ impl IsCgtWindow for TitledWindow<ResolvingSetWindow> {
                         }
                     }
                     GraphEditingMode::AddEdge => {
-                        let mouse_position = V2f::from(ui.io().mouse_pos) - graph_area_position;
-                        if let Some(pressed) = pressed {
-                            self.content.edge_start_vertex = Some(pressed);
-                            let pressed_position: V2f =
-                                self.content.graph.get_vertex(pressed).position;
-                            canvas.line(
-                                pressed_position,
-                                mouse_position,
-                                imgui::Canvas::thin_line_weight(),
-                                Color::BLACK,
-                            );
-                        } else if let Some(start) = self.content.edge_start_vertex.take() {
-                            if let Some(end) = canvas
-                                .vertex_at_position(mouse_position, self.content.graph.deref())
-                                && start != end
-                            {
-                                let should_connect = !self.content.graph.are_adjacent(start, end);
-                                self.content.graph.connect(start, end, should_connect);
-                            } else if self.content.edge_creates_vertex {
-                                let end = self.content.graph.add_vertex(Vertex {
-                                    inner: resolving_set::Vertex::new(None),
-                                    position: mouse_position,
-                                });
-                                self.content.graph.connect(start, end, true);
-                            }
-                        }
+                        self.content.add_edge_mode.handle_update(
+                            V2f::from(ui.io().mouse_pos),
+                            graph_area_position,
+                            &mut canvas,
+                            &mut self.content.graph,
+                            |position| Vertex {
+                                inner: resolving_set::Vertex::new(None),
+                                position,
+                            },
+                        );
                     }
                 }
                 drop(canvas);
