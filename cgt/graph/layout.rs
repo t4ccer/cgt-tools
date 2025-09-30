@@ -32,25 +32,24 @@ impl SpringEmbedder {
                     let u_pos = *graph.get_vertex(u).get_inner();
                     let v_pos = *graph.get_vertex(v).get_inner();
 
-                    // We add force no matter if connection is unidirectional or not
-                    forces[u.index] += if graph.are_adjacent(u, v) || graph.are_adjacent(v, u) {
+                    let distance_squared = V2f::distance_squared(u_pos, v_pos);
+
+                    forces[u.index] += if distance_squared < 0.1 {
+                        // same position, usually happens only when region bound is tiny
+                        // and position gets clamped so to avoid dividing by zero we add
+                        // maximum repulsive force that will push nodes to opposite edges of
+                        // the bounded region
+                        V2f {
+                            x: f32::MAX * (u < v) as u8 as f32,
+                            y: 0.0,
+                        }
+                    } else if graph.are_adjacent(u, v) || graph.are_adjacent(v, u) {
+                        // We add force no matter if connection is unidirectional or not
                         self.c_attractive
-                            * f32::log10(V2f::distance(v_pos, u_pos) / self.ideal_spring_length)
+                            * f32::log10(distance_squared.sqrt() / self.ideal_spring_length)
                             * V2f::direction(u_pos, v_pos)
                     } else {
-                        let d = V2f::distance_squared(u_pos, v_pos);
-                        if d == 0.0 {
-                            // same position, usually happens only when region bound is tiny
-                            // and position gets clamped so to avoid dividing by zero we add
-                            // maximum repulsive force that will push nodes to opposite edges of
-                            // the bounded region
-                            V2f {
-                                x: f32::MAX * (u < v) as u8 as f32,
-                                y: 0.0,
-                            }
-                        } else {
-                            (self.c_repulsive / d) * V2f::direction(v_pos, u_pos)
-                        }
+                        (self.c_repulsive / distance_squared) * V2f::direction(v_pos, u_pos)
                     };
                 }
             }
