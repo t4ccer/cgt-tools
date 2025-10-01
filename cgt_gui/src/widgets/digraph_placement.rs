@@ -11,7 +11,7 @@ use cgt::{
     graph::{
         Graph, VertexIndex,
         adjacency_matrix::directed::DirectedGraph,
-        layout::{CircleEdge, SpringEmbedder},
+        layout::{Bounds, CircleEdge, SpringEmbedder},
     },
     has::Has,
     impl_has,
@@ -175,16 +175,17 @@ impl DigraphPlacementWindow {
                     c_repulsive: 250.0,
                     ideal_spring_length: 140.0,
                     iterations: 1 << 14,
-                    bounds: Some((
-                        V2f {
+                    bounds: Some(Bounds {
+                        lower: V2f {
                             x: radius,
                             y: radius,
                         },
-                        V2f {
+                        upper: V2f {
                             x: f32::max(radius, radius.mul_add(-2.0, graph_panel_size.x)),
                             y: f32::max(radius, radius.mul_add(-2.0, graph_panel_size.y)),
                         },
-                    )),
+                        c_middle_attractive: None,
+                    }),
                 };
                 spring_embedder.layout(&mut self.game.get_mut_untracked().graph);
             }

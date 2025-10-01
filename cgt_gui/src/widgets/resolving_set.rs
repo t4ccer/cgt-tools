@@ -8,7 +8,7 @@ use cgt::{
     graph::{
         Graph, VertexIndex,
         adjacency_matrix::undirected::UndirectedGraph,
-        layout::{CircleEdge, SpringEmbedder},
+        layout::{Bounds, CircleEdge, SpringEmbedder},
         resolving_set::{self, Tower},
     },
     has::Has,
@@ -124,12 +124,12 @@ impl CodeGraphPanel {
                     c_repulsive: 350.0,
                     ideal_spring_length: 75.0,
                     iterations: 1 << 12,
-                    bounds: Some((
-                        V2f {
+                    bounds: Some(Bounds {
+                        lower: V2f {
                             x: imgui::Canvas::vertex_radius(),
                             y: imgui::Canvas::vertex_radius(),
                         },
-                        V2f {
+                        upper: V2f {
                             x: f32::max(
                                 imgui::Canvas::vertex_radius(),
                                 imgui::Canvas::vertex_radius().mul_add(-2.0, graph_panel_size.x),
@@ -139,7 +139,8 @@ impl CodeGraphPanel {
                                 imgui::Canvas::vertex_radius().mul_add(-2.0, graph_panel_size.y),
                             ),
                         },
-                    )),
+                        c_middle_attractive: Some(0.003),
+                    }),
                 };
                 spring_embedder.layout(&mut self.graph);
             }
@@ -214,12 +215,12 @@ impl ResolvingSetWindow {
                     c_repulsive: 250.0,
                     ideal_spring_length: 75.0,
                     iterations: 1 << 14,
-                    bounds: Some((
-                        V2f {
+                    bounds: Some(Bounds {
+                        lower: V2f {
                             x: imgui::Canvas::vertex_radius(),
                             y: imgui::Canvas::vertex_radius(),
                         },
-                        V2f {
+                        upper: V2f {
                             x: f32::max(
                                 imgui::Canvas::vertex_radius(),
                                 imgui::Canvas::vertex_radius().mul_add(-2.0, graph_panel_size.x),
@@ -229,7 +230,8 @@ impl ResolvingSetWindow {
                                 imgui::Canvas::vertex_radius().mul_add(-2.0, graph_panel_size.y),
                             ),
                         },
-                    )),
+                        c_middle_attractive: None,
+                    }),
                 };
                 spring_embedder.layout(self.graph.get_mut_untracked());
             }

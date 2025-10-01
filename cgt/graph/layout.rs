@@ -4,13 +4,20 @@ use crate::{graph::Graph, has::Has, numeric::v2f::V2f};
 use std::f32::consts::PI;
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+pub struct Bounds {
+    pub lower: V2f,
+    pub upper: V2f,
+    pub c_middle_attractive: Option<f32>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct SpringEmbedder {
     pub cooling_rate: f32,
     pub c_attractive: f32,
     pub c_repulsive: f32,
     pub ideal_spring_length: f32,
     pub iterations: usize,
-    pub bounds: Option<(V2f, V2f)>,
+    pub bounds: Option<Bounds>,
 }
 
 impl SpringEmbedder {
@@ -54,18 +61,33 @@ impl SpringEmbedder {
                 }
             }
 
+            if let Some(bounds) = self.bounds
+                && let Some(c_middle_attractive) = bounds.c_middle_attractive
+            {
+                let middle = V2f {
+                    x: bounds.lower.x + (bounds.upper.x - bounds.lower.x) * 0.5,
+                    y: bounds.lower.y + (bounds.upper.y - bounds.lower.y) * 0.5,
+                };
+
+                for u in graph.vertex_indices() {
+                    let u_pos = *graph.get_vertex(u).get_inner();
+                    let d = V2f::distance(u_pos, middle);
+                    forces[u.index] += c_middle_attractive * d * V2f::direction(u_pos, middle);
+                }
+            }
+
             for u in graph.vertex_indices() {
                 *graph.get_vertex_mut(u).get_inner_mut() += cooling * forces[u.index];
-                if let Some((lower_bound, upper_bound)) = self.bounds {
+                if let Some(bounds) = self.bounds {
                     graph.get_vertex_mut(u).get_inner_mut().x = f32::clamp(
                         graph.get_vertex(u).get_inner().x,
-                        lower_bound.x,
-                        upper_bound.x,
+                        bounds.lower.x,
+                        bounds.upper.x,
                     );
                     graph.get_vertex_mut(u).get_inner_mut().y = f32::clamp(
                         graph.get_vertex(u).get_inner().y,
-                        lower_bound.y,
-                        upper_bound.y,
+                        bounds.lower.y,
+                        bounds.upper.y,
                     );
                 }
                 forces[u.index] = V2f { x: 0.0, y: 0.0 };
