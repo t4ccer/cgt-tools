@@ -97,7 +97,7 @@ impl Moves {
             // Case: n-1 = {|n}
             // We assume that entry is normalized, no left moves, thus there must be only one
             // right entry that's a number
-            debug_assert!(num_ro == 1, "Entry not normalized");
+            debug_assert!(num_ro == 1, "Entry not normalized: `{}`", self);
             Some(Nus {
                 number: self.right[0].to_nus_unchecked().number() - DyadicRationalNumber::from(1),
                 up_multiple: 0,
@@ -107,7 +107,7 @@ impl Moves {
             // Case: n+1 = {n|}
             // We assume that entry is normalized, no left moves, thus there must be only one
             // right entry that's a number
-            debug_assert!(num_lo == 1, "Entry not normalized");
+            debug_assert!(num_lo == 1, "Entry not normalized: `{}`", self);
             Some(Nus {
                 number: self.left[0].to_nus_unchecked().number() + DyadicRationalNumber::from(1),
                 up_multiple: 0,
@@ -222,39 +222,39 @@ impl Moves {
         }
     }
 
-    // TODO: Rewrite it to work on mutable vec and not clone
-    fn eliminate_dominated_moves(moves: &[CanonicalForm], player: Player) -> Vec<CanonicalForm> {
-        let mut moves: Vec<Option<CanonicalForm>> = moves.iter().cloned().map(Some).collect();
+    fn eliminate_dominated_moves(moves: &mut Vec<CanonicalForm>, player: Player) {
+        let mut i = 0;
+        'loop_i: while i < moves.len() {
+            let mut j = i + 1;
+            'loop_j: while i < moves.len() && j < moves.len() {
+                let move_i = &moves[i];
+                let move_j = &moves[j];
 
-        'outer: for i in 0..moves.len() {
-            'inner: for j in 0..i {
-                let Some(move_i) = &moves[i] else {
-                    continue 'outer;
-                };
-                let Some(move_j) = &moves[j] else {
-                    continue 'inner;
-                };
-
-                // Split from ifs because borrow checker is sad
                 let remove_i = match player {
                     Player::Left => move_i <= move_j,
                     Player::Right => move_j <= move_i,
                 };
+
+                if remove_i {
+                    moves.swap_remove(i);
+                    continue 'loop_i;
+                }
+
                 let remove_j = match player {
                     Player::Left => move_j <= move_i,
                     Player::Right => move_i <= move_j,
                 };
 
-                if remove_i {
-                    moves[i] = None;
-                }
                 if remove_j {
-                    moves[j] = None;
+                    moves.swap_remove(j);
+                    continue 'loop_j;
                 }
-            }
-        }
 
-        moves.into_iter().flatten().collect()
+                j += 1;
+            }
+
+            i += 1;
+        }
     }
 
     /// Return false if `H <= GL` for some left option `GL` of `G` or `HR <= G` for some right
@@ -399,11 +399,11 @@ impl Moves {
     }
 
     fn canonicalize(&self) -> Self {
-        let left = self.bypass_reversible_moves_l();
-        let left = Self::eliminate_dominated_moves(&left, Player::Left);
+        let mut left = self.bypass_reversible_moves_l();
+        Self::eliminate_dominated_moves(&mut left, Player::Left);
 
-        let right = self.bypass_reversible_moves_r();
-        let right = Self::eliminate_dominated_moves(&right, Player::Right);
+        let mut right = self.bypass_reversible_moves_r();
+        Self::eliminate_dominated_moves(&mut right, Player::Right);
 
         Self { left, right }
     }
@@ -1227,6 +1227,21 @@ mod tests {
     use super::*;
     use std::str::FromStr;
 
+    macro_rules! cf {
+        ($str:expr) => {
+            CanonicalForm::from_str($str).unwrap()
+        };
+    }
+
+    macro_rules! assert_eq_iter_str {
+        ($lhs: expr, $rhs:expr) => {
+            assert_eq!(
+                $lhs.iter().map(ToString::to_string).collect::<Vec<_>>(),
+                $rhs.iter().map(ToString::to_string).collect::<Vec<_>>()
+            );
+        };
+    }
+
     #[test]
     fn constructs_integers() {
         let eight = CanonicalForm::new_integer(8);
@@ -1531,5 +1546,21 @@ mod tests {
 
         let cf = CanonicalForm::from_str("{2|1,{*|0}}").unwrap();
         assert_eq!(cf.temper(), None);
+    }
+
+    #[test]
+    fn eliminate_dominated_moves() {
+        let mut moves = vec![cf!("2"), cf!("0")];
+        Moves::eliminate_dominated_moves(&mut moves, Player::Left);
+        assert_eq_iter_str!(moves, vec![cf!("2")]);
+
+        let mut moves = vec![
+            cf!("1"),
+            cf!("{2|-1, {1|-1}}"),
+            cf!("{2|-1/2, {*|-1}}"),
+            cf!("{2|0}"),
+        ];
+        Moves::eliminate_dominated_moves(&mut moves, Player::Left);
+        assert_eq_iter_str!(moves, vec![cf!("1"), cf!("{2|0}")]);
     }
 }
