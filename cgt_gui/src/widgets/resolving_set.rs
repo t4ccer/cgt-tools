@@ -64,6 +64,7 @@ pub struct CodeVertex {
 impl_has!(CodeVertex -> position -> V2f);
 impl_has!(CodeVertex -> inner -> resolving_set::CodeVertex);
 
+#[derive(Debug, Clone)]
 struct CodeGraphPanel {
     graph: UndirectedGraph<CodeVertex>,
     reposition_option_selected: RawOf<RepositionMode>,
@@ -146,6 +147,7 @@ impl CodeGraphPanel {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct ResolvingSetWindow {
     graph: AccessTracker<UndirectedGraph<Vertex>>,
     reposition_option_selected: RawOf<RepositionMode>,
@@ -278,7 +280,10 @@ impl IsCgtWindow for TitledWindow<ResolvingSetWindow> {
 
                 if let Some(_menu_bar) = ui.begin_menu_bar() {
                     if let Some(_new_menu) = ui.begin_menu("New") {
-                        if ui.menu_item("Duplicate") {}
+                        if ui.menu_item("Duplicate") {
+                            ctx.new_windows
+                                .push(Box::new(TitledWindow::without_title(self.content.clone())));
+                        }
                     }
                 }
 
