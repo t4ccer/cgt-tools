@@ -296,10 +296,14 @@ impl IsCgtWindow for TitledWindow<ResolvingSetWindow> {
                     ComboBoxFlags::empty(),
                 );
                 ui.same_line();
-                let should_reposition = ui.button("Reposition");
+                let mut should_reposition_main = ui.button("Reposition");
                 ui.same_line();
                 if ui.button("Clear") {
-                    *self.content.graph = Graph::empty(&[]);
+                    *self.content.graph = Graph::empty(&[Vertex {
+                        position: V2f::ZERO,
+                        inner: resolving_set::Vertex::new(None),
+                    }]);
+                    should_reposition_main = true;
                 }
 
                 self.content
@@ -391,7 +395,7 @@ impl IsCgtWindow for TitledWindow<ResolvingSetWindow> {
                 }
                 drop(canvas);
 
-                if should_reposition {
+                if should_reposition_main {
                     self.content.reposition(graph_area_size);
                 }
 
@@ -405,7 +409,7 @@ impl IsCgtWindow for TitledWindow<ResolvingSetWindow> {
                     ComboBoxFlags::empty(),
                 );
                 ui.same_line();
-                let should_reposition = ui.button("Reposition");
+                let should_reposition_aux = ui.button("Reposition");
                 short_inputs.end();
 
                 ui.text_wrapped(&self.content.code_graph.collisions);
@@ -432,7 +436,7 @@ impl IsCgtWindow for TitledWindow<ResolvingSetWindow> {
                 }
                 drop(canvas);
 
-                if should_reposition {
+                if should_reposition_aux {
                     self.content.code_graph.reposition(graph_area_size);
                 }
                 drop(aux_id);
