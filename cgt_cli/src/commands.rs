@@ -7,4 +7,5 @@ crate::clap_utils::mk_subcommand! {
     Amazons => amazons,
     LeftDeadEnds => left_dead_ends,
     SkiJumps => ski_jumps,
+    PFree => p_free,
 }
