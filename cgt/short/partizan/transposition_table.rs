@@ -1,6 +1,6 @@
 //! Thread safe transposition table for game values
 
-use crate::short::partizan::canonical_form::CanonicalForm;
+use crate::{short::partizan::canonical_form::CanonicalForm, total::TotalWrapper};
 use append_only_vec::AppendOnlyVec;
 use dashmap::DashMap;
 use std::{fmt::Debug, hash::Hash, marker::PhantomData};
@@ -18,7 +18,7 @@ pub trait TranspositionTable<G> {
 pub struct ParallelTranspositionTable<G> {
     values: AppendOnlyVec<CanonicalForm>,
     positions: DashMap<G, usize, ahash::RandomState>,
-    known_values: DashMap<CanonicalForm, usize, ahash::RandomState>,
+    known_values: DashMap<TotalWrapper<CanonicalForm>, usize, ahash::RandomState>,
 }
 
 impl<G> ParallelTranspositionTable<G>
@@ -92,11 +92,11 @@ where
     #[allow(clippy::missing_panics_doc)]
     #[inline]
     fn insert_position(&self, position: G, value: CanonicalForm) {
-        if let Some(known) = self.known_values.get(&value) {
+        if let Some(known) = self.known_values.get(TotalWrapper::from_ref(&value)) {
             self.positions.insert(position, *known);
         } else {
             let inserted = self.values.push(value.clone());
-            self.known_values.insert(value, inserted);
+            self.known_values.insert(TotalWrapper::new(value), inserted);
             self.positions.insert(position, inserted);
         }
     }

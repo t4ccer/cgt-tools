@@ -502,9 +502,12 @@ impl FusedIterator for RightMovesIter {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::short::partizan::{
-        Player,
-        canonical_form::{CanonicalForm, Moves},
+    use crate::{
+        short::partizan::{
+            Player,
+            canonical_form::{CanonicalForm, Moves},
+        },
+        total::TotalWrapper,
     };
     use quickcheck::{Arbitrary, Gen, QuickCheck};
     use std::{ops::Neg, str::FromStr};
@@ -621,8 +624,14 @@ mod tests {
     fn nus_to_moves_to_nus_roundtrip() {
         fn test_impl(nus: Nus) {
             let moves = Moves {
-                left: nus.left_moves().map(CanonicalForm::new_nus).collect(),
-                right: nus.right_moves().map(CanonicalForm::new_nus).collect(),
+                left: nus
+                    .left_moves()
+                    .map(|gl| TotalWrapper::new(CanonicalForm::new_nus(gl)))
+                    .collect(),
+                right: nus
+                    .right_moves()
+                    .map(|gr| TotalWrapper::new(CanonicalForm::new_nus(gr)))
+                    .collect(),
             };
             let nus_from_moves = moves.to_nus().expect("Should be a NUS");
             assert_eq!(nus, nus_from_moves, "Should be equal");

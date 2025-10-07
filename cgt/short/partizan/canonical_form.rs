@@ -5,6 +5,7 @@ use crate::{
     numeric::{dyadic_rational_number::DyadicRationalNumber, nimber::Nimber, rational::Rational},
     parsing::{Parser, impl_from_str_via_parser, lexeme, try_option},
     short::partizan::{Player, thermograph::Thermograph},
+    total::{TotalWrapper, impl_total_wrapper},
 };
 use auto_ops::impl_op_ex;
 use nus::Nus;
@@ -13,45 +14,20 @@ use std::{
     cmp::Ordering,
     fmt::{self, Display},
     hash::Hash,
-    iter::FusedIterator,
-    iter::Sum,
+    iter::{FusedIterator, Sum},
+    ops::Deref,
 };
 
 pub mod nus;
 
 /// Left and Right moves from a given position
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct Moves {
     /// Left player's moves
-    left: Vec<CanonicalForm>,
+    left: Vec<TotalWrapper<CanonicalForm>>,
 
     /// Right player's moves
-    right: Vec<CanonicalForm>,
-}
-
-impl PartialOrd for Moves {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for Moves {
-    fn cmp(&self, other: &Self) -> Ordering {
-        let left = self
-            .left
-            .iter()
-            .map(|cf| &cf.inner)
-            .cmp(other.left.iter().map(|cf| &cf.inner));
-
-        if left.is_eq() {
-            self.right
-                .iter()
-                .map(|cf| &cf.inner)
-                .cmp(other.right.iter().map(|cf| &cf.inner))
-        } else {
-            left
-        }
-    }
+    right: Vec<TotalWrapper<CanonicalForm>>,
 }
 
 impl Moves {
@@ -65,18 +41,21 @@ impl Moves {
 
     #[inline]
     fn eliminate_duplicates(&mut self) {
-        self.left.sort_by(|lhs, rhs| lhs.inner.cmp(&rhs.inner));
-        self.left.dedup_by(|lhs, rhs| lhs.inner == rhs.inner);
+        self.left.sort();
+        self.left.dedup();
 
-        self.right.sort_by(|lhs, rhs| lhs.inner.cmp(&rhs.inner));
-        self.right.dedup_by(|lhs, rhs| lhs.inner == rhs.inner);
+        self.right.sort();
+        self.right.dedup();
     }
 
     /// Construct a canonical form of arbitrary moves.
     /// It is an alias of [`CanonicalForm::new_from_moves`]
     #[inline]
     pub fn canonical_form(self) -> CanonicalForm {
-        CanonicalForm::new_from_moves(self.left, self.right)
+        CanonicalForm::new_from_moves(
+            TotalWrapper::into_inner_vec(self.left),
+            TotalWrapper::into_inner_vec(self.right),
+        )
     }
 
     /// Try converting moves to NUS. Returns [None] if moves do not form a NUS
@@ -303,9 +282,13 @@ impl Moves {
         let mut i: i64 = 0;
 
         let mut left_moves: Vec<Option<CanonicalForm>> =
-            self.left.iter().cloned().map(Some).collect();
-        let right_moves: Vec<Option<CanonicalForm>> =
-            self.right.iter().cloned().map(Some).collect();
+            self.left.iter().cloned().map(|gl| Some(gl.get())).collect();
+        let right_moves: Vec<Option<CanonicalForm>> = self
+            .right
+            .iter()
+            .cloned()
+            .map(|gr| Some(gr.get()))
+            .collect();
 
         loop {
             if (i as usize) >= left_moves.len() {
@@ -352,9 +335,14 @@ impl Moves {
     fn bypass_reversible_moves_r(&self) -> Vec<CanonicalForm> {
         let mut i: i64 = 0;
 
-        let left_moves: Vec<Option<CanonicalForm>> = self.left.iter().cloned().map(Some).collect();
-        let mut right_moves: Vec<Option<CanonicalForm>> =
-            self.right.iter().cloned().map(Some).collect();
+        let left_moves: Vec<Option<CanonicalForm>> =
+            self.left.iter().cloned().map(|gl| Some(gl.get())).collect();
+        let mut right_moves: Vec<Option<CanonicalForm>> = self
+            .right
+            .iter()
+            .cloned()
+            .map(|gr| Some(gr.get()))
+            .collect();
 
         loop {
             if (i as usize) >= right_moves.len() {
@@ -401,9 +389,11 @@ impl Moves {
     fn canonicalize(&self) -> Self {
         let mut left = self.bypass_reversible_moves_l();
         Self::eliminate_dominated_moves(&mut left, Player::Left);
+        let left = TotalWrapper::from_inner_vec(left);
 
         let mut right = self.bypass_reversible_moves_r();
         Self::eliminate_dominated_moves(&mut right, Player::Right);
+        let right = TotalWrapper::from_inner_vec(right);
 
         Self { left, right }
     }
@@ -439,7 +429,10 @@ impl Moves {
         let p = try_option!(p.parse_ascii_char('|'));
         let (p, right) = try_option!(Moves::parse_list(p));
         let p = try_option!(p.parse_ascii_char('}'));
-        let moves = Self { left, right };
+        let moves = Self {
+            left: TotalWrapper::from_inner_vec(left),
+            right: TotalWrapper::from_inner_vec(right),
+        };
         Some((p, moves))
     }
 }
@@ -448,9 +441,9 @@ impl Display for Moves {
     /// Print moves using `{G^L | G^R}` notation
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         display::braces(f, |f| {
-            display::commas(f, &self.left)?;
+            display::commas(f, TotalWrapper::into_inner_slice(&self.left))?;
             write!(f, "|")?;
-            display::commas(f, &self.right)
+            display::commas(f, TotalWrapper::into_inner_slice(&self.right))
         })
     }
 }
@@ -483,11 +476,10 @@ enum CanonicalFormInner {
     Moves(Moves),
 }
 
-/// Canonical game form
-#[repr(transparent)]
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct CanonicalForm {
-    inner: CanonicalFormInner,
+impl_total_wrapper! {
+    /// Canonical game form
+    #[derive(Debug, Clone)]
+    CanonicalForm => inner => CanonicalFormInner
 }
 
 impl CanonicalForm {
@@ -529,16 +521,16 @@ impl CanonicalForm {
                 let new_left_moves = moves
                     .left
                     .iter()
-                    .map(Self::construct_negative)
+                    .map(|gl| Self::construct_negative(gl))
                     .collect::<Vec<_>>();
                 let new_right_moves = moves
                     .right
                     .iter()
-                    .map(Self::construct_negative)
+                    .map(|gr| Self::construct_negative(gr))
                     .collect::<Vec<_>>();
                 let new_moves = Moves {
-                    left: new_left_moves,
-                    right: new_right_moves,
+                    left: TotalWrapper::from_inner_vec(new_left_moves),
+                    right: TotalWrapper::from_inner_vec(new_right_moves),
                 };
                 Self::construct_from_canonical_moves(new_moves)
             }
@@ -561,28 +553,39 @@ impl CanonicalForm {
 
         if !g.is_number() {
             for g_l in g.left_moves() {
-                moves.left.push(Self::construct_sum(&g_l, h));
+                moves
+                    .left
+                    .push(TotalWrapper::new(Self::construct_sum(&g_l, h)));
             }
             for g_r in g.right_moves() {
-                moves.right.push(Self::construct_sum(&g_r, h));
+                moves
+                    .right
+                    .push(TotalWrapper::new(Self::construct_sum(&g_r, h)));
             }
         }
         if !h.is_number() {
             for h_l in h.left_moves() {
-                moves.left.push(Self::construct_sum(g, &h_l));
+                moves
+                    .left
+                    .push(TotalWrapper::new(Self::construct_sum(g, &h_l)));
             }
             for h_r in h.right_moves() {
-                moves.right.push(Self::construct_sum(g, &h_r));
+                moves
+                    .right
+                    .push(TotalWrapper::new(Self::construct_sum(g, &h_r)));
             }
         }
 
-        Self::new_from_moves(moves.left, moves.right)
+        Self::new_from_moves(
+            TotalWrapper::into_inner_vec(moves.left),
+            TotalWrapper::into_inner_vec(moves.right),
+        )
     }
 
     /// VERY INTERNAL
     fn construct_from_canonical_moves(mut moves: Moves) -> Self {
-        moves.left.sort_by(|lhs, rhs| lhs.inner.cmp(&rhs.inner));
-        moves.right.sort_by(|lhs, rhs| lhs.inner.cmp(&rhs.inner));
+        moves.left.sort();
+        moves.right.sort();
 
         if let Some(nus) = moves.to_nus() {
             return Self::new_nus(nus);
@@ -594,7 +597,10 @@ impl CanonicalForm {
 
     /// Safe function to construct a game from possible moves
     pub fn new_from_moves(left: Vec<CanonicalForm>, right: Vec<CanonicalForm>) -> Self {
-        let mut moves = Moves { left, right };
+        let mut moves = Moves {
+            left: TotalWrapper::from_inner_vec(left),
+            right: TotalWrapper::from_inner_vec(right),
+        };
         moves.eliminate_duplicates();
         moves = moves.canonicalize();
 
@@ -611,9 +617,9 @@ impl CanonicalForm {
         LeftMovesIter {
             inner: match &self.inner {
                 CanonicalFormInner::Nus(nus) => MovesIterInner::Nus(nus.left_moves()),
-                CanonicalFormInner::Moves(moves) => {
-                    MovesIterInner::Moves(moves.left.as_slice().iter())
-                }
+                CanonicalFormInner::Moves(moves) => MovesIterInner::Moves(
+                    TotalWrapper::into_inner_slice(moves.left.as_slice()).iter(),
+                ),
             },
         }
     }
@@ -623,9 +629,9 @@ impl CanonicalForm {
         RightMovesIter {
             inner: match &self.inner {
                 CanonicalFormInner::Nus(nus) => MovesIterInner::Nus(nus.right_moves()),
-                CanonicalFormInner::Moves(moves) => {
-                    MovesIterInner::Moves(moves.right.as_slice().iter())
-                }
+                CanonicalFormInner::Moves(moves) => MovesIterInner::Moves(
+                    TotalWrapper::into_inner_slice(moves.right.as_slice()).iter(),
+                ),
             },
         }
     }
@@ -842,8 +848,8 @@ impl CanonicalForm {
         }
 
         let new_moves = Moves {
-            left: new_left_moves,
-            right: new_right_moves,
+            left: TotalWrapper::from_inner_vec(new_left_moves),
+            right: TotalWrapper::from_inner_vec(new_right_moves),
         };
 
         new_moves.canonical_form()
@@ -872,8 +878,8 @@ impl CanonicalForm {
         }
 
         let new_moves = Moves {
-            left: new_left_moves,
-            right: new_right_moves,
+            left: TotalWrapper::from_inner_vec(new_left_moves),
+            right: TotalWrapper::from_inner_vec(new_right_moves),
         };
 
         new_moves.canonical_form()
@@ -907,16 +913,22 @@ impl CanonicalForm {
                     left: moves
                         .left
                         .iter()
-                        .map(|left_move| left_move.atomic_weight() - Self::new_integer(2))
+                        .map(|left_move| {
+                            TotalWrapper::new(left_move.atomic_weight() - Self::new_integer(2))
+                        })
                         .collect::<Vec<_>>(),
                     right: moves
                         .right
                         .iter()
-                        .map(|right_move| right_move.atomic_weight() + Self::new_integer(2))
+                        .map(|right_move| {
+                            TotalWrapper::new(right_move.atomic_weight() + Self::new_integer(2))
+                        })
                         .collect::<Vec<_>>(),
                 };
-                let new_game =
-                    Self::new_from_moves(new_moves.left.clone(), new_moves.right.clone());
+                let new_game = Self::new_from_moves(
+                    TotalWrapper::into_inner_vec(new_moves.left.clone()),
+                    TotalWrapper::into_inner_vec(new_moves.right.clone()),
+                );
 
                 let CanonicalFormInner::Nus(new_nus) = new_game.inner else {
                     return new_game;
@@ -952,7 +964,7 @@ impl CanonicalForm {
                         .iter()
                         .map(|right_move| {
                             let greatest = right_move.left_stop().round();
-                            if right_move <= &Self::new_integer(greatest) {
+                            if right_move.deref() <= &Self::new_integer(greatest) {
                                 greatest - 1
                             } else {
                                 greatest
@@ -1024,9 +1036,22 @@ impl CanonicalForm {
             Some((p, nus)) => Some((p, CanonicalForm::new_nus(nus))),
             None => {
                 let (p, Moves { left, right }) = try_option!(lexeme!(p, Moves::parse));
-                Some((p, CanonicalForm::new_from_moves(left, right)))
+                Some((
+                    p,
+                    CanonicalForm::new_from_moves(
+                        TotalWrapper::into_inner_vec(left),
+                        TotalWrapper::into_inner_vec(right),
+                    ),
+                ))
             }
         }
+    }
+}
+
+impl PartialEq for CanonicalForm {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        TotalWrapper::new(self) == TotalWrapper::new(other)
     }
 }
 
@@ -1331,35 +1356,55 @@ mod tests {
         let star = CanonicalForm::new_nus(Nus::from_str("*").unwrap());
 
         let moves_l = Moves {
-            left: vec![one],
-            right: vec![star],
+            left: vec![TotalWrapper::new(one)],
+            right: vec![TotalWrapper::new(star)],
         };
-        let left_id = CanonicalForm::new_from_moves(moves_l.left, moves_l.right);
+        let left_id = CanonicalForm::new_from_moves(
+            TotalWrapper::into_inner_vec(moves_l.left),
+            TotalWrapper::into_inner_vec(moves_l.right),
+        );
         assert_eq!(&left_id.to_string(), "{1|*}");
 
         let weird = Moves {
-            left: vec![CanonicalForm::new_nus(Nus::from_str("1v2*").unwrap())],
-            right: vec![CanonicalForm::new_nus(Nus::from_str("1").unwrap())],
+            left: vec![TotalWrapper::new(CanonicalForm::new_nus(
+                Nus::from_str("1v2*").unwrap(),
+            ))],
+            right: vec![TotalWrapper::new(CanonicalForm::new_nus(
+                Nus::from_str("1").unwrap(),
+            ))],
         };
-        let weird = CanonicalForm::new_from_moves(weird.left, weird.right);
+        let weird = CanonicalForm::new_from_moves(
+            TotalWrapper::into_inner_vec(weird.left),
+            TotalWrapper::into_inner_vec(weird.right),
+        );
         assert_eq!(&weird.to_string(), "1v3");
         assert_eq!(&weird.left_moves().nth(0).unwrap().to_string(), "1v2*");
 
         // Another case:
 
         let weird_right = Moves {
-            left: vec![CanonicalForm::new_nus(Nus::from_str("^").unwrap())],
-            right: vec![CanonicalForm::new_nus(Nus::from_str("-2").unwrap())],
+            left: vec![TotalWrapper::new(CanonicalForm::new_nus(
+                Nus::from_str("^").unwrap(),
+            ))],
+            right: vec![TotalWrapper::new(CanonicalForm::new_nus(
+                Nus::from_str("-2").unwrap(),
+            ))],
         };
-        let weird_right = CanonicalForm::new_from_moves(weird_right.left, weird_right.right);
+        let weird_right = CanonicalForm::new_from_moves(
+            TotalWrapper::into_inner_vec(weird_right.left),
+            TotalWrapper::into_inner_vec(weird_right.right),
+        );
         assert_eq!(&weird_right.to_string(), "{^|-2}");
 
         let weird = Moves {
             left: vec![],
-            right: vec![weird_right],
+            right: vec![TotalWrapper::new(weird_right)],
         };
         assert_eq!(&weird.canonicalize().to_string(), "{|}");
-        let weird = CanonicalForm::new_from_moves(weird.left, weird.right);
+        let weird = CanonicalForm::new_from_moves(
+            TotalWrapper::into_inner_vec(weird.left),
+            TotalWrapper::into_inner_vec(weird.right),
+        );
         assert_eq!(&weird.to_string(), "0");
     }
 

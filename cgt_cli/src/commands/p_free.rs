@@ -1,6 +1,9 @@
 use crate::io::FilePathOr;
 use anyhow::Context;
-use cgt::misere::p_free::{GameForm, Outcome};
+use cgt::{
+    misere::p_free::{GameForm, Outcome},
+    total::TotalWrapper,
+};
 use clap::Parser;
 use itertools::Itertools;
 use std::{
@@ -48,13 +51,13 @@ where
     let mut indices = HashMap::with_capacity(day.len());
     for (i, g) in day.iter().enumerate() {
         writeln!(f, "{i} [label = \"{g}\"];")?;
-        indices.insert(g, i);
+        indices.insert(TotalWrapper::new(g), i);
     }
 
     for (g, h) in day.iter().tuple_combinations() {
         if game_lt(g, h) && !day.iter().any(|k| game_lt(g, k) && game_lt(k, h)) {
-            let i = *indices.get(g).unwrap();
-            let j = *indices.get(h).unwrap();
+            let i = *indices.get(TotalWrapper::from_ref(&g)).unwrap();
+            let j = *indices.get(TotalWrapper::from_ref(&h)).unwrap();
             writeln!(f, "{j} -- {i}")?;
         }
     }

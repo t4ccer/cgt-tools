@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use crate::short::partizan::Player;
+use crate::{short::partizan::Player, total::impl_total_wrapper};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Outcome {
@@ -47,9 +47,14 @@ impl PartialOrd for Outcome {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct GameForm {
-    left: Vec<GameForm>,
-    right: Vec<GameForm>,
+struct GameFormInner {
+    left: Vec<GameFormInner>,
+    right: Vec<GameFormInner>,
+}
+
+impl_total_wrapper! {
+    #[derive(Debug, Clone)]
+    GameForm => inner => GameFormInner
 }
 
 impl std::fmt::Display for GameForm {
@@ -78,19 +83,25 @@ impl std::fmt::Display for GameForm {
 }
 
 impl GameForm {
+    pub fn new(left: Vec<GameForm>, right: Vec<GameForm>) -> GameForm {
+        let mut left = GameForm::into_inner_vec(left);
+        left.sort();
+
+        let mut right = GameForm::into_inner_vec(right);
+        right.sort();
+
+        GameForm {
+            inner: GameFormInner { left, right },
+        }
+    }
+
     pub fn new_integer(n: i32) -> GameForm {
         use std::cmp::Ordering;
 
         match n.cmp(&0) {
-            Ordering::Less => todo!(),
-            Ordering::Equal => GameForm {
-                left: vec![],
-                right: vec![],
-            },
-            Ordering::Greater => GameForm {
-                left: vec![GameForm::new_integer(n - 1)],
-                right: vec![],
-            },
+            Ordering::Less => GameForm::new(vec![], vec![GameForm::new_integer(n + 1)]),
+            Ordering::Equal => GameForm::new(vec![], vec![]),
+            Ordering::Greater => GameForm::new(vec![GameForm::new_integer(n - 1)], vec![]),
         }
     }
 
@@ -114,8 +125,8 @@ impl GameForm {
 
     pub fn moves(&self, player: Player) -> &[GameForm] {
         match player {
-            Player::Left => &self.left,
-            Player::Right => &self.right,
+            Player::Left => GameForm::from_inner_slice(self.inner.left.as_slice()),
+            Player::Right => GameForm::from_inner_slice(self.inner.right.as_slice()),
         }
     }
 
@@ -177,26 +188,26 @@ impl GameForm {
         use itertools::Itertools;
 
         day.iter().powerset().flat_map(|left_moves| {
-            day.iter().powerset().map(move |right_moves| GameForm {
-                left: left_moves.clone().into_iter().cloned().collect(),
-                right: right_moves.into_iter().cloned().collect(),
+            day.iter().powerset().map(move |right_moves| {
+                GameForm::new(
+                    left_moves.clone().into_iter().cloned().collect(),
+                    right_moves.into_iter().cloned().collect(),
+                )
             })
         })
     }
 
     pub fn conjugate(&self) -> GameForm {
-        GameForm {
-            left: self
-                .moves(Player::Right)
+        GameForm::new(
+            self.moves(Player::Right)
                 .iter()
                 .map(|gr| gr.conjugate())
                 .collect(),
-            right: self
-                .moves(Player::Left)
+            self.moves(Player::Left)
                 .iter()
                 .map(|gl| gl.conjugate())
                 .collect(),
-        }
+        )
     }
 
     pub fn sum(g: &GameForm, h: &GameForm) -> GameForm {
@@ -216,19 +227,16 @@ impl GameForm {
             right.push(GameForm::sum(g, hr));
         }
 
-        GameForm { left, right }
+        GameForm::new(left, right)
     }
 }
 
 #[test]
 fn to_integer() {
     assert_eq!(GameForm::new_integer(1).to_integer(), Some(1));
+    assert_eq!(GameForm::new_integer(-1).to_integer(), Some(-1));
     assert_eq!(
-        GameForm {
-            left: vec![],
-            right: vec![GameForm::new_integer(1)],
-        }
-        .to_integer(),
+        GameForm::new(vec![], vec![GameForm::new_integer(1)],).to_integer(),
         None
     );
 }

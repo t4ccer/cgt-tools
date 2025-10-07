@@ -4,9 +4,17 @@
 //!
 //! This code is heavily based on <https://github.com/alfiemd/gemau> by Alfie Davies
 
-use crate::parsing::{Parser, impl_from_str_via_parser, lexeme, try_option};
+use crate::{
+    parsing::{Parser, impl_from_str_via_parser, lexeme, try_option},
+    total::impl_total_wrapper,
+};
 use auto_ops::impl_op_ex;
-use std::{cmp::Ordering, fmt, fmt::Display, mem::ManuallyDrop};
+use std::{
+    cmp::Ordering,
+    fmt::{self, Display},
+    hash::Hash,
+    mem::ManuallyDrop,
+};
 
 pub mod interned;
 
@@ -491,11 +499,10 @@ impl LeftDeadEndInner {
     }
 }
 
-/// Left dead end is a game where every follower is a left end (there is no move for Left)
-#[derive(Debug, Clone)]
-#[repr(transparent)]
-pub struct LeftDeadEnd {
-    inner: LeftDeadEndInner,
+impl_total_wrapper! {
+    /// Left dead end is a game where every follower is a left end (there is no move for Left)
+    #[derive(Debug, Clone)]
+    LeftDeadEnd => inner => LeftDeadEndInner
 }
 
 impl Display for LeftDeadEnd {
@@ -533,16 +540,6 @@ impl_op_ex!(+|lhs: &LeftDeadEnd, rhs: &LeftDeadEnd| -> LeftDeadEnd {
 impl_from_str_via_parser!(LeftDeadEnd);
 
 impl LeftDeadEnd {
-    #[inline(always)]
-    fn from_inner_vec(moves: Vec<LeftDeadEndInner>) -> Vec<LeftDeadEnd> {
-        let mut md = ManuallyDrop::new(moves);
-        let ptr: *mut LeftDeadEndInner = md.as_mut_ptr();
-        let len = md.len();
-        let capacity = md.capacity();
-        // SAFETY: LeftDeadEnd is #[repr(transparent)] so the cast is OK
-        unsafe { Vec::from_raw_parts(ptr.cast::<LeftDeadEnd>(), len, capacity) }
-    }
-
     #[inline(always)]
     fn normalize(inner: LeftDeadEndInner) -> LeftDeadEnd {
         match inner {

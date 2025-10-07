@@ -19,5 +19,6 @@ pub mod misere;
 pub mod numeric;
 pub mod parsing;
 pub mod short;
+pub mod total;
 
 mod display;

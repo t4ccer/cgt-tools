@@ -1,19 +1,17 @@
 //! Left Dead Ends with interned storage
 
-use crate::misere::left_dead_end::LeftDeadEndContext;
+use crate::{
+    misere::left_dead_end::LeftDeadEndContext,
+    total::{TotalWrapper, impl_total_wrapper},
+};
 use append_only_vec::AppendOnlyVec;
 use dashmap::DashMap;
 use std::{cmp::Ordering, iter::FusedIterator};
 
-/// Interned Left Dead End
-///
-/// Note that `Eq` and `Ord` traits operate on the internal state and does not behave like
-/// game comparison. They are implemented for the sake of data structures. Use
-/// [`Interner::partial_cmp`] instead to get game comparison.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct LeftDeadEnd {
-    /// Index into storage vector when non-negative, an integer offset by one if negative
-    idx: i64,
+impl_total_wrapper! {
+    /// Left dead end is a game where every follower is a left end (there is no move for Left)
+    #[derive(Debug, Clone, Copy)]
+    LeftDeadEnd => idx => i64
 }
 
 impl LeftDeadEnd {
@@ -38,10 +36,10 @@ impl LeftDeadEnd {
 #[derive(Debug)]
 pub struct Interner {
     /// Storage of game moves
-    games: AppendOnlyVec<Box<[LeftDeadEnd]>>,
+    games: AppendOnlyVec<Box<[TotalWrapper<LeftDeadEnd>]>>,
 
     /// Mapping from game moves to its index in `games` vector
-    table: DashMap<Box<[LeftDeadEnd]>, usize, ahash::RandomState>,
+    table: DashMap<Box<[TotalWrapper<LeftDeadEnd>]>, usize, ahash::RandomState>,
 }
 
 impl LeftDeadEndContext for Interner {
@@ -51,12 +49,13 @@ impl LeftDeadEndContext for Interner {
         LeftDeadEnd::new_integer(integer)
     }
 
-    fn new_moves(&self, mut moves: Vec<Self::LeftDeadEnd>) -> Self::LeftDeadEnd {
+    fn new_moves(&self, moves: Vec<Self::LeftDeadEnd>) -> Self::LeftDeadEnd {
         if moves.is_empty() {
             self.new_integer(0)
         } else if moves.len() == 1 && self.to_integer(&moves[0]).is_some() {
             self.new_integer(self.to_integer(&moves[0]).unwrap() + 1)
         } else {
+            let mut moves = TotalWrapper::from_inner_vec(moves);
             moves.sort();
             let moves = moves.into_boxed_slice();
 
@@ -119,7 +118,7 @@ impl Interner {
 #[derive(Debug, Clone)]
 struct MovesIter<'a> {
     game: Option<LeftDeadEnd>,
-    moves: core::slice::Iter<'a, LeftDeadEnd>,
+    moves: core::slice::Iter<'a, TotalWrapper<LeftDeadEnd>>,
 }
 
 impl Iterator for MovesIter<'_> {
@@ -131,7 +130,7 @@ impl Iterator for MovesIter<'_> {
             self.game = None;
             Some(LeftDeadEnd::new_integer(integer - 1))
         } else {
-            self.moves.next().copied()
+            self.moves.next().copied().map(TotalWrapper::get)
         }
     }
 
@@ -176,7 +175,7 @@ fn identical() {
     ]);
 
     // == for identical
-    assert_eq!(g, h);
+    assert_eq!(g.idx, h.idx);
 }
 
 #[test]
@@ -243,7 +242,7 @@ fn factors() {
     let interner = Interner::new();
     let g = interner.new_from_string("{{{{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}}, {{{1, 0}}, {{{1, 0}}}}, {{{{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}}}, {{{{{1, 0}}, {{{1, 0}}}}}}}").unwrap();
 
-    let mut expected_factors = vec![
+    let expected_factors = vec![
         (
             interner.new_from_string("0").unwrap(),
             interner.new_from_string("{{{{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}}, {{{1, 0}}, {{{1, 0}}}}, {{{{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}}}, {{{{{1, 0}}, {{{1, 0}}}}}}}").unwrap(),
@@ -278,7 +277,9 @@ fn factors() {
             interner.new_from_string("{1, 0}").unwrap()
         ),
     ];
-    expected_factors.sort();
 
-    assert_eq!(interner.factors(&g), expected_factors);
+    for (actual, expected) in interner.factors(&g).iter().zip(expected_factors.iter()) {
+        assert_eq!(actual.0.idx, expected.0.idx);
+        assert_eq!(actual.1.idx, expected.1.idx);
+    }
 }
