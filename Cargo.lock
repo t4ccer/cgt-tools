@@ -355,6 +355,7 @@ dependencies = [
  "clap",
  "itertools 0.13.0",
  "jemallocator",
+ "quickcheck",
  "rand 0.9.2",
  "rayon",
  "serde",

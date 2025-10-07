@@ -1,21 +1,14 @@
-use crate::io::FilePathOr;
-use anyhow::Context;
-use cgt::{
-    misere::p_free::{GameForm, Outcome},
-    total::TotalWrapper,
-};
+use cgt::{misere::p_free::GameForm, short::partizan::Player};
 use clap::Parser;
-use itertools::Itertools;
-use std::{
-    cmp::Ordering,
-    collections::HashMap,
-    io::{self, BufWriter, Stdout},
-};
+use quickcheck::{Arbitrary, Gen};
 
 #[derive(Parser, Debug)]
 pub struct Args {
-    #[arg(long)]
-    dot_output: FilePathOr<Stdout>,
+    #[arg(long, allow_hyphen_values = true)]
+    lhs: GameForm,
+
+    #[arg(long, allow_hyphen_values = true)]
+    rhs: GameForm,
 }
 
 pub fn run(args: Args) -> anyhow::Result<()> {
@@ -29,47 +22,51 @@ pub fn run(args: Args) -> anyhow::Result<()> {
     let day1 = next_day(&day0);
     let day2 = next_day(&day1);
 
-    let mut f = BufWriter::new(
-        args.dot_output
-            .create()
-            .with_context(|| format!("Failed to create dot file `{}`", args.dot_output))?,
-    );
-    to_graphviz(&day2, &mut f)
-        .with_context(|| format!("Failed to write to dot file `{}`", args.dot_output))?;
+    // for g in &day2 {
+    //     eprintln!(
+    //         "o({}) = {}, l = {}, r = {}",
+    //         g,
+    //         g.outcome(),
+    //         g.tipping_point(Player::Left),
+    //         g.tipping_point(Player::Right)
+    //     );
+    // }
 
-    Ok(())
-}
+    // for x in &day2 {
+    //     if GameForm::sum(&args.lhs, x).outcome() != GameForm::sum(&args.rhs, x).outcome() {
+    //         eprintln!("{x}");
+    //     }
+    // }
 
-fn to_graphviz<W>(day: &[GameForm], mut f: W) -> io::Result<()>
-where
-    W: io::Write,
-{
-    writeln!(f, "graph {{")?;
-    writeln!(f, "splines=false;")?;
-    writeln!(f, "edge [penwidth=0.15]")?;
+    // let mut rnd = Gen::new(10);
+    // for _ in 0..100 {
+    //     let x = GameForm::arbitrary(&mut rnd);
+    //     if x.is_p_free() && x.is_dead_ending() {
+    //         let ol = GameForm::sum(&args.lhs, &x).outcome();
+    //         let or = GameForm::sum(&args.rhs, &x).outcome();
+    //         if ol != or {
+    //             eprintln!("o({} + {}) = {}", &args.lhs, x, ol);
+    //             eprintln!("o({} + {}) = {}", &args.rhs, x, or);
+    //             eprintln!("x = {x}");
+    //             eprintln!();
+    //         }
+    //     }
+    // }
 
-    let mut indices = HashMap::with_capacity(day.len());
-    for (i, g) in day.iter().enumerate() {
-        writeln!(f, "{i} [label = \"{g}\"];")?;
-        indices.insert(TotalWrapper::new(g), i);
-    }
-
-    for (g, h) in day.iter().tuple_combinations() {
-        if game_lt(g, h) && !day.iter().any(|k| game_lt(g, k) && game_lt(k, h)) {
-            let i = *indices.get(TotalWrapper::from_ref(&g)).unwrap();
-            let j = *indices.get(TotalWrapper::from_ref(&h)).unwrap();
-            writeln!(f, "{j} -- {i}")?;
+    eprintln!("game;outcome;left tipping;right tipping");
+    let mut rnd = Gen::new(8);
+    for _ in 0..1000 {
+        let x = GameForm::arbitrary(&mut rnd);
+        if x.is_p_free() && x.is_dead_ending() {
+            eprintln!(
+                "{};{};{};{}",
+                x,
+                x.outcome(),
+                x.tipping_point(Player::Left),
+                x.tipping_point(Player::Right)
+            );
         }
     }
-    writeln!(f, "}}")?;
 
     Ok(())
-}
-
-fn game_lt(g: &GameForm, h: &GameForm) -> bool {
-    let sum = GameForm::sum(&g, &h.conjugate());
-    matches!(
-        Outcome::N.partial_cmp(&sum.outcome()).unwrap(),
-        Ordering::Less
-    )
 }

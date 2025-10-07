@@ -1,6 +1,10 @@
 #![allow(missing_docs)]
 
-use crate::{short::partizan::Player, total::impl_total_wrapper};
+use crate::{
+    parsing::{Parser, impl_from_str_via_parser, lexeme, try_option},
+    short::partizan::Player,
+    total::impl_total_wrapper,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Outcome {
@@ -86,9 +90,11 @@ impl GameForm {
     pub fn new(left: Vec<GameForm>, right: Vec<GameForm>) -> GameForm {
         let mut left = GameForm::into_inner_vec(left);
         left.sort();
+        left.dedup();
 
         let mut right = GameForm::into_inner_vec(right);
         right.sort();
+        right.dedup();
 
         GameForm {
             inner: GameFormInner { left, right },
@@ -228,6 +234,143 @@ impl GameForm {
         }
 
         GameForm::new(left, right)
+    }
+
+    pub fn tipping_point(&self, player: Player) -> u32 {
+        match player {
+            Player::Left => {
+                let mut n = 0;
+                loop {
+                    if GameForm::sum(self, &GameForm::new_integer(-(n as i32))).outcome()
+                        == Outcome::L
+                    {
+                        break n;
+                    }
+                    n += 1;
+                }
+            }
+            Player::Right => {
+                let mut n = 0;
+                loop {
+                    if GameForm::sum(self, &GameForm::new_integer(n as i32)).outcome() == Outcome::R
+                    {
+                        break n;
+                    }
+                    n += 1;
+                }
+            }
+        }
+    }
+
+    fn parse_list(mut p: Parser<'_>) -> Option<(Parser<'_>, Vec<GameForm>)> {
+        let mut acc = Vec::new();
+        loop {
+            match lexeme!(p, GameForm::parse) {
+                Some((cf_p, cf)) => {
+                    acc.push(cf);
+                    p = cf_p;
+                    p = p.trim_whitespace();
+                    match p.parse_ascii_char(',') {
+                        Some(pp) => {
+                            p = pp.trim_whitespace();
+                        }
+                        None => return Some((p, acc)),
+                    }
+                }
+                None => return Some((p, acc)),
+            }
+        }
+    }
+
+    fn parse<'p>(p: Parser<'p>) -> Option<(Parser<'p>, GameForm)> {
+        let p = p.trim_whitespace();
+        if let Some(p) = p.parse_ascii_char('{') {
+            let (p, left) = try_option!(GameForm::parse_list(p));
+            let p = try_option!(p.parse_ascii_char('|'));
+            let (p, right) = try_option!(GameForm::parse_list(p));
+            let p = try_option!(p.parse_ascii_char('}'));
+            let p = p.trim_whitespace();
+            Some((p, GameForm::new(left, right)))
+        } else {
+            // TODO: Generalize number parsers
+            let (p, integer) = try_option!(lexeme!(p, Parser::parse_i64));
+            Some((p, GameForm::new_integer(integer as i32)))
+        }
+    }
+}
+
+impl_from_str_via_parser!(GameForm);
+
+#[cfg(any(test, feature = "quickcheck"))]
+impl GameForm {
+    fn arbitrary_sized(g: &mut quickcheck::Gen, mut size: i64) -> GameForm {
+        use quickcheck::Arbitrary;
+
+        let mut left = Vec::new();
+        let mut right = Vec::new();
+
+        while size > 0 {
+            let opt = if bool::arbitrary(g) {
+                let n = i64::arbitrary(g).rem_euclid(size);
+                size -= n + 1;
+                if bool::arbitrary(g) {
+                    GameForm::new_integer(n as i32)
+                } else {
+                    GameForm::new_integer(-n as i32)
+                }
+            } else {
+                let n = i64::arbitrary(g) % size;
+                size -= n;
+                GameForm::arbitrary_sized(g, n)
+            };
+
+            if bool::arbitrary(g) {
+                left.push(opt);
+            } else {
+                right.push(opt);
+            }
+        }
+
+        GameForm::new(left, right)
+    }
+}
+
+#[cfg(any(test, feature = "quickcheck"))]
+impl quickcheck::Arbitrary for GameForm {
+    fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+        let size = (g.size() / 2) as i64;
+        GameForm::arbitrary_sized(g, size)
+    }
+
+    fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
+        use std::cmp::Ordering;
+
+        match self.to_integer() {
+            Some(n) => match n.cmp(&0) {
+                Ordering::Less => quickcheck::single_shrinker(GameForm::new_integer(n + 1)),
+                Ordering::Equal => quickcheck::empty_shrinker(),
+                Ordering::Greater => quickcheck::single_shrinker(GameForm::new_integer(n - 1)),
+            },
+            None => {
+                let this = self.clone();
+                let this2 = self.clone();
+                Box::new(
+                    this.moves(Player::Left)
+                        .to_vec()
+                        .shrink()
+                        .map(move |left| GameForm::new(left, this.moves(Player::Right).to_vec()))
+                        .chain(
+                            this2
+                                .moves(Player::Right)
+                                .to_vec()
+                                .shrink()
+                                .map(move |right| {
+                                    GameForm::new(this2.moves(Player::Left).to_vec(), right)
+                                }),
+                        ),
+                )
+            }
+        }
     }
 }
 

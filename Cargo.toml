@@ -31,6 +31,7 @@ rayon = {version = "1.10", optional = true}
 mint = {version = "0.5", optional = true}
 tiny-skia = {version = "0.11.4", optional = true}
 imgui = { version = "0.12.0", optional = true, default-features = false }
+quickcheck = { version = "1.0", optional = true, default-features = false }
 
 [dev-dependencies]
 quickcheck = { version = "1.0", default-features = false }
@@ -42,6 +43,7 @@ rayon = ["dep:rayon"]
 tiny_skia = ["dep:tiny-skia"]
 imgui = ["dep:imgui"]
 mint = ["dep:mint"]
+quickcheck = ["dep:quickcheck"]
 
 [lib]
 path = "./cgt/lib.rs"
