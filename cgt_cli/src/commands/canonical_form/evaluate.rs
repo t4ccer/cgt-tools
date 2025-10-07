@@ -1,4 +1,4 @@
-use crate::io::FileOrStdout;
+use crate::io::FilePathOr;
 use anyhow::{Context, Result};
 use cgt::{
     drawing::{Draw, svg, tiny_skia},
@@ -7,7 +7,7 @@ use cgt::{
 use clap::Parser;
 use std::{
     fmt::Debug,
-    io::{BufWriter, Write},
+    io::{BufWriter, Stdout, Write},
     str::FromStr,
 };
 
@@ -20,11 +20,11 @@ pub struct Args {
 
     /// SVG render output path
     #[arg(long, default_value = None)]
-    output_svg: Option<FileOrStdout>,
+    output_svg: Option<FilePathOr<Stdout>>,
 
     /// PNG render output path
     #[arg(long, default_value = None)]
-    output_png: Option<FileOrStdout>,
+    output_png: Option<FilePathOr<Stdout>>,
 }
 
 #[allow(clippy::needless_pass_by_value)]

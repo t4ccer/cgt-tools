@@ -1,163 +1,164 @@
 use std::{
+    ffi::OsStr,
     fs::File,
     io::{self, Stderr, Stdin, Stdout, stderr, stdin, stdout},
+    marker::PhantomData,
+    path::{Path, PathBuf},
 };
 
-macro_rules! define_output_file_or_std {
-    ($name:ident, $writer:ident, $std_enum:ident, $std_impl:ident, $std_mk:ident) => {
-        #[derive(Debug, Clone)]
-        pub enum $name {
-            FilePath(String),
-            $std_enum,
-        }
+const STD_SYMBOL: &'static str = "-";
 
-        impl ::core::fmt::Display for $name {
-            fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-                match self {
-                    Self::$std_enum => write!(f, "-"),
-                    Self::FilePath(value) => write!(f, "{value}"),
-                }
-            }
-        }
-
-        impl From<String> for $name {
-            fn from(value: String) -> Self {
-                if &value == "-" {
-                    Self::$std_enum
-                } else {
-                    Self::FilePath(value)
-                }
-            }
-        }
-
-        impl $name {
-            fn create_with<'a, F>(&'a self, f: F) -> io::Result<$writer>
-            where
-                F: FnOnce(&'a str) -> io::Result<File>,
-            {
-                match self {
-                    Self::FilePath(fp) => Ok($writer::File(f(fp)?)),
-                    Self::$std_enum => Ok($writer::$std_enum($std_mk())),
-                }
-            }
-
-            #[allow(dead_code)]
-            pub fn open(&self) -> io::Result<$writer> {
-                self.create_with(File::open)
-            }
-
-            #[allow(dead_code)]
-            pub fn create(&self) -> io::Result<$writer> {
-                self.create_with(File::create)
-            }
-        }
-
-        pub enum $writer {
-            File(File),
-            $std_enum($std_impl),
-        }
-
-        impl io::Write for $writer {
-            fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-                match self {
-                    Self::File(f) => f.write(buf),
-                    Self::$std_enum(fd) => {
-                        let mut lock = fd.lock();
-                        lock.write(buf)
-                    }
-                }
-            }
-
-            fn flush(&mut self) -> io::Result<()> {
-                match self {
-                    Self::File(f) => f.flush(),
-                    Self::$std_enum(fd) => {
-                        let mut lock = fd.lock();
-                        lock.flush()
-                    }
-                }
-            }
-        }
-    };
+pub enum FilePathOr<Stream> {
+    FilePath(PathBuf),
+    Std(PhantomData<Stream>),
 }
 
-define_output_file_or_std!(
-    FileOrStderr,
-    FileOrStderrWriter,
-    FileOrStderr,
-    Stderr,
-    stderr
-);
-
-define_output_file_or_std!(
-    FileOrStdout,
-    FileOrStdoutWriter,
-    FileOrStdout,
-    Stdout,
-    stdout
-);
-
-macro_rules! define_input_file_or_std {
-    ($name:ident, $reader:ident, $std_enum:ident, $std_impl:ident, $std_mk:ident) => {
-        #[derive(Debug, Clone)]
-        pub enum $name {
-            FilePath(String),
-            $std_enum,
+impl<Stream> Clone for FilePathOr<Stream> {
+    fn clone(&self) -> FilePathOr<Stream> {
+        match self {
+            FilePathOr::FilePath(file_path) => FilePathOr::FilePath(file_path.clone()),
+            FilePathOr::Std(_) => FilePathOr::Std(PhantomData),
         }
-
-        impl ::core::fmt::Display for $name {
-            fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-                match self {
-                    Self::$std_enum => write!(f, "-"),
-                    Self::FilePath(value) => write!(f, "{value}"),
-                }
-            }
-        }
-
-        impl From<String> for $name {
-            fn from(value: String) -> Self {
-                if &value == "-" {
-                    Self::$std_enum
-                } else {
-                    Self::FilePath(value)
-                }
-            }
-        }
-
-        impl $name {
-            fn create_with<'a, F>(&'a self, f: F) -> io::Result<$reader>
-            where
-                F: FnOnce(&'a str) -> io::Result<File>,
-            {
-                match self {
-                    Self::FilePath(fp) => Ok($reader::File(f(fp)?)),
-                    Self::$std_enum => Ok($reader::$std_enum($std_mk())),
-                }
-            }
-
-            #[allow(dead_code)]
-            pub fn open(&self) -> io::Result<$reader> {
-                self.create_with(File::open)
-            }
-        }
-
-        pub enum $reader {
-            File(File),
-            $std_enum($std_impl),
-        }
-
-        impl io::Read for $reader {
-            fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-                match self {
-                    Self::File(f) => f.read(buf),
-                    Self::$std_enum(fd) => {
-                        let mut lock = fd.lock();
-                        lock.read(buf)
-                    }
-                }
-            }
-        }
-    };
+    }
 }
 
-define_input_file_or_std!(FileOrStdin, FileOrStdinReader, FileOrStdin, Stdin, stdin);
+impl<Stream> core::fmt::Debug for FilePathOr<Stream> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FilePathOr::FilePath(file_path) => f.debug_tuple("FilePath").field(file_path).finish(),
+            FilePathOr::Std(ty) => f.debug_tuple("Std").field(&ty).finish(),
+        }
+    }
+}
+
+impl<Stream> ::core::fmt::Display for FilePathOr<Stream> {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        match self {
+            FilePathOr::FilePath(file_path) => write!(f, "{}", file_path.display()),
+            FilePathOr::Std(_) => write!(f, "{}", STD_SYMBOL),
+        }
+    }
+}
+
+impl<Stream> From<String> for FilePathOr<Stream> {
+    fn from(path: String) -> FilePathOr<Stream> {
+        if &path == STD_SYMBOL {
+            FilePathOr::Std(PhantomData)
+        } else {
+            FilePathOr::FilePath(path.into())
+        }
+    }
+}
+
+impl<Stream> From<PathBuf> for FilePathOr<Stream> {
+    fn from(path: PathBuf) -> FilePathOr<Stream> {
+        if path.as_os_str() == OsStr::new(STD_SYMBOL) {
+            FilePathOr::Std(PhantomData)
+        } else {
+            FilePathOr::FilePath(path)
+        }
+    }
+}
+
+impl<Stream> FilePathOr<Stream>
+where
+    Stream: StdStream,
+{
+    fn with_file_path<'a, F>(&'a self, mk_file: F) -> io::Result<FileOr<Stream>>
+    where
+        F: FnOnce(&'a Path) -> io::Result<File>,
+    {
+        match self {
+            FilePathOr::FilePath(path) => Ok(FileOr::File(mk_file(path)?)),
+            FilePathOr::Std(_) => Ok(FileOr::Std(Stream::get_handle())),
+        }
+    }
+
+    pub fn open(&self) -> io::Result<FileOr<Stream>> {
+        self.with_file_path(File::open)
+    }
+
+    pub fn create(&self) -> io::Result<FileOr<Stream>> {
+        self.with_file_path(File::create)
+    }
+}
+
+pub enum FileOr<Stream> {
+    File(File),
+    Std(Stream),
+}
+
+impl<Stream> io::Write for FileOr<Stream>
+where
+    Stream: io::Write,
+{
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        match self {
+            FileOr::File(file) => file.write(buf),
+            FileOr::Std(stream) => stream.write(buf),
+        }
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        match self {
+            FileOr::File(file) => file.flush(),
+            FileOr::Std(stream) => stream.flush(),
+        }
+    }
+
+    fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
+        match self {
+            FileOr::File(file) => file.write_all(buf),
+            FileOr::Std(stream) => stream.write_all(buf),
+        }
+    }
+}
+
+impl<Stream> io::Read for FileOr<Stream>
+where
+    Stream: io::Read,
+{
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        match self {
+            FileOr::File(file) => file.read(buf),
+            FileOr::Std(stream) => stream.read(buf),
+        }
+    }
+}
+
+impl<Stream> From<Stream> for FileOr<Stream>
+where
+    Stream: StdStream,
+{
+    fn from(stream: Stream) -> FileOr<Stream> {
+        FileOr::Std(stream)
+    }
+}
+
+impl<Stream> From<File> for FileOr<Stream> {
+    fn from(file: File) -> FileOr<Stream> {
+        FileOr::File(file)
+    }
+}
+
+pub trait StdStream {
+    fn get_handle() -> Self;
+}
+
+impl StdStream for Stdout {
+    fn get_handle() -> Stdout {
+        stdout()
+    }
+}
+
+impl StdStream for Stderr {
+    fn get_handle() -> Stderr {
+        stderr()
+    }
+}
+
+impl StdStream for Stdin {
+    fn get_handle() -> Stdin {
+        stdin()
+    }
+}

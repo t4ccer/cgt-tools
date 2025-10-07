@@ -1,4 +1,4 @@
-use crate::io::FileOrStdout;
+use crate::io::FilePathOr;
 use anyhow::Context;
 use cgt::misere::p_free::{GameForm, Outcome};
 use clap::Parser;
@@ -6,13 +6,13 @@ use itertools::Itertools;
 use std::{
     cmp::Ordering,
     collections::HashMap,
-    io::{self, BufWriter},
+    io::{self, BufWriter, Stdout},
 };
 
 #[derive(Parser, Debug)]
 pub struct Args {
     #[arg(long)]
-    dot_output: FileOrStdout,
+    dot_output: FilePathOr<Stdout>,
 }
 
 pub fn run(args: Args) -> anyhow::Result<()> {

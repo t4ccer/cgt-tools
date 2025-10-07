@@ -1,4 +1,4 @@
-use crate::io::{FileOrStdin, FileOrStdout};
+use crate::io::FilePathOr;
 use anyhow::{Context, Result};
 use cgt::{
     misere::left_dead_end::{LeftDeadEndContext, interned::Interner},
@@ -6,7 +6,7 @@ use cgt::{
 };
 use rayon::iter::{ParallelBridge, ParallelIterator};
 use std::{
-    io::{BufRead, BufReader, BufWriter, Write},
+    io::{BufRead, BufReader, BufWriter, Stdin, Stdout, Write},
     sync::Mutex,
 };
 
@@ -14,10 +14,10 @@ use std::{
 #[derive(clap::Parser, Debug)]
 pub struct Args {
     #[arg(long)]
-    input: FileOrStdin,
+    input: FilePathOr<Stdin>,
 
     #[arg(long, default_value = "-")]
-    output: FileOrStdout,
+    output: FilePathOr<Stdout>,
 
     #[arg(long, default_value = None)]
     threads: Option<u32>,

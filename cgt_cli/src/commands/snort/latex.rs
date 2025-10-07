@@ -1,13 +1,10 @@
-use crate::{
-    commands::snort::common::Log,
-    io::{FileOrStdin, FileOrStdout},
-};
+use crate::{commands::snort::common::Log, io::FilePathOr};
 use anyhow::{Context, Result, bail};
 use cgt::numeric::rational::Rational;
 use clap::Parser;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use std::{
-    io::{BufReader, BufWriter, Write},
+    io::{BufReader, BufWriter, Stdin, Stdout, Write},
     process::{Command, Stdio},
     sync::{
         Mutex,
@@ -22,11 +19,11 @@ use std::{
 pub struct Args {
     #[arg(long)]
     /// Input file with logs
-    in_file: FileOrStdin,
+    in_file: FilePathOr<Stdin>,
 
     #[arg(long)]
     /// Output file with LaTeX table
-    out_file: FileOrStdout,
+    out_file: FilePathOr<Stdout>,
 
     /// See <https://graphviz.org/docs/outputs/>
     #[arg(long, default_value = "svg")]

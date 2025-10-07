@@ -1,4 +1,4 @@
-use crate::{commands::snort::common::Log, io::FileOrStderr};
+use crate::{commands::snort::common::Log, io::FilePathOr};
 use anyhow::{Context, Result};
 use cgt::{
     genetic_algorithm::{Algorithm, GeneticAlgorithm, Scored},
@@ -18,7 +18,7 @@ use rand::{Rng, seq::IndexedRandom};
 use std::{
     cmp::min,
     fs::File,
-    io::{BufReader, BufWriter, Write},
+    io::{BufReader, BufWriter, Stderr, Write},
     num::NonZeroUsize,
 };
 
@@ -49,7 +49,7 @@ pub struct Args {
 
     /// Path to output logs
     #[arg(long)]
-    out_file: FileOrStderr,
+    out_file: FilePathOr<Stderr>,
 
     /// Clean up transpositon table after that many generations
     #[arg(long, default_value_t = 50)]

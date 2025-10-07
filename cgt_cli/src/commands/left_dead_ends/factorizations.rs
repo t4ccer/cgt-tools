@@ -1,4 +1,4 @@
-use crate::{commands::left_dead_ends::common::to_all_factorizations, io::FileOrStdout};
+use crate::{commands::left_dead_ends::common::to_all_factorizations, io::FilePathOr};
 use anyhow::{Context, Result};
 use cgt::misere::left_dead_end::{
     LeftDeadEndContext,
@@ -8,7 +8,7 @@ use clap::{self, Parser};
 use itertools::Itertools;
 use rayon::iter::{ParallelBridge, ParallelIterator};
 use std::{
-    io::{BufWriter, Write},
+    io::{BufWriter, Stdout, Write},
     sync::{Mutex, atomic::AtomicU64},
 };
 
@@ -24,7 +24,7 @@ pub struct Args {
     threads: Option<u32>,
 
     #[arg(long, default_value = "-")]
-    output: FileOrStdout,
+    output: FilePathOr<Stdout>,
 }
 
 #[allow(clippy::needless_pass_by_value)]

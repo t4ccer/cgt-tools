@@ -1,7 +1,4 @@
-use crate::{
-    commands::domineering::common::DomineeringResult,
-    io::{FileOrStderr, FileOrStdout},
-};
+use crate::{commands::domineering::common::DomineeringResult, io::FilePathOr};
 use anyhow::{Context, Result, bail};
 use cgt::{
     genetic_algorithm::{Algorithm, GeneticAlgorithm},
@@ -15,7 +12,12 @@ use cgt::{
 };
 use clap::Parser;
 use rand::Rng;
-use std::{collections::HashSet, io::Write, num::NonZeroUsize, str::FromStr};
+use std::{
+    collections::HashSet,
+    io::{Stderr, Stdout, Write},
+    num::NonZeroUsize,
+    str::FromStr,
+};
 
 /// Perform genetic search of domineering grids of given size for high temperature positions
 #[derive(Parser, Debug)]
@@ -38,11 +40,11 @@ pub struct Args {
 
     /// Path to output positions
     #[arg(long, default_value = "-")]
-    out_file: FileOrStdout,
+    out_file: FilePathOr<Stdout>,
 
     /// Path to output diagnostics
     #[arg(long, default_value = "-")]
-    diagnostics: FileOrStderr,
+    diagnostics: FilePathOr<Stderr>,
 
     #[arg(long, default_value = "7/4")]
     temperature_threshold: DyadicRationalNumber,
