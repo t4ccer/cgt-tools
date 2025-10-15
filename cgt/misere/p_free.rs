@@ -345,31 +345,30 @@ impl quickcheck::Arbitrary for GameForm {
     }
 
     fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
+        use itertools::Itertools;
         use std::cmp::Ordering;
 
         match self.to_integer() {
             Some(n) => match n.cmp(&0) {
-                Ordering::Less => quickcheck::single_shrinker(GameForm::new_integer(n + 1)),
+                Ordering::Less => Box::new(((n + 1)..=0).map(|n| GameForm::new_integer(n))),
                 Ordering::Equal => quickcheck::empty_shrinker(),
-                Ordering::Greater => quickcheck::single_shrinker(GameForm::new_integer(n - 1)),
+                Ordering::Greater => Box::new((0..n).rev().map(|n| GameForm::new_integer(n))),
             },
             None => {
                 let this = self.clone();
-                let this2 = self.clone();
                 Box::new(
                     this.moves(Player::Left)
                         .to_vec()
                         .shrink()
-                        .map(move |left| GameForm::new(left, this.moves(Player::Right).to_vec()))
-                        .chain(
-                            this2
-                                .moves(Player::Right)
+                        .chain(std::iter::once(vec![]))
+                        .cartesian_product(
+                            this.moves(Player::Right)
                                 .to_vec()
                                 .shrink()
-                                .map(move |right| {
-                                    GameForm::new(this2.moves(Player::Left).to_vec(), right)
-                                }),
-                        ),
+                                .chain(std::iter::once(vec![]))
+                                .collect::<Vec<_>>(),
+                        )
+                        .map(|(left, right)| GameForm::new(left, right)),
                 )
             }
         }
