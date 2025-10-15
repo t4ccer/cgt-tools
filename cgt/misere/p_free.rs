@@ -58,7 +58,9 @@ struct GameFormInner {
 
 impl_total_wrapper! {
     #[derive(Debug, Clone)]
-    GameForm => inner => GameFormInner
+    struct GameForm {
+        inner: GameFormInner
+    }
 }
 
 impl std::fmt::Display for GameForm {

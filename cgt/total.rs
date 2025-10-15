@@ -65,6 +65,21 @@ where
     }
 }
 
+impl<T> TotalWrappable for [T]
+where
+    T: TotalWrappable,
+{
+    #[inline(always)]
+    fn total_cmp(&self, other: &Self) -> Ordering {
+        TotalWrapper::from_inner_slice(self).cmp(TotalWrapper::from_inner_slice(other))
+    }
+
+    #[inline(always)]
+    fn total_hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        TotalWrapper::from_inner_slice(self).hash(state)
+    }
+}
+
 /// `TotalWrapper` can be used when inner type implements non-canonical total ordering
 #[derive(Debug, Clone, Copy)]
 #[repr(transparent)]
@@ -139,6 +154,12 @@ impl<T> Deref for TotalWrapper<T> {
     }
 }
 
+impl<T> AsRef<T> for TotalWrapper<T> {
+    fn as_ref(&self) -> &T {
+        &self.inner
+    }
+}
+
 macro_rules! unsafe_impl_inner_collections {
     ($wrapper:ty, $inner:ty, $vis:vis) => {
         #[allow(dead_code, missing_docs)]
@@ -191,7 +212,9 @@ pub(crate) use unsafe_impl_inner_collections;
 
 macro_rules! impl_total_wrapper {
     ( $(#[$attr:meta])*
-      $wrapper:ident => $vis:vis $field:ident => $inner:ty
+      struct $wrapper:ident {
+          $vis:vis $field:ident: $inner:ty $(,)?
+      }
     ) => {
         $(#[$attr])*
         #[repr(transparent)]

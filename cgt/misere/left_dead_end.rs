@@ -502,7 +502,9 @@ impl LeftDeadEndInner {
 impl_total_wrapper! {
     /// Left dead end is a game where every follower is a left end (there is no move for Left)
     #[derive(Debug, Clone)]
-    LeftDeadEnd => inner => LeftDeadEndInner
+    struct LeftDeadEnd {
+        inner: LeftDeadEndInner
+    }
 }
 
 impl Display for LeftDeadEnd {

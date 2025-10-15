@@ -11,7 +11,9 @@ use std::{cmp::Ordering, iter::FusedIterator};
 impl_total_wrapper! {
     /// Left dead end is a game where every follower is a left end (there is no move for Left)
     #[derive(Debug, Clone, Copy)]
-    LeftDeadEnd => idx => i64
+    struct LeftDeadEnd {
+        idx: i64
+    }
 }
 
 impl LeftDeadEnd {
