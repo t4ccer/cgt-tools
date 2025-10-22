@@ -1,8 +1,9 @@
 use crate::widgets::{
     amazons::AmazonsWindow, canonical_form::CanonicalFormWindow,
     digraph_placement::DigraphPlacementWindow, domineering::DomineeringWindow,
-    fission::FissionWindow, konane::KonaneWindow, resolving_set::ResolvingSetWindow,
-    ski_jumps::SkiJumpsWindow, snort::SnortWindow, toads_and_frogs::ToadsAndFrogsWindow,
+    fission::FissionWindow, graph_editor::GraphWindow, konane::KonaneWindow,
+    resolving_set::ResolvingSetWindow, ski_jumps::SkiJumpsWindow, snort::SnortWindow,
+    toads_and_frogs::ToadsAndFrogsWindow,
 };
 use cgt::{
     graph::adjacency_matrix::{directed::DirectedGraph, undirected::UndirectedGraph},
@@ -466,14 +467,20 @@ fn main() {
     let mut windows: BTreeMap<WindowId, Box<dyn IsCgtWindow>> = BTreeMap::new();
 
     // must be macros because borrow checker
-    macro_rules! new_window {
-        ($d:ident) => {{
-            let mut d = TitledWindow::without_title($d::new());
+    macro_rules! insert_window {
+        ($d:expr) => {{
+            let mut d = TitledWindow::without_title($d);
             d.set_title(next_id);
             d.initialize(&gui_context);
             windows.insert(next_id, Box::new(d));
             next_id.0 += 1;
         }};
+    }
+
+    macro_rules! new_window {
+        ($d:ident) => {
+            insert_window!($d::new())
+        };
     }
 
     let mut show_demo = false;
@@ -577,6 +584,16 @@ fn main() {
                 ui.separator();
                 if ui.menu_item("Resolving Set") {
                     new_window!(ResolvingSetWindow);
+                }
+                {
+                    use crate::widgets::graph_editor::PositionedVertex;
+                    ui.separator();
+                    if ui.menu_item("Undirected Graph") {
+                        insert_window!(GraphWindow::<UndirectedGraph<PositionedVertex>>::new());
+                    }
+                    if ui.menu_item("Directed Graph") {
+                        insert_window!(GraphWindow::<DirectedGraph<PositionedVertex>>::new());
+                    }
                 }
             }
             if let Some(_debug_menu) = ui.begin_menu("Debug") {

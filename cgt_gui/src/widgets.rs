@@ -17,6 +17,7 @@ pub mod canonical_form;
 pub mod digraph_placement;
 pub mod domineering;
 pub mod fission;
+pub mod graph_editor;
 pub mod konane;
 pub mod resolving_set;
 pub mod ski_jumps;
