@@ -299,6 +299,32 @@ impl GameForm {
             Some((p, GameForm::new_integer(integer as i32)))
         }
     }
+
+    pub fn left_tipping_point(&self) -> u32 {
+        debug_assert!(self.is_p_free());
+
+        for n in 0.. {
+            let g = GameForm::sum(self, &GameForm::new_integer(-(n as i32)));
+            if g.outcome() == Outcome::L {
+                return n;
+            }
+        }
+
+        unreachable!()
+    }
+
+    pub fn right_tipping_point(&self) -> u32 {
+        debug_assert!(self.is_p_free());
+
+        for n in 0.. {
+            let g = GameForm::sum(self, &GameForm::new_integer(n as i32));
+            if g.outcome() == Outcome::R {
+                return n;
+            }
+        }
+
+        unreachable!()
+    }
 }
 
 impl_from_str_via_parser!(GameForm);

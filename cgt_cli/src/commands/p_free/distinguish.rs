@@ -8,29 +8,38 @@ pub enum Variant {
     Blocking,
 }
 
+impl Variant {
+    pub fn matches(self, g: &GameForm) -> bool {
+        match self {
+            Variant::DeadEnding => g.is_dead_ending(),
+            Variant::Blocking => g.is_blocking(),
+        }
+    }
+}
+
 #[derive(Parser, Debug)]
 pub struct Args {
     #[arg(long, allow_hyphen_values = true)]
-    lhs: GameForm,
+    pub lhs: GameForm,
 
     #[arg(long, allow_hyphen_values = true)]
-    rhs: GameForm,
+    pub rhs: GameForm,
 
     /// Generator size
     #[arg(long)]
-    size: u64,
+    pub size: u64,
 
     #[arg(long)]
-    max_attempts: u64,
+    pub max_attempts: u64,
 
     #[arg(long, value_enum)]
-    variant: Variant,
+    pub variant: Variant,
 }
 
 pub struct Stats {
-    attempted: u64,
-    ignored: u64,
-    distinguisher: Option<GameForm>,
+    pub attempted: u64,
+    pub ignored: u64,
+    pub distinguisher: Option<GameForm>,
 }
 
 pub fn run_pure(args: &Args) -> Stats {
@@ -40,29 +49,25 @@ pub fn run_pure(args: &Args) -> Stats {
         distinguisher: None,
     };
 
-    let variant = |x: &GameForm| match args.variant {
-        Variant::DeadEnding => x.is_dead_ending(),
-        Variant::Blocking => x.is_blocking(),
-    };
-
     let mut rnd = Gen::new(args.size as usize);
     for _ in 0..args.max_attempts {
         stats.attempted += 1;
         let x = GameForm::arbitrary(&mut rnd);
-        if x.is_p_free() && variant(&x) {
+        if x.is_p_free() && args.variant.matches(&x) {
             fn shrink_result(
-                x: &GameForm,
+                distinguisher: &GameForm,
                 lhs: &GameForm,
                 rhs: &GameForm,
-                variant: &impl Fn(&GameForm) -> bool,
+                variant: Variant,
             ) -> Option<GameForm> {
-                for t in x.shrink() {
-                    if x.is_p_free() && variant(&x) {
-                        let ol = GameForm::sum(lhs, &x).outcome();
-                        let or = GameForm::sum(rhs, &x).outcome();
+                for shrunken in distinguisher.shrink() {
+                    if shrunken.is_p_free() && variant.matches(&shrunken) {
+                        let ol = GameForm::sum(lhs, &shrunken).outcome();
+                        let or = GameForm::sum(rhs, &shrunken).outcome();
+
                         if ol != or {
-                            let shrunk = shrink_result(&t, lhs, rhs, variant);
-                            return Some(shrunk.unwrap_or(t));
+                            let more_shrunken = shrink_result(&shrunken, lhs, rhs, variant);
+                            return Some(more_shrunken.unwrap_or(shrunken));
                         }
                     }
                 }
@@ -72,11 +77,12 @@ pub fn run_pure(args: &Args) -> Stats {
             let ol = GameForm::sum(&args.lhs, &x).outcome();
             let or = GameForm::sum(&args.rhs, &x).outcome();
             if ol != or {
-                stats.distinguisher =
-                    Some(match shrink_result(&x, &args.lhs, &args.rhs, &variant) {
+                stats.distinguisher = Some(
+                    match shrink_result(&x, &args.lhs, &args.rhs, args.variant) {
                         Some(x) => x,
                         None => x,
-                    });
+                    },
+                );
                 break;
             }
         } else {
