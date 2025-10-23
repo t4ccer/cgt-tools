@@ -244,8 +244,7 @@ fn factors() {
     let interner = Interner::new();
     let g = interner.new_from_string("{{{{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}}, {{{1, 0}}, {{{1, 0}}}}, {{{{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}}}, {{{{{1, 0}}, {{{1, 0}}}}}}}").unwrap();
 
-    let expected_factors = vec![
-        (
+    let expected_factors = [(
             interner.new_from_string("0").unwrap(),
             interner.new_from_string("{{{{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}}, {{{1, 0}}, {{{1, 0}}}}, {{{{1, 0}, {{{1, 0}}}, {2, 0}, {{2, 0}}}}}, {{{{{1, 0}}, {{{1, 0}}}}}}}").unwrap(),
         ),
@@ -277,8 +276,7 @@ fn factors() {
         (
             interner.new_from_string("{{{2, 0}}, {2, 1}, {{{2, 0}}}, {{{2, 1}}}}").unwrap(),
             interner.new_from_string("{1, 0}").unwrap()
-        ),
-    ];
+        )];
 
     for (actual, expected) in interner.factors(&g).iter().zip(expected_factors.iter()) {
         assert_eq!(actual.0.idx, expected.0.idx);

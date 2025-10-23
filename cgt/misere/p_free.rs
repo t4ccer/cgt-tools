@@ -26,6 +26,7 @@ impl std::fmt::Display for Outcome {
 }
 
 impl PartialOrd for Outcome {
+    #[allow(clippy::match_same_arms)]
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         use std::cmp::Ordering;
 
@@ -177,7 +178,7 @@ impl GameForm {
 
     pub fn is_dead_ending(&self) -> bool {
         Player::forall(|p| !self.is_end(p) || self.is_dead_end(p))
-            && Player::forall(|p| self.moves(p).iter().all(|g| g.is_dead_ending()))
+            && Player::forall(|p| self.moves(p).iter().all(GameForm::is_dead_ending))
     }
 
     pub fn is_blocked_end(&self, p: Player) -> bool {
@@ -189,7 +190,7 @@ impl GameForm {
 
     pub fn is_blocking(&self) -> bool {
         Player::forall(|p| !self.is_end(p) || self.is_blocked_end(p))
-            && Player::forall(|p| self.moves(p).iter().all(|gp| gp.is_blocking()))
+            && Player::forall(|p| self.moves(p).iter().all(GameForm::is_blocking))
     }
 
     pub fn next_day(day: &[GameForm]) -> impl Iterator<Item = GameForm> {
@@ -205,15 +206,16 @@ impl GameForm {
         })
     }
 
+    #[must_use]
     pub fn conjugate(&self) -> GameForm {
         GameForm::new(
             self.moves(Player::Right)
                 .iter()
-                .map(|gr| gr.conjugate())
+                .map(GameForm::conjugate)
                 .collect(),
             self.moves(Player::Left)
                 .iter()
-                .map(|gl| gl.conjugate())
+                .map(GameForm::conjugate)
                 .collect(),
         )
     }
@@ -284,7 +286,7 @@ impl GameForm {
         }
     }
 
-    fn parse<'p>(p: Parser<'p>) -> Option<(Parser<'p>, GameForm)> {
+    fn parse(p: Parser<'_>) -> Option<(Parser<'_>, GameForm)> {
         let p = p.trim_whitespace();
         if let Some(p) = p.parse_ascii_char('{') {
             let (p, left) = try_option!(GameForm::parse_list(p));
@@ -370,15 +372,16 @@ impl quickcheck::Arbitrary for GameForm {
         GameForm::arbitrary_sized(g, size)
     }
 
+    #[allow(clippy::option_if_let_else)] // Needed for Box<&dyn>
     fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
         use itertools::Itertools;
         use std::cmp::Ordering;
 
         match self.to_integer() {
             Some(n) => match n.cmp(&0) {
-                Ordering::Less => Box::new(((n + 1)..=0).map(|n| GameForm::new_integer(n))),
+                Ordering::Less => Box::new(((n + 1)..=0).map(GameForm::new_integer)),
                 Ordering::Equal => quickcheck::empty_shrinker(),
-                Ordering::Greater => Box::new((0..n).rev().map(|n| GameForm::new_integer(n))),
+                Ordering::Greater => Box::new((0..n).rev().map(GameForm::new_integer)),
             },
             None => {
                 let this = self.clone();

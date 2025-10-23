@@ -6,7 +6,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-const STD_SYMBOL: &'static str = "-";
+const STD_SYMBOL: &str = "-";
 
 pub enum FilePathOr<Stream> {
     FilePath(PathBuf),
@@ -42,7 +42,7 @@ impl<Stream> ::core::fmt::Display for FilePathOr<Stream> {
 
 impl<Stream> From<String> for FilePathOr<Stream> {
     fn from(path: String) -> FilePathOr<Stream> {
-        if &path == STD_SYMBOL {
+        if path == STD_SYMBOL {
             FilePathOr::Std(PhantomData)
         } else {
             FilePathOr::FilePath(path.into())

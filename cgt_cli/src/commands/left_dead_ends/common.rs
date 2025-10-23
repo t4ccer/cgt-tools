@@ -7,8 +7,8 @@ use cgt::{
 };
 use itertools::Itertools;
 
-pub fn to_all_factorizations(interner: &Interner, game: &LeftDeadEnd) -> Vec<Vec<LeftDeadEnd>> {
-    let fs = interner.factors(game);
+pub fn to_all_factorizations(interner: &Interner, game: LeftDeadEnd) -> Vec<Vec<LeftDeadEnd>> {
+    let fs = interner.factors(&game);
     let mut acc: Vec<Vec<LeftDeadEnd>> = Vec::new();
 
     for (f, c) in fs.into_iter().filter(|&(f, c)| {
@@ -18,13 +18,13 @@ pub fn to_all_factorizations(interner: &Interner, game: &LeftDeadEnd) -> Vec<Vec
         let fs = if interner.is_atom(&f) {
             vec![vec![f]]
         } else {
-            to_all_factorizations(interner, &f)
+            to_all_factorizations(interner, f)
         };
 
         let cs = if interner.is_atom(&c) {
             vec![vec![c]]
         } else {
-            to_all_factorizations(interner, &c)
+            to_all_factorizations(interner, c)
         };
 
         let res = fs

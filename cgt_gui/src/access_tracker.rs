@@ -3,14 +3,14 @@
 use std::ops::{Deref, DerefMut};
 
 #[derive(Debug, Clone)]
-pub(crate) struct AccessTracker<T> {
+pub struct AccessTracker<T> {
     value: T,
     modified: bool,
 }
 
 impl<T> AccessTracker<T> {
     #[inline(always)]
-    pub(crate) fn new(value: T) -> Self {
+    pub(crate) const fn new(value: T) -> Self {
         Self {
             value,
             modified: true,
@@ -18,14 +18,14 @@ impl<T> AccessTracker<T> {
     }
 
     #[inline(always)]
-    pub(crate) fn clear_flag(&mut self) -> bool {
+    pub(crate) const fn clear_flag(&mut self) -> bool {
         let was_modified = self.modified;
         self.modified = false;
         was_modified
     }
 
     #[inline(always)]
-    pub(crate) fn get_mut_untracked(&mut self) -> &mut T {
+    pub(crate) const fn get_mut_untracked(&mut self) -> &mut T {
         &mut self.value
     }
 
@@ -67,7 +67,7 @@ impl<T> DerefMut for AccessTracker<T> {
 }
 
 #[derive(Debug)]
-pub(crate) struct BorrowedAccessTracker<'a, R> {
+pub struct BorrowedAccessTracker<'a, R> {
     modified: &'a mut bool,
     value: &'a mut R,
 }
@@ -80,8 +80,8 @@ impl<'a, R> BorrowedAccessTracker<'a, R> {
         U: 'a,
     {
         BorrowedAccessTracker {
-            value: map_fn(&mut self.value),
-            modified: &mut self.modified,
+            value: map_fn(self.value),
+            modified: self.modified,
         }
     }
 }
@@ -91,7 +91,7 @@ impl<T> Deref for BorrowedAccessTracker<'_, T> {
 
     #[inline(always)]
     fn deref(&self) -> &Self::Target {
-        &self.value
+        self.value
     }
 }
 

@@ -270,11 +270,11 @@ pub trait LeftDeadEndContext {
             .powerset()
             .map(|moves| self.new_moves(moves))
             .filter(move |g| {
-                if !seen.iter().any(|h| self.game_eq(h, &g)) {
+                if seen.iter().any(|h| self.game_eq(h, g)) {
+                    false
+                } else {
                     seen.push(g.clone());
                     true
-                } else {
-                    false
                 }
             })
     }

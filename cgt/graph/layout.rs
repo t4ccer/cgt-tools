@@ -65,8 +65,8 @@ impl SpringEmbedder {
                 && let Some(c_middle_attractive) = bounds.c_middle_attractive
             {
                 let middle = V2f {
-                    x: bounds.lower.x + (bounds.upper.x - bounds.lower.x) * 0.5,
-                    y: bounds.lower.y + (bounds.upper.y - bounds.lower.y) * 0.5,
+                    x: (bounds.upper.x - bounds.lower.x).mul_add(0.5, bounds.lower.x),
+                    y: (bounds.upper.y - bounds.lower.y).mul_add(0.5, bounds.lower.y),
                 };
 
                 for u in graph.vertex_indices() {

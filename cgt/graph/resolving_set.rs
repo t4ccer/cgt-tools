@@ -22,14 +22,14 @@ enum Distance {
 }
 
 impl Distance {
-    fn succ(self) -> Distance {
+    const fn succ(self) -> Distance {
         match self {
             Distance::Finite(n) => Distance::Finite(n + 1),
             Distance::Infinite => Distance::Infinite,
         }
     }
 
-    fn into_finite(self) -> Option<u32> {
+    const fn into_finite(self) -> Option<u32> {
         match self {
             Distance::Finite(n) => Some(n),
             Distance::Infinite => None,
@@ -73,7 +73,7 @@ pub struct Vertex {
 }
 
 impl Vertex {
-    pub fn new(tower: Option<Tower>) -> Self {
+    pub const fn new(tower: Option<Tower>) -> Self {
         Self {
             tower,
             distances: Distances { inner: Vec::new() },
@@ -81,19 +81,19 @@ impl Vertex {
         }
     }
 
-    pub fn tower(&self) -> Option<Tower> {
+    pub const fn tower(&self) -> Option<Tower> {
         self.tower
     }
 
-    pub fn set_tower(&mut self, tower: Option<Tower>) {
+    pub const fn set_tower(&mut self, tower: Option<Tower>) {
         self.tower = tower;
     }
 
-    pub fn is_unique(&self) -> bool {
+    pub const fn is_unique(&self) -> bool {
         self.is_unique
     }
 
-    pub fn distances(&self) -> &Distances {
+    pub const fn distances(&self) -> &Distances {
         &self.distances
     }
 }
@@ -126,7 +126,7 @@ where
         let tower_vertex: &mut Vertex = graph.get_vertex_mut(tower_idx).get_inner_mut();
         if tower_vertex.tower.is_none() {
             continue;
-        };
+        }
         tower_vertex.get_inner_mut().distances.inner[tower_no] = Distance::Finite(0);
         let mut queue = BTreeSet::from_iter([WithDistance {
             distance: Distance::Finite(0),
@@ -233,15 +233,15 @@ pub struct CodeVertex {
 }
 
 impl CodeVertex {
-    pub fn is_colliding(&self) -> bool {
+    pub const fn is_colliding(&self) -> bool {
         self.is_colliding
     }
 
-    pub fn distances(&self) -> &Distances {
+    pub const fn distances(&self) -> &Distances {
         &self.distances
     }
 
-    pub fn is_original(&self) -> bool {
+    pub const fn is_original(&self) -> bool {
         self.is_original
     }
 }

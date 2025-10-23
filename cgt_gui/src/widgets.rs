@@ -7,10 +7,7 @@ use cgt::{
     numeric::v2f::V2f,
     short::partizan::thermograph::Thermograph,
 };
-use std::{
-    ops::{Deref, DerefMut},
-    time::SystemTime,
-};
+use std::{ops::DerefMut, time::SystemTime};
 
 pub mod amazons;
 pub mod canonical_form;
@@ -139,7 +136,7 @@ pub struct AddEdgeMode {
 }
 
 impl AddEdgeMode {
-    pub fn new() -> AddEdgeMode {
+    pub const fn new() -> AddEdgeMode {
         AddEdgeMode {
             edge_creates_vertex: true,
             edge_start_vertex: None,
@@ -168,7 +165,7 @@ impl AddEdgeMode {
                 Color::BLACK,
             );
         } else if let Some(start) = self.edge_start_vertex.take() {
-            let graph_ref: &G = graph.deref();
+            let graph_ref: &G = &*graph;
             if let Some(end) = canvas.vertex_at_position(mouse_position, graph_ref)
                 && start != end
             {

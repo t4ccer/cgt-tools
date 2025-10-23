@@ -15,7 +15,6 @@ use std::{
     fmt::{self, Display},
     hash::Hash,
     iter::{FusedIterator, Sum},
-    ops::Deref,
 };
 
 pub mod nus;
@@ -966,7 +965,7 @@ impl CanonicalForm {
                         .iter()
                         .map(|right_move| {
                             let greatest = right_move.left_stop().round();
-                            if right_move.deref() <= &Self::new_integer(greatest) {
+                            if **right_move <= Self::new_integer(greatest) {
                                 greatest - 1
                             } else {
                                 greatest
@@ -1380,7 +1379,7 @@ mod tests {
             TotalWrapper::into_inner_vec(weird.right),
         );
         assert_eq!(&weird.to_string(), "1v3");
-        assert_eq!(&weird.left_moves().nth(0).unwrap().to_string(), "1v2*");
+        assert_eq!(&weird.left_moves().next().unwrap().to_string(), "1v2*");
 
         // Another case:
 
@@ -1599,7 +1598,7 @@ mod tests {
     fn eliminate_dominated_moves() {
         let mut moves = vec![cf!("2"), cf!("0")];
         Moves::eliminate_dominated_moves(&mut moves, Player::Left);
-        assert_eq_iter_str!(moves, vec![cf!("2")]);
+        assert_eq_iter_str!(moves, [cf!("2")]);
 
         let mut moves = vec![
             cf!("1"),
@@ -1608,6 +1607,6 @@ mod tests {
             cf!("{2|0}"),
         ];
         Moves::eliminate_dominated_moves(&mut moves, Player::Left);
-        assert_eq_iter_str!(moves, vec![cf!("1"), cf!("{2|0}")]);
+        assert_eq_iter_str!(moves, [cf!("1"), cf!("{2|0}")]);
     }
 }

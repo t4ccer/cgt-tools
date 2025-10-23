@@ -1,5 +1,3 @@
-use std::ops::Deref;
-
 use crate::{
     AccessTracker, Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow,
     UpdateKind, imgui_enum, impl_titled_window,
@@ -247,7 +245,7 @@ impl IsCgtWindow for TitledWindow<DigraphPlacementWindow> {
                     save_button(
                         ui,
                         "digraph_placement",
-                        self.content.game.deref(),
+                        &*self.content.game,
                         self.content.details.as_ref().map(|d| &d.thermograph),
                     );
                 }

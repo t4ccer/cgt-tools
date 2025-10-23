@@ -77,12 +77,8 @@ pub fn run_pure(args: &Args) -> Stats {
             let ol = GameForm::sum(&args.lhs, &x).outcome();
             let or = GameForm::sum(&args.rhs, &x).outcome();
             if ol != or {
-                stats.distinguisher = Some(
-                    match shrink_result(&x, &args.lhs, &args.rhs, args.variant) {
-                        Some(x) => x,
-                        None => x,
-                    },
-                );
+                stats.distinguisher =
+                    Some(shrink_result(&x, &args.lhs, &args.rhs, args.variant).unwrap_or(x));
                 break;
             }
         } else {
@@ -93,6 +89,7 @@ pub fn run_pure(args: &Args) -> Stats {
     stats
 }
 
+#[allow(clippy::needless_pass_by_value)]
 pub fn run(args: Args) -> anyhow::Result<()> {
     let stats = run_pure(&args);
     eprintln!("Attempted: {}", stats.attempted);

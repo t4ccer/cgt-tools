@@ -17,7 +17,8 @@ pub enum Player {
 impl Player {
     /// Opposite player
     #[inline(always)]
-    pub fn opposite(self) -> Player {
+    #[must_use]
+    pub const fn opposite(self) -> Player {
         match self {
             Player::Left => Player::Right,
             Player::Right => Player::Left,

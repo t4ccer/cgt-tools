@@ -44,7 +44,7 @@ pub fn run(args: Args) -> Result<()> {
     let interner = Interner::new();
 
     let day0 = vec![LeftDeadEnd::new_integer(0)];
-    let day1 = interner.next_day(day0.into_iter());
+    let day1 = interner.next_day(day0);
     let day2 = interner.next_day(day1);
     let day3 = interner.next_day(day2);
     let day4 = interner.next_day(day3).collect::<Vec<_>>();
@@ -76,7 +76,7 @@ pub fn run(args: Args) -> Result<()> {
                 return;
             }
 
-            let l = analyze_left_dead_end(&interner, &d);
+            let l = analyze_left_dead_end(&interner, d);
             output.lock().unwrap().write_all(l.as_bytes()).unwrap();
         });
 
@@ -86,9 +86,9 @@ pub fn run(args: Args) -> Result<()> {
     Ok(())
 }
 
-fn analyze_left_dead_end(interner: &Interner, g: &LeftDeadEnd) -> String {
+fn analyze_left_dead_end(interner: &Interner, g: LeftDeadEnd) -> String {
     let mut b = String::new();
-    b.push_str(&interner.to_string(g));
+    b.push_str(&interner.to_string(&g));
     let atoms = to_all_factorizations(interner, g);
     for fs in &atoms {
         if fs.len() == 1 {

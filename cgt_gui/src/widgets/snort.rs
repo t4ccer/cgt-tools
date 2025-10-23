@@ -16,7 +16,7 @@ use cgt::{
     numeric::v2f::V2f,
     short::partizan::games::snort::{Snort, VertexColor, VertexKind},
 };
-use std::{fmt::Write, ops::Deref};
+use std::fmt::Write;
 
 imgui_enum! {
     GraphEditingMode {
@@ -198,7 +198,7 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                     save_button(
                         ui,
                         "snort",
-                        self.content.game.deref(),
+                        &*self.content.game,
                         self.content.details.as_ref().map(|d| &d.thermograph),
                     );
                 }

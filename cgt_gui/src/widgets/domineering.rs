@@ -125,7 +125,7 @@ impl IsCgtWindow for TitledWindow<DomineeringWindow> {
                         "Domineering",
                         Task::EvalDomineering(EvalTask {
                             window: self.window_id,
-                            game: *self.content.game.deref(),
+                            game: *self.content.game,
                         }),
                     );
                 }

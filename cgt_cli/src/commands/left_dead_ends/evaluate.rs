@@ -17,7 +17,7 @@ pub fn run(args: Args) -> Result<()> {
         .context("Could not parse the game")?;
 
     println!("{}", interner.to_string(&g));
-    for factors in to_all_factorizations(&interner, &g) {
+    for factors in to_all_factorizations(&interner, g) {
         print!("  = ");
         for (i, f) in factors.into_iter().enumerate() {
             if i != 0 {

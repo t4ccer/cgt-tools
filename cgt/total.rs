@@ -26,12 +26,12 @@ where
 {
     #[inline(always)]
     fn total_cmp(&self, other: &Self) -> Ordering {
-        (&**self).total_cmp(&**other)
+        (**self).total_cmp(&**other)
     }
 
     #[inline(always)]
     fn total_hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        (&**self).total_hash(state)
+        (**self).total_hash(state);
     }
 }
 
@@ -41,12 +41,12 @@ where
 {
     #[inline(always)]
     fn total_cmp(&self, other: &Self) -> Ordering {
-        (&**self).total_cmp(&**other)
+        (**self).total_cmp(&**other)
     }
 
     #[inline(always)]
     fn total_hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        (&**self).total_hash(state);
+        (**self).total_hash(state);
     }
 }
 
@@ -61,7 +61,7 @@ where
 
     #[inline(always)]
     fn total_hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        TotalWrapper::from_inner_slice(self).hash(state)
+        TotalWrapper::from_inner_slice(self).hash(state);
     }
 }
 
@@ -76,7 +76,7 @@ where
 
     #[inline(always)]
     fn total_hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        TotalWrapper::from_inner_slice(self).hash(state)
+        TotalWrapper::from_inner_slice(self).hash(state);
     }
 }
 
@@ -90,7 +90,7 @@ pub struct TotalWrapper<T> {
 impl<T> TotalWrapper<T> {
     /// Create new wrapper
     #[inline(always)]
-    pub fn new(inner: T) -> TotalWrapper<T> {
+    pub const fn new(inner: T) -> TotalWrapper<T> {
         TotalWrapper { inner }
     }
 
@@ -116,6 +116,7 @@ where
 
 impl<T> Eq for TotalWrapper<T> where T: TotalWrappable {}
 
+#[allow(clippy::non_canonical_partial_ord_impl)]
 impl<T> PartialOrd for TotalWrapper<T>
 where
     T: TotalWrappable,
@@ -204,7 +205,7 @@ macro_rules! unsafe_impl_inner_collections {
         #[allow(dead_code, missing_docs)]
         #[inline(always)]
         $vis fn from_ref(inner: &$inner) -> &$wrapper {
-            unsafe { &*(inner as *const $inner).cast::<$wrapper>() }
+            unsafe { &*core::ptr::from_ref::<$inner>(inner).cast::<$wrapper>() }
         }
     };
 }

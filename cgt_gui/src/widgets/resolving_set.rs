@@ -15,10 +15,7 @@ use cgt::{
     impl_has,
     numeric::v2f::V2f,
 };
-use std::{
-    collections::HashSet,
-    ops::{Deref, DerefMut},
-};
+use std::collections::HashSet;
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct Vertex {
@@ -30,7 +27,7 @@ impl_has!(Vertex -> position -> V2f);
 impl_has!(Vertex -> inner -> resolving_set::Vertex);
 
 impl Vertex {
-    pub fn new(tower: Option<Tower>) -> Vertex {
+    pub const fn new(tower: Option<Tower>) -> Vertex {
         Vertex {
             position: V2f::ZERO,
             inner: resolving_set::Vertex::new(tower),
@@ -258,7 +255,7 @@ impl ResolvingSetWindow {
             write!(self.duplicates, "{}", v.inner.distances()).unwrap();
         }
 
-        self.code_graph = CodeGraphPanel::new(self.graph.deref(), self.infinite_distances);
+        self.code_graph = CodeGraphPanel::new(&*self.graph, self.infinite_distances);
         self.code_graph.reposition_circle();
     }
 }
@@ -321,7 +318,7 @@ impl IsCgtWindow for TitledWindow<ResolvingSetWindow> {
                 }
 
                 if ui.checkbox("Infinite distances", &mut self.content.infinite_distances) {
-                    let _ = self.content.graph.deref_mut();
+                    let _ = &mut *self.content.graph;
                 }
 
                 short_inputs.end();
@@ -342,9 +339,9 @@ impl IsCgtWindow for TitledWindow<ResolvingSetWindow> {
 
                 let mut canvas =
                     imgui::Canvas::new(ui, &draw_list, ctx.large_font_id, &mut self.scratch_buffer);
-                resolving_set::draw_graph(&mut canvas, self.content.graph.deref());
+                resolving_set::draw_graph(&mut canvas, &*self.content.graph);
                 let pressed = canvas.pressed_vertex();
-                let clicked = canvas.clicked_vertex(self.content.graph.deref());
+                let clicked = canvas.clicked_vertex(&*self.content.graph);
                 match self.content.editing_mode.get() {
                     GraphEditingMode::DragVertex => {
                         if let Some(pressed) = pressed {
@@ -395,7 +392,6 @@ impl IsCgtWindow for TitledWindow<ResolvingSetWindow> {
                         );
                     }
                 }
-                drop(canvas);
 
                 if should_reposition_main {
                     self.content.reposition(graph_area_size);
@@ -436,7 +432,6 @@ impl IsCgtWindow for TitledWindow<ResolvingSetWindow> {
                         .get_inner_mut();
                     *current_pos += delta;
                 }
-                drop(canvas);
 
                 if should_reposition_aux {
                     self.content.code_graph.reposition(graph_area_size);
