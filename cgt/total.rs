@@ -213,19 +213,19 @@ pub(crate) use unsafe_impl_inner_collections;
 
 macro_rules! impl_total_wrapper {
     ( $(#[$attr:meta])*
-      struct $wrapper:ident {
-          $vis:vis $field:ident: $inner:ty $(,)?
+      $struct_vis:vis struct $wrapper:ident {
+          $field_vis:vis $field:ident: $inner:ty $(,)?
       }
     ) => {
         $(#[$attr])*
         #[repr(transparent)]
-        pub struct $wrapper {
+        $struct_vis struct $wrapper {
             $field: $inner,
         }
 
         impl $wrapper {
             // SAFETY: $wrapper is #[repr(transparent)]
-            $crate::total::unsafe_impl_inner_collections!($wrapper, $inner, $vis);
+            $crate::total::unsafe_impl_inner_collections!($wrapper, $inner, $field_vis);
         }
 
         impl $crate::total::TotalWrappable for $wrapper {

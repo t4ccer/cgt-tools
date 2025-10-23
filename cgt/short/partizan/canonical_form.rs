@@ -478,7 +478,7 @@ enum CanonicalFormInner {
 impl_total_wrapper! {
     /// Canonical game form
     #[derive(Debug, Clone)]
-    struct CanonicalForm {
+    pub struct CanonicalForm {
         inner: CanonicalFormInner
     }
 }

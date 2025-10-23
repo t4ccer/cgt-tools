@@ -59,7 +59,7 @@ struct GameFormInner {
 
 impl_total_wrapper! {
     #[derive(Debug, Clone)]
-    struct GameForm {
+    pub struct GameForm {
         inner: GameFormInner
     }
 }
