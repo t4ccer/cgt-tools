@@ -302,6 +302,15 @@ impl GameForm {
         }
     }
 
+    pub fn birthday(&self) -> u32 {
+        self.moves(Player::Left)
+            .iter()
+            .chain(self.moves(Player::Right))
+            .map(|g| g.birthday() + 1)
+            .max()
+            .unwrap_or(0)
+    }
+
     pub fn left_tipping_point(&self) -> u32 {
         debug_assert!(self.is_p_free());
 
@@ -321,6 +330,24 @@ impl GameForm {
         for n in 0.. {
             let g = GameForm::sum(self, &GameForm::new_integer(n as i32));
             if g.outcome() == Outcome::R {
+                return n;
+            }
+        }
+
+        unreachable!()
+    }
+
+    pub fn next_tipping_point(&self) -> u32 {
+        debug_assert!(self.is_p_free());
+
+        for n in 0.. {
+            let g = GameForm::sum(self, &GameForm::new_integer(n as i32));
+            if g.outcome() == Outcome::N {
+                return n;
+            }
+
+            let g = GameForm::sum(self, &GameForm::new_integer(-(n as i32)));
+            if g.outcome() == Outcome::N {
                 return n;
             }
         }
