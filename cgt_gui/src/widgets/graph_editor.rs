@@ -1,8 +1,8 @@
 use crate::{
-    GuiContext, IsCgtWindow, RawOf, TitledWindow, imgui_enum, impl_titled_window,
-    widgets::{AddEdgeMode, save_button},
+    GuiContext, IsCgtWindow, TitledWindow, imgui_enum, impl_titled_window,
+    widgets::{AddEdgeMode, RepositionMode, save_button},
 };
-use ::imgui::{ComboBoxFlags, Condition, Ui};
+use ::imgui::{Condition, Ui};
 use cgt::{
     drawing::{Canvas, Color, Draw, imgui},
     graph::{
@@ -16,6 +16,7 @@ use cgt::{
 };
 
 imgui_enum! {
+    #[derive(Debug, Clone, Copy)]
     GraphEditingMode {
         DragVertex, "Drag vertex",
         ColorVertexBlue, "Color vertex blue (left)",
@@ -27,13 +28,6 @@ imgui_enum! {
     }
 }
 
-imgui_enum! {
-    RepositionMode {
-        SpringEmbedder, "Spring Embedder",
-        Circle, "Circle",
-    }
-}
-
 #[derive(Debug, Clone, Copy)]
 pub enum VertexColor {
     Blue,
@@ -41,9 +35,9 @@ pub enum VertexColor {
     None,
 }
 
-impl From<RawOf<NewVertexColor>> for VertexColor {
-    fn from(color: RawOf<NewVertexColor>) -> VertexColor {
-        match color.get() {
+impl From<NewVertexColor> for VertexColor {
+    fn from(color: NewVertexColor) -> VertexColor {
+        match color {
             NewVertexColor::Blue => VertexColor::Blue,
             NewVertexColor::Red => VertexColor::Red,
             NewVertexColor::None => VertexColor::None,
@@ -61,6 +55,7 @@ impl_has!(PositionedVertex -> color -> VertexColor);
 impl_has!(PositionedVertex -> position -> V2f);
 
 imgui_enum! {
+    #[derive(Debug, Clone, Copy)]
     NewVertexColor {
         Blue, "Blue",
         Red, "Red",
@@ -71,9 +66,9 @@ imgui_enum! {
 #[derive(Debug, Clone)]
 pub struct GraphWindow<G> {
     widget: GraphWidget<G>,
-    reposition_option_selected: RawOf<RepositionMode>,
-    new_vertex_color: RawOf<NewVertexColor>,
-    editing_mode: RawOf<GraphEditingMode>,
+    reposition_mode: RepositionMode,
+    new_vertex_color: NewVertexColor,
+    editing_mode: GraphEditingMode,
     add_edge_mode: AddEdgeMode,
 }
 
@@ -113,9 +108,9 @@ where
                     }; 14],
                 ),
             },
-            new_vertex_color: RawOf::new(NewVertexColor::None),
-            reposition_option_selected: RawOf::new(RepositionMode::SpringEmbedder),
-            editing_mode: RawOf::new(GraphEditingMode::DragVertex),
+            new_vertex_color: NewVertexColor::None,
+            reposition_mode: RepositionMode::SpringEmbedder,
+            editing_mode: GraphEditingMode::DragVertex,
             add_edge_mode: AddEdgeMode::new(),
         };
         this.reposition_circle();
@@ -134,7 +129,7 @@ where
     }
 
     pub fn reposition(&mut self, graph_panel_size: V2f) {
-        match self.reposition_option_selected.get() {
+        match self.reposition_mode {
             RepositionMode::Circle => {
                 self.reposition_circle();
             }
@@ -188,8 +183,7 @@ where
         }
 
         let short_inputs = ui.push_item_width(200.0);
-        self.reposition_option_selected
-            .combo(ui, "##Reposition Mode", ComboBoxFlags::empty());
+        self.reposition_mode.combo(ui, "##Reposition Mode");
         ui.same_line();
         let should_reposition = ui.button("Reposition");
         ui.same_line();
@@ -200,22 +194,20 @@ where
             }]);
         }
 
-        self.editing_mode
-            .combo(ui, "Edit Mode", ComboBoxFlags::HEIGHT_LARGE);
+        self.editing_mode.combo(ui, "Edit Mode");
 
-        if matches!(self.editing_mode.get(), GraphEditingMode::AddEdge) {
+        if matches!(self.editing_mode, GraphEditingMode::AddEdge) {
             ui.same_line();
             ui.checkbox("Add vertex", &mut self.add_edge_mode.edge_creates_vertex);
         }
 
-        if matches!(self.editing_mode.get(), GraphEditingMode::AddVertex)
+        if matches!(self.editing_mode, GraphEditingMode::AddVertex)
             || matches!(
-                self.editing_mode.get(),
+                self.editing_mode,
                 GraphEditingMode::AddEdge if self.add_edge_mode.edge_creates_vertex
             )
         {
-            self.new_vertex_color
-                .combo(ui, "New Vertex Color", ComboBoxFlags::HEIGHT_LARGE);
+            self.new_vertex_color.combo(ui, "New Vertex Color");
         }
 
         short_inputs.end();
@@ -226,7 +218,7 @@ where
             y: unsafe { ui.style().item_spacing[1] }
                 .mul_add(-2.0, ui.window_size()[1] - ui.cursor_pos()[1]),
         };
-        let new_vertex_position = (matches!(self.editing_mode.get(), GraphEditingMode::AddVertex)
+        let new_vertex_position = (matches!(self.editing_mode, GraphEditingMode::AddVertex)
             && ui.invisible_button("Add vertex area", graph_area_size))
         .then(|| V2f::from(ui.io().mouse_pos) - graph_area_position);
         ui.set_cursor_screen_pos(graph_area_position);
@@ -236,7 +228,7 @@ where
 
         let pressed = canvas.pressed_vertex();
         let clicked = canvas.clicked_vertex(&self.widget.graph);
-        match self.editing_mode.get() {
+        match self.editing_mode {
             GraphEditingMode::DragVertex => {
                 if let Some(pressed) = pressed {
                     let delta = V2f::from(ui.io().mouse_delta);

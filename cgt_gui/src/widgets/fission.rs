@@ -1,9 +1,9 @@
 use crate::{
-    AccessTracker, Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow,
-    imgui_enum, impl_game_window, impl_titled_window,
+    AccessTracker, Details, EvalTask, GuiContext, IsCgtWindow, Task, TitledWindow, imgui_enum,
+    impl_game_window, impl_titled_window,
     widgets::{self, canonical_form::CanonicalFormWindow},
 };
-use ::imgui::{ComboBoxFlags, Condition, Ui};
+use ::imgui::{Condition, Ui};
 use cgt::{
     drawing::{Draw, imgui},
     grid::{FiniteGrid, Grid, vec_grid::VecGrid},
@@ -12,6 +12,7 @@ use cgt::{
 use std::{ops::Deref, str::FromStr};
 
 imgui_enum! {
+    #[derive(Debug, Clone, Copy)]
     GridEditingMode {
         AddStone, "Add Stone",
         BlockTile, "Block Tile",
@@ -24,7 +25,7 @@ imgui_enum! {
 #[derive(Debug, Clone)]
 pub struct FissionWindow {
     game: AccessTracker<Fission>,
-    editing_mode: RawOf<GridEditingMode>,
+    editing_mode: GridEditingMode,
     alternating_moves: bool,
     pub details: Option<Details>,
 }
@@ -33,7 +34,7 @@ impl FissionWindow {
     pub fn new() -> FissionWindow {
         FissionWindow {
             game: AccessTracker::new(Fission::from_str("....|..x.|....|....").unwrap()),
-            editing_mode: RawOf::new(GridEditingMode::AddStone),
+            editing_mode: GridEditingMode::AddStone,
             alternating_moves: true,
             details: None,
         }
@@ -80,13 +81,11 @@ impl IsCgtWindow for TitledWindow<FissionWindow> {
                 ui.columns(2, "Columns", true);
 
                 let short_inputs = ui.push_item_width(200.0);
-                self.content
-                    .editing_mode
-                    .combo(ui, "Edit Mode", ComboBoxFlags::HEIGHT_LARGE);
+                self.content.editing_mode.combo(ui, "Edit Mode");
                 short_inputs.end();
 
                 if matches!(
-                    self.content.editing_mode.get(),
+                    self.content.editing_mode,
                     GridEditingMode::MoveLeft | GridEditingMode::MoveRight
                 ) {
                     ui.same_line();
@@ -105,7 +104,7 @@ impl IsCgtWindow for TitledWindow<FissionWindow> {
                         }
                     };
 
-                    match self.content.editing_mode.get() {
+                    match self.content.editing_mode {
                         GridEditingMode::AddStone => place_tile(Tile::Stone),
                         GridEditingMode::BlockTile => place_tile(Tile::Blocked),
                         GridEditingMode::ClearTile => place_tile(Tile::Empty),
@@ -114,8 +113,7 @@ impl IsCgtWindow for TitledWindow<FissionWindow> {
                             if moves.contains(&(x, y)) {
                                 *self.content.game = self.content.game.move_in_left(x, y);
                                 if self.content.alternating_moves {
-                                    self.content.editing_mode =
-                                        RawOf::new(GridEditingMode::MoveRight);
+                                    self.content.editing_mode = GridEditingMode::MoveRight;
                                 }
                             }
                         }
@@ -124,8 +122,7 @@ impl IsCgtWindow for TitledWindow<FissionWindow> {
                             if moves.contains(&(x, y)) {
                                 *self.content.game = self.content.game.move_in_right(x, y);
                                 if self.content.alternating_moves {
-                                    self.content.editing_mode =
-                                        RawOf::new(GridEditingMode::MoveLeft);
+                                    self.content.editing_mode = GridEditingMode::MoveLeft;
                                 }
                             }
                         }

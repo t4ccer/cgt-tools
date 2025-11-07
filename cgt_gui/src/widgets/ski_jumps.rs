@@ -1,12 +1,12 @@
 use crate::{
-    AccessTracker, Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow,
-    imgui_enum, impl_game_window, impl_titled_window,
+    AccessTracker, Details, EvalTask, GuiContext, IsCgtWindow, Task, TitledWindow, imgui_enum,
+    impl_game_window, impl_titled_window,
     widgets::{
         self, TILE_COLOR_EMPTY, TILE_COLOR_FILLED, TILE_SPACING,
         canonical_form::CanonicalFormWindow, interactive_color,
     },
 };
-use ::imgui::{ComboBoxFlags, Condition, Ui};
+use ::imgui::{Condition, Ui};
 use cgt::{
     drawing::{Canvas, Color, Draw, imgui},
     grid::{FiniteGrid, Grid, vec_grid::VecGrid},
@@ -21,6 +21,7 @@ use std::{ops::Deref, str::FromStr};
 const OFF_BUTTON_SCALE: f32 = 0.3;
 
 imgui_enum! {
+    #[derive(Debug, Clone, Copy)]
     GridEditingMode {
         LeftJumper, "Place Left Jumper",
         LeftSlipper, "Place Left Slipper",
@@ -55,7 +56,7 @@ impl From<GridEditingMode> for Edit {
 #[derive(Debug, Clone)]
 pub struct SkiJumpsWindow {
     game: AccessTracker<SkiJumps>,
-    editing_mode: RawOf<GridEditingMode>,
+    editing_mode: GridEditingMode,
     alternating_moves: bool,
 
     /// When making move, this is the starting skier position
@@ -67,7 +68,7 @@ impl SkiJumpsWindow {
     pub fn new() -> SkiJumpsWindow {
         SkiJumpsWindow {
             game: AccessTracker::new(SkiJumps::from_str("L....|....R|.....").unwrap()),
-            editing_mode: RawOf::new(GridEditingMode::ClearTile),
+            editing_mode: GridEditingMode::ClearTile,
             alternating_moves: true,
             initial_position: None,
             details: None,
@@ -115,17 +116,14 @@ impl IsCgtWindow for TitledWindow<SkiJumpsWindow> {
                 ui.columns(2, "Columns", true);
 
                 let short_inputs = ui.push_item_width(200.0);
-                let changed_edit_mode =
-                    self.content
-                        .editing_mode
-                        .combo(ui, "Edit Mode", ComboBoxFlags::HEIGHT_LARGE);
+                let changed_edit_mode = self.content.editing_mode.combo(ui, "Edit Mode");
                 if changed_edit_mode {
                     self.content.initial_position = None;
                 }
                 short_inputs.end();
 
                 if matches!(
-                    self.content.editing_mode.get(),
+                    self.content.editing_mode,
                     GridEditingMode::MoveLeft | GridEditingMode::MoveRight
                 ) {
                     ui.same_line();
@@ -138,7 +136,7 @@ impl IsCgtWindow for TitledWindow<SkiJumpsWindow> {
 
                 let mut slide_off_y = None;
 
-                let editing_mode = self.content.editing_mode.get();
+                let editing_mode = self.content.editing_mode;
 
                 let mut off_buttons = |text| {
                     let off_buttons = ui.push_id("off_buttons");
@@ -206,7 +204,7 @@ impl IsCgtWindow for TitledWindow<SkiJumpsWindow> {
                 let mut move_target = None;
 
                 if let Some((x, y)) = canvas.clicked_tile(self.content.game.grid()) {
-                    match Edit::from(self.content.editing_mode.get()) {
+                    match Edit::from(self.content.editing_mode) {
                         Edit::Place(tile) => {
                             if self.content.game.grid().get(x, y) != tile {
                                 self.content.game.grid_mut().set(x, y, tile);
@@ -286,11 +284,9 @@ impl IsCgtWindow for TitledWindow<SkiJumpsWindow> {
                             *self.content.game = self.content.game.move_in(legal_move);
                             if self.content.alternating_moves {
                                 if matches!(editing_mode, GridEditingMode::MoveLeft) {
-                                    self.content.editing_mode =
-                                        RawOf::new(GridEditingMode::MoveRight);
+                                    self.content.editing_mode = GridEditingMode::MoveRight;
                                 } else {
-                                    self.content.editing_mode =
-                                        RawOf::new(GridEditingMode::MoveLeft);
+                                    self.content.editing_mode = GridEditingMode::MoveLeft;
                                 }
                             }
                         }

@@ -1,9 +1,9 @@
 use crate::{
-    AccessTracker, Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow,
-    imgui_enum, impl_game_window, impl_titled_window,
+    AccessTracker, Details, EvalTask, GuiContext, IsCgtWindow, Task, TitledWindow, imgui_enum,
+    impl_game_window, impl_titled_window,
     widgets::{self, canonical_form::CanonicalFormWindow},
 };
-use ::imgui::{ComboBoxFlags, Condition, Ui};
+use ::imgui::{Condition, Ui};
 use cgt::{
     drawing::{Canvas, Color, Draw, imgui},
     grid::{FiniteGrid, Grid, vec_grid::VecGrid},
@@ -15,6 +15,7 @@ use cgt::{
 use std::{ops::Deref, str::FromStr};
 
 imgui_enum! {
+    #[derive(Debug, Clone, Copy)]
     GridEditingMode {
         AddStone, "Add Stone",
         AddBlueQueen, "Add Blue Queen",
@@ -54,7 +55,7 @@ enum PendingMove {
 #[derive(Debug, Clone)]
 pub struct AmazonsWindow {
     game: AccessTracker<Amazons>,
-    editing_mode: RawOf<GridEditingMode>,
+    editing_mode: GridEditingMode,
     alternating_moves: bool,
     pending_move: PendingMove,
     pub details: Option<Details>,
@@ -64,7 +65,7 @@ impl AmazonsWindow {
     pub fn new() -> AmazonsWindow {
         AmazonsWindow {
             game: AccessTracker::new(Amazons::from_str("x..#|....|.#.o").unwrap()),
-            editing_mode: RawOf::new(GridEditingMode::AddStone),
+            editing_mode: GridEditingMode::AddStone,
             alternating_moves: true,
             pending_move: PendingMove::None,
             details: None,
@@ -112,17 +113,14 @@ impl IsCgtWindow for TitledWindow<AmazonsWindow> {
                 ui.columns(2, "Columns", true);
 
                 let short_inputs = ui.push_item_width(200.0);
-                let edit_mode_changed =
-                    self.content
-                        .editing_mode
-                        .combo(ui, "Edit Mode", ComboBoxFlags::HEIGHT_LARGE);
+                let edit_mode_changed = self.content.editing_mode.combo(ui, "Edit Mode");
                 if edit_mode_changed {
                     self.content.pending_move = PendingMove::None;
                 }
                 short_inputs.end();
 
                 if matches!(
-                    self.content.editing_mode.get(),
+                    self.content.editing_mode,
                     GridEditingMode::MoveLeft | GridEditingMode::MoveRight
                 ) {
                     ui.same_line();
@@ -136,7 +134,7 @@ impl IsCgtWindow for TitledWindow<AmazonsWindow> {
                     imgui::Canvas::new(ui, &draw_list, ctx.large_font_id, &mut self.scratch_buffer);
                 self.content.game.draw(&mut canvas);
                 if let Some((x, y)) = canvas.clicked_tile(self.content.game.grid()) {
-                    match Edit::from(self.content.editing_mode.get()) {
+                    match Edit::from(self.content.editing_mode) {
                         Edit::Place(tile) => {
                             if self.content.game.grid().get(x, y) != tile {
                                 self.content.game.grid_mut().set(x, y, tile);
@@ -180,7 +178,7 @@ impl IsCgtWindow for TitledWindow<AmazonsWindow> {
                                     if moves.contains(&new_game) {
                                         *self.content.game = new_game;
                                         if self.content.alternating_moves {
-                                            self.content.editing_mode = RawOf::new(other_mode);
+                                            self.content.editing_mode = other_mode;
                                         }
                                     }
                                 }
@@ -190,7 +188,7 @@ impl IsCgtWindow for TitledWindow<AmazonsWindow> {
                 }
 
                 let highlight_color =
-                    if matches!(self.content.editing_mode.get(), GridEditingMode::MoveLeft) {
+                    if matches!(self.content.editing_mode, GridEditingMode::MoveLeft) {
                         Color::BLUE
                     } else {
                         Color::RED

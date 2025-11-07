@@ -1,8 +1,9 @@
 use crate::{
-    AccessTracker, GuiContext, IsCgtWindow, RawOf, TitledWindow, UpdateKind, imgui_enum,
-    impl_titled_window, widgets::AddEdgeMode,
+    AccessTracker, GuiContext, IsCgtWindow, TitledWindow, UpdateKind, imgui_enum,
+    impl_titled_window,
+    widgets::{AddEdgeMode, RepositionMode},
 };
-use ::imgui::{ComboBoxFlags, Condition, Ui};
+use ::imgui::{Condition, Ui};
 use cgt::{
     drawing::{Canvas, imgui},
     graph::{
@@ -36,19 +37,13 @@ impl Vertex {
 }
 
 imgui_enum! {
+    #[derive(Debug, Clone, Copy)]
     GraphEditingMode {
         DragVertex, "Drag vertex",
         AddRemoveTower, "Add/Remove tower",
         AddVertex, "Add vertex",
         DeleteVertex, "Remove vertex",
         AddEdge, "Add/Remove edge",
-    }
-}
-
-imgui_enum! {
-    RepositionMode {
-        SpringEmbedder, "Spring Embedder",
-        Circle, "Circle",
     }
 }
 
@@ -64,7 +59,7 @@ impl_has!(CodeVertex -> inner -> resolving_set::CodeVertex);
 #[derive(Debug, Clone)]
 struct CodeGraphPanel {
     graph: UndirectedGraph<CodeVertex>,
-    reposition_option_selected: RawOf<RepositionMode>,
+    reposition_mode: RepositionMode,
     collisions: String,
 }
 
@@ -96,7 +91,7 @@ impl CodeGraphPanel {
                 inner: v.clone(),
                 position: V2f::ZERO,
             }),
-            reposition_option_selected: RawOf::new(RepositionMode::SpringEmbedder),
+            reposition_mode: RepositionMode::SpringEmbedder,
             collisions,
         }
     }
@@ -110,7 +105,7 @@ impl CodeGraphPanel {
     }
 
     fn reposition(&mut self, graph_panel_size: V2f) {
-        match self.reposition_option_selected.get() {
+        match self.reposition_mode {
             RepositionMode::Circle => {
                 self.reposition_circle();
             }
@@ -148,8 +143,8 @@ impl CodeGraphPanel {
 #[derive(Debug, Clone)]
 pub struct ResolvingSetWindow {
     graph: AccessTracker<UndirectedGraph<Vertex>>,
-    reposition_option_selected: RawOf<RepositionMode>,
-    editing_mode: RawOf<GraphEditingMode>,
+    reposition_mode: RepositionMode,
+    editing_mode: GraphEditingMode,
     add_edge_mode: AddEdgeMode,
     code_graph: CodeGraphPanel,
     infinite_distances: bool,
@@ -178,8 +173,8 @@ impl ResolvingSetWindow {
 
         let mut this = ResolvingSetWindow {
             graph: AccessTracker::new(graph),
-            reposition_option_selected: RawOf::new(RepositionMode::SpringEmbedder),
-            editing_mode: RawOf::new(GraphEditingMode::DragVertex),
+            reposition_mode: RepositionMode::SpringEmbedder,
+            editing_mode: GraphEditingMode::DragVertex,
             add_edge_mode: AddEdgeMode::new(),
             code_graph,
             infinite_distances,
@@ -201,7 +196,7 @@ impl ResolvingSetWindow {
     }
 
     pub fn reposition(&mut self, graph_panel_size: V2f) {
-        match self.reposition_option_selected.get() {
+        match self.reposition_mode {
             RepositionMode::Circle => {
                 self.reposition_circle();
             }
@@ -289,11 +284,7 @@ impl IsCgtWindow for TitledWindow<ResolvingSetWindow> {
                 ui.columns(2, "columns", true);
 
                 let short_inputs = ui.push_item_width(200.0);
-                self.content.reposition_option_selected.combo(
-                    ui,
-                    "##Reposition Mode",
-                    ComboBoxFlags::empty(),
-                );
+                self.content.reposition_mode.combo(ui, "##Reposition Mode");
                 ui.same_line();
                 let mut should_reposition_main = ui.button("Reposition");
                 ui.same_line();
@@ -305,11 +296,9 @@ impl IsCgtWindow for TitledWindow<ResolvingSetWindow> {
                     should_reposition_main = true;
                 }
 
-                self.content
-                    .editing_mode
-                    .combo(ui, "Edit Mode", ComboBoxFlags::HEIGHT_LARGE);
+                self.content.editing_mode.combo(ui, "Edit Mode");
 
-                if matches!(self.content.editing_mode.get(), GraphEditingMode::AddEdge) {
+                if matches!(self.content.editing_mode, GraphEditingMode::AddEdge) {
                     ui.same_line();
                     ui.checkbox(
                         "Add vertex",
@@ -332,7 +321,7 @@ impl IsCgtWindow for TitledWindow<ResolvingSetWindow> {
                         .mul_add(-2.0, ui.window_size()[1] - ui.cursor_pos()[1]),
                 };
                 let new_vertex_position =
-                    (matches!(self.content.editing_mode.get(), GraphEditingMode::AddVertex)
+                    (matches!(self.content.editing_mode, GraphEditingMode::AddVertex)
                         && ui.invisible_button("Add vertex", graph_area_size))
                     .then(|| V2f::from(ui.io().mouse_pos) - graph_area_position);
                 ui.set_cursor_screen_pos(graph_area_position);
@@ -342,7 +331,7 @@ impl IsCgtWindow for TitledWindow<ResolvingSetWindow> {
                 resolving_set::draw_graph(&mut canvas, &*self.content.graph);
                 let pressed = canvas.pressed_vertex();
                 let clicked = canvas.clicked_vertex(&*self.content.graph);
-                match self.content.editing_mode.get() {
+                match self.content.editing_mode {
                     GraphEditingMode::DragVertex => {
                         if let Some(pressed) = pressed {
                             let delta = V2f::from(ui.io().mouse_delta);
@@ -401,11 +390,10 @@ impl IsCgtWindow for TitledWindow<ResolvingSetWindow> {
                 let aux_id = ui.push_id("aux");
 
                 let short_inputs = ui.push_item_width(200.0);
-                self.content.code_graph.reposition_option_selected.combo(
-                    ui,
-                    "##Reposition Mode",
-                    ComboBoxFlags::empty(),
-                );
+                self.content
+                    .code_graph
+                    .reposition_mode
+                    .combo(ui, "##Reposition Mode");
                 ui.same_line();
                 let should_reposition_aux = ui.button("Reposition");
                 short_inputs.end();

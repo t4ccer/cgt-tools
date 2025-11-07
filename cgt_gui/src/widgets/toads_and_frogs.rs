@@ -1,9 +1,9 @@
 use crate::{
-    AccessTracker, Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow,
-    imgui_enum, impl_game_window, impl_titled_window,
+    AccessTracker, Details, EvalTask, GuiContext, IsCgtWindow, Task, TitledWindow, imgui_enum,
+    impl_game_window, impl_titled_window,
     widgets::{self, canonical_form::CanonicalFormWindow},
 };
-use ::imgui::{ComboBoxFlags, Condition, Ui};
+use ::imgui::{Condition, Ui};
 use cgt::{
     drawing::{Draw, imgui},
     short::partizan::games::toads_and_frogs::{Tile, ToadsAndFrogs},
@@ -11,6 +11,7 @@ use cgt::{
 use std::{ops::Deref, str::FromStr};
 
 imgui_enum! {
+    #[derive(Debug, Clone, Copy)]
     GridEditingMode {
         PlaceToad, "Place Toad",
         PlaceFrog, "Place Frog",
@@ -23,7 +24,7 @@ imgui_enum! {
 #[derive(Debug, Clone)]
 pub struct ToadsAndFrogsWindow {
     game: AccessTracker<ToadsAndFrogs>,
-    editing_mode: RawOf<GridEditingMode>,
+    editing_mode: GridEditingMode,
     alternating_moves: bool,
     pub details: Option<Details>,
 }
@@ -32,7 +33,7 @@ impl ToadsAndFrogsWindow {
     pub fn new() -> ToadsAndFrogsWindow {
         ToadsAndFrogsWindow {
             game: AccessTracker::new(ToadsAndFrogs::from_str("T.TF.").unwrap()),
-            editing_mode: RawOf::new(GridEditingMode::ClearTile),
+            editing_mode: GridEditingMode::ClearTile,
             alternating_moves: true,
             details: None,
         }
@@ -77,13 +78,11 @@ impl IsCgtWindow for TitledWindow<ToadsAndFrogsWindow> {
                 ui.columns(2, "Columns", true);
 
                 let short_inputs = ui.push_item_width(200.0);
-                self.content
-                    .editing_mode
-                    .combo(ui, "Edit Mode", ComboBoxFlags::HEIGHT_LARGE);
+                self.content.editing_mode.combo(ui, "Edit Mode");
                 short_inputs.end();
 
                 if matches!(
-                    self.content.editing_mode.get(),
+                    self.content.editing_mode,
                     GridEditingMode::MoveLeft | GridEditingMode::MoveRight
                 ) {
                     ui.same_line();
@@ -108,7 +107,7 @@ impl IsCgtWindow for TitledWindow<ToadsAndFrogsWindow> {
                         }
                     };
 
-                    match self.content.editing_mode.get() {
+                    match self.content.editing_mode {
                         GridEditingMode::PlaceToad => place_tile(Tile::Toad),
                         GridEditingMode::PlaceFrog => place_tile(Tile::Frog),
                         GridEditingMode::ClearTile => place_tile(Tile::Empty),
@@ -123,8 +122,7 @@ impl IsCgtWindow for TitledWindow<ToadsAndFrogsWindow> {
                                     self.content.game.row_mut()[grid_x + 1] = Tile::Toad;
 
                                     if self.content.alternating_moves {
-                                        self.content.editing_mode =
-                                            RawOf::new(GridEditingMode::MoveRight);
+                                        self.content.editing_mode = GridEditingMode::MoveRight;
                                     }
                                 } else if grid_x + 2 < width
                                     && matches!(self.content.game.row()[grid_x + 1], Tile::Frog)
@@ -134,8 +132,7 @@ impl IsCgtWindow for TitledWindow<ToadsAndFrogsWindow> {
                                     self.content.game.row_mut()[grid_x + 2] = Tile::Toad;
 
                                     if self.content.alternating_moves {
-                                        self.content.editing_mode =
-                                            RawOf::new(GridEditingMode::MoveRight);
+                                        self.content.editing_mode = GridEditingMode::MoveRight;
                                     }
                                 }
                             }
@@ -149,8 +146,7 @@ impl IsCgtWindow for TitledWindow<ToadsAndFrogsWindow> {
                                     self.content.game.row_mut()[grid_x - 1] = Tile::Frog;
 
                                     if self.content.alternating_moves {
-                                        self.content.editing_mode =
-                                            RawOf::new(GridEditingMode::MoveLeft);
+                                        self.content.editing_mode = GridEditingMode::MoveLeft;
                                     }
                                 } else if grid_x >= 2
                                     && matches!(self.content.game.row()[grid_x - 1], Tile::Toad)
@@ -160,8 +156,7 @@ impl IsCgtWindow for TitledWindow<ToadsAndFrogsWindow> {
                                     self.content.game.row_mut()[grid_x - 2] = Tile::Frog;
 
                                     if self.content.alternating_moves {
-                                        self.content.editing_mode =
-                                            RawOf::new(GridEditingMode::MoveLeft);
+                                        self.content.editing_mode = GridEditingMode::MoveLeft;
                                     }
                                 }
                             }

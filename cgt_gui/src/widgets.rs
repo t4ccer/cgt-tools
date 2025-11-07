@@ -178,3 +178,11 @@ impl AddEdgeMode {
         }
     }
 }
+
+crate::imgui_enum! {
+    #[derive(Debug, Clone, Copy)]
+    RepositionMode {
+        SpringEmbedder, "Spring Embedder",
+        Circle, "Circle",
+    }
+}

@@ -1,9 +1,11 @@
 use crate::{
-    AccessTracker, Details, EvalTask, GuiContext, IsCgtWindow, RawOf, Task, TitledWindow,
-    UpdateKind, imgui_enum, impl_titled_window,
-    widgets::{self, AddEdgeMode, canonical_form::CanonicalFormWindow, save_button},
+    AccessTracker, Details, EvalTask, GuiContext, IsCgtWindow, Task, TitledWindow, UpdateKind,
+    imgui_enum, impl_titled_window,
+    widgets::{
+        self, AddEdgeMode, RepositionMode, canonical_form::CanonicalFormWindow, save_button,
+    },
 };
-use ::imgui::{ComboBoxFlags, Condition, Ui};
+use ::imgui::{Condition, Ui};
 use cgt::{
     drawing::{Canvas, Draw, imgui},
     graph::{
@@ -19,6 +21,7 @@ use cgt::{
 use std::fmt::Write;
 
 imgui_enum! {
+    #[derive(Debug, Clone, Copy)]
     GraphEditingMode {
         DragVertex, "Drag vertex",
         TintVertexBlue, "Tint vertex blue (left)",
@@ -29,13 +32,6 @@ imgui_enum! {
         AddVertex, "Add vertex",
         DeleteVertex, "Remove vertex",
         AddEdge, "Add/Remove edge",
-    }
-}
-
-imgui_enum! {
-    RepositionMode {
-        SpringEmbedder, "Spring Embedder",
-        Circle, "Circle",
     }
 }
 
@@ -51,8 +47,8 @@ impl_has!(PositionedVertex -> position -> V2f);
 #[derive(Debug, Clone)]
 pub struct SnortWindow {
     game: AccessTracker<Snort<PositionedVertex, UndirectedGraph<PositionedVertex>>>,
-    reposition_option_selected: RawOf<RepositionMode>,
-    editing_mode: RawOf<GraphEditingMode>,
+    reposition_mode: RepositionMode,
+    editing_mode: GraphEditingMode,
     alternating_moves: bool,
     add_edge_mode: AddEdgeMode,
     details: Option<Details>,
@@ -90,8 +86,8 @@ impl SnortWindow {
                     14
                 ],
             ))),
-            reposition_option_selected: RawOf::new(RepositionMode::SpringEmbedder),
-            editing_mode: RawOf::new(GraphEditingMode::DragVertex),
+            reposition_mode: RepositionMode::SpringEmbedder,
+            editing_mode: GraphEditingMode::DragVertex,
             alternating_moves: true,
             add_edge_mode: AddEdgeMode::new(),
             details: None,
@@ -109,7 +105,7 @@ impl SnortWindow {
     }
 
     pub fn reposition(&mut self, graph_panel_size: V2f) {
-        match self.reposition_option_selected.get() {
+        match self.reposition_mode {
             RepositionMode::Circle => {
                 self.reposition_circle();
             }
@@ -206,11 +202,7 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                 ui.columns(2, "columns", true);
 
                 let short_inputs = ui.push_item_width(200.0);
-                self.content.reposition_option_selected.combo(
-                    ui,
-                    "##Reposition Mode",
-                    ComboBoxFlags::empty(),
-                );
+                self.content.reposition_mode.combo(ui, "##Reposition Mode");
                 ui.same_line();
                 should_reposition = ui.button("Reposition");
                 ui.same_line();
@@ -218,18 +210,16 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                     *self.content.game = Snort::new(UndirectedGraph::empty(&[]));
                 }
 
-                self.content
-                    .editing_mode
-                    .combo(ui, "Edit Mode", ComboBoxFlags::HEIGHT_LARGE);
+                self.content.editing_mode.combo(ui, "Edit Mode");
                 short_inputs.end();
 
                 if matches!(
-                    self.content.editing_mode.get(),
+                    self.content.editing_mode,
                     GraphEditingMode::MoveLeft | GraphEditingMode::MoveRight
                 ) {
                     ui.same_line();
                     ui.checkbox("Alternating", &mut self.content.alternating_moves);
-                } else if matches!(self.content.editing_mode.get(), GraphEditingMode::AddEdge) {
+                } else if matches!(self.content.editing_mode, GraphEditingMode::AddEdge) {
                     ui.same_line();
                     ui.checkbox(
                         "Add vertex",
@@ -244,7 +234,7 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                         .mul_add(-2.0, ui.window_size()[1] - ui.cursor_pos()[1]),
                 };
                 let new_vertex_position =
-                    (matches!(self.content.editing_mode.get(), GraphEditingMode::AddVertex)
+                    (matches!(self.content.editing_mode, GraphEditingMode::AddVertex)
                         && ui.invisible_button("Add vertex", graph_area_size))
                     .then(|| V2f::from(ui.io().mouse_pos) - graph_area_position);
                 ui.set_cursor_screen_pos(graph_area_position);
@@ -255,7 +245,7 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
 
                 let pressed = canvas.pressed_vertex();
                 let clicked = canvas.clicked_vertex(&self.content.game.graph);
-                match self.content.editing_mode.get() {
+                match self.content.editing_mode {
                     GraphEditingMode::DragVertex => {
                         if let Some(pressed) = pressed {
                             let delta = V2f::from(ui.io().mouse_delta);
@@ -314,7 +304,7 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                                     self.content
                                         .game
                                         .move_in_vertex::<{ VertexColor::TintLeft as u8 }>(clicked);
-                                self.content.editing_mode = RawOf::new(GraphEditingMode::MoveRight);
+                                self.content.editing_mode = GraphEditingMode::MoveRight;
                             }
                         }
                     }
@@ -332,7 +322,7 @@ impl IsCgtWindow for TitledWindow<SnortWindow> {
                                         .move_in_vertex::<{ VertexColor::TintRight as u8 }>(
                                             clicked,
                                         );
-                                self.content.editing_mode = RawOf::new(GraphEditingMode::MoveLeft);
+                                self.content.editing_mode = GraphEditingMode::MoveLeft;
                             }
                         }
                     }

@@ -25,10 +25,9 @@ use cgt::{
         transposition_table::ParallelTranspositionTable,
     },
 };
-use imgui::{ComboBoxFlags, Condition, FontId, TableColumnSetup};
+use imgui::{Condition, FontId, TableColumnSetup};
 use std::{
     collections::{BTreeMap, VecDeque},
-    marker::PhantomData,
     sync::{
         Arc, Condvar, Mutex,
         atomic::{self, AtomicU64},
@@ -150,92 +149,43 @@ macro_rules! impl_game_window {
 
 pub(crate) use impl_game_window;
 
-pub trait IsEnum: Sized
-where
-    Self: 'static,
-{
-    const LABELS: &'static [&'static str];
-    const VARIANTS: &'static [Self];
-
-    fn to_usize(self) -> usize;
-    fn from_usize(raw: usize) -> Self;
-    fn label(self) -> &'static str {
-        Self::LABELS[self.to_usize()]
-    }
-}
-
-#[derive(Debug)]
-pub struct RawOf<T> {
-    value: usize,
-    _ty: PhantomData<T>,
-}
-
-impl<T> Clone for RawOf<T> {
-    fn clone(&self) -> Self {
-        *self
-    }
-}
-
-impl<T> Copy for RawOf<T> {}
-
-impl<T> RawOf<T>
-where
-    T: IsEnum,
-{
-    pub fn new(value: T) -> RawOf<T> {
-        RawOf {
-            value: value.to_usize(),
-            _ty: PhantomData,
-        }
-    }
-
-    pub fn get(self) -> T {
-        T::from_usize(self.value)
-    }
-
-    pub fn combo(&mut self, ui: &imgui::Ui, label: impl AsRef<str>, flags: ComboBoxFlags) -> bool {
-        let mut changed = false;
-        let preview = self.get().label();
-        if let Some(_combo) = ui.begin_combo_with_flags(label, preview, flags) {
-            for (mode_idx, mode) in T::LABELS.iter().enumerate() {
-                let is_selected = self.value == mode_idx;
-                if is_selected {
-                    ui.set_item_default_focus();
-                }
-                let clicked = ui.selectable_config(mode).selected(is_selected).build();
-                changed |= clicked;
-                if clicked {
-                    self.value = mode_idx;
-                }
-            }
-        }
-        changed
-    }
-}
-
 macro_rules! imgui_enum {
-    ($v:vis $name:ident { $($variant:ident, $pretty:expr,)*}) => {
-        #[derive(Debug, Clone, Copy)]
+    ($(#[$attr:meta])* $v:vis $name:ident { $($variant:ident, $pretty:expr,)*}) => {
+        $(#[$attr])*
         #[repr(usize)]
         $v enum $name {
             $($variant,)*
         }
 
-        #[automatically_derived]
-        impl $crate::IsEnum for $name {
-            const LABELS: &'static [&'static str] = &[$($pretty,)*];
-            const VARIANTS: &'static [$name] = &[$($name::$variant ,)*];
-
-            fn to_usize(self) -> usize {
-                self as usize
+        impl $name {
+            #[inline(always)]
+            fn combo(&mut self, ui: &::imgui::Ui, label: &str) -> bool {
+                self.combo_with_flags(ui, label, ::imgui::ComboBoxFlags::HEIGHT_LARGE)
             }
 
+            fn combo_with_flags(&mut self, ui: &::imgui::Ui, label: &str, flags: ::imgui::ComboBoxFlags) -> bool {
+                const LABELS: &'static [&'static str] = &[$($pretty,)*];
 
-            fn from_usize(raw: usize) -> $name {
-                match raw {
-                    $(x if x == $name::$variant as usize => $name::$variant,)*
-                    _ => panic!("Invalid value for {}: {}", stringify!($name), raw),
+                let mut changed = false;
+                let preview = LABELS[*self as usize];
+                if let Some(_combo) = ui.begin_combo_with_flags(label, preview, flags) {
+                    for (mode_idx, mode) in LABELS.iter().enumerate() {
+                        let is_selected = *self as usize == mode_idx;
+                        if is_selected {
+                            ui.set_item_default_focus();
+                        }
+                        let clicked = ui.selectable_config(mode).selected(is_selected).build();
+                        changed |= clicked;
+                        if clicked {
+                            match mode_idx {
+                                $(raw if raw == ($name::$variant as usize) => *self = $name::$variant,)*
+                                raw => unreachable!("Invalid value for {}: {}", stringify!($name), raw),
+                            }
+                        }
+                    }
                 }
+                changed
+
             }
         }
     };
