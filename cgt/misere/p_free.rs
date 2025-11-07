@@ -333,43 +333,40 @@ impl_from_str_via_parser!(GameForm);
 
 #[cfg(any(test, feature = "quickcheck"))]
 impl GameForm {
-    fn arbitrary_sized(g: &mut quickcheck::Gen, mut size: i64) -> GameForm {
+    fn arbitrary_sized(g: &mut quickcheck::Gen, size: i64) -> GameForm {
         use quickcheck::Arbitrary;
 
-        let mut left = Vec::new();
-        let mut right = Vec::new();
-
-        while size > 0 {
-            let opt = if bool::arbitrary(g) {
-                let n = i64::arbitrary(g).rem_euclid(size);
-                size -= n + 1;
-                if bool::arbitrary(g) {
-                    GameForm::new_integer(n as i32)
-                } else {
-                    GameForm::new_integer(-n as i32)
-                }
-            } else {
-                let n = i64::arbitrary(g) % size;
-                size -= n;
-                GameForm::arbitrary_sized(g, n)
-            };
-
-            if bool::arbitrary(g) {
-                left.push(opt);
-            } else {
-                right.push(opt);
-            }
+        if size < 1 {
+            return GameForm::new_integer(0);
         }
 
-        GameForm::new(left, right)
+        let is_integer = u8::arbitrary(g) < 64;
+        if is_integer {
+            let n = i64::arbitrary(g).rem_euclid(size);
+            if bool::arbitrary(g) {
+                GameForm::new_integer(n as i32)
+            } else {
+                GameForm::new_integer(-n as i32)
+            }
+        } else {
+            let mut mk_player = || {
+                let size = i64::arbitrary(g).rem_euclid(size);
+                (0..size)
+                    .map(|_| GameForm::arbitrary_sized(g, size - 1))
+                    .collect()
+            };
+            let left = mk_player();
+            let right = mk_player();
+
+            GameForm::new(left, right)
+        }
     }
 }
 
 #[cfg(any(test, feature = "quickcheck"))]
 impl quickcheck::Arbitrary for GameForm {
     fn arbitrary(g: &mut quickcheck::Gen) -> Self {
-        let size = (g.size() / 2) as i64;
-        GameForm::arbitrary_sized(g, size)
+        GameForm::arbitrary_sized(g, g.size() as i64)
     }
 
     #[allow(clippy::option_if_let_else)] // Needed for Box<&dyn>
