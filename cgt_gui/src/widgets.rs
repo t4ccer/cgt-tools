@@ -16,6 +16,7 @@ pub mod domineering;
 pub mod fission;
 pub mod graph_editor;
 pub mod konane;
+pub mod quelhas;
 pub mod resolving_set;
 pub mod ski_jumps;
 pub mod snort;
