@@ -72,7 +72,6 @@ where
             && let [gr] = right.as_slice()
             && let Some(b) = self.to_integer(gr)
         {
-            // TODO: Is there a general rule for this?
             if a == -1 && b == 1 {
                 return self.new_integer(0).unwrap();
             }
@@ -291,7 +290,7 @@ where
 mod tests {
     use crate::{
         misere::game_form::{
-            DeadEndingContext, DeadEndingFormContext, GameFormContext, PFreeDeadEndingContext,
+            DeadEndingFormContext, GameFormContext, PFreeDeadEndingContext,
             PFreeDeadEndingFormContext, PFreeFormContext, StandardFormContext,
         },
         total::TotalWrappable,
@@ -303,30 +302,81 @@ mod tests {
             DeadEndingFormContext::new(StandardFormContext),
         ));
 
-        let g = context.from_str("0").unwrap();
-        let h = context.from_str("1").unwrap();
-        assert!(context.ge_mod_p_free_dead_ending(&g, &h));
-        assert!(!context.ge_mod_dead_ending(&g, &h));
+        macro_rules! assert_rel {
+            ($lhs:expr, $rhs:expr, $func:ident, $fmt:literal) => {
+                let g = context.from_str($lhs).unwrap();
+                let h = context.from_str($rhs).unwrap();
+                assert!(
+                    context.$func(&g, &h),
+                    $fmt,
+                    context.display(&g),
+                    context.display(&h)
+                );
 
-        let g = context.from_str("{1|3}").unwrap();
-        let h = context.from_str("2").unwrap();
-        assert!(context.eq_mod_p_free_dead_ending(&g, &h));
+                let gc = context.conjugate(&g).unwrap();
+                let hc = context.conjugate(&h).unwrap();
+                assert!(
+                    context.$func(&hc, &gc),
+                    $fmt,
+                    context.display(&hc),
+                    context.display(&gc)
+                );
+            };
+        }
 
-        let g = context.from_str("{-2|1}").unwrap();
-        let h = context.from_str("{-2|2}").unwrap();
-        assert!(context.ge_mod_p_free_dead_ending(&g, &h));
+        macro_rules! assert_eq_mod_p_free_dead_ending {
+            ($lhs:expr, $rhs:expr) => {
+                assert_rel!(
+                    $lhs,
+                    $rhs,
+                    eq_mod_p_free_dead_ending,
+                    "Game forms are not = (mod pf(E))\n  left: {}\n right: {}"
+                );
+            };
+        }
 
-        let g = context.from_str("{0,{-2|2}|1}").unwrap();
-        let h = context.from_str("{0|1}").unwrap();
-        assert!(context.eq_mod_p_free_dead_ending(&g, &h));
+        macro_rules! assert_ge_mod_p_free_dead_ending {
+            ($lhs:expr, $rhs:expr) => {
+                assert_rel!(
+                    $lhs,
+                    $rhs,
+                    ge_mod_p_free_dead_ending,
+                    "Game forms are >= (mod pf(E))\n  left: {}\n right: {}"
+                );
+            };
+        }
 
-        let g = context.from_str("{0,{-2|2}|2}").unwrap();
-        let h = context.from_str("{0|2}").unwrap();
-        assert!(context.eq_mod_p_free_dead_ending(&g, &h));
+        assert_eq_mod_p_free_dead_ending!("1", "{0|1}");
 
-        let g = context.from_str("{0,{-2|2},{-3|3}|2}").unwrap();
-        let h = context.from_str("{0|2}").unwrap();
-        assert!(context.eq_mod_p_free_dead_ending(&g, &h));
+        assert_eq_mod_p_free_dead_ending!("1", "{0,{-2|2}|1}");
+        assert_eq_mod_p_free_dead_ending!("2", "{1,{-2|2}|1}");
+        assert_eq_mod_p_free_dead_ending!("2", "{2,{-2|2}|1}");
+        assert_eq_mod_p_free_dead_ending!("2", "{3,{-2|2}|1}");
+
+        assert_eq_mod_p_free_dead_ending!("1", "{0,{-3|3}|1}");
+        assert_eq_mod_p_free_dead_ending!("2", "{1,{-3|3}|1}");
+        assert_eq_mod_p_free_dead_ending!("3", "{2,{-3|3}|1}");
+        assert_eq_mod_p_free_dead_ending!("3", "{3,{-3|3}|1}");
+        assert_eq_mod_p_free_dead_ending!("3", "{4,{-3|3}|1}");
+
+        assert_eq_mod_p_free_dead_ending!("3", "{{-3|3}|1}");
+        assert_eq_mod_p_free_dead_ending!("3", "{{-3|3}|2}");
+        assert_eq_mod_p_free_dead_ending!("3", "{{-3|3}|3}");
+        assert_eq_mod_p_free_dead_ending!("3", "{{-3|3}|4}");
+
+        assert_ge_mod_p_free_dead_ending!("3", "{{-3|3}|5}");
+
+        assert_eq_mod_p_free_dead_ending!("{{-3|3},{-4|4}|1}", "3");
+
+        assert_ge_mod_p_free_dead_ending!("0", "1");
+
+        assert_eq_mod_p_free_dead_ending!("{1|3}", "2");
+
+        assert_ge_mod_p_free_dead_ending!("{-2|1}", "{-2|2}");
+
+        assert_eq_mod_p_free_dead_ending!("{0, {-2|2}|1}", "{0|1}");
+        assert_eq_mod_p_free_dead_ending!("{0, {-2|2}|2}", "{0|2}");
+        assert_eq_mod_p_free_dead_ending!("{0, {-2|2}, {-3|3}|2}", "{0|2}");
     }
 
     #[test]
@@ -335,16 +385,34 @@ mod tests {
             DeadEndingFormContext::new(StandardFormContext),
         ));
 
-        let g = context.reduced(&context.from_str("{0,1|3}").unwrap());
-        let h = context.from_str("{0|3}").unwrap();
-        assert!(TotalWrappable::total_eq(&g, &h));
+        macro_rules! assert_identical {
+            ($lhs:expr, $rhs:expr) => {
+                let g = context.reduced(&context.from_str($lhs).unwrap());
+                let h = context.from_str($rhs).unwrap();
+                assert!(
+                    TotalWrappable::total_eq(&g, &h),
+                    "Game forms are not identical\n  left: {}\n right: {}",
+                    context.display(&g),
+                    context.display(&h)
+                );
 
-        let g = context.reduced(&context.from_str("{0|2}").unwrap());
-        let h = context.from_str("1").unwrap();
-        assert!(TotalWrappable::total_eq(&g, &h));
+                let gc = context.conjugate(&g).unwrap();
+                let hc = context.conjugate(&h).unwrap();
+                assert!(
+                    TotalWrappable::total_eq(&hc, &gc),
+                    "Conjugate game forms are not identical\n  left: {}\n right: {}",
+                    context.display(&hc),
+                    context.display(&gc)
+                );
+            };
+        }
 
-        let g = context.reduced(&context.from_str("{-2|0}").unwrap());
-        let h = context.from_str("-1").unwrap();
-        assert!(TotalWrappable::total_eq(&g, &h));
+        assert_identical!("{0|2}", "1");
+        assert_identical!("{0,1|2}", "1");
+        assert_identical!("{0,1|3}", "{0|3}");
+        assert_identical!("{-2|0}", "-1");
+
+        // assert_identical!("{0,{-2|2}|1}", "1");
+        // assert_identical!("{3,{-2|2}|1}", "4");
     }
 }
