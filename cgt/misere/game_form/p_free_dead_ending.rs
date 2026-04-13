@@ -25,6 +25,125 @@ where
         self.ge_mod_p_free_dead_ending(g, h) && self.ge_mod_p_free_dead_ending(h, g)
     }
 
+    fn incomp_mod_p_free_dead_ending(&self, g: &Self::Form, h: &Self::Form) -> bool {
+        !self.ge_mod_p_free_dead_ending(g, h) && !self.ge_mod_p_free_dead_ending(h, g)
+    }
+
+    fn bypass_reversible_moves_l(&self, g: &Self::Form) -> Vec<Self::Form> {
+        let mut i: i64 = 0;
+
+        let mut left_moves: Vec<Option<Self::Form>> =
+            self.moves(g, Player::Left).cloned().map(Some).collect();
+
+        loop {
+            if (i as usize) >= left_moves.len() {
+                break;
+            }
+            let g_l = match &left_moves[i as usize] {
+                None => {
+                    i += 1;
+                    continue;
+                }
+                Some(g) => g.clone(),
+            };
+            for g_lr in self.moves(&g_l, Player::Right) {
+                if self.ge_mod_p_free_dead_ending(g, g_lr) {
+                    let mut end_reversible = true;
+                    for g_lrl in self.moves(&g_lr, Player::Left) {
+                        end_reversible = false;
+                        left_moves.push(Some(g_lrl.clone()));
+                    }
+                    if end_reversible {
+                        // FIXME
+                        // let mut n = 0;
+                        // let wn = loop {
+                        //     let wn = self.waiting_protected(n);
+                        //     if self.ge_mod_p_free_dead_ending(g, &wn) {
+                        //         break wn;
+                        //     }
+                        //     n += 1
+                        // };
+                        // let replacement = self.new([], [wn]).unwrap();
+
+                        let replacement = self
+                            .new([], self.moves(&g_l, Player::Right).cloned())
+                            .unwrap();
+                        if !self.eq_mod_p_free_dead_ending(&replacement, &g_l) {
+                            left_moves.push(Some(replacement));
+                            left_moves[i as usize] = None;
+                        }
+                    } else {
+                        left_moves[i as usize] = None;
+                    }
+                    break;
+                }
+            }
+
+            i += 1;
+        }
+
+        left_moves.into_iter().flatten().collect()
+    }
+
+    fn bypass_reversible_moves_r(&self, g: &Self::Form) -> Vec<Self::Form> {
+        let mut i: i64 = 0;
+
+        let mut right_moves: Vec<Option<Self::Form>> =
+            self.moves(g, Player::Right).cloned().map(Some).collect();
+
+        loop {
+            if (i as usize) >= right_moves.len() {
+                break;
+            }
+            let g_r = match &right_moves[i as usize] {
+                None => {
+                    i += 1;
+                    continue;
+                }
+                Some(g) => g.clone(),
+            };
+
+            for g_rl in self.moves(&g_r, Player::Left) {
+                if self.ge_mod_p_free_dead_ending(g_rl, g) {
+                    let mut end_reversible = true;
+
+                    for g_rlr in self.moves(&g_rl, Player::Right) {
+                        end_reversible = false;
+                        right_moves.push(Some(g_rlr.clone()));
+                    }
+
+                    if end_reversible {
+                        // FIXME
+                        // let mut n = 0;
+                        // let wn = loop {
+                        //     let wn = self.waiting_protected(n);
+                        //     if self.ge_mod_p_free_dead_ending(&wn, g) {
+                        //         break wn;
+                        //     }
+                        //     n -= 1
+                        // };
+                        // let replacement = self.new([wn], []).unwrap();
+
+                        let replacement = self
+                            .new(self.moves(&g_r, Player::Left).cloned(), [])
+                            .unwrap();
+                        if !self.eq_mod_p_free_dead_ending(&replacement, &g_r) {
+                            right_moves.push(Some(replacement));
+                            right_moves[i as usize] = None;
+                        }
+                    } else {
+                        right_moves[i as usize] = None;
+                    }
+                    break;
+                }
+            }
+
+            i += 1;
+        }
+
+        right_moves.into_iter().flatten().collect()
+    }
+
     fn eliminate_dominated_moves(&self, moves: &mut Vec<Self::Form>, player: Player) {
         let mut i = 0;
         'loop_i: while i < moves.len() {
@@ -61,10 +180,10 @@ where
     }
 
     fn reduced(&self, game: &Self::Form) -> Self::Form {
-        let mut left = self.moves(game, Player::Left).cloned().collect::<Vec<_>>();
+        let mut left = self.bypass_reversible_moves_l(game);
         self.eliminate_dominated_moves(&mut left, Player::Left);
 
-        let mut right = self.moves(game, Player::Right).cloned().collect::<Vec<_>>();
+        let mut right = self.bypass_reversible_moves_r(game);
         self.eliminate_dominated_moves(&mut right, Player::Right);
 
         if let [gl] = left.as_slice()
@@ -72,10 +191,12 @@ where
             && let [gr] = right.as_slice()
             && let Some(b) = self.to_integer(gr)
         {
+            // {-1|1} = 0
             if a == -1 && b == 1 {
                 return self.new_integer(0).unwrap();
             }
 
+            // {a|b} = a+1
             if a >= 0 && b <= a + 2 {
                 return self.new_integer(a + 1).unwrap();
             }
@@ -387,16 +508,24 @@ mod tests {
 
         macro_rules! assert_identical {
             ($lhs:expr, $rhs:expr) => {
-                let g = context.reduced(&context.from_str($lhs).unwrap());
+                let g = context.from_str($lhs).unwrap();
                 let h = context.from_str($rhs).unwrap();
                 assert!(
-                    TotalWrappable::total_eq(&g, &h),
-                    "Game forms are not identical\n  left: {}\n right: {}",
+                    context.eq_mod_p_free_dead_ending(&g, &h),
+                    "SANITY CHECK: Games are not equal mod pf(E)\n  left: {}\n right: {}",
                     context.display(&g),
                     context.display(&h)
                 );
 
-                let gc = context.conjugate(&g).unwrap();
+                let gg = context.reduced(&g);
+                assert!(
+                    TotalWrappable::total_eq(&gg, &h),
+                    "Game forms are not identical\n  left: {}\n right: {}",
+                    context.display(&gg),
+                    context.display(&h)
+                );
+
+                let gc = context.conjugate(&gg).unwrap();
                 let hc = context.conjugate(&h).unwrap();
                 assert!(
                     TotalWrappable::total_eq(&hc, &gc),
@@ -409,10 +538,37 @@ mod tests {
 
         assert_identical!("{0|2}", "1");
         assert_identical!("{0,1|2}", "1");
+        assert_identical!("{0|3}", "{0|3}");
         assert_identical!("{0,1|3}", "{0|3}");
         assert_identical!("{-2|0}", "-1");
 
-        // assert_identical!("{0,{-2|2}|1}", "1");
-        // assert_identical!("{3,{-2|2}|1}", "4");
+        assert_identical!("{{-2|1}|1}", "1");
+        assert_identical!("{{-2|1}|2}", "1");
+
+        assert_identical!("{{-1|2}|1}", "2");
+        assert_identical!("{{-1|2}|2}", "2");
+        assert_identical!("{{-1|2}|3}", "2");
+        assert_identical!("{{-2|2}|1}", "2");
+        assert_identical!("{{-2|2}|2}", "2");
+        assert_identical!("{{-2|2}|3}", "2");
+
+        assert_identical!("{-1|{-1|2}}", "-1");
+        assert_identical!("{-2|{-1|2}}", "-1");
+
+        assert_identical!("{-1|{-2|1}}", "-2");
+        assert_identical!("{-1|{-2|2}}", "-2");
+        assert_identical!("{-2|{-2|1}}", "-2");
+        assert_identical!("{-2|{-2|2}}", "-2");
+        assert_identical!("{-3|{-2|1}}", "-2");
+        assert_identical!("{-3|{-2|2}}", "-2");
+
+        assert_identical!("{0,{-2|2}|1}", "1");
+        assert_identical!("{0,{-3|3}|1}", "1");
+        assert_identical!("{0,{-2|2},{-3|3}|1}", "1");
+
+        assert_identical!("{0,{-2|2}|3}", "{0|3}");
+        assert_identical!("{-3|0,{-2|2}}", "{-3|0}");
+
+        assert_identical!("{1,{-2|2},{-3|3}|1}", "2");
     }
 }
