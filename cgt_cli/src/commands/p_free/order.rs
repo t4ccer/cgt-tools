@@ -1,6 +1,6 @@
 use cgt::misere::game_form::{
-    ConstructionError, DeadEndingFormContext, GameFormContext, Outcome, PFreeFormContext,
-    StandardFormContext,
+    ConstructionError, DeadEndingContext, DeadEndingFormContext, GameFormContext, Outcome,
+    PFreeFormContext, StandardFormContext,
 };
 use clap::ValueEnum;
 use quickcheck::Gen;
@@ -352,6 +352,20 @@ pub fn run(args: Args) -> anyhow::Result<()> {
         Variant::DeadEnding => {
             let context = PFreeFormContext::new(DeadEndingFormContext::new(StandardFormContext));
             let args = RichArgs::new(&context, &args)?;
+            eprintln!("--------------------");
+            eprintln!(
+                "{} >= {} (mod pf(E)) => {}",
+                context.display(&args.lhs),
+                context.display(&args.rhs),
+                context.ge_mod_dead_ending(&args.lhs, &args.rhs)
+            );
+            eprintln!(
+                "{} <= {} (mod pf(E)) => {}",
+                context.display(&args.lhs),
+                context.display(&args.rhs),
+                context.ge_mod_dead_ending(&args.rhs, &args.lhs)
+            );
+            eprintln!("--------------------");
             show_results(&context, &args);
         }
         Variant::Blocking => todo!(),
