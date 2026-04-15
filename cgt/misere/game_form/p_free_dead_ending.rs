@@ -17,8 +17,41 @@ where
             && let Some(h) = self.to_integer(h)
         {
             return g <= h;
+        };
+
+        if self.ge_mod_dead_ending(g, h) {
+            return true;
         }
-        self.ge_mod_dead_ending(g, h)
+
+        let plug_end = |g| {
+            self.to_integer(g).and_then(|g| match g.cmp(&0) {
+                std::cmp::Ordering::Less => Some(
+                    self.new(
+                        [self.new_integer(-1).unwrap_infallible()],
+                        [self.new_integer(g + 1).unwrap_infallible()],
+                    )
+                    .unwrap(),
+                ),
+                // FIXME: We need to try plugging the zero to {-1|1} but that requires cycle detection
+                std::cmp::Ordering::Equal => None,
+                std::cmp::Ordering::Greater => Some(
+                    self.new(
+                        [self.new_integer(g - 1).unwrap_infallible()],
+                        [self.new_integer(1).unwrap_infallible()],
+                    )
+                    .unwrap(),
+                ),
+            })
+        };
+
+        // No need to plug both cause then they are both integers and handled by the case above
+        if let Some(g) = plug_end(g) {
+            self.ge_mod_p_free_dead_ending(&g, h)
+        } else if let Some(h) = plug_end(h) {
+            self.ge_mod_p_free_dead_ending(g, &h)
+        } else {
+            false
+        }
     }
 
     fn eq_mod_p_free_dead_ending(&self, g: &Self::Form, h: &Self::Form) -> bool {
@@ -445,7 +478,7 @@ mod tests {
                     $lhs,
                     $rhs,
                     ge_mod_p_free_dead_ending,
-                    "Game forms are >= (mod pf(E))\n  left: {}\n right: {}"
+                    "Game forms are not >= (mod pf(E))\n  left: {}\n right: {}"
                 );
             };
         }
@@ -478,6 +511,15 @@ mod tests {
 
         assert_ge_mod_p_free_dead_ending!("{-2|1}", "{-2|2}");
 
+        assert_eq_mod_p_free_dead_ending!("5", "{4|1,{-1|3}}");
+        assert_ge_mod_p_free_dead_ending!("-1", "5");
+        assert_ge_mod_p_free_dead_ending!("-1", "{4|1,{-1|3}}");
+        assert_ge_mod_p_free_dead_ending!("{-1|0}", "5");
+        assert_ge_mod_p_free_dead_ending!("{-1|0}", "{4|1,{-1|3}}");
+
+        assert_eq_mod_p_free_dead_ending!("5", "{4|{0|3}}");
+        // assert_ge_mod_p_free_dead_ending!("0", "{4|{0|3}}"); // FIXME: Plug the zero
+
         assert_eq_mod_p_free_dead_ending!("{0, {-2|2}|1}", "{0|1}");
         assert_eq_mod_p_free_dead_ending!("{0, {-2|2}|2}", "{0|2}");
         assert_eq_mod_p_free_dead_ending!("{0, {-2|2}, {-3|3}|2}", "{0|2}");
@@ -501,6 +543,14 @@ mod tests {
                 );
 
                 let gg = context.reduced(&g);
+
+                assert!(
+                    context.eq_mod_p_free_dead_ending(&g, &h),
+                    "SANITY CHECK: Original and reduced are not equal mod pf(E)\n  left: {}\n right: {}",
+                    context.display(&g),
+                    context.display(&gg)
+                );
+
                 assert!(
                     TotalWrappable::total_eq(&gg, &h),
                     "Game forms are not identical\n  left: {}\n right: {}",
@@ -553,5 +603,7 @@ mod tests {
         assert_identical!("{-3|0,{-2|2}}", "{-3|0}");
 
         assert_identical!("{1,{-2|2},{-3|3}|1}", "2");
+
+        assert_identical!("{-1|{0|3}}", "0");
     }
 }
