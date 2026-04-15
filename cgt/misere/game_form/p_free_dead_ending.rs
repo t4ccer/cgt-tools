@@ -2,7 +2,7 @@
 
 use crate::{
     misere::game_form::{ConstructionError, DeadEndingContext, GameFormContext, PFreeContext},
-    result::Void,
+    result::{UnwrapInfallible, Void},
     short::partizan::Player,
     total::TotalWrappable,
 };
@@ -193,20 +193,29 @@ where
         {
             // {-1|1} = 0
             if a == -1 && b == 1 {
-                return self.new_integer(0).unwrap();
+                return self.new_integer(0).unwrap_infallible();
             }
 
             // {a|b} = a+1
             if a >= 0 && b <= a + 2 {
-                return self.new_integer(a + 1).unwrap();
+                return self.new_integer(a + 1).unwrap_infallible();
             }
 
             if b <= 0 && a >= b - 2 {
-                return self.new_integer(b - 1).unwrap();
+                return self.new_integer(b - 1).unwrap_infallible();
             }
         }
 
-        self.new(left, right).unwrap()
+        match self.new(left, right) {
+            Ok(g) => g,
+            Err(err) => {
+                unreachable!(
+                    "Reduction of `{}` is `{}` which is not pf(E)",
+                    self.display(game),
+                    self.base_context().display(&err.recover())
+                )
+            }
+        }
     }
 }
 
