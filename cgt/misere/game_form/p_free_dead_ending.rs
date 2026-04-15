@@ -53,28 +53,16 @@ where
                         end_reversible = false;
                         left_moves.push(Some(g_lrl.clone()));
                     }
-                    if end_reversible {
-                        // FIXME
-                        // let mut n = 0;
-                        // let wn = loop {
-                        //     let wn = self.waiting_protected(n);
-                        //     if self.ge_mod_p_free_dead_ending(g, &wn) {
-                        //         break wn;
-                        //     }
-                        //     n += 1
-                        // };
-                        // let replacement = self.new([], [wn]).unwrap();
 
-                        let replacement = self
-                            .new([], self.moves(&g_l, Player::Right).cloned())
-                            .unwrap();
-                        if !self.eq_mod_p_free_dead_ending(&replacement, &g_l) {
-                            left_moves.push(Some(replacement));
+                    if end_reversible {
+                        if self.to_integer(&g_l).is_none_or(|n| n != -1) {
+                            left_moves.push(Some(self.new_integer(-1).unwrap_infallible()));
                             left_moves[i as usize] = None;
                         }
                     } else {
                         left_moves[i as usize] = None;
                     }
+
                     break;
                 }
             }
@@ -106,34 +94,20 @@ where
             for g_rl in self.moves(&g_r, Player::Left) {
                 if self.ge_mod_p_free_dead_ending(g_rl, g) {
                     let mut end_reversible = true;
-
                     for g_rlr in self.moves(&g_rl, Player::Right) {
                         end_reversible = false;
                         right_moves.push(Some(g_rlr.clone()));
                     }
 
                     if end_reversible {
-                        // FIXME
-                        // let mut n = 0;
-                        // let wn = loop {
-                        //     let wn = self.waiting_protected(n);
-                        //     if self.ge_mod_p_free_dead_ending(&wn, g) {
-                        //         break wn;
-                        //     }
-                        //     n -= 1
-                        // };
-                        // let replacement = self.new([wn], []).unwrap();
-
-                        let replacement = self
-                            .new(self.moves(&g_r, Player::Left).cloned(), [])
-                            .unwrap();
-                        if !self.eq_mod_p_free_dead_ending(&replacement, &g_r) {
-                            right_moves.push(Some(replacement));
+                        if self.to_integer(&g_r).is_none_or(|n| n != 1) {
+                            right_moves.push(Some(self.new_integer(1).unwrap_infallible()));
                             right_moves[i as usize] = None;
                         }
                     } else {
                         right_moves[i as usize] = None;
                     }
+
                     break;
                 }
             }
