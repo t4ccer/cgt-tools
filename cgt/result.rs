@@ -4,7 +4,7 @@ use std::convert::Infallible;
 
 /// Uninhabited types
 pub trait Void {
-    /// Since `Self` is uninhabited, it can be converted into anything.This must not panic.
+    /// Since `Self` is uninhabited, it can be converted into anything. This must not panic.
     fn absurd<T>(self) -> T;
 }
 
@@ -23,11 +23,19 @@ pub trait UnwrapInfallible {
     fn unwrap_infallible(self) -> Self::R;
 }
 
+/// # Example
+/// ```
+/// use cgt::result::UnwrapInfallible;
+/// use std::str::FromStr;
+///
+/// let s: String = String::from_str("Hello, World!").unwrap_infallible();
+/// ```
 impl<T, E> UnwrapInfallible for Result<T, E>
 where
     E: Void,
 {
     type R = T;
+
     fn unwrap_infallible(self) -> Self::R {
         match self {
             Ok(res) => res,
