@@ -19,6 +19,7 @@ pub mod loopy;
 pub mod misere;
 pub mod numeric;
 pub mod parsing;
+pub mod poset;
 pub mod result;
 pub mod short;
 pub mod total;

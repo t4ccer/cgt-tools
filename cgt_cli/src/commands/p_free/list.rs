@@ -5,12 +5,20 @@ use cgt::{
         DeadEndingFormContext, GameFormContext, PFreeDeadEndingContext, PFreeDeadEndingFormContext,
         PFreeFormContext, StandardFormContext,
     },
+    poset::AntichainIterator,
     result::{UnwrapInfallible, Void},
 };
-use itertools::Itertools;
+use indicatif::{ProgressBar, ProgressStyle};
 use std::{
+    borrow::Borrow,
     collections::{BTreeSet, VecDeque},
-    io::{self, BufWriter, Stdout},
+    io::{self, Stdout, Write},
+    process::Stdio,
+    sync::{
+        RwLock,
+        atomic::{self, AtomicU64, AtomicUsize},
+    },
+    time::Duration,
 };
 
 #[derive(Debug, clap::Parser)]
@@ -19,44 +27,127 @@ pub struct Args {
     #[arg(long)]
     day: u32,
 
-    #[arg(long, default_value = "-")]
-    output: FilePathOr<Stdout>,
+    /// Dot output path
+    #[arg(long, default_value = None)]
+    dot: Option<FilePathOr<Stdout>>,
 
-    #[arg(long, default_value_t = false)]
-    print_equal: bool,
+    /// Pdf output path
+    #[arg(long, default_value = None)]
+    pdf: Option<FilePathOr<Stdout>>,
+
+    /// TeX/tikz output path
+    #[arg(long, default_value = None)]
+    tex: Option<FilePathOr<Stdout>>,
     // TODO: Support variant
 }
 
-fn compute_partitioned_antichains<C>(context: &C, forms: &[C::Form]) -> Vec<Vec<C::Form>>
+fn compute_relations<C, Form>(
+    context: &C,
+    forms: &[Form],
+    bar: &ProgressBar,
+) -> (Vec<bool>, Vec<bool>)
 where
-    C: PFreeDeadEndingContext,
+    C: PFreeDeadEndingContext + Send + Sync,
     C::IntegerConstructionError: Void,
+    C::Form: Send + Sync,
+    Form: Borrow<C::Form> + Send + Sync,
+{
+    let n = forms.len();
+
+    let lt = vec![false; n * n];
+    let mut eq = vec![false; n * n];
+
+    for i in 0..n {
+        eq[i * n + i] = true;
+    }
+
+    parallel_for(0, n * (n - 1) / 2, |idx| {
+        let _ = DropGuard(|| bar.inc(1));
+
+        // Map flat coordinates into a triangle
+        let a = 2 * n - 1;
+        let mut i = (a - (a * a - 8 * idx).isqrt()) / 2;
+        let mut start = i * (2 * n - i - 1) / 2;
+        if start > idx {
+            i -= 1;
+            start = i * (2 * n - i - 1) / 2;
+        }
+        let j = i + 1 + (idx - start);
+
+        let i_le_j = context.ge_mod_p_free_dead_ending(&forms[i].borrow(), &forms[j].borrow());
+        let j_le_i = context.ge_mod_p_free_dead_ending(&forms[j].borrow(), &forms[i].borrow());
+
+        // SAFETY: Each thread gets scheduled with a unique pair of indices that are in bounds
+        unsafe {
+            if i_le_j && j_le_i {
+                eq.as_ptr().add(i * n + j).cast_mut().write(true);
+                eq.as_ptr().add(j * n + i).cast_mut().write(true);
+            } else if i_le_j {
+                lt.as_ptr().add(i * n + j).cast_mut().write(true);
+            } else if j_le_i {
+                lt.as_ptr().add(j * n + i).cast_mut().write(true);
+            }
+        }
+    });
+
+    (eq, lt)
+}
+
+fn precompute_ge_relations<C, Form>(context: &C, forms: &[Form]) -> Vec<bool>
+where
+    C: PFreeDeadEndingContext + Send + Sync,
+    C::IntegerConstructionError: Void,
+    C::Form: Send + Sync,
+    Form: Borrow<C::Form> + Send + Sync,
+{
+    let n = forms.len();
+
+    let mut ge = vec![false; n * n];
+
+    for i in 0..n {
+        ge[i * n + i] = true;
+    }
+
+    parallel_for(0, n * (n - 1) / 2, |idx| {
+        // Map flat coordinates into a triangle
+        let a = 2 * n - 1;
+        let mut i = (a - (a * a - 8 * idx).isqrt()) / 2;
+        let mut start = i * (2 * n - i - 1) / 2;
+        if start > idx {
+            i -= 1;
+            start = i * (2 * n - i - 1) / 2;
+        }
+        let j = i + 1 + (idx - start);
+
+        let i_ge_j = context.ge_mod_p_free_dead_ending(&forms[i].borrow(), &forms[j].borrow());
+        let j_ge_i = context.ge_mod_p_free_dead_ending(&forms[j].borrow(), &forms[i].borrow());
+
+        // SAFETY: Each thread gets scheduled with a unique pair of indices that are in bounds
+        unsafe {
+            ge.as_ptr().add(i * n + j).cast_mut().write(i_ge_j);
+            ge.as_ptr().add(j * n + i).cast_mut().write(j_ge_i);
+        }
+    });
+
+    ge
+}
+
+fn compute_partitioned_antichains<C>(
+    context: &C,
+    forms: &[C::Form],
+    bar: &ProgressBar,
+) -> Vec<Vec<C::Form>>
+where
+    C: PFreeDeadEndingContext + Send + Sync,
+    C::IntegerConstructionError: Void,
+    C::Form: Send + Sync,
 {
     let n = forms.len();
     if n == 0 {
         return Vec::new();
     }
 
-    // Memorize relations
-    let mut lt = vec![vec![false; n]; n];
-    let mut eq = vec![vec![false; n]; n];
-
-    for i in 0..n {
-        eq[i][i] = true;
-        for j in (i + 1)..n {
-            let i_le_j = context.ge_mod_p_free_dead_ending(&forms[j], &forms[i]);
-            let j_le_i = context.ge_mod_p_free_dead_ending(&forms[i], &forms[j]);
-
-            if i_le_j && j_le_i {
-                eq[i][j] = true;
-                eq[j][i] = true;
-            } else if i_le_j {
-                lt[i][j] = true;
-            } else if j_le_i {
-                lt[j][i] = true;
-            }
-        }
-    }
+    let (eq, lt) = compute_relations(context, forms, bar);
 
     let mut class_id = vec![None; n];
     let mut classes: Vec<Vec<usize>> = Vec::new();
@@ -73,7 +164,7 @@ where
         while let Some(u) = queue.pop_front() {
             component.push(u);
             for v in 0..n {
-                if eq[u][v] && class_id[v].is_none() {
+                if eq[u * n + v] && class_id[v].is_none() {
                     class_id[v] = Some(cid);
                     queue.push_back(v);
                 }
@@ -91,7 +182,7 @@ where
     for i in 0..n {
         let a = class_id[i];
         for j in 0..n {
-            if lt[i][j] {
+            if lt[i * n + j] {
                 let b = class_id[j];
                 if a != b && class_edges[a].insert(b) {
                     class_in_degree[b] += 1;
@@ -142,108 +233,188 @@ where
     antichains
 }
 
-#[must_use]
-fn next_day_antichains<C>(
-    context: &C,
-    previous_day_antichains: &[Vec<C::Form>],
-) -> Vec<Vec<C::Form>>
-where
-    C: PFreeDeadEndingContext,
-    C::IntegerConstructionError: Void,
+struct DropGuard<F: FnMut()>(F);
+
+impl<F: FnMut()> Drop for DropGuard<F> {
+    fn drop(&mut self) {
+        (self.0)()
+    }
+}
+
+fn parallel_for(from: usize, to: usize, action: impl Fn(usize) + Send + Sync) {
+    let i = AtomicUsize::new(from);
+    let num_threads = 12; // FIXME: get it from CLI/libc
+    std::thread::scope(|scope| {
+        for _ in 0..num_threads {
+            scope.spawn(|| {
+                loop {
+                    let i = i.fetch_add(1, atomic::Ordering::Relaxed);
+                    if i >= to {
+                        break;
+                    }
+                    action(i);
+                }
+            });
+        }
+    });
+}
+
+fn parallel<T>(
+    mut make_tasks: impl FnMut(crossbeam_channel::Sender<T>) + Send,
+    perform_task: impl Fn(T) + Send + Sync,
+) where
+    T: Send,
 {
-    let mut seen: Vec<C::Form> = Vec::new();
+    let num_threads = 12; // FIXME: get it from CLI/libc
+    let (tx, rx) = crossbeam_channel::bounded::<T>(num_threads * 4);
 
-    for a1 in previous_day_antichains {
-        for a2 in previous_day_antichains {
-            for l in a1.iter().powerset() {
-                for r in a2.iter().powerset() {
-                    let Ok(g) = context.new(
-                        l.iter().map(|g| C::Form::clone(g)),
-                        r.iter().map(|g| C::Form::clone(g)),
-                    ) else {
-                        continue;
-                    };
-                    let g = context.reduced(&g);
-                    if !context.is_p_free(&g) || !context.is_dead_ending(&g) {
-                        continue;
+    std::thread::scope(|scope| {
+        for _ in 0..num_threads {
+            let rx = rx.clone();
+            let perform_task = &perform_task;
+            scope.spawn(move || {
+                loop {
+                    match rx.recv() {
+                        Ok(g) => perform_task(g),
+                        Err(_) => break,
                     }
+                }
+            });
+        }
 
-                    if seen.iter().any(|h| context.total_eq(&g, h)) {
-                        continue;
-                    }
+        make_tasks(tx);
+    });
+}
 
-                    seen.push(g.clone());
+#[must_use]
+fn next_day<C>(context: &C, previous_day: Vec<C::Form>) -> Vec<C::Form>
+where
+    C: PFreeDeadEndingContext + Send + Sync,
+    C::IntegerConstructionError: Void,
+    C::Form: Send + Sync,
+{
+    let ge = precompute_ge_relations(context, &previous_day);
+    let antichains = AntichainIterator::new((0..previous_day.len()).collect(), |lhs, rhs| {
+        ge[lhs * previous_day.len() + rhs]
+    })
+    .collect::<Vec<_>>();
+
+    let n = antichains.len() as u64;
+    let bar = ProgressBar::new(n * n).with_style(progress_style());
+    bar.enable_steady_tick(Duration::from_secs(1));
+
+    let seen = RwLock::new(Vec::<C::Form>::new());
+
+    parallel(
+        |tx| {
+            for l in &antichains {
+                for r in &antichains {
+                    tx.send((
+                        l.iter()
+                            .map(|idx| previous_day[*idx].clone())
+                            .collect::<Vec<_>>(),
+                        r.iter()
+                            .map(|idx| previous_day[*idx].clone())
+                            .collect::<Vec<_>>(),
+                    ))
+                    .unwrap();
                 }
             }
-        }
-    }
+        },
+        |(l, r)| {
+            let _ = DropGuard(|| bar.inc(1));
 
-    // FIXME: That is not correct is it?
-    // We actually need all maximal antichains if we want to feed it recursively.
-    // Otherwise we would never get e.g. {-1, {-3|2}} as a set of moves in day 5 generation
-    compute_partitioned_antichains(context, &seen)
-}
+            let Ok(g) = context.new(l, r) else {
+                return;
+            };
 
-fn print_equal<C>(context: &C, games: &[C::Form])
-where
-    C: PFreeDeadEndingContext,
-    C::IntegerConstructionError: Void,
-{
-    let mut seen = vec![false; games.len()];
-
-    for i in 0..games.len() {
-        if seen[i] {
-            continue;
-        }
-
-        eprint!("  {}", context.display(&games[i]),);
-        seen[i] = true;
-
-        for j in (i + 1)..games.len() {
-            if !seen[j] && context.eq_mod_p_free_dead_ending(&games[i], &games[j]) {
-                seen[j] = true;
-                eprint!(" = {}", context.display(&games[j]));
+            if !context.is_p_free(&g) || !context.is_dead_ending(&g) {
+                return;
             }
-        }
 
-        eprintln!();
-    }
-}
+            let g = context.reduced(&g);
 
-fn deduplicate_equal<C>(context: &C, antichains: &mut [Vec<C::Form>])
-where
-    C: PFreeDeadEndingContext,
-    C::IntegerConstructionError: Void,
-{
-    let mut seen: Vec<C::Form> = Vec::new();
-    for antichain in antichains {
-        antichain.retain(|g| {
-            if seen.iter().any(|h| context.eq_mod_p_free_dead_ending(g, h)) {
-                false
-            } else {
-                seen.push(g.clone());
-                true
+            let already_checked = {
+                let seen = seen.read().unwrap();
+                if seen.iter().any(|h| context.total_eq(&g, h)) {
+                    return;
+                }
+                seen.len()
+            };
+
+            // Two therads may have constructed equal games so even though we just checked that
+            // the game is new we need to check again after taking the exclusive write lock.
+            // We only append games so the first `constructed_so_far` are not equal to our game
+            // so we only check the tail, i.e. games inserted by other therads after we did the check
+            let mut seen = seen.write().unwrap();
+            if seen[already_checked..]
+                .iter()
+                .any(|h| context.total_eq(&g, h))
+            {
+                return;
             }
-        });
-    }
+            seen.push(g);
+            bar.set_message(format!("(Found {})", seen.len()));
+        },
+    );
+
+    bar.finish();
+    eprintln!();
+
+    seen.into_inner().unwrap()
 }
 
-fn generate_hasse<C, W>(context: &C, mut w: W, antichains: &[Vec<C::Form>]) -> io::Result<()>
+fn deduplicate_equal<C>(context: &C, games: &mut Vec<C::Form>, bar: &ProgressBar)
 where
-    C: PFreeDeadEndingContext,
+    C: PFreeDeadEndingContext + Send + Sync,
     C::IntegerConstructionError: Void,
+    C::Form: Send + Sync,
+{
+    let duplicates = AtomicU64::new(0);
+
+    let is_removed = vec![false; games.len()];
+    parallel_for(0, games.len(), |idx| {
+        let _ = DropGuard(|| bar.inc(1));
+        let g = &games[idx];
+        if let Some(h) = games[0..idx]
+            .iter()
+            .find(|h| context.eq_mod_p_free_dead_ending(g, h))
+        {
+            // SAFETY: Each thread gets scheduled a unique index that is in bounds
+            unsafe {
+                is_removed.as_ptr().add(idx).cast_mut().write(true);
+            }
+            let duplicates = duplicates.fetch_add(1, atomic::Ordering::SeqCst);
+            bar.println(format!("  {} = {}", context.display(h), context.display(g)));
+            bar.set_message(format!("(Found {duplicates})"));
+        }
+    });
+
+    let mut i = 0;
+    games.retain(|_| {
+        let retain = !is_removed[i];
+        i += 1;
+        retain
+    });
+}
+fn generate_hasse<C, W>(
+    context: &C,
+    mut w: W,
+    antichains: &[Vec<C::Form>],
+    bar: &ProgressBar,
+) -> io::Result<()>
+where
+    C: PFreeDeadEndingContext + Send + Sync,
+    C::IntegerConstructionError: Void,
+    C::Form: Send + Sync,
     W: io::Write,
 {
     writeln!(w, "graph Hasse {{")?;
     writeln!(w, "  rankdir=BT;")?;
 
     let day = antichains.iter().flatten().collect::<Vec<_>>();
-    let mut ge = vec![false; day.len() * day.len()];
-    for i in 0..day.len() {
-        for j in 0..day.len() {
-            ge[i * day.len() + j] = context.ge_mod_p_free_dead_ending(&day[i], &day[j]);
-        }
-    }
+
+    let (_, lt) = compute_relations(context, day.as_slice(), bar);
 
     let mut i = 0;
     for antichain in antichains {
@@ -263,7 +434,7 @@ where
 
     for i in 0..day.len() {
         'inner: for j in 0..day.len() {
-            if i == j || !ge[j * day.len() + i] {
+            if i == j || !lt[j * day.len() + i] {
                 continue;
             }
 
@@ -272,7 +443,7 @@ where
                     continue;
                 }
 
-                if ge[j * day.len() + k] && ge[k * day.len() + i] {
+                if lt[j * day.len() + k] && lt[k * day.len() + i] {
                     continue 'inner;
                 }
             }
@@ -284,30 +455,98 @@ where
     writeln!(w, "}}")
 }
 
+fn progress_style() -> ProgressStyle {
+    ProgressStyle::with_template("[{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} {msg}")
+        .unwrap()
+        .progress_chars("#> ")
+}
+
 #[allow(clippy::needless_pass_by_value, clippy::unnecessary_wraps)]
 pub fn run(args: Args) -> Result<()> {
-    let mut output = BufWriter::new(args.output.create()?);
-
     let context = PFreeDeadEndingFormContext::new(PFreeFormContext::new(
         DeadEndingFormContext::new(StandardFormContext),
     ));
 
-    let mut day_antichains = vec![vec![context.new_integer(0).unwrap_infallible()]];
-    for _ in 0..args.day {
-        day_antichains = next_day_antichains(&context, &mut day_antichains);
+    let style = progress_style();
+
+    let mut day = vec![context.new_integer(0).unwrap_infallible()];
+    for day_number in 0..args.day {
+        eprintln!("Generating day {}/{}", day_number + 1, args.day);
+        day = next_day(&context, day);
     }
 
-    if args.print_equal {
-        dbg!(day_antichains.len());
-        for antichain in &day_antichains {
-            eprintln!("Antichain:");
-            print_equal(&context, antichain);
+    {
+        eprintln!("Deduplicating");
+        let form_count: u64 = day.len() as u64;
+        let bar = ProgressBar::new(form_count).with_style(style.clone());
+        deduplicate_equal(&context, &mut day, &bar);
+        bar.finish();
+        eprintln!();
+    }
+
+    {
+        let game_count: u64 = day.len() as u64;
+
+        let day_antichains = {
+            eprintln!("Calculating antichain partitions for day {}", args.day);
+            let bar = ProgressBar::new(game_count * (game_count - 1) / 2).with_style(style.clone());
+            let res = compute_partitioned_antichains(&context, &day, &bar);
+            bar.finish();
+            eprintln!();
+            res
+        };
+
+        eprintln!("Generating Hasse diagram");
+        let bar = ProgressBar::new(game_count * (game_count - 1) / 2).with_style(style.clone());
+        let mut graphviz = Vec::new();
+        // TODO: Reuse `lt` table generated in `compute_partitioned_antichains` if we can remap indices
+        generate_hasse(&context, &mut graphviz, &day_antichains, &bar)?;
+        bar.finish();
+        eprintln!();
+        drop(bar);
+
+        if let Some(dot_output) = &args.dot {
+            let mut output = dot_output.create()?;
+            output.write_all(&graphviz)?;
+        }
+
+        if let Some(pdf_output) = &args.pdf {
+            let mut output = pdf_output.create()?;
+
+            let mut dot2tex = std::process::Command::new("dot")
+                .arg("-Tpdf")
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .spawn()?;
+            dot2tex.stdin.take().unwrap().write_all(&graphviz)?;
+            output.write_all(&dot2tex.wait_with_output()?.stdout)?;
+        }
+
+        if let Some(tex_output) = &args.tex {
+            let mut output = tex_output.create()?;
+
+            let mut dot2tex = std::process::Command::new("dot2tex")
+                .arg("--codeonly")
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .spawn()?;
+            dot2tex.stdin.take().unwrap().write_all(&graphviz)?;
+            output.write_all(&dot2tex.wait_with_output()?.stdout)?;
         }
     }
 
-    deduplicate_equal(&context, &mut day_antichains);
-
-    generate_hasse(&context, &mut output, &day_antichains)?;
+    // for g in &day {
+    //     for h in &day {
+    //         let sum = context.sum(g, h).unwrap();
+    //         let sum_reduced = context.reduced(&sum);
+    //         println!(
+    //             "{} + {} = {}",
+    //             context.display(g),
+    //             context.display(h),
+    //             context.display(&sum_reduced),
+    //         );
+    //     }
+    // }
 
     Ok(())
 }

@@ -26,6 +26,8 @@ rand = "0.9"
 itertools = "0.13"
 quickcheck = { version = "1.0", default-features = false }
 ctrlc = "3.5.0"
+indicatif = "0.18.4"
+crossbeam-channel = "0.5.15"
 
 [target.'cfg(all(not(windows)))'.dependencies]
 jemallocator = "0.5.4"
