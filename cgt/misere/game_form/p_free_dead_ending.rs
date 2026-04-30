@@ -4,55 +4,15 @@ use crate::{
     misere::game_form::{ConstructionError, DeadEndingContext, GameFormContext, PFreeContext},
     result::{UnwrapInfallible, Void},
     short::partizan::Player,
-    total::TotalWrappable,
+    total::{TotalWrappable, TotalWrapper},
 };
-use std::{error::Error, fmt};
+use std::{collections::HashMap, error::Error, fmt, sync::RwLock};
 
 pub trait PFreeDeadEndingContext: DeadEndingContext + PFreeContext
 where
     Self::IntegerConstructionError: Void,
 {
-    fn ge_mod_p_free_dead_ending(&self, g: &Self::Form, h: &Self::Form) -> bool {
-        if let Some(g) = self.to_integer(g)
-            && let Some(h) = self.to_integer(h)
-        {
-            return g <= h;
-        };
-
-        if self.ge_mod_dead_ending(g, h) {
-            return true;
-        }
-
-        let plug_end = |g| {
-            self.to_integer(g).and_then(|g| match g.cmp(&0) {
-                std::cmp::Ordering::Less => Some(
-                    self.new(
-                        [self.new_integer(-1).unwrap_infallible()],
-                        [self.new_integer(g + 1).unwrap_infallible()],
-                    )
-                    .unwrap(),
-                ),
-                // FIXME: We need to try plugging the zero to {-1|1} but that requires cycle detection
-                std::cmp::Ordering::Equal => None,
-                std::cmp::Ordering::Greater => Some(
-                    self.new(
-                        [self.new_integer(g - 1).unwrap_infallible()],
-                        [self.new_integer(1).unwrap_infallible()],
-                    )
-                    .unwrap(),
-                ),
-            })
-        };
-
-        // No need to plug both cause then they are both integers and handled by the case above
-        if let Some(g) = plug_end(g) {
-            self.ge_mod_p_free_dead_ending(&g, h)
-        } else if let Some(h) = plug_end(h) {
-            self.ge_mod_p_free_dead_ending(g, &h)
-        } else {
-            false
-        }
-    }
+    fn ge_mod_p_free_dead_ending(&self, g: &Self::Form, h: &Self::Form) -> bool;
 
     fn eq_mod_p_free_dead_ending(&self, g: &Self::Form, h: &Self::Form) -> bool {
         self.ge_mod_p_free_dead_ending(g, h) && self.ge_mod_p_free_dead_ending(h, g)
@@ -226,14 +186,32 @@ where
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct PFreeDeadEndingFormContext<C> {
+#[derive(Debug, Clone, Copy)]
+enum SeenZero {
+    Once,
+    Multiple,
+}
+
+#[derive(Debug)]
+pub struct PFreeDeadEndingFormContext<C>
+where
+    C: GameFormContext,
+{
+    not_ge_zero: RwLock<HashMap<TotalWrapper<PFreeDeadEndingForm<C::Form>>, SeenZero>>,
+    not_zero_ge: RwLock<HashMap<TotalWrapper<PFreeDeadEndingForm<C::Form>>, SeenZero>>,
     context: C,
 }
 
-impl<C> PFreeDeadEndingFormContext<C> {
+impl<C> PFreeDeadEndingFormContext<C>
+where
+    C: GameFormContext,
+{
     pub fn new(context: C) -> Self {
-        Self { context }
+        Self {
+            context,
+            not_ge_zero: RwLock::new(HashMap::new()),
+            not_zero_ge: RwLock::new(HashMap::new()),
+        }
     }
 }
 
@@ -395,6 +373,7 @@ impl<C> DeadEndingContext for PFreeDeadEndingFormContext<C>
 where
     C: DeadEndingContext + PFreeContext,
     C::IntegerConstructionError: Void,
+    C::Form: TotalWrappable,
 {
     fn satisfy_maintenance(&self, g: &Self::Form, h: &Self::Form) -> bool {
         let a = self.moves(g, Player::Right).all(|gr| {
@@ -420,7 +399,90 @@ impl<C> PFreeDeadEndingContext for PFreeDeadEndingFormContext<C>
 where
     C: DeadEndingContext + PFreeContext,
     C::IntegerConstructionError: Void,
+    C::Form: TotalWrappable,
 {
+    fn ge_mod_p_free_dead_ending(&self, g: &Self::Form, h: &Self::Form) -> bool {
+        // Relation on integers does not follow from maintenance/proviso so it is hardcoded
+        if let Some(g) = self.to_integer(g)
+            && let Some(h) = self.to_integer(h)
+        {
+            // The order of games is the opposite of order of integers so <= is correct for `ge` check
+            return g <= h;
+        };
+
+        if self.ge_mod_dead_ending(g, h) {
+            return true;
+        }
+
+        let plug_end = |g,
+                        h,
+                        seen_zero: &RwLock<
+            HashMap<TotalWrapper<PFreeDeadEndingForm<C::Form>>, SeenZero>,
+        >| {
+            self.to_integer(g).and_then(|g| match g.cmp(&0) {
+                // G = -n = {-1 | -(n - 1)}
+                std::cmp::Ordering::Less => Some(
+                    self.new(
+                        [self.new_integer(-1).unwrap_infallible()],
+                        [self.new_integer(g + 1).unwrap_infallible()],
+                    )
+                    .unwrap(),
+                ),
+                // We need to try plugging the G = 0 to G = {-1|1} but that may loop since G^RL = 0
+                // in the maintenance check
+                std::cmp::Ordering::Equal => {
+                    // NOTE: Race may happen here but worst case we'll just do a redundant check
+                    // and two threads will mark the same game as checked in the HashMap
+                    let not_zero_ge = seen_zero.read().unwrap();
+                    match not_zero_ge.get(TotalWrapper::from_ref(h)) {
+                        // First time we see `h` compared against G = 0
+                        // If we are here that means that first call to `self.ge_mod_dead_ending(0, h)`
+                        // returned false so we try again with `self.ge_mod_dead_ending({-1|1}, h)`
+                        None => {
+                            drop(not_zero_ge);
+                            let mut not_zero_ge = seen_zero.write().unwrap();
+                            not_zero_ge.insert(TotalWrapper::new(h.clone()), SeenZero::Once);
+                            Some(
+                                self.new(
+                                    [self.new_integer(-1).unwrap_infallible()],
+                                    [self.new_integer(1).unwrap_infallible()],
+                                )
+                                .unwrap(),
+                            )
+                        }
+                        // If we are here that means that we are in the process of checking
+                        // `self.ge_mod_dead_ending({-1|1}, h)` holds since we got `self.ge_mod_dead_ending(0, h) = false`
+                        // already, so we break the recursion and note that in the HashMap to not take
+                        // the write lock again for that game
+                        Some(SeenZero::Once) => {
+                            drop(not_zero_ge);
+                            let mut not_zero_ge = seen_zero.write().unwrap();
+                            not_zero_ge.insert(TotalWrapper::new(h.clone()), SeenZero::Multiple);
+                            None
+                        }
+                        Some(SeenZero::Multiple) => None,
+                    }
+                }
+                // G = n = {n - 1 | 1}
+                std::cmp::Ordering::Greater => Some(
+                    self.new(
+                        [self.new_integer(g - 1).unwrap_infallible()],
+                        [self.new_integer(1).unwrap_infallible()],
+                    )
+                    .unwrap(),
+                ),
+            })
+        };
+
+        // No need to plug both cause then they are both integers and handled by the case above
+        if let Some(g) = plug_end(g, h, &self.not_ge_zero) {
+            self.ge_mod_p_free_dead_ending(&g, h)
+        } else if let Some(h) = plug_end(h, g, &self.not_zero_ge) {
+            self.ge_mod_p_free_dead_ending(g, &h)
+        } else {
+            false
+        }
+    }
 }
 
 #[cfg(test)]
@@ -518,7 +580,7 @@ mod tests {
         assert_ge_mod_p_free_dead_ending!("{-1|0}", "{4|1,{-1|3}}");
 
         assert_eq_mod_p_free_dead_ending!("5", "{4|{0|3}}");
-        // assert_ge_mod_p_free_dead_ending!("0", "{4|{0|3}}"); // FIXME: Plug the zero
+        assert_ge_mod_p_free_dead_ending!("0", "{4|{0|3}}");
 
         assert_eq_mod_p_free_dead_ending!("{0, {-2|2}|1}", "{0|1}");
         assert_eq_mod_p_free_dead_ending!("{0, {-2|2}|2}", "{0|2}");
