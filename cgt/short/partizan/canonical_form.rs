@@ -1052,6 +1052,7 @@ impl CanonicalForm {
 impl PartialEq for CanonicalForm {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
+        // FIXME: This should be game equality
         TotalWrapper::new(self) == TotalWrapper::new(other)
     }
 }
@@ -1441,7 +1442,7 @@ mod tests {
             }};
         }
 
-        // test_game_parse!("{|}", "0");
+        test_game_parse!("{|}", "0");
         test_game_parse!("{1,2|}", "3");
         test_game_parse!("{42|*}", "{42|*}");
         test_game_parse!("123", "123");
