@@ -463,6 +463,10 @@ fn progress_style() -> ProgressStyle {
 
 #[allow(clippy::needless_pass_by_value, clippy::unnecessary_wraps)]
 pub fn run(args: Args) -> Result<()> {
+    if args.dot.is_none() && args.pdf.is_none() && args.tex.is_none() {
+        eprintln!("Warning: Not generating any output");
+    }
+
     let context = PFreeDeadEndingFormContext::new(PFreeFormContext::new(
         DeadEndingFormContext::new(StandardFormContext),
     ));
