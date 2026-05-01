@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use cgt::short::partizan::canonical_form::CanonicalForm;
-use clap::{Parser, arg};
+use clap::Parser;
 use std::{fmt::Write, str::FromStr};
 
 /// Sum multiple canonical forms

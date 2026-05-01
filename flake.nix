@@ -12,6 +12,7 @@
     };
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
+      inputs.nixpkgs.follows = "nixpkgs";
     };
     hercules-ci-effects = {
       url = "github:hercules-ci/hercules-ci-effects";
@@ -94,7 +95,7 @@
           ];
         };
 
-        pythonToolchain = "python311";
+        pythonToolchain = "python313";
 
         hostPkgs = pkgs;
 
