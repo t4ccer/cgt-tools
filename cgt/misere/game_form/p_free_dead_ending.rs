@@ -174,7 +174,14 @@ where
         }
 
         match self.new(left, right) {
-            Ok(g) => g,
+            Ok(g) => {
+                // TODO: Find a better way of doing it, I'm not even sure why this happens but it does
+                if self.total_eq(game, &g) {
+                    g
+                } else {
+                    self.reduced(&g)
+                }
+            }
             Err(err) => {
                 unreachable!(
                     "Reduction of `{}` is `{}` which is not pf(E)",

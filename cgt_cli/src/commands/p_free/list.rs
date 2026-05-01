@@ -324,19 +324,19 @@ where
         |(l, r)| {
             let _ = DropGuard(|| bar.inc(1));
 
-            let Ok(g) = context.new(l, r) else {
+            let Ok(non_reduced) = context.new(l, r) else {
                 return;
             };
 
-            if !context.is_p_free(&g) || !context.is_dead_ending(&g) {
+            if !context.is_p_free(&non_reduced) || !context.is_dead_ending(&non_reduced) {
                 return;
             }
 
-            let g = context.reduced(&g);
+            let reduced = context.reduced(&non_reduced);
 
             let already_checked = {
                 let seen = seen.read().unwrap();
-                if seen.iter().any(|h| context.total_eq(&g, h)) {
+                if seen.iter().any(|h| context.total_eq(&reduced, h)) {
                     return;
                 }
                 seen.len()
@@ -349,11 +349,11 @@ where
             let mut seen = seen.write().unwrap();
             if seen[already_checked..]
                 .iter()
-                .any(|h| context.total_eq(&g, h))
+                .any(|h| context.total_eq(&reduced, h))
             {
                 return;
             }
-            seen.push(g);
+            seen.push(reduced);
             bar.set_message(format!("(Found {})", seen.len()));
         },
     );
