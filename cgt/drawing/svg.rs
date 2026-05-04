@@ -127,8 +127,13 @@ impl Canvas {
         let size = viewport.size();
         Self {
             buffer: format!(
-                "<svg viewBox=\"{} {} {} {}\">",
-                viewport.top_left.x, viewport.top_left.y, size.x, size.y
+                "<svg viewBox=\"{} {} {} {}\" width=\"{}\" height=\"{}\">",
+                viewport.top_left.x,
+                viewport.top_left.y,
+                size.x,
+                size.y,
+                viewport.size().x,
+                viewport.size().y,
             ),
         }
     }
