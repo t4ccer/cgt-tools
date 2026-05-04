@@ -53,6 +53,14 @@ macro_rules! impl_py_partizan_game {
                 format!("{}('{}')", stringify!($game), self.inner)
             }
 
+            fn _repr_svg_(&self) -> String {
+                use cgt::drawing::{Draw, svg};
+                let bounding_box = self.inner.required_canvas::<svg::Canvas>();
+                let mut canvas = svg::Canvas::new(bounding_box);
+                self.inner.draw(&mut canvas);
+                canvas.to_svg()
+            }
+
             #[staticmethod]
             fn transposition_table() -> $py_tt {
                 $py_tt::default()
