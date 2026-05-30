@@ -21,6 +21,8 @@ use std::{
     time::Duration,
 };
 
+const SHOULD_LOG_DISTINGUISHING_GAME: bool = false;
+
 fn compute_relations<C, Form>(
     context: &C,
     forms: &[Form],
@@ -488,6 +490,45 @@ pub fn run(args: Args) -> Result<()> {
         let form_count: u64 = day.len() as u64;
         let bar = ProgressBar::new(form_count).with_style(style.clone());
         deduplicate_equal(&context, &mut day, &bar);
+        bar.finish();
+        eprintln!();
+    }
+
+    {
+        eprintln!("Distinguishing");
+        let form_count: u64 = day.len() as u64;
+        let bar = ProgressBar::new(form_count).with_style(style.clone());
+
+        for (idx, g) in day.iter().enumerate() {
+            'h: for h in &day[idx + 1..] {
+                for x in &day {
+                    let gx = context.sum(g, x).unwrap();
+                    let hx = context.sum(h, x).unwrap();
+                    let o_gx = context.outcome(&gx);
+                    let o_hx = context.outcome(&hx);
+
+                    if o_gx != o_hx {
+                        if SHOULD_LOG_DISTINGUISHING_GAME {
+                            bar.println(format!(
+                                "Distinguished o({g} + {x}) = {o_gx} != {o_hx} = o({h} + {x})",
+                                g = context.display(g),
+                                h = context.display(h),
+                                x = context.display(x),
+                            ));
+                        }
+
+                        break 'h;
+                    }
+                }
+                bar.println(format!(
+                    "Could not distinguish {g} and {h}",
+                    g = context.display(g),
+                    h = context.display(h),
+                ));
+            }
+            bar.inc(1);
+        }
+
         bar.finish();
         eprintln!();
     }
