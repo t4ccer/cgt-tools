@@ -21,26 +21,6 @@ use std::{
     time::Duration,
 };
 
-#[derive(Debug, clap::Parser)]
-pub struct Args {
-    /// Day to print
-    #[arg(long)]
-    day: u32,
-
-    /// Dot output path
-    #[arg(long, default_value = None)]
-    dot: Option<FilePathOr<Stdout>>,
-
-    /// Pdf output path
-    #[arg(long, default_value = None)]
-    pdf: Option<FilePathOr<Stdout>>,
-
-    /// TeX/tikz output path
-    #[arg(long, default_value = None)]
-    tex: Option<FilePathOr<Stdout>>,
-    // TODO: Support variant
-}
-
 fn compute_relations<C, Form>(
     context: &C,
     forms: &[Form],
@@ -461,9 +441,33 @@ fn progress_style() -> ProgressStyle {
         .progress_chars("#> ")
 }
 
+#[derive(Debug, clap::Parser)]
+pub struct Args {
+    /// Day to print
+    #[arg(long)]
+    day: u32,
+
+    /// txt output path
+    #[arg(long, default_value = None)]
+    txt: Option<FilePathOr<Stdout>>,
+
+    /// Dot output path
+    #[arg(long, default_value = None)]
+    dot: Option<FilePathOr<Stdout>>,
+
+    /// Pdf output path
+    #[arg(long, default_value = None)]
+    pdf: Option<FilePathOr<Stdout>>,
+
+    /// TeX/tikz output path
+    #[arg(long, default_value = None)]
+    tex: Option<FilePathOr<Stdout>>,
+    // TODO: Support variant
+}
+
 #[allow(clippy::needless_pass_by_value, clippy::unnecessary_wraps)]
 pub fn run(args: Args) -> Result<()> {
-    if args.dot.is_none() && args.pdf.is_none() && args.tex.is_none() {
+    if args.txt.is_none() && args.dot.is_none() && args.pdf.is_none() && args.tex.is_none() {
         eprintln!("Warning: Not generating any output");
     }
 
@@ -491,66 +495,66 @@ pub fn run(args: Args) -> Result<()> {
     {
         let game_count: u64 = day.len() as u64;
 
-        let day_antichains = {
-            eprintln!("Calculating antichain partitions for day {}", args.day);
-            let bar = ProgressBar::new(game_count * (game_count - 1) / 2).with_style(style.clone());
-            let res = compute_partitioned_antichains(&context, &day, &bar);
-            bar.finish();
-            eprintln!();
-            res
-        };
-
-        eprintln!("Generating Hasse diagram");
-        let bar = ProgressBar::new(game_count * (game_count - 1) / 2).with_style(style.clone());
-        let mut graphviz = Vec::new();
-        // TODO: Reuse `lt` table generated in `compute_partitioned_antichains` if we can remap indices
-        generate_hasse(&context, &mut graphviz, &day_antichains, &bar)?;
-        bar.finish();
-        eprintln!();
-        drop(bar);
-
-        if let Some(dot_output) = &args.dot {
-            let mut output = dot_output.create()?;
-            output.write_all(&graphviz)?;
+        if let Some(txt_output) = &args.txt {
+            let mut output = txt_output.create()?;
+            for game in &day {
+                writeln!(output, "{}", context.display(game))?;
+            }
         }
 
-        if let Some(pdf_output) = &args.pdf {
-            let mut output = pdf_output.create()?;
+        if args.dot.is_some() || args.pdf.is_some() || args.tex.is_some() {
+            let day_antichains = {
+                eprintln!("Calculating antichain partitions for day {}", args.day);
+                let bar =
+                    ProgressBar::new(game_count * (game_count - 1) / 2).with_style(style.clone());
+                let res = compute_partitioned_antichains(&context, &day, &bar);
+                bar.finish();
+                eprintln!();
+                res
+            };
 
-            let mut dot2tex = std::process::Command::new("dot")
-                .arg("-Tpdf")
-                .stdin(Stdio::piped())
-                .stdout(Stdio::piped())
-                .spawn()?;
-            dot2tex.stdin.take().unwrap().write_all(&graphviz)?;
-            output.write_all(&dot2tex.wait_with_output()?.stdout)?;
-        }
+            let graphviz = {
+                eprintln!("Generating Hasse diagram");
+                let bar =
+                    ProgressBar::new(game_count * (game_count - 1) / 2).with_style(style.clone());
+                let mut graphviz = Vec::new();
+                // TODO: Reuse `lt` table generated in `compute_partitioned_antichains` if we can remap indices
+                generate_hasse(&context, &mut graphviz, &day_antichains, &bar)?;
+                bar.finish();
+                eprintln!();
+                graphviz
+            };
 
-        if let Some(tex_output) = &args.tex {
-            let mut output = tex_output.create()?;
+            if let Some(dot_output) = &args.dot {
+                let mut output = dot_output.create()?;
+                output.write_all(&graphviz)?;
+            }
 
-            let mut dot2tex = std::process::Command::new("dot2tex")
-                .arg("--codeonly")
-                .stdin(Stdio::piped())
-                .stdout(Stdio::piped())
-                .spawn()?;
-            dot2tex.stdin.take().unwrap().write_all(&graphviz)?;
-            output.write_all(&dot2tex.wait_with_output()?.stdout)?;
+            if let Some(pdf_output) = &args.pdf {
+                let mut output = pdf_output.create()?;
+
+                let mut dot2tex = std::process::Command::new("dot")
+                    .arg("-Tpdf")
+                    .stdin(Stdio::piped())
+                    .stdout(Stdio::piped())
+                    .spawn()?;
+                dot2tex.stdin.take().unwrap().write_all(&graphviz)?;
+                output.write_all(&dot2tex.wait_with_output()?.stdout)?;
+            }
+
+            if let Some(tex_output) = &args.tex {
+                let mut output = tex_output.create()?;
+
+                let mut dot2tex = std::process::Command::new("dot2tex")
+                    .arg("--codeonly")
+                    .stdin(Stdio::piped())
+                    .stdout(Stdio::piped())
+                    .spawn()?;
+                dot2tex.stdin.take().unwrap().write_all(&graphviz)?;
+                output.write_all(&dot2tex.wait_with_output()?.stdout)?;
+            }
         }
     }
-
-    // for g in &day {
-    //     for h in &day {
-    //         let sum = context.sum(g, h).unwrap();
-    //         let sum_reduced = context.reduced(&sum);
-    //         println!(
-    //             "{} + {} = {}",
-    //             context.display(g),
-    //             context.display(h),
-    //             context.display(&sum_reduced),
-    //         );
-    //     }
-    // }
 
     Ok(())
 }
