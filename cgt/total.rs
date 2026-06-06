@@ -3,7 +3,11 @@
 //! Useful when there exists a total ordering but it does not obey domain-specific rules but you
 //! can use the wrapper type if you need to store that type in some collection.
 
-use std::{cmp::Ordering, hash::Hash, ops::Deref};
+use std::{
+    cmp::Ordering,
+    hash::Hash,
+    ops::{Deref, DerefMut},
+};
 
 /// Types that have non-canonical total ordering
 pub trait TotalWrappable {
@@ -253,3 +257,45 @@ macro_rules! impl_total_wrapper {
     };
 }
 pub(crate) use impl_total_wrapper;
+
+/// Wrapper to ignore struct fields during ordering checks
+#[derive(Debug, Clone, Copy)]
+pub struct IgnoreOrder<T>(pub T);
+
+impl<T> PartialEq for IgnoreOrder<T> {
+    fn eq(&self, _: &Self) -> bool {
+        true
+    }
+}
+
+impl<T> Eq for IgnoreOrder<T> {}
+
+impl<T> PartialOrd for IgnoreOrder<T> {
+    fn partial_cmp(&self, _: &Self) -> Option<Ordering> {
+        Some(Ordering::Equal)
+    }
+}
+
+impl<T> Ord for IgnoreOrder<T> {
+    fn cmp(&self, _: &Self) -> Ordering {
+        Ordering::Equal
+    }
+}
+
+impl<T> Hash for IgnoreOrder<T> {
+    fn hash<H: std::hash::Hasher>(&self, _: &mut H) {}
+}
+
+impl<T> Deref for IgnoreOrder<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<T> DerefMut for IgnoreOrder<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
