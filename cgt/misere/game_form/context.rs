@@ -375,7 +375,9 @@ pub trait GameFormContext {
         g: &Self::Form,
         h: &Self::Form,
     ) -> Result<Self::Form, Self::SumConstructionError> {
-        let mut left = Vec::new();
+        let mut left = Vec::with_capacity(
+            self.moves(g, Player::Left).count() + self.moves(h, Player::Left).count(),
+        );
         for gl in self.moves(g, Player::Left) {
             left.push(self.sum(gl, h)?);
         }
@@ -383,7 +385,9 @@ pub trait GameFormContext {
             left.push(self.sum(g, hl)?);
         }
 
-        let mut right = Vec::new();
+        let mut right = Vec::with_capacity(
+            self.moves(g, Player::Right).count() + self.moves(h, Player::Right).count(),
+        );
         for gr in self.moves(g, Player::Right) {
             right.push(self.sum(gr, h)?);
         }
