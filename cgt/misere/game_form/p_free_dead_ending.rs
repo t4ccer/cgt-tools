@@ -360,6 +360,14 @@ where
         self.context.total_eq(&lhs.underlying, &rhs.underlying)
     }
 
+    fn is_dead_ending(&self, _: &Self::Form) -> bool {
+        true
+    }
+
+    fn is_p_free(&self, _: &Self::Form) -> bool {
+        true
+    }
+
     fn base(&self, game: Self::Form) -> Self::BaseForm {
         self.context.base(game.underlying)
     }
