@@ -24,5 +24,6 @@ pub mod result;
 pub mod short;
 pub mod total;
 
+mod atomic_enum;
 mod display;
 mod ref_wrapper;
