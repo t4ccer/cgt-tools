@@ -1,7 +1,9 @@
+#![allow(unused)]
+
 use std::{
     ffi::OsStr,
     fs::File,
-    io::{self, Stderr, Stdin, Stdout, stderr, stdin, stdout},
+    io::{self, BufWriter, Stderr, Stdin, Stdout, Write, stderr, stdin, stdout},
     marker::PhantomData,
     path::{Path, PathBuf},
 };
@@ -160,5 +162,47 @@ impl StdStream for Stderr {
 impl StdStream for Stdin {
     fn get_handle() -> Stdin {
         stdin()
+    }
+}
+
+pub enum IgnoreOr<W> {
+    Ignore,
+    Writer(W),
+}
+
+impl<W> IgnoreOr<W> {
+    pub const fn is_writer(&self) -> bool {
+        matches!(self, IgnoreOr::Writer(_))
+    }
+}
+
+impl<Stream> IgnoreOr<BufWriter<FileOr<Stream>>>
+where
+    Stream: StdStream + Write,
+{
+    pub fn create_from_option(w: Option<FilePathOr<Stream>>) -> io::Result<Self> {
+        match w {
+            Some(w) => Ok(IgnoreOr::Writer(BufWriter::new(w.create()?))),
+            None => Ok(IgnoreOr::Ignore),
+        }
+    }
+}
+
+impl<W> Write for IgnoreOr<W>
+where
+    W: Write,
+{
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        match self {
+            IgnoreOr::Ignore => Ok(buf.len()),
+            IgnoreOr::Writer(w) => w.write(buf),
+        }
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        match self {
+            IgnoreOr::Ignore => Ok(()),
+            IgnoreOr::Writer(w) => w.flush(),
+        }
     }
 }

@@ -1,7 +1,7 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use cgt::{
     genetic_algorithm::Scored,
-    graph::{adjacency_matrix::undirected::UndirectedGraph, Graph},
+    graph::{Graph, adjacency_matrix::undirected::UndirectedGraph},
     numeric::{dyadic_rational_number::DyadicRationalNumber, rational::Rational},
     parsing::Parser,
     short::partizan::{
@@ -12,7 +12,7 @@ use cgt::{
     },
 };
 use std::{
-    io::{self, stderr, Write},
+    io::{self, Write, stderr},
     process::{Command, Stdio},
     str::FromStr,
     time,

@@ -9,6 +9,7 @@ use crate::{
 };
 
 pub mod adjacency_matrix;
+pub mod bipartite;
 pub mod layout;
 pub mod resolving_set;
 

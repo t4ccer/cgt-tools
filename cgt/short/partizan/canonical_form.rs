@@ -1061,7 +1061,7 @@ impl CanonicalForm {
 impl PartialEq for CanonicalForm {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
-        // FIXME: This should be game equality
+        // Already in canonical form so the structural equality is the game equality
         TotalWrapper::new(self) == TotalWrapper::new(other)
     }
 }
