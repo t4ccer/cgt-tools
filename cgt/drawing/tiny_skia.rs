@@ -40,16 +40,39 @@ impl super::Canvas for Canvas {
         );
     }
 
-    fn circle(&mut self, position: V2f, radius: f32, color: Color) {
+    fn circle(
+        &mut self,
+        position: V2f,
+        radius: f32,
+        fill_color: Color,
+        stroke_width: f32,
+        stroke_color: Color,
+    ) {
         let position = self.offset + position;
-        let path = tiny_skia::PathBuilder::from_circle(position.x, position.y, radius).unwrap();
-        self.pixmap.fill_path(
-            &path,
-            &paint_solid_color(color),
-            tiny_skia::FillRule::Winding,
-            tiny_skia::Transform::identity(),
-            None,
-        );
+
+        {
+            let path =
+                tiny_skia::PathBuilder::from_circle(position.x, position.y, radius - stroke_width)
+                    .unwrap();
+            self.pixmap.fill_path(
+                &path,
+                &paint_solid_color(stroke_color),
+                tiny_skia::FillRule::Winding,
+                tiny_skia::Transform::identity(),
+                None,
+            );
+        }
+
+        {
+            let path = tiny_skia::PathBuilder::from_circle(position.x, position.y, radius).unwrap();
+            self.pixmap.fill_path(
+                &path,
+                &paint_solid_color(fill_color),
+                tiny_skia::FillRule::Winding,
+                tiny_skia::Transform::identity(),
+                None,
+            );
+        }
     }
 
     fn line(&mut self, start: V2f, end: V2f, weight: f32, color: Color) {
@@ -96,6 +119,10 @@ impl super::Canvas for Canvas {
 
     fn thick_line_weight() -> f32 {
         2.0
+    }
+
+    fn vertex_radius() -> f32 {
+        16.0
     }
 }
 

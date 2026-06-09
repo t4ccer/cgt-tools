@@ -177,13 +177,21 @@ impl crate::drawing::Canvas for Canvas {
         rect.attribute("fill", Rgba(color));
     }
 
-    fn circle(&mut self, position: V2f, radius: f32, color: Color) {
+    fn circle(
+        &mut self,
+        position: V2f,
+        radius: f32,
+        fill_color: Color,
+        stroke_width: f32,
+        stroke_color: Color,
+    ) {
         let mut circle = self.self_closing_tag("circle");
         circle.attribute("cx", position.x);
         circle.attribute("cy", position.y);
         circle.attribute("r", radius);
-        circle.attribute("stroke", 2.0);
-        circle.attribute("fill", Rgba(color));
+        circle.attribute("fill", Rgba(fill_color));
+        circle.attribute("stroke-width", stroke_width);
+        circle.attribute("stroke", Rgba(stroke_color));
     }
 
     fn line(&mut self, start: V2f, end: V2f, weight: f32, color: Color) {
@@ -245,5 +253,9 @@ impl crate::drawing::Canvas for Canvas {
 
     fn thick_line_weight() -> f32 {
         2.0
+    }
+
+    fn vertex_radius() -> f32 {
+        16.0
     }
 }

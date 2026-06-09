@@ -103,9 +103,24 @@ impl drawing::Canvas for Canvas<'_> {
             .build();
     }
 
-    fn circle(&mut self, position: V2f, radius: f32, color: drawing::Color) {
+    fn circle(
+        &mut self,
+        position: V2f,
+        radius: f32,
+        fill_color: drawing::Color,
+        stroke_weight: f32,
+        stroke_color: drawing::Color,
+    ) {
         self.draw_list
-            .add_circle(self.start_position + position, radius, color)
+            .add_circle(self.start_position + position, radius, stroke_color)
+            .filled(true)
+            .build();
+        self.draw_list
+            .add_circle(
+                self.start_position + position,
+                radius - stroke_weight,
+                fill_color,
+            )
             .filled(true)
             .build();
     }
@@ -194,6 +209,8 @@ impl drawing::Canvas for Canvas<'_> {
                     position + tile_size * 0.5,
                     tile_size.x * 0.4,
                     self.faded(circle_color),
+                    1.0,
+                    Color::BLACK,
                 );
             }
             drawing::Tile::Char {
@@ -245,8 +262,7 @@ impl drawing::Canvas for Canvas<'_> {
             self.pressed_vertex = Some(idx);
         }
 
-        self.circle(position, radius, Color::BLACK);
-        self.circle(position, radius - 1.0, self.faded(color));
+        self.circle(position, radius, self.faded(color), 1.0, Color::BLACK);
     }
 
     fn tile_size() -> V2f {
@@ -255,5 +271,9 @@ impl drawing::Canvas for Canvas<'_> {
 
     fn thick_line_weight() -> f32 {
         2.0
+    }
+
+    fn vertex_radius() -> f32 {
+        16.0
     }
 }

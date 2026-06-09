@@ -7,6 +7,7 @@ use std::fmt::Arguments;
 use crate::{graph::VertexIndex, numeric::v2f::V2f};
 
 pub mod svg;
+pub mod tikz;
 
 #[cfg(feature = "tiny_skia")]
 pub mod tiny_skia;
@@ -110,7 +111,14 @@ pub enum TextAlignment {
 pub trait Canvas {
     fn rect(&mut self, position: V2f, size: V2f, color: Color);
 
-    fn circle(&mut self, position: V2f, radius: f32, color: Color);
+    fn circle(
+        &mut self,
+        position: V2f,
+        radius: f32,
+        fill_color: Color,
+        stroke_width: f32,
+        stroke_color: Color,
+    );
 
     fn line(&mut self, start: V2f, end: V2f, weight: f32, color: Color);
 
@@ -129,7 +137,13 @@ pub trait Canvas {
                 circle_color,
             } => {
                 self.rect(position, tile_size, tile_color);
-                self.circle(position + tile_size * 0.5, tile_size.x * 0.4, circle_color);
+                self.circle(
+                    position + tile_size * 0.5,
+                    tile_size.x * 0.4,
+                    circle_color,
+                    Self::thin_line_weight(),
+                    Color::BLACK,
+                );
             }
             Tile::Char {
                 tile_color,
@@ -246,17 +260,18 @@ pub trait Canvas {
     }
 
     fn vertex(&mut self, position: V2f, color: Color, _idx: VertexIndex) {
-        let radius = Self::vertex_radius();
-        self.circle(position, radius, Color::BLACK);
-        self.circle(position, radius - 1.0, color);
+        self.circle(
+            position,
+            Self::vertex_radius(),
+            color,
+            Self::thin_line_weight(),
+            Color::BLACK,
+        );
     }
 
     fn tile_size() -> V2f;
 
-    fn vertex_radius() -> f32 {
-        // FIXME: Remove default
-        Self::tile_size().x * 0.25
-    }
+    fn vertex_radius() -> f32;
 
     fn thick_line_weight() -> f32;
 
