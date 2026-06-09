@@ -15,6 +15,7 @@ pub mod genetic_algorithm;
 pub mod graph;
 pub mod grid;
 pub mod has;
+pub mod latex;
 pub mod loopy;
 pub mod misere;
 pub mod numeric;
