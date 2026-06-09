@@ -75,6 +75,59 @@ macro_rules! lexeme {
 }
 pub(crate) use lexeme;
 
+macro_rules! mk_unsigned_parser {
+    ($name:ident, $ty:ty) => {
+        /// Parse unsigned number
+        pub const fn $name(self) -> Option<(Parser<'s>, $ty)> {
+            let mut bs = self.input.as_bytes();
+
+            let mut parsed_anything = false;
+            let mut acc: $ty = 0;
+
+            loop {
+                match bs {
+                    [
+                        b @ (b'0' | b'1' | b'2' | b'3' | b'4' | b'5' | b'6' | b'7' | b'8' | b'9'),
+                        rest @ ..,
+                    ] => {
+                        parsed_anything = true;
+                        match acc.checked_mul(10) {
+                            Some(a) => acc = a,
+                            None => {
+                                return None;
+                            }
+                        }
+                        match acc.checked_add((*b - b'0') as $ty) {
+                            Some(a) => acc = a,
+                            None => {
+                                return None;
+                            }
+                        }
+
+                        bs = rest;
+                    }
+                    _ => {
+                        if !parsed_anything {
+                            return None;
+                        }
+
+                        return Some((
+                            Parser {
+                                // const-hack
+                                input: match core::str::from_utf8(bs) {
+                                    Ok(input) => input,
+                                    Err(_) => unreachable!(),
+                                },
+                            },
+                            acc,
+                        ));
+                    }
+                }
+            }
+        }
+    };
+}
+
 impl<'s> Parser<'s> {
     /// Create new parser marking the beginning of the input
     pub const fn new(input: &'s str) -> Parser<'s> {
@@ -188,52 +241,8 @@ impl<'s> Parser<'s> {
         }
     }
 
-    /// Parse unsigned number
-    pub const fn parse_u32(self) -> Option<(Parser<'s>, u32)> {
-        let mut bs = self.input.as_bytes();
-
-        let mut parsed_anything = false;
-        let mut acc: u32 = 0;
-
-        loop {
-            match bs {
-                [
-                    b @ (b'0' | b'1' | b'2' | b'3' | b'4' | b'5' | b'6' | b'7' | b'8' | b'9'),
-                    rest @ ..,
-                ] => {
-                    parsed_anything = true;
-                    match acc.checked_mul(10) {
-                        Some(a) => acc = a,
-                        None => {
-                            return None;
-                        }
-                    }
-                    match acc.checked_add((*b - b'0') as u32) {
-                        Some(a) => acc = a,
-                        None => {
-                            return None;
-                        }
-                    }
-
-                    bs = rest;
-                }
-                _ => {
-                    if !parsed_anything {
-                        return None;
-                    }
-
-                    return Some((
-                        Parser {
-                            // const-hack
-                            input: match core::str::from_utf8(bs) {
-                                Ok(input) => input,
-                                Err(_) => unreachable!(),
-                            },
-                        },
-                        acc,
-                    ));
-                }
-            }
-        }
-    }
+    mk_unsigned_parser!(parse_u8, u8);
+    mk_unsigned_parser!(parse_u16, u16);
+    mk_unsigned_parser!(parse_u32, u32);
+    mk_unsigned_parser!(parse_u64, u64);
 }
