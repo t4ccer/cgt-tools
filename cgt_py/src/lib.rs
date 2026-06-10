@@ -87,12 +87,48 @@ macro_rules! impl_py_partizan_game {
                     .collect()
             }
 
+            #[pyo3(signature = (transposition_table = None))]
+            fn sensible_left_moves(&self, transposition_table: Option<&$py_tt>) -> Vec<Self> {
+                match transposition_table {
+                    Some(transposition_table) => self
+                        .inner
+                        .sensible_left_moves(&transposition_table.inner)
+                        .into_iter()
+                        .map(|inner| $py_game { inner })
+                        .collect::<Vec<_>>(),
+                    None => self
+                        .inner
+                        .sensible_left_moves(&Self::transposition_table().inner)
+                        .into_iter()
+                        .map(|inner| $py_game { inner })
+                        .collect::<Vec<_>>(),
+                }
+            }
+
             fn right_moves(&self) -> Vec<Self> {
                 self.inner
                     .right_moves()
                     .into_iter()
                     .map(Self::from)
                     .collect()
+            }
+
+            #[pyo3(signature = (transposition_table = None))]
+            fn sensible_right_moves(&self, transposition_table: Option<&$py_tt>) -> Vec<Self> {
+                match transposition_table {
+                    Some(transposition_table) => self
+                        .inner
+                        .sensible_right_moves(&transposition_table.inner)
+                        .into_iter()
+                        .map(|inner| $py_game { inner })
+                        .collect::<Vec<_>>(),
+                    None => self
+                        .inner
+                        .sensible_right_moves(&Self::transposition_table().inner)
+                        .into_iter()
+                        .map(|inner| $py_game { inner })
+                        .collect::<Vec<_>>(),
+                }
             }
         }
     };
