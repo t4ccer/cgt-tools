@@ -724,6 +724,15 @@ impl CanonicalForm {
         true
     }
 
+    /// Get birthday of the canonical form
+    pub fn birthday(&self) -> u32 {
+        self.left_moves()
+            .chain(self.right_moves())
+            .map(|g| g.birthday() + 1)
+            .max()
+            .unwrap_or(0)
+    }
+
     /// Calculate temperature of the game. Avoids computing a thermograph is game is a NUS
     #[allow(clippy::missing_panics_doc)]
     pub fn temperature(&self) -> DyadicRationalNumber {

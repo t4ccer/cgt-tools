@@ -63,4 +63,8 @@ impl PyCanonicalForm {
     fn thermograph(&self) -> PyThermograph {
         PyThermograph::from(self.inner.thermograph())
     }
+
+    fn birthday(&self) -> u32 {
+        self.inner.birthday()
+    }
 }
