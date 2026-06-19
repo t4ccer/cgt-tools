@@ -15,6 +15,9 @@ pub use amazons::AmazonsWindow;
 mod canonical_form;
 pub use canonical_form::CanonicalFormWindow;
 
+mod col;
+pub use col::ColWindow;
+
 mod dead_ending;
 pub use dead_ending::DeadEndingWindow;
 

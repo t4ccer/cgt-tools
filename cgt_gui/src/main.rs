@@ -1,5 +1,5 @@
 use crate::widgets::{
-    AmazonsWindow, CanonicalFormWindow, DeadEndingWindow, DigraphPlacementWindow,
+    AmazonsWindow, CanonicalFormWindow, ColWindow, DeadEndingWindow, DigraphPlacementWindow,
     DomineeringWindow, FissionWindow, GraphWindow, KonaneWindow, QuelhasWindow, ResolvingSetWindow,
     SkiJumpsWindow, SnortWindow, ToadsAndFrogsWindow,
 };
@@ -10,6 +10,7 @@ use cgt::{
         canonical_form::CanonicalForm,
         games::{
             amazons::Amazons,
+            col::{self, Col},
             digraph_placement::{self, DigraphPlacement},
             domineering::Domineering,
             fission::Fission,
@@ -222,6 +223,7 @@ pub enum Task {
     EvalSkiJumps(EvalTask<SkiJumps>),
     EvalToadsAndFrogs(EvalTask<ToadsAndFrogs>),
     EvalSnort(EvalTask<Snort<snort::VertexKind, UndirectedGraph<snort::VertexKind>>>),
+    EvalCol(EvalTask<Col<col::VertexColor, UndirectedGraph<col::VertexColor>>>),
     EvalDigraphPlacement(
         EvalTask<
             DigraphPlacement<
@@ -283,6 +285,10 @@ pub enum UpdateKind {
         Snort<snort::VertexKind, UndirectedGraph<snort::VertexKind>>,
         Details,
     ),
+    ColDetails(
+        Col<col::VertexColor, UndirectedGraph<col::VertexColor>>,
+        Details,
+    ),
     DigraphPlacementDetails(
         DigraphPlacement<
             digraph_placement::VertexColor,
@@ -310,6 +316,7 @@ pub struct SchedulerContext {
     toads_and_frogs_tt: ParallelTranspositionTable<ToadsAndFrogs>,
     snort_tt:
         ParallelTranspositionTable<Snort<snort::VertexKind, UndirectedGraph<snort::VertexKind>>>,
+    col_tt: ParallelTranspositionTable<Col<col::VertexColor, UndirectedGraph<col::VertexColor>>>,
     digraph_placement_tt: ParallelTranspositionTable<
         DigraphPlacement<
             digraph_placement::VertexColor,
@@ -377,6 +384,9 @@ fn scheduler(ctx: SchedulerContext) {
                 Task::EvalSnort(task) => {
                     handle_game_update!(task, SnortDetails, snort_tt);
                 }
+                Task::EvalCol(task) => {
+                    handle_game_update!(task, ColDetails, col_tt);
+                }
                 Task::EvalDigraphPlacement(task) => {
                     handle_game_update!(task, DigraphPlacementDetails, digraph_placement_tt);
                 }
@@ -405,6 +415,7 @@ fn main() {
         ski_jumps_tt: ParallelTranspositionTable::new(),
         toads_and_frogs_tt: ParallelTranspositionTable::new(),
         snort_tt: ParallelTranspositionTable::new(),
+        col_tt: ParallelTranspositionTable::new(),
         digraph_placement_tt: ParallelTranspositionTable::new(),
     };
 
@@ -525,6 +536,9 @@ fn main() {
                 ui.separator();
                 if ui.menu_item("Snort") {
                     new_window!(SnortWindow);
+                }
+                if ui.menu_item("Col") {
+                    new_window!(ColWindow);
                 }
                 if ui.menu_item("Digraph Placement") {
                     new_window!(DigraphPlacementWindow);

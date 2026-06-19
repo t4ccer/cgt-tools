@@ -2,6 +2,7 @@
 
 pub mod amazons;
 pub mod bipartite_snort;
+pub mod col;
 pub mod digraph_placement;
 pub mod domineering;
 pub mod fission;
