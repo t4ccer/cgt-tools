@@ -1,6 +1,7 @@
 //! Grid with arbitrary finite size
 
 use crate::grid::{FiniteGrid, Grid};
+use std::convert::Infallible;
 
 /// Grid with arbitrary finite size
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -9,6 +10,34 @@ pub struct VecGrid<T> {
     width: u8,
     height: u8,
     grid: Vec<T>,
+}
+
+impl<T> VecGrid<T> {
+    /// Transform grid tiles
+    pub fn map<U>(&self, mut f: impl FnMut(&T) -> U) -> VecGrid<U> {
+        match self.try_map::<U, Infallible>(|t| Ok(f(t))) {
+            Ok(grid) => grid,
+            Err(err) => match err {},
+        }
+    }
+
+    /// Transform grid tiles
+    pub fn try_map<U, E>(&self, mut f: impl FnMut(&T) -> Result<U, E>) -> Result<VecGrid<U>, E> {
+        let mut new_grid = VecGrid {
+            width: self.width,
+            height: self.height,
+            grid: Vec::with_capacity(self.grid.len()),
+        };
+
+        for y in 0..self.height {
+            for x in 0..self.width {
+                let elem = &self.grid[(self.width as usize) * (y as usize) + (x as usize)];
+                new_grid.grid.push(f(elem)?);
+            }
+        }
+
+        Ok(new_grid)
+    }
 }
 
 impl<T> Grid for VecGrid<T>

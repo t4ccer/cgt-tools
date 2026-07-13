@@ -11,7 +11,6 @@
 
 pub mod bit_vec;
 pub mod drawing;
-pub mod genetic_algorithm;
 pub mod graph;
 pub mod grid;
 pub mod has;
@@ -25,6 +24,10 @@ pub mod result;
 pub mod short;
 pub mod total;
 
+#[cfg(feature = "rand")]
+pub mod genetic_algorithm;
+
 mod atomic_enum;
 mod display;
+mod hash;
 mod ref_wrapper;

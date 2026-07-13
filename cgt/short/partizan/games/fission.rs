@@ -8,7 +8,7 @@
 use crate::{
     drawing::{self, BoundingBox, Canvas, Color, Draw},
     grid::{FiniteGrid, Grid, vec_grid::VecGrid},
-    short::partizan::partizan_game::PartizanGame,
+    short::partizan::{Player, partizan_game::PartizanGame},
 };
 use cgt_derive::Tile;
 use std::{fmt::Display, hash::Hash, str::FromStr};
@@ -81,7 +81,7 @@ where
     }
 
     #[inline]
-    fn move_in<const DIR_X: u8, const DIR_Y: u8>(&self, x: u8, y: u8) -> Self
+    fn move_in_impl<const DIR_X: u8, const DIR_Y: u8>(&self, x: u8, y: u8) -> Self
     where
         G: Clone,
     {
@@ -97,24 +97,17 @@ where
         Fission::new(new_grid)
     }
 
-    /// Make Left move in given tile without checking if move is legal
+    /// Make move in given tile without checking if move is legal
     #[inline]
     #[must_use]
-    pub fn move_in_left(&self, x: u8, y: u8) -> Self
+    pub fn move_in(&self, x: u8, y: u8, player: Player) -> Self
     where
         G: Clone,
     {
-        self.move_in::<0, 1>(x, y)
-    }
-
-    /// Make Right move in given tile without checking if move is legal
-    #[inline]
-    #[must_use]
-    pub fn move_in_right(&self, x: u8, y: u8) -> Self
-    where
-        G: Clone,
-    {
-        self.move_in::<1, 0>(x, y)
+        match player {
+            Player::Left => self.move_in_impl::<0, 1>(x, y),
+            Player::Right => self.move_in_impl::<1, 0>(x, y),
+        }
     }
 
     #[inline]
@@ -144,16 +137,13 @@ where
         moves
     }
 
-    /// List available tiles (ones with stone) where Left can move
+    /// List available tiles (ones with stone) where player can move
     #[inline]
-    pub fn available_moves_left(&self) -> Vec<(u8, u8)> {
-        self.available_moves_for::<0, 1>()
-    }
-
-    /// List available tiles (ones with stone) where Right can move
-    #[inline]
-    pub fn available_moves_right(&self) -> Vec<(u8, u8)> {
-        self.available_moves_for::<1, 0>()
+    pub fn available_moves(&self, player: Player) -> Vec<(u8, u8)> {
+        match player {
+            Player::Left => self.available_moves_for::<0, 1>(),
+            Player::Right => self.available_moves_for::<1, 0>(),
+        }
     }
 
     #[inline]
@@ -178,7 +168,7 @@ where
                     && self.grid.get(prev_x, prev_y) == Tile::Empty
                     && self.grid.get(next_x, next_y) == Tile::Empty
                 {
-                    moves.push(self.move_in::<DIR_X, DIR_Y>(x, y));
+                    moves.push(self.move_in_impl::<DIR_X, DIR_Y>(x, y));
                 }
             }
         }

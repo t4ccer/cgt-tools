@@ -198,6 +198,8 @@ where
     where
         C: Canvas,
     {
+        // FIXME: The bounding box is slightly off
+
         // NOTE: This probably could be computed on the fly
         let mut positions = vec![V2f::ZERO; self.graph.size()];
 

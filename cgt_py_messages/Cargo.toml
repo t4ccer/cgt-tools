@@ -1,0 +1,9 @@
+[package]
+name = "cgt_py_messages"
+version = "0.10.0"
+edition = "2024"
+
+[dependencies]
+bitflags = "2.13.1"
+cgt = { path = "../.", features = ["serde"] }
+serde.workspace = true

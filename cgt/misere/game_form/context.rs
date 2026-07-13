@@ -127,7 +127,7 @@ pub trait GameFormContext {
     ///         [context.from_str("{|0}").unwrap()],
     ///         [context.from_str("{1,2|}").unwrap()],
     ///     )
-    ///     .unwrap();    
+    ///     .unwrap();
     /// assert_eq!(context.to_string(&g), "{-1|{1,2|}}");
     /// ```
     #[allow(clippy::wrong_self_convention)]

@@ -53,9 +53,9 @@ pub fn run(args: Args) -> Result<()> {
     let total = choose(day4.len() as u64, 3);
 
     day4.into_iter()
-        .tuple_combinations::<(_, _, _)>()
+        .array_combinations::<3>()
         .par_bridge()
-        .for_each(|(a, b, c)| {
+        .for_each(|[a, b, c]| {
             let _logger = ProgressLogger::new(&current, total);
 
             if !interner.is_atom(&a) || !interner.is_atom(&b) || !interner.is_atom(&c) {

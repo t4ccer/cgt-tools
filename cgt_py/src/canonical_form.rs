@@ -6,71 +6,99 @@ use std::{
     str::FromStr,
 };
 
-crate::wrap_struct!(CanonicalForm, PyCanonicalForm, "CanonicalForm", Clone);
+#[pyclass(from_py_object, name = "CanonicalForm")]
+#[derive(Clone)]
+pub struct PyCanonicalForm(pub CanonicalForm);
 
 #[pymethods]
 impl PyCanonicalForm {
     #[new]
-    fn py_new(value: Py<PyAny>) -> PyResult<Self> {
-        Python::with_gil(|gil| {
-            if let Ok(integer) = value.extract::<i64>(gil) {
-                return Ok(Self::from(CanonicalForm::new_integer(integer)));
-            } else if let Ok(string) = value.extract::<&str>(gil) {
-                match CanonicalForm::from_str(string) {
-                    Ok(cf) => return Ok(Self::from(cf)),
-                    Err(_) => {
-                        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                            "Could not parse CanonicalForm. Invalid input format.",
-                        ));
-                    }
+    fn new(value: Bound<'_, PyAny>) -> PyResult<Self> {
+        if let Ok(integer) = value.extract::<i64>() {
+            return Ok(Self(CanonicalForm::new_integer(integer)));
+        } else if let Ok(string) = value.extract::<&str>() {
+            match CanonicalForm::from_str(string) {
+                Ok(cf) => return Ok(Self(cf)),
+                Err(_) => {
+                    return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                        "Could not parse CanonicalForm. Invalid input format.",
+                    ));
                 }
-            } else if let Ok(canonical_form) = value.extract::<PyCanonicalForm>(gil) {
-                return Ok(canonical_form);
             }
+        } else if let Ok(canonical_form) = value.extract::<PyCanonicalForm>() {
+            return Ok(canonical_form);
+        }
 
-            Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                "Could not convert to CanonicalForm. Expected integer or string.",
-            ))
-        })
+        Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+            "Could not convert to CanonicalForm. Expected integer or string.",
+        ))
     }
 
     fn __repr__(&self) -> String {
-        format!("CanonicalForm('{}')", self.inner)
+        format!("CanonicalForm('{}')", self.0)
     }
 
     fn __add__(&self, other: &Self) -> Self {
-        Self::from(Add::add(&self.inner, &other.inner))
+        PyCanonicalForm(Add::add(&self.0, &other.0))
     }
 
     fn __sub__(&self, other: &Self) -> Self {
-        Self::from(Sub::sub(&self.inner, &other.inner))
+        PyCanonicalForm(Sub::sub(&self.0, &other.0))
     }
 
     fn __neg__(&self) -> Self {
-        Self::from(Neg::neg(&self.inner))
+        PyCanonicalForm(Neg::neg(&self.0))
     }
 
     fn __richcmp__(&self, other: &Self, op: CompareOp) -> bool {
-        self.inner
-            .partial_cmp(&other.inner)
+        self.0
+            .partial_cmp(&other.0)
             .map_or(false, |ord| op.matches(ord))
     }
 
+    #[getter]
     fn temperature(&self) -> PyDyadicRationalNumber {
-        self.inner.temperature().into()
+        PyDyadicRationalNumber(self.0.temperature())
     }
 
+    #[getter]
     fn thermograph(&self) -> PyThermograph {
-        PyThermograph::from(self.inner.thermograph())
+        PyThermograph(self.0.thermograph())
     }
 
+    #[getter]
     fn reduced(&self) -> PyCanonicalForm {
-        PyCanonicalForm {
-            inner: self.inner.reduced(),
-        }
+        PyCanonicalForm(self.0.reduced())
     }
 
+    #[getter]
     fn birthday(&self) -> u32 {
-        self.inner.birthday()
+        self.0.birthday()
+    }
+
+    #[getter]
+    fn left_options(&self) -> Vec<PyCanonicalForm> {
+        self.0
+            .left_moves()
+            .map(|cf| PyCanonicalForm(cf.into_owned()))
+            .collect()
+    }
+
+    #[getter]
+    fn right_options(&self) -> Vec<PyCanonicalForm> {
+        self.0
+            .right_moves()
+            .map(|cf| PyCanonicalForm(cf.into_owned()))
+            .collect()
+    }
+
+    #[getter]
+    fn left_stop(&self) -> PyDyadicRationalNumber {
+        PyDyadicRationalNumber(self.0.left_stop())
+    }
+
+    #[getter]
+    fn right_stop(&self) -> PyDyadicRationalNumber {
+        PyDyadicRationalNumber(self.0.right_stop())
     }
 }

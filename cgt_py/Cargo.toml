@@ -1,10 +1,9 @@
 [package]
 name = "cgt_py"
-version = "0.9.0"
+version = "0.10.0"
 edition = "2024"
 authors = ["Tomasz Maciosowski <t4ccer@gmail.com>"]
 license = "AGPL-3.0"
-readme = "README.md"
 repository = "https://github.com/t4ccer/cgt-tools"
 description = "Python bindings for Rust `cgt` package"
 homepage = "https://github.com/t4ccer/cgt-tools"
@@ -16,5 +15,7 @@ name = "cgt_py"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = "0.25"
-cgt = { path = "../." }
+pyo3 = { workspace = true }
+cgt = { path = "../.", features = ["serde"] }
+cgt_py_messages = { path = "../cgt_py_messages" }
+jupyter_rust_widget_backend = { path = "../jupyter_rust_widget_backend" }

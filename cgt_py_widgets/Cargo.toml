@@ -1,0 +1,17 @@
+[package]
+name = "cgt_py_widgets"
+version = "0.10.0"
+edition = "2024"
+
+[lib]
+name = "cgt_py_widgets"
+crate-type = ["cdylib"]
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+web-sys.workspace = true
+wasm-bindgen.workspace = true
+cgt_py_messages = { path = "../cgt_py_messages" }
+cgt = { path = "../.", features = ["serde"] }
+jupyter_rust_widget_frontend = { path = "../jupyter_rust_widget_frontend" }

@@ -732,6 +732,7 @@ impl Draw for Thermograph {
     where
         C: Canvas,
     {
+        // FIXME: Account for text size when computing bounding boxes
         self.required_canvas_scaled::<C>(64.0)
     }
 }

@@ -11,8 +11,8 @@ use std::{fmt::Debug, hash::Hash};
 /// Transaction table (cache) of game positions and canonical forms.
 pub struct ParallelTranspositionTable<G> {
     values: AppendOnlyVec<CanonicalForm>,
-    positions: DashMap<G, usize, ahash::RandomState>,
-    known_values: DashMap<TotalWrapper<CanonicalForm>, usize, ahash::RandomState>,
+    positions: DashMap<G, usize, crate::hash::RandomState>,
+    known_values: DashMap<TotalWrapper<CanonicalForm>, usize, crate::hash::RandomState>,
 }
 
 impl<G> ParallelTranspositionTable<G>

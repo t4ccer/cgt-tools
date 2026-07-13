@@ -92,10 +92,22 @@
           targets = [
             "x86_64-unknown-linux-gnu"
             "x86_64-unknown-linux-musl"
+            "wasm32-unknown-unknown"
           ];
         };
 
-        pythonToolchain = "python313";
+        pythonToolchain = pkgs.python313.override {
+          packageOverrides = self: super: {
+            anywidget = super.anywidget.overridePythonAttrs (oldAttrs: rec {
+              version = "0.11.0";
+              src = pkgs.fetchPypi {
+                pname = "anywidget";
+                inherit version;
+                hash = "sha256-ZpX775RJz4wn9CG5bFg3qjf5CewfYM+jOt0zPhtwsWk=";
+              };
+            });
+          };
+        };
 
         hostPkgs = pkgs;
 
@@ -146,6 +158,9 @@
                 "numer" # `numerator` from `num-rational`
               ];
             };
+            taplo.enable = true;
+            prettier.enable = true;
+            trim-trailing-whitespace.enable = true;
           };
           tools = {
             rustfmt = lib.mkForce rustToolchain;
@@ -176,41 +191,37 @@
 
         devShells.default = pkgs.mkShell {
           shellHook = ''
-            ${config.pre-commit.installationScript}
+            ${config.pre-commit.shellHook}
             PATH=$PATH:$(pwd)/target/release
           '';
 
           hardeningDisable = ["fortify"];
 
           nativeBuildInputs = [
-            pkgs.${pythonToolchain}
-            pkgs.${pythonToolchain}.pkgs.pip
-            pkgs.alejandra
+            (pythonToolchain.withPackages (ps: with ps; [pip jupyter anywidget]))
+            pkgs.maturin
+
             pkgs.cargo-expand
             pkgs.cargo-flamegraph
-            pkgs.cargo-leptos
-            pkgs.cargo-machete
-            pkgs.cargo-modules
             pkgs.cargo-nextest
             pkgs.cargo-tarpaulin
-            pkgs.cargo-udeps
+            rustToolchain
+
+            pkgs.alejandra
+            pkgs.dot2tex
             pkgs.fd
             pkgs.graphviz
             pkgs.hyperfine
-            pkgs.maturin
+            pkgs.kdePackages.kcachegrind
+            pkgs.lldb
             pkgs.texlive.combined.scheme-full
-            pkgs.trunk
+            pkgs.valgrind
+
+            pkgs.wasm-pack
+            pkgs.webpack-cli
 
             pkgs.pkg-config
             pkgs.SDL2
-
-            pkgs.valgrind
-            pkgs.kdePackages.kcachegrind
-
-            rustToolchain
-            pkgs.lldb
-            pkgs.dot2tex
-            # pkgs.wineWow64Packages.unstableFull
           ];
         };
         formatter = pkgs.alejandra;

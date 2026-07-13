@@ -1,0 +1,13 @@
+[package]
+name = "jupyter_rust_widget_backend"
+version = "0.10.0"
+edition = "2024"
+
+[lib]
+name = "jupyter_rust_widget_backend"
+crate-type = ["rlib"]
+
+[dependencies]
+pyo3.workspace = true
+serde.workspace = true
+serde_json.workspace = true

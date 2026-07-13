@@ -4,18 +4,19 @@ use cgt::{
 };
 use pyo3::prelude::*;
 
-crate::wrap_struct!(Thermograph, PyThermograph, "Thermograph", Clone);
+#[pyclass(name = "Thermograph")]
+pub struct PyThermograph(pub Thermograph);
 
 #[pymethods]
 impl PyThermograph {
     fn __repr__(&self) -> String {
-        format!("Thermograph({})", self.inner)
+        format!("Thermograph({})", self.0)
     }
 
     fn _repr_svg_(&self) -> String {
-        let bb = self.inner.required_canvas::<svg::Canvas>();
+        let bb = self.0.required_canvas::<svg::Canvas>();
         let mut canvas = svg::Canvas::new(bb);
-        self.inner.draw(&mut canvas);
+        self.0.draw(&mut canvas);
         canvas.to_svg()
     }
 }

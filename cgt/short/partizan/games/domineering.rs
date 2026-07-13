@@ -252,7 +252,7 @@ where
     /// ```
     /// // ..#       ..   #. |
     /// // .#.  = {  .# , #. | <...> }
-    /// // ##.               
+    /// // ##.
     ///
     /// use cgt::short::partizan::games::domineering::Domineering;
     /// use crate::cgt::short::partizan::partizan_game::PartizanGame;

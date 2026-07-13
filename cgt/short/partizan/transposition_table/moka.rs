@@ -8,7 +8,7 @@ use std::{fmt::Debug, hash::Hash};
 
 /// Transaction table (cache) of game positions and canonical forms.
 pub struct CacheTranspositionTable<G> {
-    cache: Cache<G, CanonicalForm, ahash::RandomState>,
+    cache: Cache<G, CanonicalForm, crate::hash::RandomState>,
 }
 
 impl<G> Debug for CacheTranspositionTable<G>
@@ -32,7 +32,7 @@ where
         Self {
             cache: Cache::builder()
                 .max_capacity(max_capacity)
-                .build_with_hasher(ahash::RandomState::new()),
+                .build_with_hasher(crate::hash::RandomState::new()),
         }
     }
 

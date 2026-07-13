@@ -88,7 +88,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
     let cgt_crate = if crate_name == "cgt" {
         quote! {crate}
     } else {
-        quote! {crate_name}
+        quote! {cgt}
     };
 
     let ast = parse_macro_input!(input as DeriveInput);

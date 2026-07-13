@@ -14,7 +14,7 @@ use cgt::{
     },
 };
 use clap::{self, Parser};
-use rand::{Rng, seq::IndexedRandom};
+use rand::{RngExt, seq::IndexedRandom};
 use std::{
     cmp::min,
     fs::File,

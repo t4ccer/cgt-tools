@@ -11,7 +11,7 @@ use cgt::{
     },
 };
 use clap::Parser;
-use rand::Rng;
+use rand::RngExt;
 use std::{
     collections::HashSet,
     io::{Stderr, Stdout, Write},

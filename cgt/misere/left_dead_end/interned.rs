@@ -41,7 +41,7 @@ pub struct Interner {
     games: AppendOnlyVec<Box<[TotalWrapper<LeftDeadEnd>]>>,
 
     /// Mapping from game moves to its index in `games` vector
-    table: DashMap<Box<[TotalWrapper<LeftDeadEnd>]>, usize, ahash::RandomState>,
+    table: DashMap<Box<[TotalWrapper<LeftDeadEnd>]>, usize, crate::hash::RandomState>,
 }
 
 impl LeftDeadEndContext for Interner {

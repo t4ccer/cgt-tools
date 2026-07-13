@@ -14,6 +14,7 @@ pub struct UndirectedGraph<V>(directed::DirectedGraph<V>);
 
 impl<V> UndirectedGraph<V> {
     /// Map vertex values
+    #[must_use]
     pub fn map<R>(&self, f: impl FnMut(&V) -> R) -> UndirectedGraph<R> {
         UndirectedGraph(self.0.map(f))
     }

@@ -1,6 +1,6 @@
 # cgt
 
-Combinatorial Game Theory framework and toolkit  in Rust and Python.
+Combinatorial Game Theory framework and toolkit in Rust and Python.
 
 ## `cgt-gui`
 
