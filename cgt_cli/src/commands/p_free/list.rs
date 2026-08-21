@@ -499,7 +499,9 @@ pub fn run(args: Args) -> Result<()> {
         let form_count: u64 = day.len() as u64;
         let bar = ProgressBar::new(form_count).with_style(style.clone());
 
-        for (idx, g) in day.iter().enumerate() {
+        parallel_for(0, day.len(), |idx| {
+            let _ = DropGuard(|| bar.inc(1));
+            let g = &day[idx];
             'h: for h in &day[idx + 1..] {
                 for x in &day {
                     let gx = context.sum(g, x).unwrap();
@@ -526,8 +528,7 @@ pub fn run(args: Args) -> Result<()> {
                     h = context.display(h),
                 ));
             }
-            bar.inc(1);
-        }
+        });
 
         bar.finish();
         eprintln!();

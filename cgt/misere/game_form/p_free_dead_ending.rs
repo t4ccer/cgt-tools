@@ -1,7 +1,9 @@
 #![allow(missing_docs)]
 
 use crate::{
-    misere::game_form::{ConstructionError, DeadEndingContext, GameFormContext, PFreeContext},
+    misere::game_form::{
+        ConstructionError, DeadEndingContext, GameFormContext, Outcome, PFreeContext,
+    },
     result::{UnwrapInfallible, Void},
     short::partizan::Player,
     total::{TotalWrappable, TotalWrapper},
@@ -407,6 +409,11 @@ where
         });
 
         a && b
+    }
+
+    fn satisfy_proviso(&self, g: &Self::Form, h: &Self::Form) -> bool {
+        (!self.is_end(g, Player::Right) || self.outcome(h) != Outcome::L)
+            && (!self.is_end(h, Player::Left) || self.outcome(g) != Outcome::R)
     }
 }
 
