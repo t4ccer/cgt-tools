@@ -354,10 +354,10 @@ pub enum GraphFrontendMessage {
 }
 
 preset! {
-    #[derive(Clone, Copy)]
+    #[derive(Clone, Copy, Debug)]
     pub struct GraphPresetFlag;
 
-    #[derive(Clone, Copy)]
+    #[derive(Clone, Copy, Debug)]
     pub enum GraphPreset {
         Snort = 1,
         Col = 2,
@@ -373,15 +373,6 @@ impl GraphPreset {
         match self {
             GraphPreset::Snort | GraphPreset::Col => false,
             GraphPreset::DigraphPlacement => true,
-        }
-    }
-
-    /// Color of a vertex added without the user picking one. Games that have no uncolored
-    /// vertex have to start somewhere
-    pub const fn default_vertex_color(self) -> VertexColor {
-        match self {
-            GraphPreset::Snort | GraphPreset::Col => VertexColor::White,
-            GraphPreset::DigraphPlacement => VertexColor::Blue,
         }
     }
 }

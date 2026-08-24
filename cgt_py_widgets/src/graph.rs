@@ -43,7 +43,7 @@ struct HtmlState {
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum EditMode {
     MoveVertex,
-    ToggleEdge,
+    ToggleEdge(Option<VertexColor>),
     RemoveVertex,
     /// This is 3 in 1
     /// - Clicking on canvas adds a vertex of this color
@@ -55,10 +55,11 @@ enum EditMode {
 }
 
 impl EditMode {
-    /// Color of the vertex that clicking on empty canvas adds, if the mode adds one at all
-    const fn new_vertex_color(self, preset: GraphPreset) -> Option<VertexColor> {
+    /// Color of the vertex that clicking on empty canvas adds, if the mode adds one at all.
+    /// [`EditMode::ToggleEdge`] adds whichever vertex its own dropdown is set to
+    const fn new_vertex_color(self) -> Option<VertexColor> {
         match self {
-            EditMode::ToggleEdge => Some(preset.default_vertex_color()),
+            EditMode::ToggleEdge(edge_vertex) => edge_vertex,
             EditMode::AddColorVertex(color) => Some(color),
             EditMode::MoveVertex | EditMode::RemoveVertex | EditMode::GameMove(_) => None,
         }
@@ -68,7 +69,7 @@ impl EditMode {
     const fn moves_vertices(self) -> bool {
         match self {
             EditMode::MoveVertex | EditMode::AddColorVertex(_) => true,
-            EditMode::ToggleEdge | EditMode::RemoveVertex | EditMode::GameMove(_) => false,
+            EditMode::ToggleEdge(_) | EditMode::RemoveVertex | EditMode::GameMove(_) => false,
         }
     }
 
@@ -76,7 +77,7 @@ impl EditMode {
     const fn opposite_player(self) -> Option<EditMode> {
         match self {
             EditMode::MoveVertex
-            | EditMode::ToggleEdge
+            | EditMode::ToggleEdge(_)
             | EditMode::RemoveVertex
             | EditMode::AddColorVertex(_) => None,
             EditMode::GameMove(player) => Some(EditMode::GameMove(player.opposite())),
@@ -122,10 +123,6 @@ impl Applied {
 struct SharedState {
     preset: GraphPreset,
     edit_mode: EditMode,
-    // TODO: Move into EditMode
-    // TODO: This also needs to track what vertex we want to add, either from dropdown
-    // or forced for e.g. BipartiteSnort
-    edge_creates_vertex: bool,
     /// Whether the same player keeps moving instead of the players taking turns
     consecutive_moves: bool,
     state: Option<HtmlState>,
@@ -134,37 +131,40 @@ struct SharedState {
     interactions: Interactions,
 }
 
+const UNCOLORED_VERTEX: GraphPresetFlag =
+    GraphPresetFlag::from_slice(&[GraphPresetFlag::Snort, GraphPresetFlag::Col]);
+
+const PLAYER_VERTEX: GraphPresetFlag = GraphPresetFlag::from_slice(&[
+    GraphPresetFlag::Snort,
+    GraphPresetFlag::Col,
+    GraphPresetFlag::DigraphPlacement,
+]);
+
+const GREEN_VERTEX: GraphPresetFlag = GraphPresetFlag::from_slice(&[]);
+
+const PLAYABLE: GraphPresetFlag =
+    GraphPresetFlag::from_slice(&[GraphPresetFlag::Snort, GraphPresetFlag::DigraphPlacement]);
+
 const EDIT_OPTIONS: &[EditOption] = &[
     EditOption {
         text: "Add White Vertex",
         mode: EditMode::AddColorVertex(VertexColor::White),
-        visible_preset: GraphPresetFlag::from_slice(&[
-            GraphPresetFlag::Snort,
-            GraphPresetFlag::Col,
-        ]),
+        visible_preset: UNCOLORED_VERTEX,
     },
     EditOption {
         text: "Add Blue Vertex",
         mode: EditMode::AddColorVertex(VertexColor::Blue),
-        visible_preset: GraphPresetFlag::from_slice(&[
-            GraphPresetFlag::Snort,
-            GraphPresetFlag::Col,
-            GraphPresetFlag::DigraphPlacement,
-        ]),
+        visible_preset: PLAYER_VERTEX,
     },
     EditOption {
         text: "Add Red Vertex",
         mode: EditMode::AddColorVertex(VertexColor::Red),
-        visible_preset: GraphPresetFlag::from_slice(&[
-            GraphPresetFlag::Snort,
-            GraphPresetFlag::Col,
-            GraphPresetFlag::DigraphPlacement,
-        ]),
+        visible_preset: PLAYER_VERTEX,
     },
     EditOption {
         text: "Add Green Vertex",
         mode: EditMode::AddColorVertex(VertexColor::Green),
-        visible_preset: GraphPresetFlag::from_slice(&[]),
+        visible_preset: GREEN_VERTEX,
     },
     EditOption {
         text: "Move Vertex",
@@ -173,7 +173,7 @@ const EDIT_OPTIONS: &[EditOption] = &[
     },
     EditOption {
         text: "Add/Remove Edge",
-        mode: EditMode::ToggleEdge,
+        mode: EditMode::ToggleEdge(None),
         visible_preset: GraphPresetFlag::all(),
     },
     EditOption {
@@ -185,18 +185,42 @@ const EDIT_OPTIONS: &[EditOption] = &[
     EditOption {
         text: "Left Move",
         mode: EditMode::GameMove(Player::Left),
-        visible_preset: GraphPresetFlag::from_slice(&[
-            GraphPresetFlag::Snort,
-            GraphPresetFlag::DigraphPlacement,
-        ]),
+        visible_preset: PLAYABLE,
     },
     EditOption {
         text: "Right Move",
         mode: EditMode::GameMove(Player::Right),
-        visible_preset: GraphPresetFlag::from_slice(&[
-            GraphPresetFlag::Snort,
-            GraphPresetFlag::DigraphPlacement,
-        ]),
+        visible_preset: PLAYABLE,
+    },
+];
+
+/// Vertex that [`EditMode::ToggleEdge`] leaves behind when an edge is dropped on empty
+/// canvas. The first option visible for a preset is the one that preset starts on
+const EDGE_VERTEX_OPTIONS: &[EdgeVertexOption] = &[
+    EdgeVertexOption {
+        text: "White",
+        color: Some(VertexColor::White),
+        visible_preset: UNCOLORED_VERTEX,
+    },
+    EdgeVertexOption {
+        text: "Blue",
+        color: Some(VertexColor::Blue),
+        visible_preset: PLAYER_VERTEX,
+    },
+    EdgeVertexOption {
+        text: "Red",
+        color: Some(VertexColor::Red),
+        visible_preset: PLAYER_VERTEX,
+    },
+    EdgeVertexOption {
+        text: "Green",
+        color: Some(VertexColor::Green),
+        visible_preset: GREEN_VERTEX,
+    },
+    EdgeVertexOption {
+        text: "None",
+        color: None,
+        visible_preset: GraphPresetFlag::all(),
     },
 ];
 
@@ -210,8 +234,8 @@ struct GraphWidget {
 
 impl GraphWidget {
     fn new(preset: GraphPreset) -> GraphWidget {
-        // The dropdown starts on its first option, which is not the same one for every
-        // preset, so the widget has to start in whatever mode that turns out to be
+        // Both dropdowns start on their first option, which is not the same one for every
+        // preset, so the widget has to start on whatever those turn out to be
         let edit_mode = SelectOption::selected_value("0", &preset, EDIT_OPTIONS)
             .map_or(EditMode::MoveVertex, |option| option.mode);
 
@@ -220,7 +244,6 @@ impl GraphWidget {
             shared: Arc::new(Mutex::new(SharedState {
                 preset,
                 edit_mode,
-                edge_creates_vertex: true,
                 consecutive_moves: false,
                 state: None,
                 canvas_size: DEFAULT_CANVAS_SIZE,
@@ -350,7 +373,7 @@ impl GraphWidget {
                 canvas.vertex(position, color.color(), vertex)
             });
 
-            if edit_mode == EditMode::ToggleEdge {
+            if matches!(edit_mode, EditMode::ToggleEdge(_)) {
                 GraphWidget::draw_new_edge(canvas, graph, preset, &vertices);
             }
 
@@ -443,7 +466,7 @@ impl GraphWidget {
         let moved = GraphWidget::move_dragged_vertex(this, frame);
 
         if let Some(position) = frame.background.clicked
-            && let Some(color) = this.edit_mode.new_vertex_color(this.preset)
+            && let Some(color) = this.edit_mode.new_vertex_color()
         {
             GraphWidget::add_vertex_at(this, position, color);
             return Applied {
@@ -479,7 +502,7 @@ impl GraphWidget {
                 None => Applied::none(),
             },
 
-            EditMode::ToggleEdge => GraphWidget::drop_edge(this, frame),
+            EditMode::ToggleEdge(edge_vertex) => GraphWidget::drop_edge(this, frame, edge_vertex),
 
             EditMode::GameMove(player) => match this.preset {
                 GraphPreset::Snort => GraphWidget::snort_move(this, frame, player),
@@ -507,7 +530,11 @@ impl GraphWidget {
         }
     }
 
-    fn drop_edge(this: &mut SharedState, frame: &Frame) -> Applied {
+    fn drop_edge(
+        this: &mut SharedState,
+        frame: &Frame,
+        edge_vertex: Option<VertexColor>,
+    ) -> Applied {
         let Some((from, drag)) = frame.vertices.dragged.filter(|(_, drag)| drag.dropped) else {
             return Applied::none();
         };
@@ -515,11 +542,12 @@ impl GraphWidget {
         let connected = match frame.vertices.hovered {
             Some(target) if target == from => return Applied::none(),
             Some(target) => target,
-            None if this.edge_creates_vertex => {
-                let color = this
-                    .edit_mode
-                    .new_vertex_color(this.preset)
-                    .unwrap_or(this.preset.default_vertex_color());
+            // Dropped on empty canvas, so the edge only lands somewhere if the dropdown
+            // is set to leave a vertex behind
+            None => {
+                let Some(color) = edge_vertex else {
+                    return Applied::none();
+                };
                 let target = GraphWidget::add_vertex_at(this, drag.cursor, color);
                 GraphWidget::connect(this, from, target, true);
                 return Applied {
@@ -527,7 +555,6 @@ impl GraphWidget {
                     committed: true,
                 };
             }
-            None => return Applied::none(),
         };
 
         let adjacent = this.graph.are_adjacent(from, connected);
@@ -670,6 +697,25 @@ impl SelectOptionElement for EditOption {
     }
 }
 
+#[derive(Clone, Copy)]
+pub(crate) struct EdgeVertexOption {
+    text: &'static str,
+    color: Option<VertexColor>,
+    visible_preset: GraphPresetFlag,
+}
+
+impl SelectOptionElement for EdgeVertexOption {
+    type Preset = GraphPreset;
+
+    fn text(&self) -> &str {
+        self.text
+    }
+
+    fn is_visible(&self, preset: &Self::Preset) -> bool {
+        preset.intersects(self.visible_preset)
+    }
+}
+
 impl WasmWidget for GraphWidget {
     type BackendMessage = GraphBackendMessage;
     type FrontendMessage = GraphFrontendMessage;
@@ -706,7 +752,7 @@ impl WasmWidget for GraphWidget {
         let mode_select: HtmlSelectElement =
             SelectOption::create_element(&document, "Edit mode", &self.preset, EDIT_OPTIONS)?;
 
-        // Wrapping the checkbox in the label associates the two without needing a unique id
+        // Wrapping the dropdown in the label associates the two without needing a unique id
         let edge_options = document
             .create_element("label")?
             .dyn_into::<HtmlLabelElement>()?;
@@ -714,15 +760,16 @@ impl WasmWidget for GraphWidget {
         edge_options.style().set_property("align-items", "center")?;
         edge_options.style().set_property("gap", "4px")?;
 
-        let edge_creates_vertex = document
-            .create_element("input")?
-            .dyn_into::<HtmlInputElement>()?;
-        edge_creates_vertex.set_type("checkbox");
-        edge_creates_vertex.set_checked(true);
+        let edge_vertex: HtmlSelectElement = SelectOption::create_element(
+            &document,
+            "Edge vertex",
+            &self.preset,
+            EDGE_VERTEX_OPTIONS,
+        )?;
         let edge_options_text = document.create_element("span")?;
-        edge_options_text.set_text_content(Some("Add vertex"));
-        edge_options.append_child(&edge_creates_vertex)?;
+        edge_options_text.set_text_content(Some("New vertex"));
         edge_options.append_child(&edge_options_text)?;
+        edge_options.append_child(&edge_vertex)?;
 
         let move_options = document
             .create_element("label")?
@@ -745,7 +792,7 @@ impl WasmWidget for GraphWidget {
             let this = Arc::clone(&self.shared);
             let mode_select = mode_select.clone();
             let edge_options = edge_options.clone();
-            let edge_creates_vertex = edge_creates_vertex.clone();
+            let edge_vertex_select = edge_vertex.clone();
             let move_options = move_options.clone();
             let consecutive_moves = consecutive_moves.clone();
             move || {
@@ -753,16 +800,26 @@ impl WasmWidget for GraphWidget {
                     SelectOption::selected_value(&mode_select.value(), &preset, EDIT_OPTIONS)
                 {
                     let display = |shown| if shown { "flex" } else { "none" };
-                    edge_options
-                        .style()
-                        .set_property("display", display(mode.mode == EditMode::ToggleEdge))?;
+                    edge_options.style().set_property(
+                        "display",
+                        display(matches!(mode.mode, EditMode::ToggleEdge(_))),
+                    )?;
                     move_options
                         .style()
                         .set_property("display", display(mode.mode.opposite_player().is_some()))?;
 
                     let mut this = this.lock().unwrap();
                     this.edit_mode = mode.mode;
-                    this.edge_creates_vertex = edge_creates_vertex.checked();
+
+                    if let EditMode::ToggleEdge(edge_vertex) = &mut this.edit_mode {
+                        *edge_vertex = SelectOption::selected_value(
+                            &edge_vertex_select.value(),
+                            &preset,
+                            EDGE_VERTEX_OPTIONS,
+                        )
+                        .and_then(|option| option.color);
+                    }
+
                     this.consecutive_moves = consecutive_moves.checked();
                     GraphWidget::draw(&mut this)?;
                 }
