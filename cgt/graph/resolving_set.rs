@@ -185,7 +185,7 @@ where
     graph.draw(canvas, move |canvas, idx| {
         let vertex: &Vertex = graph.get_vertex(idx).get_inner();
         let vertex_position: V2f = *graph.get_vertex(idx).get_inner();
-        canvas.vertex(
+        let interaction = canvas.vertex(
             vertex_position,
             if vertex.tower.is_some() {
                 Color::DARK_GRAY
@@ -222,6 +222,8 @@ where
                 text_color,
             );
         }
+
+        interaction
     });
 }
 
@@ -358,7 +360,7 @@ where
     graph.draw(canvas, move |canvas, idx| {
         let vertex: &CodeVertex = graph.get_vertex(idx).get_inner();
         let vertex_position: V2f = *graph.get_vertex(idx).get_inner();
-        canvas.vertex(
+        let interaction = canvas.vertex(
             vertex_position,
             if vertex.is_original {
                 Color::DARK_GRAY
@@ -385,5 +387,7 @@ where
             TextAlignment::Center,
             text_color,
         );
+
+        interaction
     });
 }

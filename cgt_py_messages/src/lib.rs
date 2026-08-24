@@ -1,4 +1,5 @@
 use cgt::{
+    drawing::{self, Color},
     graph::adjacency_matrix::undirected::UndirectedGraph,
     grid::vec_grid::VecGrid,
     impl_has,
@@ -14,6 +15,31 @@ pub enum Tile {
     BlueStone,
     RedStone,
     BlackStone,
+}
+
+impl Tile {
+    pub const fn drawing(self) -> drawing::Tile {
+        match self {
+            Tile::Empty => drawing::Tile::Square {
+                color: Color::LIGHT_GRAY,
+            },
+            Tile::Taken => drawing::Tile::Square {
+                color: Color::DARK_GRAY,
+            },
+            Tile::BlueStone => drawing::Tile::Circle {
+                tile_color: Color::LIGHT_GRAY,
+                circle_color: Color::BLUE,
+            },
+            Tile::RedStone => drawing::Tile::Circle {
+                tile_color: Color::LIGHT_GRAY,
+                circle_color: Color::RED,
+            },
+            Tile::BlackStone => drawing::Tile::Circle {
+                tile_color: Color::LIGHT_GRAY,
+                circle_color: Color::DARK_GRAY,
+            },
+        }
+    }
 }
 
 impl std::fmt::Display for Tile {
@@ -160,7 +186,6 @@ bitflags::bitflags! {
     }
 }
 
-/// Color of a graph vertex. Not tied to any game yet
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone, Copy, PartialEq, Eq)]
 #[serde(tag = "type")]
 pub enum VertexColor {
@@ -171,14 +196,12 @@ pub enum VertexColor {
 }
 
 impl VertexColor {
-    /// Color to paint the vertex with, as `0xRRGGBB`
-    pub const fn rgb(self) -> u32 {
-        // TODO: Use our Color module
+    pub const fn color(self) -> Color {
         match self {
-            VertexColor::White => 0xf5f5f5,
-            VertexColor::Blue => 0x4e4afb,
-            VertexColor::Red => 0xf92672,
-            VertexColor::Green => 0xa6e22e,
+            VertexColor::White => Color::from_hex(0xf5f5f5ff),
+            VertexColor::Blue => Color::BLUE,
+            VertexColor::Red => Color::RED,
+            VertexColor::Green => Color::from_hex(0xa6e22eff),
         }
     }
 }
@@ -194,7 +217,6 @@ impl std::fmt::Display for VertexColor {
     }
 }
 
-/// Graph vertex as drawn by the widget. Games will add their own data here
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone, Copy, PartialEq)]
 pub struct Vertex {
     pub position: V2f,

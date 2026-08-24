@@ -1,9 +1,10 @@
 use cgt::{
+    drawing::{Button, Canvas, Color, Hits, Interactions},
     grid::{FiniteGrid, Grid, vec_grid::VecGrid},
+    numeric::v2f::V2f,
     short::partizan::{Player, games::fission},
 };
 use cgt_py_messages::{GridBackendMessage, GridFrontendMessage, GridPreset, GridPresetFlag, Tile};
-use core::f64;
 use jupyter_rust_widget_frontend::{AnyWidgetModel, Context, WasmWidget};
 use std::sync::{Arc, Mutex};
 use wasm_bindgen::{
@@ -15,7 +16,7 @@ use web_sys::{
     HtmlDivElement, HtmlInputElement, HtmlLabelElement, HtmlSelectElement, MouseEvent,
 };
 
-use crate::{ActiveElement, SelectOption, SelectOptionElement};
+use crate::{SelectOption, SelectOptionElement, canvas::HtmlCanvas};
 
 struct HtmlState {
     canvas: HtmlCanvasElement,
@@ -59,7 +60,7 @@ struct SharedState {
     consecutive_moves: bool,
     state: Option<HtmlState>,
     grid: VecGrid<Tile>,
-    active_cell: ActiveElement<(u8, u8)>,
+    interactions: Interactions,
 }
 
 const EDIT_OPTIONS: &[EditOption] = &[
@@ -135,42 +136,17 @@ impl GridWidget {
                 consecutive_moves: true,
                 state: None,
                 grid: FiniteGrid::zero_size(),
-                active_cell: ActiveElement::None,
+                interactions: Interactions::new(),
             })),
         }
     }
 }
 
-const CELL_SIZE: f64 = 64.0f64;
-const GAP_SIZE: f64 = 2.0f64;
-
-fn screen_to_grid(click_x: f64, click_y: f64) -> Option<(u8, u8)> {
-    let stride = CELL_SIZE + GAP_SIZE;
-
-    if click_x < GAP_SIZE || click_y < GAP_SIZE {
-        return None;
+fn mouse_event_to_canvas(event: &MouseEvent) -> V2f {
+    V2f {
+        x: event.offset_x() as f32,
+        y: event.offset_y() as f32,
     }
-
-    let col = (click_x - GAP_SIZE) / stride;
-    let row = (click_y - GAP_SIZE) / stride;
-
-    let cell_start_x = GAP_SIZE + (col * stride);
-    let cell_start_y = GAP_SIZE + (row * stride);
-
-    let hit_cell_x = click_x >= cell_start_x && click_x < (cell_start_x + CELL_SIZE);
-    let hit_cell_y = click_y >= cell_start_y && click_y < (cell_start_y + CELL_SIZE);
-
-    if hit_cell_x && hit_cell_y {
-        Some((col as u8, row as u8))
-    } else {
-        None
-    }
-}
-
-fn mouse_event_to_grid(event: &MouseEvent) -> Option<(u8, u8)> {
-    let click_x = event.offset_x() as f64;
-    let click_y = event.offset_y() as f64;
-    screen_to_grid(click_x, click_y)
 }
 
 fn resize_edge(grid: &VecGrid<Tile>, edge: Edge, action: ResizeAction) -> Option<VecGrid<Tile>> {
@@ -276,7 +252,9 @@ fn edge_buttons(
 
                 this.grid = new_grid;
                 GridWidget::send_grid(&this, &context);
-                GridWidget::draw_grid(&this)
+                GridWidget::draw(&mut this)?;
+
+                Ok(())
             }
         });
         button.add_event_listener_with_callback("click", handler.as_ref().unchecked_ref())?;
@@ -289,11 +267,11 @@ fn edge_buttons(
 }
 
 impl GridWidget {
-    // TODO: This whole mess should implement Canvas trait and delegate
-    // actual grid/graph drawing there
-    fn draw_grid(this: &SharedState) -> Result<(), JsValue> {
+    /// Keep the mode dropdown showing the mode that is actually in effect, which changes on
+    /// its own when a move is made in a game that alternates players
+    fn sync_edit_mode(this: &SharedState) {
         let Some(state) = &this.state else {
-            return Ok(());
+            return;
         };
 
         let current_mode =
@@ -304,21 +282,34 @@ impl GridWidget {
         {
             state.edit_mode.set_value(&mode.to_string());
         }
+    }
 
-        let canvas_width =
-            (this.grid.width() as f64 * CELL_SIZE) + ((this.grid.width() + 1) as f64 * GAP_SIZE);
-        let canvas_height =
-            (this.grid.height() as f64 * CELL_SIZE) + ((this.grid.height() + 1) as f64 * GAP_SIZE);
-        state.canvas.set_width(canvas_width as u32);
-        state.canvas.set_height(canvas_height as u32);
+    /// Paint the grid and report what the mouse did to its tiles
+    fn draw(this: &mut SharedState) -> Result<Hits<(u8, u8)>, JsValue> {
+        GridWidget::sync_edit_mode(this);
+
+        let SharedState {
+            state,
+            grid,
+            interactions,
+            ..
+        } = this;
+
+        let Some(state) = state else {
+            return Ok(Hits::new());
+        };
+
+        let canvas_size = grid.canvas_size::<HtmlCanvas>().size();
+        state.canvas.set_width(canvas_size.x as u32);
+        state.canvas.set_height(canvas_size.y as u32);
         state
             .canvas
             .style()
-            .set_property("width", &format!("{}px", canvas_width as u32))?;
+            .set_property("width", &format!("{}px", canvas_size.x as u32))?;
         state
             .canvas
             .style()
-            .set_property("height", &format!("{}px", canvas_height as u32))?;
+            .set_property("height", &format!("{}px", canvas_size.y as u32))?;
 
         let context = state
             .canvas
@@ -326,83 +317,13 @@ impl GridWidget {
             .unwrap()
             .dyn_into::<CanvasRenderingContext2d>()?;
 
-        context.set_fill_style_str("#000000");
-        context.fill_rect(0.0, 0.0, canvas_width, canvas_height);
-
-        for grid_y in 0..this.grid.height() {
-            for grid_x in 0..this.grid.width() {
-                #[derive(Clone, Copy)]
-                enum CellState {
-                    None,
-                    Hover,
-                    Pressed,
-                }
-
-                let cell_state = match this.active_cell {
-                    ActiveElement::Hover((x, y)) if x == grid_x && y == grid_y => CellState::Hover,
-                    ActiveElement::Pressed((x, y)) if x == grid_x && y == grid_y => {
-                        CellState::Pressed
-                    }
-                    _ => CellState::None,
-                };
-
-                let tile_color = match this.grid.get(grid_x, grid_y) {
-                    Tile::Empty | Tile::BlueStone | Tile::RedStone | Tile::BlackStone => {
-                        match cell_state {
-                            CellState::None => "#cccccc",
-                            CellState::Hover => "#b8b8b8",
-                            CellState::Pressed => "#8f8f8f",
-                        }
-                    }
-                    Tile::Taken => match cell_state {
-                        CellState::None => "#444444",
-                        CellState::Hover => "#3d3d3d",
-                        CellState::Pressed => "#303030",
-                    },
-                };
-                context.set_fill_style_str(tile_color);
-                let pixel_x = (GAP_SIZE + grid_x as f64 * (CELL_SIZE + GAP_SIZE)) as f64;
-                let pixel_y = (GAP_SIZE + grid_y as f64 * (CELL_SIZE + GAP_SIZE)) as f64;
-                context.fill_rect(pixel_x, pixel_y, CELL_SIZE, CELL_SIZE);
-
-                if let Some(stone_color) = match this.grid.get(grid_x, grid_y) {
-                    Tile::Empty | Tile::Taken => None,
-                    Tile::RedStone => Some(match cell_state {
-                        CellState::None => "#f92672",
-                        CellState::Hover => "#e02267",
-                        CellState::Pressed => "#ae1b50",
-                    }),
-                    Tile::BlueStone => Some(match cell_state {
-                        CellState::None => "#4e4afb",
-                        CellState::Hover => "#4643e2",
-                        CellState::Pressed => "#3734b0",
-                    }),
-                    Tile::BlackStone => Some(match cell_state {
-                        CellState::None => "#444444",
-                        CellState::Hover => "#3d3d3d",
-                        CellState::Pressed => "#303030",
-                    }),
-                } {
-                    const STONE_SCALE: f64 = 0.35;
-                    context.begin_path();
-                    context.arc(
-                        pixel_x + CELL_SIZE * 0.5,
-                        pixel_y + CELL_SIZE * 0.5,
-                        CELL_SIZE * STONE_SCALE,
-                        0.0,
-                        2.0 * f64::consts::PI,
-                    )?;
-                    context.set_fill_style_str(stone_color);
-                    context.fill();
-
-                    context.set_line_width(2.0);
-                    context.set_stroke_style_str("#000000");
-                    context.stroke();
-                }
-            }
-        }
-
-        Ok(())
+        let grid: &VecGrid<Tile> = grid;
+        let mut canvas = HtmlCanvas::new(context, interactions);
+        Ok(canvas.frame(|canvas| {
+            // The tiles do not cover the gaps between them, which the grid lines are drawn in
+            canvas.rect(V2f::ZERO, canvas_size, Color::BLACK);
+            grid.draw(canvas, Tile::drawing)
+        }))
     }
 
     fn send_grid(this: &SharedState, context: &Context<GridBackendMessage>) {
@@ -411,42 +332,67 @@ impl GridWidget {
         });
     }
 
-    fn handle_edit(
-        this: &mut SharedState,
-        x: u8,
-        y: u8,
-        context: &Context<GridBackendMessage>,
-    ) -> Result<(), JsValue> {
+    /// Apply what the mouse did to the grid, reporting whether it changed. Tiles are
+    /// clicked, never dragged
+    fn apply(this: &mut SharedState, hits: &Hits<(u8, u8)>) -> bool {
+        let Some((x, y)) = hits.clicked else {
+            return false;
+        };
+
         match this.edit_mode {
-            EditMode::FlipCell => {
-                if let Some(flipped_tile) = match this.grid.get(x, y) {
-                    Tile::Empty => Some(Tile::Taken),
-                    Tile::Taken => Some(Tile::Empty),
-                    _ => None,
-                } {
-                    this.grid.set(x, y, flipped_tile);
-                    GridWidget::send_grid(this, context);
+            EditMode::FlipCell => match this.grid.get(x, y) {
+                Tile::Empty => {
+                    this.grid.set(x, y, Tile::Taken);
+                    true
                 }
-            }
+                Tile::Taken => {
+                    this.grid.set(x, y, Tile::Empty);
+                    true
+                }
+                Tile::BlueStone | Tile::RedStone | Tile::BlackStone => false,
+            },
             EditMode::PlaceObject(tile) => {
                 this.grid.set(x, y, tile);
-                GridWidget::send_grid(this, context);
+                true
             }
             EditMode::FissionMove(player) => {
-                if let Ok(grid) = this.grid.try_map(|t| fission::Tile::try_from(*t)) {
-                    let fission = fission::Fission::new(grid);
-                    if fission.available_moves(player).contains(&(x, y)) {
-                        this.grid = fission.move_in(x, y, player).grid().map(|t| Tile::from(t));
-                        GridWidget::send_grid(this, context);
+                let Ok(grid) = this.grid.try_map(|t| fission::Tile::try_from(*t)) else {
+                    return false;
+                };
 
-                        if !this.consecutive_moves
-                            && let Some(new_mode) = this.edit_mode.opposite_player()
-                        {
-                            this.edit_mode = new_mode;
-                        }
-                    }
+                let fission = fission::Fission::new(grid);
+                if !fission.available_moves(player).contains(&(x, y)) {
+                    return false;
                 }
+
+                this.grid = fission.move_in(x, y, player).grid().map(|t| Tile::from(t));
+                if !this.consecutive_moves
+                    && let Some(new_mode) = this.edit_mode.opposite_player()
+                {
+                    this.edit_mode = new_mode;
+                }
+                true
             }
+        }
+    }
+
+    /// Paint a frame, apply what the mouse did to it, and paint it again if that changed
+    /// anything
+    fn update(
+        this: &mut SharedState,
+        context: &Context<GridBackendMessage>,
+    ) -> Result<(), JsValue> {
+        // Clicks are reported by a single frame and consumed by it, so the shading of
+        // whatever was pressed has to be painted over even when nothing else changed
+        let settling = matches!(this.interactions.pointer().button, Button::Released(_));
+
+        let hits = GridWidget::draw(this)?;
+        let changed = GridWidget::apply(this, &hits);
+        if changed {
+            GridWidget::send_grid(this, context);
+        }
+        if changed || settling {
+            GridWidget::draw(this)?;
         }
 
         Ok(())
@@ -481,7 +427,9 @@ impl WasmWidget for GridWidget {
             GridFrontendMessage::SetGrid(new_grid) => {
                 let mut this = self.shared.lock().unwrap();
                 this.grid = new_grid;
-                GridWidget::draw_grid(&this)
+                GridWidget::draw(&mut this)?;
+
+                Ok(())
             }
         }
     }
@@ -573,22 +521,16 @@ impl WasmWidget for GridWidget {
 
         let down_handler = ScopedClosure::<dyn FnMut(MouseEvent) -> Result<(), JsValue>>::new({
             let this = Arc::clone(&self.shared);
-            move |event| {
-                if let Some((grid_x, grid_y)) = mouse_event_to_grid(&event) {
-                    let mut this = this.lock().unwrap();
-                    match this.active_cell {
-                        // Tiles are clicked, never dragged
-                        ActiveElement::None
-                        | ActiveElement::Pressed(_)
-                        | ActiveElement::Dragging(..) => Ok(()),
-                        ActiveElement::Hover(_) => {
-                            this.active_cell = ActiveElement::Pressed((grid_x, grid_y));
-                            GridWidget::draw_grid(&this)
-                        }
-                    }
-                } else {
-                    Ok(())
+            let context = context.clone();
+            move |event: MouseEvent| {
+                if event.button() != 0 {
+                    return Ok(());
                 }
+
+                let mut this = this.lock().unwrap();
+                this.interactions
+                    .pointer_pressed(mouse_event_to_canvas(&event));
+                GridWidget::update(&mut this, &context)
             }
         });
         canvas
@@ -601,23 +543,9 @@ impl WasmWidget for GridWidget {
             let context = context.clone();
             move |event| {
                 let mut this = this.lock().unwrap();
-                if let Some((grid_x, grid_y)) = mouse_event_to_grid(&event) {
-                    match this.active_cell {
-                        ActiveElement::Pressed((x, y)) => {
-                            if x == grid_x && y == grid_y {
-                                GridWidget::handle_edit(&mut this, x, y, &context)?;
-                            }
-                        }
-                        ActiveElement::None
-                        | ActiveElement::Hover(_)
-                        | ActiveElement::Dragging(..) => {}
-                    }
-                    this.active_cell = ActiveElement::Hover((grid_x, grid_y));
-                    GridWidget::draw_grid(&this)
-                } else {
-                    this.active_cell = ActiveElement::None;
-                    GridWidget::draw_grid(&this)
-                }
+                this.interactions
+                    .pointer_released(mouse_event_to_canvas(&event));
+                GridWidget::update(&mut this, &context)
             }
         });
         canvas
@@ -627,22 +555,12 @@ impl WasmWidget for GridWidget {
 
         let move_handler = ScopedClosure::<dyn FnMut(MouseEvent) -> Result<(), JsValue>>::new({
             let this = Arc::clone(&self.shared);
+            let context = context.clone();
             move |event| {
-                let new_hover = mouse_event_to_grid(&event);
                 let mut this = this.lock().unwrap();
-
-                match (this.active_cell, new_hover) {
-                    (ActiveElement::None, None)
-                    | (ActiveElement::Pressed(_) | ActiveElement::Dragging(..), _) => Ok(()),
-                    (ActiveElement::Hover(_), None) => {
-                        this.active_cell = ActiveElement::None;
-                        GridWidget::draw_grid(&this)
-                    }
-                    (ActiveElement::None | ActiveElement::Hover(_), Some((x, y))) => {
-                        this.active_cell = ActiveElement::Hover((x, y));
-                        GridWidget::draw_grid(&this)
-                    }
-                }
+                this.interactions
+                    .pointer_moved(mouse_event_to_canvas(&event));
+                GridWidget::update(&mut this, &context)
             }
         });
         canvas
@@ -652,17 +570,11 @@ impl WasmWidget for GridWidget {
 
         let leave_handler = ScopedClosure::<dyn FnMut() -> Result<(), JsValue>>::new({
             let this = Arc::clone(&self.shared);
+            let context = context.clone();
             move || {
                 let mut this = this.lock().unwrap();
-                if matches!(
-                    this.active_cell,
-                    ActiveElement::Hover(_) | ActiveElement::Pressed(_)
-                ) {
-                    this.active_cell = ActiveElement::None;
-                    GridWidget::draw_grid(&this)
-                } else {
-                    Ok(())
-                }
+                this.interactions.pointer_left();
+                GridWidget::update(&mut this, &context)
             }
         });
         canvas

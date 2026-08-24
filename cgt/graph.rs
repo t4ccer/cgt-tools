@@ -3,7 +3,7 @@
 use std::collections::VecDeque;
 
 use crate::{
-    drawing::{BoundingBox, Canvas, Color},
+    drawing::{BoundingBox, Canvas, Color, Hits, Interaction},
     has::Has,
     numeric::v2f::V2f,
 };
@@ -142,8 +142,12 @@ pub trait Graph<V>: Sized {
     /// Get vertex mutably
     fn get_vertex_mut(&mut self, vertex: VertexIndex) -> &mut V;
 
-    /// Draw graph on existing canvas
-    fn draw<C>(&self, canvas: &mut C, mut draw_vertex: impl FnMut(&mut C, VertexIndex))
+    /// Draw graph on existing canvas, reporting what the pointer is doing to its vertices
+    fn draw<C>(
+        &self,
+        canvas: &mut C,
+        mut draw_vertex: impl FnMut(&mut C, VertexIndex) -> Interaction,
+    ) -> Hits<VertexIndex>
     where
         V: Has<V2f>,
         C: Canvas,
@@ -209,9 +213,11 @@ pub trait Graph<V>: Sized {
             }
         }
 
+        let mut hits = Hits::new();
         for this_vertex_idx in self.vertex_indices() {
-            draw_vertex(canvas, this_vertex_idx);
+            hits.record(this_vertex_idx, draw_vertex(canvas, this_vertex_idx));
         }
+        hits
     }
 
     /// Get required canvas size to fit whole graph

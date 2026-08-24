@@ -3,7 +3,7 @@
 use std::{collections::VecDeque, fmt::Write};
 
 use crate::{
-    drawing::{self, BoundingBox, Canvas},
+    drawing::{self, BoundingBox, Canvas, Hits},
     numeric::v2f::V2f,
 };
 
@@ -114,21 +114,29 @@ pub trait FiniteGrid: Grid + Sized {
         }
     }
 
-    /// Paint grid on existing canvas
-    fn draw<C>(&self, canvas: &mut C, mut get_tile: impl FnMut(Self::Item) -> drawing::Tile)
+    /// Paint grid on existing canvas, reporting what the pointer is doing to its tiles
+    fn draw<C>(
+        &self,
+        canvas: &mut C,
+        mut get_tile: impl FnMut(Self::Item) -> drawing::Tile,
+    ) -> Hits<(u8, u8)>
     where
         C: Canvas,
     {
         // TODO: get_tile_color should return shape to handle fissions etc.
 
+        let mut hits = Hits::new();
+
         for y in 0..self.height() {
             for x in 0..self.width() {
                 let tile = get_tile(self.get(x, y));
-                canvas.tile(C::tile_position(x, y), tile);
+                hits.record((x, y), canvas.tile(C::tile_position(x, y), tile));
             }
         }
 
         canvas.grid(V2f::ZERO, self.width() as u32, self.height() as u32);
+
+        hits
     }
 
     /// Get tile position from canvas position

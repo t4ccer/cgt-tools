@@ -106,7 +106,7 @@ where
                     VertexColor::Right => drawing::Color::RED,
                 },
                 vertex_index,
-            );
+            )
         });
     }
 

@@ -49,14 +49,14 @@ impl PyGraph {
     }
 
     fn _repr_svg_(&self) -> String {
-        use cgt::drawing::{Canvas, Color, svg};
+        use cgt::drawing::{Canvas, svg};
 
         let bounding_box = Graph::required_canvas::<svg::Canvas>(&self.graph);
         let mut canvas = svg::Canvas::new(bounding_box);
         self.graph.draw(&mut canvas, |canvas, vertex| {
             let position: V2f = *self.graph.get_vertex(vertex).get_inner();
             let color: VertexColor = *self.graph.get_vertex(vertex).get_inner();
-            canvas.vertex(position, Color::from_hex(color.rgb() << 8 | 0xff), vertex);
+            canvas.vertex(position, color.color(), vertex)
         });
         canvas.to_svg()
     }

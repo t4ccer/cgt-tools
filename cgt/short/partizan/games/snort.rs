@@ -383,7 +383,7 @@ where
                     VertexColor::TintRight => Color::RED,
                 },
                 vertex_index,
-            );
+            )
         });
     }
 
