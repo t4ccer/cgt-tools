@@ -207,10 +207,10 @@ macro_rules! preset {
 }
 
 preset! {
-    #[derive(Clone, Copy)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub struct GridPresetFlag;
 
-    #[derive(Clone, Copy)]
+    #[derive(Debug, Clone, Copy)]
     pub enum GridPreset {
         Domineering = 1,
         Fission = 2,

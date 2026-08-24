@@ -15,3 +15,5 @@ wasm-bindgen.workspace = true
 cgt_py_messages = { path = "../cgt_py_messages" }
 cgt = { path = "../.", features = ["serde"] }
 jupyter_rust_widget_frontend = { path = "../jupyter_rust_widget_frontend" }
+wasm-bindgen-futures = { version = "0.4.77", default-features = false }
+futures-signals = { version = "0.3.34", default-features = false }

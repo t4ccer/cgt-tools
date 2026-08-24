@@ -1,3 +1,7 @@
+use crate::{
+    canvas::HtmlCanvas,
+    reactive::{SelectOption, SelectOptionElement},
+};
 use cgt::{
     drawing::{Area, Button, Canvas, Color, Hits, Interaction, Interactions},
     graph::{
@@ -32,8 +36,6 @@ use web_sys::{
     HtmlDivElement, HtmlElement, HtmlInputElement, HtmlLabelElement, HtmlSelectElement, MouseEvent,
     ResizeObserver,
 };
-
-use crate::{SelectOption, SelectOptionElement, canvas::HtmlCanvas};
 
 struct HtmlState {
     canvas: HtmlCanvasElement,

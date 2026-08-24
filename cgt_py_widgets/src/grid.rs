@@ -1,27 +1,28 @@
+use crate::{
+    SyncState,
+    canvas::HtmlCanvas,
+    reactive::{self, SelectOption, SelectOptionElement},
+};
 use cgt::{
-    drawing::{Button, Canvas, Color, Hits, Interactions},
-    grid::{FiniteGrid, Grid, vec_grid::VecGrid},
+    drawing::{Canvas, Color, Hits, Interactions},
+    grid::{FiniteGrid, Grid as _, vec_grid::VecGrid},
     numeric::v2f::V2f,
     short::partizan::{Player, games::fission},
 };
 use cgt_py_messages::{GridBackendMessage, GridFrontendMessage, GridPreset, GridPresetFlag, Tile};
+use futures_signals::{
+    map_ref,
+    signal::{Mutable, SignalExt},
+};
 use jupyter_rust_widget_frontend::{AnyWidgetModel, Context, WasmWidget};
-use std::sync::{Arc, Mutex};
 use wasm_bindgen::{
     JsCast, JsValue,
     prelude::{ScopedClosure, wasm_bindgen},
 };
 use web_sys::{
     CanvasRenderingContext2d, Document, Element, HtmlButtonElement, HtmlCanvasElement,
-    HtmlDivElement, HtmlInputElement, HtmlLabelElement, HtmlSelectElement, MouseEvent,
+    HtmlDivElement, HtmlElement, HtmlInputElement, HtmlLabelElement, MouseEvent,
 };
-
-use crate::{SelectOption, SelectOptionElement, canvas::HtmlCanvas};
-
-struct HtmlState {
-    canvas: HtmlCanvasElement,
-    edit_mode: HtmlSelectElement,
-}
 
 #[derive(Clone, Copy)]
 enum Edge {
@@ -37,7 +38,7 @@ enum ResizeAction {
     Shrink,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum EditMode {
     FlipCell,
     PlaceObject(Tile),
@@ -52,15 +53,6 @@ impl EditMode {
             EditMode::FissionMove(player) => Some(EditMode::FissionMove(player.opposite())),
         }
     }
-}
-
-struct SharedState {
-    preset: GridPreset,
-    edit_mode: EditMode,
-    consecutive_moves: bool,
-    state: Option<HtmlState>,
-    grid: VecGrid<Tile>,
-    interactions: Interactions,
 }
 
 const EDIT_OPTIONS: &[EditOption] = &[
@@ -117,34 +109,100 @@ const EDIT_OPTIONS: &[EditOption] = &[
 
 struct GridWidget {
     preset: GridPreset,
-    shared: Arc<Mutex<SharedState>>,
+    edit_option: Mutable<EditOption>,
+    consecutive_moves: Mutable<bool>,
+    grid: Mutable<SyncState<VecGrid<Tile>>>,
+
+    /// What the pointer is doing, which every frame both reads and consumes
+    interactions: Mutable<Interactions>,
 }
 
 impl GridWidget {
     fn new(preset: GridPreset) -> GridWidget {
         GridWidget {
             preset,
-            shared: Arc::new(Mutex::new(SharedState {
-                preset,
-                edit_mode: EDIT_OPTIONS
+            edit_option: Mutable::new(
+                *EDIT_OPTIONS
                     .iter()
                     .filter(|edit| preset.intersects(edit.visible_presets))
                     .next()
-                    .unwrap()
-                    .mode,
-                consecutive_moves: false,
-                state: None,
-                grid: FiniteGrid::zero_size(),
-                interactions: Interactions::new(),
-            })),
+                    .unwrap(),
+            ),
+            consecutive_moves: Mutable::new(false),
+            grid: Mutable::new(SyncState::uninitialized(FiniteGrid::zero_size())),
+            interactions: Mutable::new(Interactions::new()),
         }
     }
-}
 
-fn mouse_event_to_canvas(event: &MouseEvent) -> V2f {
-    V2f {
-        x: event.offset_x() as f32,
-        y: event.offset_y() as f32,
+    fn edge_buttons(
+        grid: Mutable<SyncState<VecGrid<Tile>>>,
+        document: &Document,
+        edge: Edge,
+    ) -> Result<HtmlDivElement, JsValue> {
+        let (row, column, direction) = match edge {
+            Edge::Top => ("1", "2", "row"),
+            Edge::Bottom => ("3", "2", "row"),
+            Edge::Left => ("2", "1", "column"),
+            Edge::Right => ("2", "3", "column"),
+        };
+
+        let group = document
+            .create_element("div")?
+            .dyn_into::<HtmlDivElement>()?;
+        group.style().set_property("display", "flex")?;
+        group.style().set_property("gap", "4px")?;
+        group.style().set_property("flex-direction", direction)?;
+        group.style().set_property("grid-row", row)?;
+        group.style().set_property("grid-column", column)?;
+
+        let (axis, side) = match edge {
+            Edge::Top => ("row", "top"),
+            Edge::Bottom => ("row", "bottom"),
+            Edge::Left => ("column", "left"),
+            Edge::Right => ("column", "right"),
+        };
+
+        for (text, grow) in [("-", ResizeAction::Shrink), ("+", ResizeAction::Grow)] {
+            let button = document
+                .create_element("button")?
+                .dyn_into::<HtmlButtonElement>()?;
+            button.set_text_content(Some(text));
+            button.set_title(&format!(
+                "{} {} {} the {}",
+                match grow {
+                    ResizeAction::Grow => "Add",
+                    ResizeAction::Shrink => "Remove",
+                },
+                axis,
+                match grow {
+                    ResizeAction::Grow => "at",
+                    ResizeAction::Shrink => "from",
+                },
+                side,
+            ));
+            button.style().set_property("width", "24px")?;
+            button.style().set_property("height", "24px")?;
+            button.style().set_property("padding", "0")?;
+            button.style().set_property("line-height", "1")?;
+
+            let handler = ScopedClosure::<dyn FnMut() -> Result<(), JsValue>>::new({
+                let grid = grid.clone();
+                move || {
+                    let Some(new_grid) = resize_edge(&grid.lock_ref().state, edge, grow) else {
+                        return Ok(());
+                    };
+                    grid.set(SyncState::edited(new_grid));
+
+                    Ok(())
+                }
+            });
+            button.add_event_listener_with_callback("click", handler.as_ref().unchecked_ref())?;
+            handler.forget();
+
+            group.append_child(&button)?;
+        }
+
+        Ok(group)
     }
 }
 
@@ -188,135 +246,28 @@ fn checked_resize(value: u8, action: ResizeAction) -> Option<u8> {
     }
 }
 
-fn edge_buttons(
-    document: &Document,
-    shared: &Arc<Mutex<SharedState>>,
-    context: &Context<GridBackendMessage>,
-    edge: Edge,
-) -> Result<HtmlDivElement, JsValue> {
-    let (row, column, direction) = match edge {
-        Edge::Top => ("1", "2", "row"),
-        Edge::Bottom => ("3", "2", "row"),
-        Edge::Left => ("2", "1", "column"),
-        Edge::Right => ("2", "3", "column"),
-    };
-
-    let group = document
-        .create_element("div")?
-        .dyn_into::<HtmlDivElement>()?;
-    group.style().set_property("display", "flex")?;
-    group.style().set_property("gap", "4px")?;
-    group.style().set_property("flex-direction", direction)?;
-    group.style().set_property("grid-row", row)?;
-    group.style().set_property("grid-column", column)?;
-
-    let (axis, side) = match edge {
-        Edge::Top => ("row", "top"),
-        Edge::Bottom => ("row", "bottom"),
-        Edge::Left => ("column", "left"),
-        Edge::Right => ("column", "right"),
-    };
-
-    for (text, grow) in [("-", ResizeAction::Shrink), ("+", ResizeAction::Grow)] {
-        let button = document
-            .create_element("button")?
-            .dyn_into::<HtmlButtonElement>()?;
-        button.set_text_content(Some(text));
-        button.set_title(&format!(
-            "{} {} {} the {}",
-            match grow {
-                ResizeAction::Grow => "Add",
-                ResizeAction::Shrink => "Remove",
-            },
-            axis,
-            match grow {
-                ResizeAction::Grow => "at",
-                ResizeAction::Shrink => "from",
-            },
-            side,
-        ));
-        button.style().set_property("width", "24px")?;
-        button.style().set_property("height", "24px")?;
-        button.style().set_property("padding", "0")?;
-        button.style().set_property("line-height", "1")?;
-
-        let handler = ScopedClosure::<dyn FnMut() -> Result<(), JsValue>>::new({
-            let this = Arc::clone(shared);
-            let context = context.clone();
-            move || {
-                let mut this = this.lock().unwrap();
-                let Some(new_grid) = resize_edge(&this.grid, edge, grow) else {
-                    return Ok(());
-                };
-
-                this.grid = new_grid;
-                GridWidget::send_grid(&this, &context);
-                GridWidget::draw(&mut this)?;
-
-                Ok(())
-            }
-        });
-        button.add_event_listener_with_callback("click", handler.as_ref().unchecked_ref())?;
-        handler.forget();
-
-        group.append_child(&button)?;
-    }
-
-    Ok(group)
-}
-
 impl GridWidget {
-    /// Keep the mode dropdown showing the mode that is actually in effect, which changes on
-    /// its own when a move is made in a game that alternates players
-    fn sync_edit_mode(this: &SharedState) {
-        let Some(state) = &this.state else {
-            return;
-        };
-
-        let current_mode =
-            SelectOption::selected_value(&state.edit_mode.value(), &this.preset, EDIT_OPTIONS);
-        if current_mode.map(|o| o.mode) != Some(this.edit_mode)
-            && let Some(mode) =
-                SelectOption::find_index(|o| o.mode == this.edit_mode, &this.preset, EDIT_OPTIONS)
-        {
-            state.edit_mode.set_value(&mode.to_string());
-        }
-    }
-
     /// Paint the grid and report what the mouse did to its tiles
-    fn draw(this: &mut SharedState) -> Result<Hits<(u8, u8)>, JsValue> {
-        GridWidget::sync_edit_mode(this);
-
-        let SharedState {
-            state,
-            grid,
-            interactions,
-            ..
-        } = this;
-
-        let Some(state) = state else {
-            return Ok(Hits::new());
-        };
-
+    fn draw(
+        canvas: &HtmlCanvasElement,
+        grid: &VecGrid<Tile>,
+        interactions: &mut Interactions,
+    ) -> Result<Hits<(u8, u8)>, JsValue> {
         let canvas_size = grid.canvas_size::<HtmlCanvas>().size();
-        state.canvas.set_width(canvas_size.x as u32);
-        state.canvas.set_height(canvas_size.y as u32);
-        state
-            .canvas
+        canvas.set_width(canvas_size.x as u32);
+        canvas.set_height(canvas_size.y as u32);
+        canvas
             .style()
             .set_property("width", &format!("{}px", canvas_size.x as u32))?;
-        state
-            .canvas
+        canvas
             .style()
             .set_property("height", &format!("{}px", canvas_size.y as u32))?;
 
-        let context = state
-            .canvas
+        let context = canvas
             .get_context("2d")?
             .unwrap()
             .dyn_into::<CanvasRenderingContext2d>()?;
 
-        let grid: &VecGrid<Tile> = grid;
         let mut canvas = HtmlCanvas::new(context, interactions);
         Ok(canvas.frame(|canvas| {
             // The tiles do not cover the gaps between them, which the grid lines are drawn in
@@ -325,80 +276,81 @@ impl GridWidget {
         }))
     }
 
-    fn send_grid(this: &SharedState, context: &Context<GridBackendMessage>) {
-        context.send_message(&GridBackendMessage::SetGrid {
-            grid: this.grid.clone(),
-        });
-    }
-
-    /// Apply what the mouse did to the grid, reporting whether it changed. Tiles are
-    /// clicked, never dragged
-    fn apply(this: &mut SharedState, hits: &Hits<(u8, u8)>) -> bool {
+    fn apply(
+        grid: &Mutable<SyncState<VecGrid<Tile>>>,
+        edit_option: &Mutable<EditOption>,
+        consecutive_moves: &Mutable<bool>,
+        preset: &GridPreset,
+        hits: &Hits<(u8, u8)>,
+    ) {
         let Some((x, y)) = hits.clicked else {
-            return false;
+            return;
         };
 
-        match this.edit_mode {
-            EditMode::FlipCell => match this.grid.get(x, y) {
-                Tile::Empty => {
-                    this.grid.set(x, y, Tile::Taken);
-                    true
-                }
-                Tile::Taken => {
-                    this.grid.set(x, y, Tile::Empty);
-                    true
-                }
-                Tile::BlueStone | Tile::RedStone | Tile::BlackStone => false,
-            },
+        match edit_option.get().mode {
+            EditMode::FlipCell => {
+                let mut grid = grid.lock_mut();
+                let flipped = match grid.state.get(x, y) {
+                    Tile::Empty => Tile::Taken,
+                    Tile::Taken => Tile::Empty,
+                    Tile::BlueStone | Tile::RedStone | Tile::BlackStone => return,
+                };
+                grid.edit().set(x, y, flipped);
+            }
             EditMode::PlaceObject(tile) => {
-                this.grid.set(x, y, tile);
-                true
+                // Placing what is already there is not an edit, and reporting it would
+                // have python run its update callbacks over an unchanged grid
+                let mut grid = grid.lock_mut();
+                if grid.state.get(x, y) != tile {
+                    grid.edit().set(x, y, tile);
+                }
             }
             EditMode::FissionMove(player) => {
-                let Ok(grid) = this.grid.try_map(|t| fission::Tile::try_from(*t)) else {
-                    return false;
+                let Ok(fission_grid) = grid
+                    .lock_ref()
+                    .state
+                    .try_map(|t| fission::Tile::try_from(*t))
+                else {
+                    return;
                 };
 
-                let fission = fission::Fission::new(grid);
+                let fission = fission::Fission::new(fission_grid);
                 if !fission.available_moves(player).contains(&(x, y)) {
-                    return false;
+                    return;
                 }
 
-                this.grid = fission.move_in(x, y, player).grid().map(|t| Tile::from(t));
-                if !this.consecutive_moves
-                    && let Some(new_mode) = this.edit_mode.opposite_player()
+                grid.set(SyncState::edited(
+                    fission.move_in(x, y, player).grid().map(|t| Tile::from(t)),
+                ));
+                if !consecutive_moves.get()
+                    && let Some(new_mode) = edit_option.get().mode.opposite_player()
+                    && let Some(new_option_idx) =
+                        SelectOption::find_index(|o| o.mode == new_mode, preset, EDIT_OPTIONS)
+                    && let Some(new_option) =
+                        SelectOption::selected_value_idx(new_option_idx, preset, EDIT_OPTIONS)
                 {
-                    this.edit_mode = new_mode;
+                    edit_option.set(new_option);
                 }
-                true
             }
         }
     }
 
-    /// Paint a frame, apply what the mouse did to it, and paint it again if that changed
-    /// anything
     fn update(
-        this: &mut SharedState,
-        context: &Context<GridBackendMessage>,
+        canvas: &HtmlCanvasElement,
+        grid: &Mutable<SyncState<VecGrid<Tile>>>,
+        interactions: &Mutable<Interactions>,
+        edit_option: &Mutable<EditOption>,
+        consecutive_moves: &Mutable<bool>,
+        preset: &GridPreset,
     ) -> Result<(), JsValue> {
-        // Clicks are reported by a single frame and consumed by it, so the shading of
-        // whatever was pressed has to be painted over even when nothing else changed
-        let settling = matches!(this.interactions.pointer().button, Button::Released(_));
-
-        let hits = GridWidget::draw(this)?;
-        let changed = GridWidget::apply(this, &hits);
-        if changed {
-            GridWidget::send_grid(this, context);
-        }
-        if changed || settling {
-            GridWidget::draw(this)?;
-        }
+        let hits = GridWidget::draw(canvas, &grid.lock_ref().state, &mut interactions.lock_mut())?;
+        GridWidget::apply(grid, edit_option, consecutive_moves, preset, &hits);
 
         Ok(())
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct EditOption {
     text: &'static str,
     mode: EditMode,
@@ -424,10 +376,12 @@ impl WasmWidget for GridWidget {
     fn handle_message(&mut self, message: Self::FrontendMessage) -> Result<(), JsValue> {
         match message {
             GridFrontendMessage::SetGrid(new_grid) => {
-                // Do not send that grid back to python
-                let mut this = self.shared.lock().unwrap();
-                this.grid = new_grid;
-                GridWidget::draw(&mut this)?;
+                // Python echoes back every grid it is told about
+                // (since there may be multiple frontend instances)
+                let mut grid = self.grid.lock_mut();
+                if grid.state != new_grid {
+                    *grid = SyncState::from_python(new_grid);
+                }
 
                 Ok(())
             }
@@ -449,138 +403,56 @@ impl WasmWidget for GridWidget {
         controls.style().set_property("gap", "4px")?;
         controls.style().set_property("margin-bottom", "4px")?;
 
-        let edit_mode = {
-            let mode_box = document.create_element("div")?;
+        let mode_box = document.create_element("div")?;
 
-            let mode_select =
-                SelectOption::create_element(&document, "Edit mode", &self.preset, EDIT_OPTIONS)?;
-            let consecutive_box = document
-                .create_element("div")?
-                .dyn_into::<HtmlDivElement>()?;
-            consecutive_box.style().set_property("display", "none")?;
+        let mode_select = SelectOption::create_element_reactive(
+            &document,
+            "Edit mode",
+            self.preset,
+            EDIT_OPTIONS,
+            self.edit_option.clone(),
+        )?;
+        let consecutive_box = document
+            .create_element("div")?
+            .dyn_into::<HtmlDivElement>()?;
 
-            // TODO: Auto-generate unique element id to link the label
-            let consecutive_moves = document
-                .create_element("input")?
-                .dyn_into::<HtmlInputElement>()?;
-            consecutive_moves.set_type("checkbox");
-            let consecutive_label = document
-                .create_element("label")?
-                .dyn_into::<HtmlLabelElement>()?;
-            consecutive_label.set_text_content(Some("Consecutive Moves"));
-            consecutive_box.append_child(&consecutive_label)?;
-            consecutive_box.append_child(&consecutive_moves)?;
+        // TODO: Auto-generate unique element id to link the label
+        let consecutive_moves_checkbox = document
+            .create_element("input")?
+            .dyn_into::<HtmlInputElement>()?;
+        consecutive_moves_checkbox.set_type("checkbox");
+        let consecutive_moves = self.consecutive_moves.clone();
+        reactive::checkbox(&consecutive_moves_checkbox, &consecutive_moves)?;
 
-            let on_change_handler = ScopedClosure::<dyn FnMut() -> Result<(), JsValue>>::new({
-                let preset = self.preset;
-                let this = Arc::clone(&self.shared);
-                let mode_select = mode_select.clone();
-                let alternate_box = consecutive_box.clone();
-                let alternate_checkbox = consecutive_moves.clone();
-                move || {
-                    if let Some(mode) =
-                        SelectOption::selected_value(&mode_select.value(), &preset, EDIT_OPTIONS)
-                    {
-                        let display = if mode.mode.opposite_player().is_some() {
-                            "block"
-                        } else {
-                            "none"
-                        };
-                        alternate_box.style().set_property("display", display)?;
-                        this.lock().unwrap().edit_mode = mode.mode;
-                    };
+        let consecutive_label = document
+            .create_element("label")?
+            .dyn_into::<HtmlLabelElement>()?;
+        consecutive_label.set_text_content(Some("Consecutive Moves"));
+        consecutive_box.append_child(&consecutive_label)?;
+        consecutive_box.append_child(&consecutive_moves_checkbox)?;
 
-                    this.lock().unwrap().consecutive_moves = alternate_checkbox.checked();
-
-                    Ok(())
+        reactive::style_set_property(
+            HtmlElement::from(consecutive_box.clone()),
+            "display",
+            self.edit_option.signal().map(|option| {
+                if option.mode.opposite_player().is_some() {
+                    "block"
+                } else {
+                    "none"
                 }
-            });
-            mode_select.add_event_listener_with_callback(
-                "change",
-                on_change_handler.as_ref().unchecked_ref(),
-            )?;
-            consecutive_box.add_event_listener_with_callback(
-                "change",
-                on_change_handler.as_ref().unchecked_ref(),
-            )?;
+            }),
+        )?;
 
-            on_change_handler.forget();
-
-            mode_box.append_child(&mode_select)?;
-            mode_box.append_child(&consecutive_box)?;
-            controls.append_child(&mode_box)?;
-
-            mode_select
-        };
+        mode_box.append_child(&mode_select)?;
+        mode_box.append_child(&consecutive_box)?;
+        controls.append_child(&mode_box)?;
 
         element.append_child(&controls).unwrap();
 
         let canvas = document
             .create_element("canvas")?
             .dyn_into::<HtmlCanvasElement>()?;
-
-        let down_handler = ScopedClosure::<dyn FnMut(MouseEvent) -> Result<(), JsValue>>::new({
-            let this = Arc::clone(&self.shared);
-            let context = context.clone();
-            move |event: MouseEvent| {
-                if event.button() != 0 {
-                    return Ok(());
-                }
-
-                let mut this = this.lock().unwrap();
-                this.interactions
-                    .pointer_pressed(mouse_event_to_canvas(&event));
-                GridWidget::update(&mut this, &context)
-            }
-        });
-        canvas
-            .add_event_listener_with_callback("mousedown", down_handler.as_ref().unchecked_ref())
-            .unwrap();
-        down_handler.forget();
-
-        let up_handler = ScopedClosure::<dyn FnMut(MouseEvent) -> Result<(), JsValue>>::new({
-            let this = Arc::clone(&self.shared);
-            let context = context.clone();
-            move |event| {
-                let mut this = this.lock().unwrap();
-                this.interactions
-                    .pointer_released(mouse_event_to_canvas(&event));
-                GridWidget::update(&mut this, &context)
-            }
-        });
-        canvas
-            .add_event_listener_with_callback("mouseup", up_handler.as_ref().unchecked_ref())
-            .unwrap();
-        up_handler.forget();
-
-        let move_handler = ScopedClosure::<dyn FnMut(MouseEvent) -> Result<(), JsValue>>::new({
-            let this = Arc::clone(&self.shared);
-            let context = context.clone();
-            move |event| {
-                let mut this = this.lock().unwrap();
-                this.interactions
-                    .pointer_moved(mouse_event_to_canvas(&event));
-                GridWidget::update(&mut this, &context)
-            }
-        });
-        canvas
-            .add_event_listener_with_callback("mousemove", move_handler.as_ref().unchecked_ref())
-            .unwrap();
-        move_handler.forget();
-
-        let leave_handler = ScopedClosure::<dyn FnMut() -> Result<(), JsValue>>::new({
-            let this = Arc::clone(&self.shared);
-            let context = context.clone();
-            move || {
-                let mut this = this.lock().unwrap();
-                this.interactions.pointer_left();
-                GridWidget::update(&mut this, &context)
-            }
-        });
-        canvas
-            .add_event_listener_with_callback("mouseleave", leave_handler.as_ref().unchecked_ref())
-            .unwrap();
-        leave_handler.forget();
+        reactive::canvas_interactions(&canvas, &self.interactions)?;
 
         let board = document
             .create_element("div")?
@@ -592,7 +464,7 @@ impl WasmWidget for GridWidget {
         board.style().set_property("gap", "4px")?;
 
         for edge in [Edge::Top, Edge::Bottom, Edge::Left, Edge::Right] {
-            let buttons = edge_buttons(&document, &self.shared, &context, edge)?;
+            let buttons = Self::edge_buttons(self.grid.clone(), &document, edge)?;
             board.append_child(&buttons)?;
         }
 
@@ -601,8 +473,45 @@ impl WasmWidget for GridWidget {
         board.append_child(&canvas)?;
         element.append_child(&board).unwrap();
 
-        let mut this = self.shared.lock().unwrap();
-        this.state = Some(HtmlState { canvas, edit_mode });
+        wasm_bindgen_futures::spawn_local(
+            map_ref! {
+                let _grid = self.grid.signal_ref(|_| ()),
+                let _pointer = self.interactions.signal_ref(Interactions::pointer).dedupe() => ()
+            }
+            .for_each({
+                let canvas = canvas.clone();
+                let grid = self.grid.clone();
+                let interactions = self.interactions.clone();
+                let edit_option = self.edit_option.clone();
+                let consecutive_moves = self.consecutive_moves.clone();
+                let preset = self.preset;
+                move |()| {
+                    // Nothing can be done about a frame that fails to paint
+                    let _ = GridWidget::update(
+                        &canvas,
+                        &grid,
+                        &interactions,
+                        &edit_option,
+                        &consecutive_moves,
+                        &preset,
+                    );
+
+                    async {}
+                }
+            }),
+        );
+
+        wasm_bindgen_futures::spawn_local(self.grid.signal_cloned().for_each({
+            let context = context.clone();
+            move |grid| {
+                if grid.provenance.should_report_to_python() {
+                    context.send_message(&GridBackendMessage::SetGrid { grid: grid.state });
+                }
+
+                async {}
+            }
+        }));
+
         context.send_message(&GridBackendMessage::Initialized);
 
         Ok(())
