@@ -11,7 +11,10 @@ use cgt::{
     short::partizan::{Player, games::fission},
 };
 use cgt_py_messages::{GridBackendMessage, GridFrontendMessage, GridPreset, GridPresetFlag, Tile};
-use futures_signals::signal::{Mutable, SignalExt};
+use futures_signals::{
+    map_ref,
+    signal::{Mutable, SignalExt},
+};
 use jupyter_rust_widget_frontend::{AnyWidgetModel, Context, WasmWidget};
 use wasm_bindgen::{
     JsCast, JsValue,
@@ -22,6 +25,7 @@ use web_sys::{
     HtmlDivElement, HtmlElement, HtmlInputElement, HtmlLabelElement,
 };
 
+mod amazons;
 mod domineering;
 
 #[derive(Clone, Copy)]
@@ -44,6 +48,7 @@ enum EditMode {
     PlaceObject(Tile),
     FissionMove(Player),
     DomineeringMove(Player),
+    AmazonsMove(Player),
 }
 
 impl EditMode {
@@ -53,7 +58,16 @@ impl EditMode {
             EditMode::PlaceObject(_) => None,
             EditMode::FissionMove(player) => Some(EditMode::FissionMove(player.opposite())),
             EditMode::DomineeringMove(player) => Some(EditMode::DomineeringMove(player.opposite())),
+            EditMode::AmazonsMove(player) => Some(EditMode::AmazonsMove(player.opposite())),
         }
+    }
+}
+
+// TODO: Should be in some more general place like color module
+const fn player_color(player: Player) -> Color {
+    match player {
+        Player::Left => Color::BLUE,
+        Player::Right => Color::RED,
     }
 }
 
@@ -90,10 +104,7 @@ const EDIT_OPTIONS: &[EditOption] = &[
     EditOption {
         text: "Place Stone",
         mode: EditMode::PlaceObject(Tile::BlackStone),
-        visible_presets: GridPresetFlag::from_slice(&[
-            GridPresetFlag::Fission,
-            GridPresetFlag::Amazons,
-        ]),
+        visible_presets: GridPresetFlag::Fission,
     },
     EditOption {
         text: "Left Move",
@@ -116,7 +127,16 @@ const EDIT_OPTIONS: &[EditOption] = &[
         mode: EditMode::PlaceObject(Tile::RedStone),
         visible_presets: GridPresetFlag::Amazons,
     },
-    // TODO: Amazons moves
+    EditOption {
+        text: "Left Move",
+        mode: EditMode::AmazonsMove(Player::Left),
+        visible_presets: GridPresetFlag::Amazons,
+    },
+    EditOption {
+        text: "Right Move",
+        mode: EditMode::AmazonsMove(Player::Right),
+        visible_presets: GridPresetFlag::Amazons,
+    },
 ];
 
 struct GridWidget {
@@ -124,6 +144,10 @@ struct GridWidget {
     edit_option: Mutable<EditOption>,
     alternating_moves: Mutable<bool>,
     grid: Mutable<SyncState<VecGrid<Tile>>>,
+
+    /// Amazons move that has been started but not played yet, which takes three clicks to
+    /// put together
+    amazons_move: Mutable<Option<amazons::Move>>,
 
     /// What the pointer is doing, which every frame both reads and consumes
     interactions: Mutable<Interactions>,
@@ -142,6 +166,7 @@ impl GridWidget {
             ),
             alternating_moves: Mutable::new(true),
             grid: Mutable::new(SyncState::uninitialized(FiniteGrid::zero_size())),
+            amazons_move: Mutable::new(None),
             interactions: Mutable::new(Interactions::new()),
         }
     }
@@ -283,6 +308,7 @@ impl GridWidget {
         grid: &VecGrid<Tile>,
         interactions: &mut Interactions,
         edit_mode: EditMode,
+        amazons_move: Option<amazons::Move>,
     ) -> Result<Frame, JsValue> {
         let canvas_size = grid.canvas_size::<HtmlCanvas>().size();
         canvas.set_width(canvas_size.x as u32);
@@ -304,7 +330,10 @@ impl GridWidget {
             EditMode::DomineeringMove(player) => {
                 cursor.and_then(|cursor| domineering::hovered_domino(grid, player, cursor))
             }
-            EditMode::FlipCell | EditMode::PlaceObject(_) | EditMode::FissionMove(_) => None,
+            EditMode::FlipCell
+            | EditMode::PlaceObject(_)
+            | EditMode::FissionMove(_)
+            | EditMode::AmazonsMove(_) => None,
         };
 
         let mut canvas = HtmlCanvas::new(context, interactions);
@@ -321,11 +350,18 @@ impl GridWidget {
             // A highlight registers no area of its own, so previewing the domino cannot
             // disturb hit testing
             if let (Some(domino), EditMode::DomineeringMove(player)) = (domino, edit_mode) {
-                let color = match player {
-                    Player::Left => Color::BLUE,
-                    Player::Right => Color::RED,
-                };
+                let color = player_color(player);
                 for (x, y) in domino {
+                    canvas.highlight_tile(HtmlCanvas::tile_position(x, y), color);
+                }
+            }
+
+            if let Some(amazons_move) = amazons_move {
+                let color = player_color(amazons_move.player);
+                for (x, y) in [Some(amazons_move.queen), amazons_move.target]
+                    .into_iter()
+                    .flatten()
+                {
                     canvas.highlight_tile(HtmlCanvas::tile_position(x, y), color);
                 }
             }
@@ -354,10 +390,21 @@ impl GridWidget {
         }
     }
 
+    fn abandon_stale_move(
+        amazons_move: &Mutable<Option<amazons::Move>>,
+        grid: &VecGrid<Tile>,
+        mode: EditMode,
+    ) {
+        amazons_move.set_neq(amazons_move.get().filter(|pending| {
+            mode == EditMode::AmazonsMove(pending.player) && pending.is_live(grid)
+        }));
+    }
+
     fn apply(
         grid: &Mutable<SyncState<VecGrid<Tile>>>,
         edit_option: &Mutable<EditOption>,
         alternating_moves: &Mutable<bool>,
+        amazons_move: &Mutable<Option<amazons::Move>>,
         preset: &GridPreset,
         frame: &Frame,
     ) {
@@ -421,6 +468,66 @@ impl GridWidget {
                 ));
                 GridWidget::pass_turn(edit_option, alternating_moves, preset);
             }
+            EditMode::AmazonsMove(player) => {
+                let clicked = (x, y);
+
+                let Some(pending) = amazons_move.get() else {
+                    // Nothing picked up yet, so the only click worth anything is one on a
+                    // queen of one's own
+                    if amazons::holds_queen(&grid.lock_ref().state, player, clicked) {
+                        amazons_move.set(Some(amazons::Move {
+                            player,
+                            queen: clicked,
+                            target: None,
+                        }));
+                    }
+                    return;
+                };
+
+                let Some(target) = pending.target else {
+                    // Clicking the queen again puts it back down, calling the move off
+                    if clicked == pending.queen {
+                        amazons_move.set(None);
+                        return;
+                    }
+
+                    // Where the queen is walking to
+                    if amazons::can_reach(&grid.lock_ref().state, pending.queen, clicked) {
+                        amazons_move.set(Some(amazons::Move {
+                            target: Some(clicked),
+                            ..pending
+                        }));
+                    }
+                    return;
+                };
+
+                // Clicking where the queen is headed takes back that step alone, leaving
+                // the queen picked up and waiting for somewhere else to go
+                if clicked == target {
+                    amazons_move.set(Some(amazons::Move {
+                        target: None,
+                        ..pending
+                    }));
+                    return;
+                }
+
+                // Anything else is the stone being thrown, which plays the move. The tile
+                // the queen is leaving counts: it is empty by the time the stone flies, so
+                // it can be thrown across and landed on like any other
+                let Some(played) = amazons::play(
+                    &grid.lock_ref().state,
+                    player,
+                    pending.queen,
+                    target,
+                    clicked,
+                ) else {
+                    return;
+                };
+
+                grid.set(SyncState::edited(played));
+                amazons_move.set(None);
+                GridWidget::pass_turn(edit_option, alternating_moves, preset);
+            }
 
             // Played above, before the click was narrowed down to a tile
             EditMode::DomineeringMove(_) => {}
@@ -433,15 +540,27 @@ impl GridWidget {
         interactions: &Mutable<Interactions>,
         edit_option: &Mutable<EditOption>,
         alternating_moves: &Mutable<bool>,
+        amazons_move: &Mutable<Option<amazons::Move>>,
         preset: &GridPreset,
     ) -> Result<(), JsValue> {
+        let mode = edit_option.get().mode;
+        GridWidget::abandon_stale_move(amazons_move, &grid.lock_ref().state, mode);
+
         let frame = GridWidget::draw(
             canvas,
             &grid.lock_ref().state,
             &mut interactions.lock_mut(),
-            edit_option.get().mode,
+            mode,
+            amazons_move.get(),
         )?;
-        GridWidget::apply(grid, edit_option, alternating_moves, preset, &frame);
+        GridWidget::apply(
+            grid,
+            edit_option,
+            alternating_moves,
+            amazons_move,
+            preset,
+            &frame,
+        );
 
         Ok(())
     }
@@ -570,24 +689,34 @@ impl WasmWidget for GridWidget {
         board.append_child(&canvas)?;
         element.append_child(&board).unwrap();
 
-        reactive::frames(self.grid.signal_ref(|_| ()), &self.interactions, {
-            let canvas = canvas.clone();
-            let grid = self.grid.clone();
-            let interactions = self.interactions.clone();
-            let edit_option = self.edit_option.clone();
-            let alternating_moves = self.alternating_moves.clone();
-            let preset = self.preset;
-            move || {
-                GridWidget::update(
-                    &canvas,
-                    &grid,
-                    &interactions,
-                    &edit_option,
-                    &alternating_moves,
-                    &preset,
-                )
-            }
-        });
+        reactive::frames(
+            map_ref! {
+                let _grid = self.grid.signal_ref(|_| ()),
+                let _edit_mode = self.edit_option.signal().dedupe(),
+                let _amazons_move = self.amazons_move.signal().dedupe() => ()
+            },
+            &self.interactions,
+            {
+                let canvas = canvas.clone();
+                let grid = self.grid.clone();
+                let interactions = self.interactions.clone();
+                let edit_option = self.edit_option.clone();
+                let alternating_moves = self.alternating_moves.clone();
+                let amazons_move = self.amazons_move.clone();
+                let preset = self.preset;
+                move || {
+                    GridWidget::update(
+                        &canvas,
+                        &grid,
+                        &interactions,
+                        &edit_option,
+                        &alternating_moves,
+                        &amazons_move,
+                        &preset,
+                    )
+                }
+            },
+        );
 
         report_edits_to_python(&self.grid, &context, |grid| GridBackendMessage::SetGrid {
             grid,
