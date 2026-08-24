@@ -2,16 +2,35 @@ use cgt::{
     graph::{Graph, adjacency_matrix::undirected::UndirectedGraph},
     has::Has,
     numeric::v2f::V2f,
+    short::partizan::games::snort::{self, Snort},
 };
 use cgt_py_messages::{
     GraphBackendMessage, GraphFrontendMessage, GraphPreset, VertexColor, WidgetGraph,
 };
 use jupyter_rust_widget_backend::{Response, RustWidget};
-use pyo3::{Bound, PyAny, PyResult, Python, pyclass, pyfunction, pymethods};
+use pyo3::{
+    Bound, IntoPyObjectExt, Py, PyAny, PyResult, Python, exceptions::PyValueError, pyclass,
+    pyfunction, pymethods,
+};
+
+use crate::snort::PySnort;
 
 #[pyclass(name = "Graph")]
 pub struct PyGraph {
+    known_preset: Option<GraphPreset>,
     graph: WidgetGraph,
+}
+
+impl PyGraph {
+    fn try_into_graph<T>(&self) -> PyResult<UndirectedGraph<T>>
+    where
+        T: TryFrom<VertexColor>,
+        T::Error: std::error::Error,
+    {
+        self.graph
+            .try_map(|&v| T::try_from(v.color))
+            .map_err(|err| PyValueError::new_err(err.to_string()))
+    }
 }
 
 #[pymethods]
@@ -29,6 +48,7 @@ impl PyGraph {
             .collect()
     }
 
+    // TODO: This should be a dict or something
     /// Color of each vertex, in vertex order
     #[getter]
     fn colors(&self) -> Vec<String> {
@@ -61,6 +81,33 @@ impl PyGraph {
             canvas.vertex(position, color.color(), vertex)
         });
         canvas.to_svg()
+    }
+
+    #[getter]
+    fn game(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        match self.known_preset {
+            Some(preset) => match preset {
+                GraphPreset::Snort => self.snort()?.into_py_any(py),
+                GraphPreset::Col => self.col()?.into_py_any(py),
+            },
+            None => Err(PyValueError::new_err(
+                "This graph is not associated with any game",
+            )),
+        }
+    }
+
+    #[getter]
+    fn snort(&self) -> PyResult<PySnort> {
+        let graph = self
+            .try_into_graph::<snort::VertexColor>()?
+            .map(|&color| snort::VertexKind::Single(color));
+        Ok(PySnort(Snort::new(graph)))
+    }
+
+    #[getter]
+    fn col(&self) -> PyResult<()> {
+        // TODO: fn col once we have PyCol
+        todo!()
     }
 }
 
@@ -105,6 +152,7 @@ impl RustWidget for GraphWidget {
 
     fn value<'py>(&mut self) -> impl pyo3::IntoPyObject<'py> {
         PyGraph {
+            known_preset: Some(self.preset),
             graph: self.graph.clone(),
         }
     }

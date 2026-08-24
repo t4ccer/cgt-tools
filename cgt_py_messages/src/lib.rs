@@ -4,7 +4,7 @@ use cgt::{
     grid::vec_grid::VecGrid,
     impl_has,
     numeric::v2f::V2f,
-    short::partizan::games::{amazons, domineering, fission},
+    short::partizan::games::{amazons, col, domineering, fission, snort},
 };
 
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone, Copy, PartialEq, Eq)]
@@ -224,6 +224,78 @@ pub enum VertexColor {
     Blue,
     Red,
     Green,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct UnsupportedVertexError(VertexColor);
+
+impl std::fmt::Display for UnsupportedVertexError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "unsupported vertex: {}", self.0)
+    }
+}
+
+impl std::error::Error for UnsupportedVertexError {}
+
+/// Macro helper to define bidirectional mapping between widget vertex and game vertices
+macro_rules! impl_vertex_map {
+    (match $ty:ty {
+        $($t:ident => $u:ident,)*
+    }) => {
+        impl From<$ty> for VertexColor {
+            fn from(vertex: $ty) -> Self {
+                match vertex {
+                    $(<$ty>::$t => VertexColor::$u,)*
+                }
+            }
+        }
+
+        impl From<&$ty> for VertexColor {
+            fn from(vertex: &$ty) -> Self {
+                match vertex {
+                    $(<$ty>::$t => VertexColor::$u,)*
+                }
+            }
+        }
+
+        impl TryFrom<VertexColor> for $ty {
+            type Error = UnsupportedVertexError;
+
+            fn try_from(vertex: VertexColor) -> Result<Self, Self::Error> {
+                match vertex {
+                    $(VertexColor::$u => Ok(<$ty>::$t),)*
+                    _ => Err(UnsupportedVertexError(vertex)),
+                }
+            }
+        }
+
+        impl TryFrom<&VertexColor> for $ty {
+            type Error = UnsupportedVertexError;
+
+            fn try_from(vertex: &VertexColor) -> Result<Self, Self::Error> {
+                match vertex {
+                    $(VertexColor::$u => Ok(<$ty>::$t),)*
+                    _ => Err(UnsupportedVertexError(*vertex)),
+                }
+            }
+        }
+    };
+}
+
+impl_vertex_map! {
+    match snort::VertexColor {
+        Empty => White,
+        TintLeft => Blue,
+        TintRight => Red,
+    }
+}
+
+impl_vertex_map! {
+    match col::VertexColor {
+        Empty => White,
+        TintLeft => Blue,
+        TintRight => Red,
+    }
 }
 
 impl VertexColor {
