@@ -422,6 +422,7 @@ impl WasmWidget for GraphWidget {
     fn handle_message(&mut self, message: Self::FrontendMessage) -> Result<(), JsValue> {
         match message {
             GraphFrontendMessage::SetGraph(new_graph) => {
+                // Do not send that graph back to python
                 let mut this = self.shared.lock().unwrap();
                 this.graph = new_graph;
                 GraphWidget::draw(&mut this)?;

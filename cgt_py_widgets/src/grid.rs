@@ -425,6 +425,7 @@ impl WasmWidget for GridWidget {
     fn handle_message(&mut self, message: Self::FrontendMessage) -> Result<(), JsValue> {
         match message {
             GridFrontendMessage::SetGrid(new_grid) => {
+                // Do not send that grid back to python
                 let mut this = self.shared.lock().unwrap();
                 this.grid = new_grid;
                 GridWidget::draw(&mut this)?;

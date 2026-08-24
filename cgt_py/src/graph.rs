@@ -91,7 +91,7 @@ impl RustWidget for GraphWidget {
             GraphBackendMessage::SetGraph { graph } => {
                 self.graph = graph;
                 Response {
-                    message: None,
+                    message: Some(GraphFrontendMessage::SetGraph(self.graph.clone())),
                     run_on_update: true,
                 }
             }

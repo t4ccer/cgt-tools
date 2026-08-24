@@ -109,7 +109,7 @@ impl RustWidget for GridWidget {
             GridBackendMessage::SetGrid { grid } => {
                 self.grid = grid;
                 Response {
-                    message: None,
+                    message: Some(GridFrontendMessage::SetGrid(self.grid.clone())),
                     run_on_update: true,
                 }
             }
