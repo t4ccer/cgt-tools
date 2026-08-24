@@ -20,6 +20,15 @@ impl<V> DirectedGraph<V> {
             vertices: self.vertices.iter().map(f).collect::<Vec<_>>(),
         }
     }
+
+    /// Map vertex values
+    pub fn try_map<R, E>(&self, f: impl FnMut(&V) -> Result<R, E>) -> Result<DirectedGraph<R>, E> {
+        let vertices = self.vertices.iter().map(f).collect::<Result<Vec<_>, E>>()?;
+        Ok(DirectedGraph {
+            adjacency_matrix: self.adjacency_matrix.clone(),
+            vertices,
+        })
+    }
 }
 
 impl<V> Graph<V> for DirectedGraph<V>

@@ -18,6 +18,15 @@ impl<V> UndirectedGraph<V> {
     pub fn map<R>(&self, f: impl FnMut(&V) -> R) -> UndirectedGraph<R> {
         UndirectedGraph(self.0.map(f))
     }
+
+    /// Map vertex values
+    #[must_use]
+    pub fn try_map<R, E>(
+        &self,
+        f: impl FnMut(&V) -> Result<R, E>,
+    ) -> Result<UndirectedGraph<R>, E> {
+        Ok(UndirectedGraph(self.0.try_map(f)?))
+    }
 }
 
 impl<V> Graph<V> for UndirectedGraph<V>
