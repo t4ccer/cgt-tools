@@ -122,7 +122,7 @@ const EDIT_OPTIONS: &[EditOption] = &[
 struct GridWidget {
     preset: GridPreset,
     edit_option: Mutable<EditOption>,
-    consecutive_moves: Mutable<bool>,
+    alternating_moves: Mutable<bool>,
     grid: Mutable<SyncState<VecGrid<Tile>>>,
 
     /// What the pointer is doing, which every frame both reads and consumes
@@ -140,7 +140,7 @@ impl GridWidget {
                     .next()
                     .unwrap(),
             ),
-            consecutive_moves: Mutable::new(false),
+            alternating_moves: Mutable::new(true),
             grid: Mutable::new(SyncState::uninitialized(FiniteGrid::zero_size())),
             interactions: Mutable::new(Interactions::new()),
         }
@@ -326,10 +326,10 @@ impl GridWidget {
 
     fn pass_turn(
         edit_option: &Mutable<EditOption>,
-        consecutive_moves: &Mutable<bool>,
+        alternating_moves: &Mutable<bool>,
         preset: &GridPreset,
     ) {
-        if !consecutive_moves.get()
+        if alternating_moves.get()
             && let Some(new_mode) = edit_option.get().mode.opposite_player()
             && let Some(new_option) =
                 SelectOption::find(|o| o.mode == new_mode, preset, EDIT_OPTIONS)
@@ -341,7 +341,7 @@ impl GridWidget {
     fn apply(
         grid: &Mutable<SyncState<VecGrid<Tile>>>,
         edit_option: &Mutable<EditOption>,
-        consecutive_moves: &Mutable<bool>,
+        alternating_moves: &Mutable<bool>,
         preset: &GridPreset,
         frame: &Frame,
     ) {
@@ -384,7 +384,7 @@ impl GridWidget {
                 grid.set(SyncState::edited(
                     fission.move_in(x, y, player).grid().map(|t| Tile::from(t)),
                 ));
-                GridWidget::pass_turn(edit_option, consecutive_moves, preset);
+                GridWidget::pass_turn(edit_option, alternating_moves, preset);
             }
 
             EditMode::DomineeringMove(_) => {
@@ -400,7 +400,7 @@ impl GridWidget {
                     }
                 }
 
-                GridWidget::pass_turn(edit_option, consecutive_moves, preset);
+                GridWidget::pass_turn(edit_option, alternating_moves, preset);
             }
         }
     }
@@ -410,7 +410,7 @@ impl GridWidget {
         grid: &Mutable<SyncState<VecGrid<Tile>>>,
         interactions: &Mutable<Interactions>,
         edit_option: &Mutable<EditOption>,
-        consecutive_moves: &Mutable<bool>,
+        alternating_moves: &Mutable<bool>,
         preset: &GridPreset,
     ) -> Result<(), JsValue> {
         let frame = GridWidget::draw(
@@ -419,7 +419,7 @@ impl GridWidget {
             &mut interactions.lock_mut(),
             edit_option.get().mode,
         )?;
-        GridWidget::apply(grid, edit_option, consecutive_moves, preset, &frame);
+        GridWidget::apply(grid, edit_option, alternating_moves, preset, &frame);
 
         Ok(())
     }
@@ -487,27 +487,27 @@ impl WasmWidget for GridWidget {
             EDIT_OPTIONS,
             self.edit_option.clone(),
         )?;
-        let consecutive_box = document
+        let alternating_box = document
             .create_element("div")?
             .dyn_into::<HtmlDivElement>()?;
 
         // TODO: Auto-generate unique element id to link the label
-        let consecutive_moves_checkbox = document
+        let alternating_moves_checkbox = document
             .create_element("input")?
             .dyn_into::<HtmlInputElement>()?;
-        consecutive_moves_checkbox.set_type("checkbox");
-        let consecutive_moves = self.consecutive_moves.clone();
-        reactive::checkbox(&consecutive_moves_checkbox, &consecutive_moves)?;
+        alternating_moves_checkbox.set_type("checkbox");
+        let alternating_moves = self.alternating_moves.clone();
+        reactive::checkbox(&alternating_moves_checkbox, &alternating_moves)?;
 
-        let consecutive_label = document
+        let alternating_label = document
             .create_element("label")?
             .dyn_into::<HtmlLabelElement>()?;
-        consecutive_label.set_text_content(Some("Consecutive Moves"));
-        consecutive_box.append_child(&consecutive_label)?;
-        consecutive_box.append_child(&consecutive_moves_checkbox)?;
+        alternating_label.set_text_content(Some("Alternating Moves"));
+        alternating_box.append_child(&alternating_label)?;
+        alternating_box.append_child(&alternating_moves_checkbox)?;
 
         reactive::style_set_property(
-            HtmlElement::from(consecutive_box.clone()),
+            HtmlElement::from(alternating_box.clone()),
             "display",
             self.edit_option.signal().map(|option| {
                 if option.mode.opposite_player().is_some() {
@@ -519,7 +519,7 @@ impl WasmWidget for GridWidget {
         )?;
 
         mode_box.append_child(&mode_select)?;
-        mode_box.append_child(&consecutive_box)?;
+        mode_box.append_child(&alternating_box)?;
         controls.append_child(&mode_box)?;
 
         element.append_child(&controls).unwrap();
@@ -553,7 +553,7 @@ impl WasmWidget for GridWidget {
             let grid = self.grid.clone();
             let interactions = self.interactions.clone();
             let edit_option = self.edit_option.clone();
-            let consecutive_moves = self.consecutive_moves.clone();
+            let alternating_moves = self.alternating_moves.clone();
             let preset = self.preset;
             move || {
                 GridWidget::update(
@@ -561,7 +561,7 @@ impl WasmWidget for GridWidget {
                     &grid,
                     &interactions,
                     &edit_option,
-                    &consecutive_moves,
+                    &alternating_moves,
                     &preset,
                 )
             }

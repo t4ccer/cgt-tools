@@ -215,7 +215,7 @@ const MIN_CANVAS_SIZE: V2f = V2f { x: 240.0, y: 160.0 };
 struct EditModeInputs {
     option: Mutable<EditOption>,
     edge_vertex: Mutable<EdgeVertexOption>,
-    consecutive_moves: Mutable<bool>,
+    alternating_moves: Mutable<bool>,
 }
 
 impl EditModeInputs {
@@ -227,12 +227,12 @@ impl EditModeInputs {
             edge_vertex: Mutable::new(
                 SelectOption::selected_value_idx(0, &preset, EDGE_VERTEX_OPTIONS).unwrap(),
             ),
-            consecutive_moves: Mutable::new(false),
+            alternating_moves: Mutable::new(true),
         }
     }
 
     fn pass_turn(&self, preset: GraphPreset) {
-        if !self.consecutive_moves.get()
+        if self.alternating_moves.get()
             && let Some(new_mode) = self.option.get().mode.opposite_player()
             && let Some(new_option) =
                 SelectOption::find(|o| o.mode == new_mode, &preset, EDIT_OPTIONS)
@@ -1252,15 +1252,15 @@ impl WasmWidget for GraphWidget {
         move_options.style().set_property("align-items", "center")?;
         move_options.style().set_property("gap", "4px")?;
 
-        let consecutive_moves = document
+        let alternating_moves = document
             .create_element("input")?
             .dyn_into::<HtmlInputElement>()?;
-        consecutive_moves.set_type("checkbox");
-        reactive::checkbox(&consecutive_moves, &self.edit.consecutive_moves)?;
+        alternating_moves.set_type("checkbox");
+        reactive::checkbox(&alternating_moves, &self.edit.alternating_moves)?;
 
         let move_options_text = document.create_element("span")?;
-        move_options_text.set_text_content(Some("Consecutive Moves"));
-        move_options.append_child(&consecutive_moves)?;
+        move_options_text.set_text_content(Some("Alternating Moves"));
+        move_options.append_child(&alternating_moves)?;
         move_options.append_child(&move_options_text)?;
 
         // Show only those of the extra controls that the mode has a use for
