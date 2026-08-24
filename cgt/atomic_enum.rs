@@ -16,7 +16,7 @@ macro_rules! atomic_enum {
 
         #[allow(dead_code)]
         impl $atomic_name {
-            fn new(val: $enum_name) -> $atomic_name {
+            const fn new(val: $enum_name) -> $atomic_name {
                 $atomic_name(::std::sync::atomic::AtomicU32::new(val as u32))
             }
 

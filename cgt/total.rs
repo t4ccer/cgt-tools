@@ -270,12 +270,14 @@ impl<T> PartialEq for IgnoreOrder<T> {
 
 impl<T> Eq for IgnoreOrder<T> {}
 
+#[allow(clippy::non_canonical_partial_ord_impl)]
 impl<T> PartialOrd for IgnoreOrder<T> {
     fn partial_cmp(&self, _: &Self) -> Option<Ordering> {
         Some(Ordering::Equal)
     }
 }
 
+#[allow(clippy::non_canonical_partial_ord_impl)]
 impl<T> Ord for IgnoreOrder<T> {
     fn cmp(&self, _: &Self) -> Ordering {
         Ordering::Equal

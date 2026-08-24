@@ -18,7 +18,7 @@ impl<M> Clone for Context<M> {
     fn clone(&self) -> Self {
         Self {
             model: self.model.clone(),
-            _ty: self._ty.clone(),
+            _ty: self._ty,
         }
     }
 }

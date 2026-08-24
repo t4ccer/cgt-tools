@@ -438,29 +438,29 @@ where
 
     fn reductions(&self) -> Option<CanonicalForm> {
         let mut vertex_indices = self.graph.vertex_indices();
-        if let Some(vertex_idx) = vertex_indices.next() {
-            if vertex_indices.next().is_none() {
-                let vertex = self.graph.get_vertex(vertex_idx);
+        if let Some(vertex_idx) = vertex_indices.next()
+            && vertex_indices.next().is_none()
+        {
+            let vertex = self.graph.get_vertex(vertex_idx);
 
-                let cf = match vertex {
-                    VertexKind::Single(VertexColor::Empty) => {
-                        CanonicalForm::new_nimber(DyadicRationalNumber::from(0), Nimber::new(1))
-                    }
-                    VertexKind::Single(VertexColor::TintLeft) => CanonicalForm::new_integer(1),
-                    VertexKind::Single(VertexColor::TintRight) => CanonicalForm::new_integer(-1),
-                    VertexKind::Cluster(VertexColor::Empty, cluster_size) => {
-                        let nimber = Nimber::new(cluster_size.get() % 2);
-                        CanonicalForm::new_nimber(DyadicRationalNumber::from(0), nimber)
-                    }
-                    VertexKind::Cluster(VertexColor::TintLeft, cluster_size) => {
-                        CanonicalForm::new_integer(cluster_size.get() as i64)
-                    }
-                    VertexKind::Cluster(VertexColor::TintRight, cluster_size) => {
-                        CanonicalForm::new_integer(-(cluster_size.get() as i64))
-                    }
-                };
-                return Some(cf);
-            }
+            let cf = match vertex {
+                VertexKind::Single(VertexColor::Empty) => {
+                    CanonicalForm::new_nimber(DyadicRationalNumber::from(0), Nimber::new(1))
+                }
+                VertexKind::Single(VertexColor::TintLeft) => CanonicalForm::new_integer(1),
+                VertexKind::Single(VertexColor::TintRight) => CanonicalForm::new_integer(-1),
+                VertexKind::Cluster(VertexColor::Empty, cluster_size) => {
+                    let nimber = Nimber::new(cluster_size.get() % 2);
+                    CanonicalForm::new_nimber(DyadicRationalNumber::from(0), nimber)
+                }
+                VertexKind::Cluster(VertexColor::TintLeft, cluster_size) => {
+                    CanonicalForm::new_integer(cluster_size.get() as i64)
+                }
+                VertexKind::Cluster(VertexColor::TintRight, cluster_size) => {
+                    CanonicalForm::new_integer(-(cluster_size.get() as i64))
+                }
+            };
+            return Some(cf);
         }
 
         None

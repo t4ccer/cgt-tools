@@ -44,7 +44,7 @@ where
             for g_lr in self.moves(&g_l, Player::Right) {
                 if self.ge_mod_p_free_dead_ending(g, g_lr) {
                     let mut end_reversible = true;
-                    for g_lrl in self.moves(&g_lr, Player::Left) {
+                    for g_lrl in self.moves(g_lr, Player::Left) {
                         end_reversible = false;
                         left_moves.push(Some(g_lrl.clone()));
                     }
@@ -89,7 +89,7 @@ where
             for g_rl in self.moves(&g_r, Player::Left) {
                 if self.ge_mod_p_free_dead_ending(g_rl, g) {
                     let mut end_reversible = true;
-                    for g_rlr in self.moves(&g_rl, Player::Right) {
+                    for g_rlr in self.moves(g_rl, Player::Right) {
                         end_reversible = false;
                         right_moves.push(Some(g_rlr.clone()));
                     }
@@ -430,7 +430,7 @@ where
         {
             // The order of games is the opposite of order of integers so <= is correct for `ge` check
             return g <= h;
-        };
+        }
 
         if self.ge_mod_dead_ending(g, h) {
             return true;
@@ -462,8 +462,10 @@ where
                         // returned false so we try again with `self.ge_mod_dead_ending({-1|1}, h)`
                         None => {
                             drop(not_zero_ge);
-                            let mut not_zero_ge = seen_zero.write().unwrap();
-                            not_zero_ge.insert(TotalWrapper::new(h.clone()), SeenZero::Once);
+                            seen_zero
+                                .write()
+                                .unwrap()
+                                .insert(TotalWrapper::new(h.clone()), SeenZero::Once);
                             Some(
                                 self.new(
                                     [self.new_integer(-1).unwrap_infallible()],
@@ -478,8 +480,10 @@ where
                         // the write lock again for that game
                         Some(SeenZero::Once) => {
                             drop(not_zero_ge);
-                            let mut not_zero_ge = seen_zero.write().unwrap();
-                            not_zero_ge.insert(TotalWrapper::new(h.clone()), SeenZero::Multiple);
+                            seen_zero
+                                .write()
+                                .unwrap()
+                                .insert(TotalWrapper::new(h.clone()), SeenZero::Multiple);
                             None
                         }
                         Some(SeenZero::Multiple) => None,
@@ -498,12 +502,14 @@ where
 
         // No need to plug both cause then they are both integers and handled by the case above
         if let Some(g) = plug_end(g, h, &self.not_ge_zero) {
-            self.ge_mod_p_free_dead_ending(&g, h)
-        } else if let Some(h) = plug_end(h, g, &self.not_zero_ge) {
-            self.ge_mod_p_free_dead_ending(g, &h)
-        } else {
-            false
+            return self.ge_mod_p_free_dead_ending(&g, h);
         }
+
+        if let Some(h) = plug_end(h, g, &self.not_zero_ge) {
+            return self.ge_mod_p_free_dead_ending(g, &h);
+        }
+
+        false
     }
 }
 

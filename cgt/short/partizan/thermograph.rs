@@ -320,10 +320,10 @@ impl Thermograph {
                         None
                     };
 
-                if left_scaffold_crossing_point.is_some()
-                    && (right_scaffold_crossing_point.is_none()
-                        || left_scaffold_crossing_point.as_ref().unwrap()
-                            <= right_scaffold_crossing_point.as_ref().unwrap())
+                if let Some(left_scaffold_crossing_point_r) = &left_scaffold_crossing_point
+                    && right_scaffold_crossing_point
+                        .as_ref()
+                        .is_none_or(|right| left_scaffold_crossing_point_r <= right)
                 {
                     // We are in case (i). First add the truncated vertical mast.
                     Trajectory::extend_trajectory(
@@ -331,7 +331,7 @@ impl Thermograph {
                         &mut left_wall_cps,
                         &mut left_wall_slopes,
                         &mut left_wall_x_intercepts,
-                        left_scaffold_crossing_point.as_ref().unwrap(),
+                        left_scaffold_crossing_point_r,
                         &0.into(),
                         previous_cave_value_r,
                     );
@@ -340,7 +340,7 @@ impl Thermograph {
                         &mut right_wall_cps,
                         &mut right_wall_slopes,
                         &mut right_wall_x_intercepts,
-                        left_scaffold_crossing_point.as_ref().unwrap(), // it should be left
+                        left_scaffold_crossing_point_r, // it should be left
                         &0.into(),
                         previous_cave_value_r,
                     );

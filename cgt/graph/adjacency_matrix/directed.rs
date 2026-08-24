@@ -22,6 +22,9 @@ impl<V> DirectedGraph<V> {
     }
 
     /// Map vertex values
+    ///
+    /// # Errors
+    /// Propagates the first error returned by `f`
     pub fn try_map<R, E>(&self, f: impl FnMut(&V) -> Result<R, E>) -> Result<DirectedGraph<R>, E> {
         let vertices = self.vertices.iter().map(f).collect::<Result<Vec<_>, E>>()?;
         Ok(DirectedGraph {

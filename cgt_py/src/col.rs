@@ -25,7 +25,7 @@ impl_has!(PositionedVertex -> position -> V2f);
 
 static TRANSPOSITION_TABLE: LazyLock<
     ParallelTranspositionTable<Col<VertexColor, UndirectedGraph<VertexColor>>>,
-> = LazyLock::new(|| ParallelTranspositionTable::new());
+> = LazyLock::new(ParallelTranspositionTable::new);
 
 #[pyclass(name = "Col")]
 pub struct PyCol(pub Col<VertexColor, UndirectedGraph<VertexColor>>);

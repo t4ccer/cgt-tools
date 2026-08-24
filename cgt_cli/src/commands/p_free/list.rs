@@ -56,8 +56,8 @@ where
         }
         let j = i + 1 + (idx - start);
 
-        let i_le_j = context.ge_mod_p_free_dead_ending(&forms[i].borrow(), &forms[j].borrow());
-        let j_le_i = context.ge_mod_p_free_dead_ending(&forms[j].borrow(), &forms[i].borrow());
+        let i_le_j = context.ge_mod_p_free_dead_ending(forms[i].borrow(), forms[j].borrow());
+        let j_le_i = context.ge_mod_p_free_dead_ending(forms[j].borrow(), forms[i].borrow());
 
         // SAFETY: Each thread gets scheduled with a unique pair of indices that are in bounds
         unsafe {
@@ -101,8 +101,8 @@ where
         }
         let j = i + 1 + (idx - start);
 
-        let i_ge_j = context.ge_mod_p_free_dead_ending(&forms[i].borrow(), &forms[j].borrow());
-        let j_ge_i = context.ge_mod_p_free_dead_ending(&forms[j].borrow(), &forms[i].borrow());
+        let i_ge_j = context.ge_mod_p_free_dead_ending(forms[i].borrow(), forms[j].borrow());
+        let j_ge_i = context.ge_mod_p_free_dead_ending(forms[j].borrow(), forms[i].borrow());
 
         // SAFETY: Each thread gets scheduled with a unique pair of indices that are in bounds
         unsafe {
@@ -177,8 +177,8 @@ where
     let mut class_rank = vec![0; num_classes];
     let mut queue = VecDeque::new();
 
-    for c in 0..num_classes {
-        if class_in_degree[c] == 0 {
+    for (c, in_degree) in class_in_degree.iter().enumerate() {
+        if *in_degree == 0 {
             queue.push_back(c);
         }
     }
@@ -219,7 +219,7 @@ struct DropGuard<F: FnMut()>(F);
 
 impl<F: FnMut()> Drop for DropGuard<F> {
     fn drop(&mut self) {
-        (self.0)()
+        (self.0)();
     }
 }
 
@@ -255,11 +255,8 @@ fn parallel<T>(
             let rx = rx.clone();
             let perform_task = &perform_task;
             scope.spawn(move || {
-                loop {
-                    match rx.recv() {
-                        Ok(g) => perform_task(g),
-                        Err(_) => break,
-                    }
+                while let Ok(g) = rx.recv() {
+                    perform_task(g);
                 }
             });
         }
@@ -269,13 +266,13 @@ fn parallel<T>(
 }
 
 #[must_use]
-fn next_day<C>(context: &C, previous_day: Vec<C::Form>) -> Vec<C::Form>
+fn next_day<C>(context: &C, previous_day: &[C::Form]) -> Vec<C::Form>
 where
     C: PFreeDeadEndingContext + Send + Sync,
     C::IntegerConstructionError: Void,
     C::Form: Send + Sync,
 {
-    let ge = precompute_ge_relations(context, &previous_day);
+    let ge = precompute_ge_relations(context, previous_day);
     let antichains = AntichainIterator::new((0..previous_day.len()).collect(), |lhs, rhs| {
         ge[lhs * previous_day.len() + rhs]
     })
@@ -336,7 +333,9 @@ where
                 return;
             }
             seen.push(reduced);
-            bar.set_message(format!("(Found {})", seen.len()));
+            let found = seen.len();
+            drop(seen);
+            bar.set_message(format!("(Found {})", found));
         },
     );
 
@@ -482,7 +481,7 @@ pub fn run(args: Args) -> Result<()> {
     let mut day = vec![context.new_integer(0).unwrap_infallible()];
     for day_number in 0..args.day {
         eprintln!("Generating day {}/{}", day_number + 1, args.day);
-        day = next_day(&context, day);
+        day = next_day(&context, &day);
     }
 
     {
@@ -558,7 +557,7 @@ pub fn run(args: Args) -> Result<()> {
             let graphviz = {
                 eprintln!("Generating Hasse diagram");
                 let bar =
-                    ProgressBar::new(game_count * (game_count - 1) / 2).with_style(style.clone());
+                    ProgressBar::new(game_count * (game_count - 1) / 2).with_style(style);
                 let mut graphviz = Vec::new();
                 // TODO: Reuse `lt` table generated in `compute_partitioned_antichains` if we can remap indices
                 generate_hasse(&context, &mut graphviz, &day_antichains, &bar)?;

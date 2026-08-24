@@ -6,7 +6,7 @@ use pyo3::{PyErr, PyResult, pyclass, pymethods};
 use std::{str::FromStr, sync::LazyLock};
 
 static TRANSPOSITION_TABLE: LazyLock<ParallelTranspositionTable<Fission>> =
-    LazyLock::new(|| ParallelTranspositionTable::new());
+    LazyLock::new(ParallelTranspositionTable::new);
 
 #[pyclass(name = "Fission")]
 pub struct PyFission(pub Fission);

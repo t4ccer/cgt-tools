@@ -46,7 +46,9 @@ impl<V> UndirectedGraph<V> {
     }
 
     /// Map vertex values
-    #[must_use]
+    ///
+    /// # Errors
+    /// Propagates the first error returned by `f`
     pub fn try_map<R, E>(
         &self,
         f: impl FnMut(&V) -> Result<R, E>,

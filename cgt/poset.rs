@@ -139,7 +139,7 @@ where
     F: Fn(),
 {
     /// Create new iterator over a partial order with a callback on each element inserted into a chain
-    pub fn with_callback(
+    pub const fn with_callback(
         elements: Vec<T>,
         partial_order: P,
         on_inserted: F,
@@ -164,7 +164,7 @@ where
     where
         T: 'a,
     {
-        if !((self.partial_order)(y, x) && !(self.partial_order)(x, y)) {
+        if !(self.partial_order)(y, x) || (self.partial_order)(x, y) {
             return false;
         }
 
@@ -181,7 +181,7 @@ where
 
         let other = self.vertices.clone();
         let first = self.minimum_in_pool(&other).unwrap().clone();
-        let mut chain = vec![first.clone()];
+        let mut chain = vec![first];
         let mut latest = &chain[0];
 
         'outer: loop {

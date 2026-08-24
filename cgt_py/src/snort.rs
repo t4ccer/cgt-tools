@@ -25,7 +25,7 @@ impl_has!(PositionedVertex -> position -> V2f);
 
 static TRANSPOSITION_TABLE: LazyLock<
     ParallelTranspositionTable<Snort<VertexKind, UndirectedGraph<VertexKind>>>,
-> = LazyLock::new(|| ParallelTranspositionTable::new());
+> = LazyLock::new(ParallelTranspositionTable::new);
 
 #[pyclass(name = "Snort")]
 pub struct PySnort(pub Snort<VertexKind, UndirectedGraph<VertexKind>>);

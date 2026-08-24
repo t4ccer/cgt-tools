@@ -25,7 +25,7 @@ impl_has!(PositionedVertex -> position -> V2f);
 
 static TRANSPOSITION_TABLE: LazyLock<
     ParallelTranspositionTable<DigraphPlacement<VertexColor, DirectedGraph<VertexColor>>>,
-> = LazyLock::new(|| ParallelTranspositionTable::new());
+> = LazyLock::new(ParallelTranspositionTable::new);
 
 #[pyclass(name = "DigraphPlacement")]
 pub struct PyDigraphPlacement(pub DigraphPlacement<VertexColor, DirectedGraph<VertexColor>>);

@@ -44,7 +44,7 @@ impl DyadicRationalNumber {
             return None;
         }
 
-        while denominator % 2 == 0 {
+        while denominator.is_multiple_of(2) {
             denominator /= 2;
             denominator_exponent += 1;
         }

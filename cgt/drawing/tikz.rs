@@ -33,7 +33,7 @@ pub struct Canvas {
 }
 
 impl Canvas {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             buffer: String::new(),
         }

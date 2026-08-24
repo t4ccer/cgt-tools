@@ -6,7 +6,7 @@ use pyo3::{PyErr, PyResult, pyclass, pymethods};
 use std::{str::FromStr, sync::LazyLock};
 
 static TRANSPOSITION_TABLE: LazyLock<ParallelTranspositionTable<Amazons>> =
-    LazyLock::new(|| ParallelTranspositionTable::new());
+    LazyLock::new(ParallelTranspositionTable::new);
 
 #[pyclass(name = "Amazons")]
 pub struct PyAmazons(pub Amazons);

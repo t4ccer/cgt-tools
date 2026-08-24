@@ -117,10 +117,10 @@ impl WindUp {
 
                 for m in &subtraction_set {
                     let v1 = &graph[(idx - *m as i32).rem_euclid(n) as usize];
-                    if let UnresolvedVertex::Resolved(Vertex::Value(g)) = v1 {
-                        if !infinities.contains(g) {
-                            infinities.push(*g);
-                        }
+                    if let UnresolvedVertex::Resolved(Vertex::Value(g)) = v1
+                        && !infinities.contains(g)
+                    {
+                        infinities.push(*g);
                     }
                 }
 

@@ -56,9 +56,9 @@ fn get_set() {
     let mut bit_vec = FixedBitVec::<{ 32 / 8 }>::new();
     bit_vec.set(10, true);
     bit_vec.set(16, true);
-    assert_eq!(bit_vec.get(4), false);
-    assert_eq!(bit_vec.get(10), true);
-    assert_eq!(bit_vec.get(14), false);
-    assert_eq!(bit_vec.get(16), true);
-    assert_eq!(bit_vec.get(30), false);
+    assert!(!bit_vec.get(4));
+    assert!(bit_vec.get(10));
+    assert!(!bit_vec.get(14));
+    assert!(bit_vec.get(16));
+    assert!(!bit_vec.get(30));
 }

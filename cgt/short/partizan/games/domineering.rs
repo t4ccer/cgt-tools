@@ -113,7 +113,7 @@ where
             write!(buf, ", baseline={}", baseline).unwrap();
         }
 
-        write!(buf, "] ",).unwrap();
+        write!(buf, "] ").unwrap();
         for y in 0..self.grid.height() {
             for x in 0..self.grid.width() {
                 if self.grid.get(x, y) == Tile::Taken {

@@ -124,7 +124,7 @@ pub fn run(args: Args) -> Result<()> {
             .collect::<Vec<_>>()
     };
 
-    input.sort_by(|lhs, rhs| rhs.temperature.cmp(&lhs.temperature)); // descending sort
+    input.sort_by_key(|entry| std::cmp::Reverse(entry.temperature)); // descending sort
 
     let max_grid_width = input
         .iter()

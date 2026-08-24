@@ -11,7 +11,7 @@ use std::sync::LazyLock;
 
 static TRANSPOSITION_TABLE: LazyLock<
     ParallelTranspositionTable<BipartiteSnort<UndirectedGraph<VertexColor>>>,
-> = LazyLock::new(|| ParallelTranspositionTable::new());
+> = LazyLock::new(ParallelTranspositionTable::new);
 
 #[pyclass(name = "BipartiteSnort")]
 pub struct PyBipartiteSnort(pub BipartiteSnort<UndirectedGraph<VertexColor>>);

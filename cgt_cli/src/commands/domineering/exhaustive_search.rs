@@ -216,11 +216,10 @@ pub fn run(args: Args) -> Result<()> {
                 return;
             }
 
-            if let Some(max_empty_tiles) = progress_tracker.args.max_empty_tiles {
-                if grid.free_places() > max_empty_tiles {
+            if let Some(max_empty_tiles) = progress_tracker.args.max_empty_tiles
+                && grid.free_places() > max_empty_tiles {
                     return;
                 }
-            }
 
             let thermograph = match progress_tracker.args.thermograph_method {
                 ThermographMethod::CanonicalForm => {
@@ -242,11 +241,10 @@ pub fn run(args: Args) -> Result<()> {
             let temperature = thermograph.temperature();
 
             // Don't save temperatures below or equal to treashold
-            if let Some(temperature_threshold) = &progress_tracker.args.temperature_threshold {
-                if &temperature <= temperature_threshold {
+            if let Some(temperature_threshold) = &progress_tracker.args.temperature_threshold
+                && &temperature <= temperature_threshold {
                     return;
                 }
-            }
 
             // Save results as newline separated JSON objects
             let result = DomineeringResult {

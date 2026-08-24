@@ -53,7 +53,7 @@ impl PyCanonicalForm {
     fn __richcmp__(&self, other: &Self, op: CompareOp) -> bool {
         self.0
             .partial_cmp(&other.0)
-            .map_or(false, |ord| op.matches(ord))
+            .is_some_and(|ord| op.matches(ord))
     }
 
     #[getter]

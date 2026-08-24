@@ -64,14 +64,14 @@ pub trait LeftDeadEndContext {
 
     fn game_cmp(&self, lhs: &Self::LeftDeadEnd, rhs: &Self::LeftDeadEnd) -> Option<Ordering> {
         // Optimization: If integers are not equal then they are incomparable
-        if let Some(lhs) = self.to_integer(lhs) {
-            if let Some(rhs) = self.to_integer(rhs) {
-                if lhs == rhs {
-                    return Some(Ordering::Equal);
-                }
-
-                return None;
+        if let Some(lhs) = self.to_integer(lhs)
+            && let Some(rhs) = self.to_integer(rhs)
+        {
+            if lhs == rhs {
+                return Some(Ordering::Equal);
             }
+
+            return None;
         }
 
         match (self.game_ge(lhs, rhs), self.game_ge(rhs, lhs)) {

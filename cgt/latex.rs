@@ -6,7 +6,7 @@ struct LatexStreamWriter<'a, 'b> {
     formatter: &'a mut fmt::Formatter<'b>,
 }
 
-impl<'a, 'b> fmt::Write for LatexStreamWriter<'a, 'b> {
+impl fmt::Write for LatexStreamWriter<'_, '_> {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         for ch in s.chars() {
             match ch {
@@ -34,7 +34,7 @@ impl<'a, 'b> fmt::Write for LatexStreamWriter<'a, 'b> {
 #[derive(Debug, Clone, Copy)]
 pub struct LatexMathEscape<'a, T>(pub &'a T);
 
-impl<'a, T> fmt::Display for LatexMathEscape<'a, T>
+impl<T> fmt::Display for LatexMathEscape<'_, T>
 where
     T: fmt::Display,
 {

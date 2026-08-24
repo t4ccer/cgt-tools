@@ -115,6 +115,8 @@ fn analyze_left_dead_end(interner: &Interner, g: LeftDeadEnd) -> String {
     b
 }
 
+// `k == 0` is the base case of the recursion, not a division-by-zero guard
+#[allow(clippy::manual_checked_ops)]
 fn choose(n: u64, k: u64) -> u64 {
     if k == 0 {
         1

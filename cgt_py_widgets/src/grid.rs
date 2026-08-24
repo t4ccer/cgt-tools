@@ -160,8 +160,7 @@ impl GridWidget {
             edit_option: Mutable::new(
                 *EDIT_OPTIONS
                     .iter()
-                    .filter(|edit| preset.intersects(edit.visible_presets))
-                    .next()
+                    .find(|edit| preset.intersects(edit.visible_presets))
                     .unwrap(),
             ),
             alternating_moves: Mutable::new(true),

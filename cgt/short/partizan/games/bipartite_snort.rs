@@ -125,7 +125,7 @@ where
         visited_vertices[initial_subgraph_vertex.index] = true;
 
         while let Some(connected_vertex_idx) = connected_visit_queue.pop_front() {
-            vertices_to_take.push(self.graph.get_vertex(connected_vertex_idx).clone());
+            vertices_to_take.push(*self.graph.get_vertex(connected_vertex_idx));
             vertex_indices_to_take.push(connected_vertex_idx);
 
             for adjacent_to_connected_idx in self.graph.adjacent_to(connected_vertex_idx) {
@@ -211,7 +211,8 @@ where
         {
             positions[vertex_index.index] = V2f {
                 x: C::vertex_radius(),
-                y: C::vertex_radius() + (C::vertex_radius() * (2.0 + NODE_DISTANCE)) * off as f32,
+                y: (C::vertex_radius() * (2.0 + NODE_DISTANCE))
+                    .mul_add(off as f32, C::vertex_radius()),
             };
         }
 
@@ -223,7 +224,8 @@ where
         {
             positions[vertex_index.index] = V2f {
                 x: C::vertex_radius() * (3.0 + PARTITION_DISTANCE),
-                y: C::vertex_radius() + (C::vertex_radius() * (2.0 + NODE_DISTANCE)) * off as f32,
+                y: (C::vertex_radius() * (2.0 + NODE_DISTANCE))
+                    .mul_add(off as f32, C::vertex_radius()),
             };
         }
 
@@ -268,8 +270,8 @@ where
             top_left: V2f::ZERO,
             bottom_right: V2f {
                 x: (PARTITION_DISTANCE + 4.0) * C::vertex_radius(),
-                y: (C::vertex_radius() * (2.0 + NODE_DISTANCE)) * higher as f32
-                    - (C::vertex_radius() * NODE_DISTANCE),
+                y: (C::vertex_radius() * (2.0 + NODE_DISTANCE))
+                    .mul_add(higher as f32, -(C::vertex_radius() * NODE_DISTANCE)),
             },
         }
     }

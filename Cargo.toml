@@ -64,6 +64,7 @@ single_match_else = "allow"
 too_long_first_doc_paragraph = "allow"
 should_panic_without_expect = "allow"
 multiple_crate_versions = "allow"
+type_complexity = "allow"
 
 [package]
 name = "cgt"

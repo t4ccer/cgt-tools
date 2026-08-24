@@ -22,6 +22,9 @@ impl<T> VecGrid<T> {
     }
 
     /// Transform grid tiles
+    ///
+    /// # Errors
+    /// Propagates the first error returned by `f`
     pub fn try_map<U, E>(&self, mut f: impl FnMut(&T) -> Result<U, E>) -> Result<VecGrid<U>, E> {
         let mut new_grid = VecGrid {
             width: self.width,

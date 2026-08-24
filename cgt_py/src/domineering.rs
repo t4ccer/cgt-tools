@@ -6,7 +6,7 @@ use pyo3::{PyErr, PyResult, pyclass, pymethods};
 use std::{str::FromStr, sync::LazyLock};
 
 static TRANSPOSITION_TABLE: LazyLock<ParallelTranspositionTable<Domineering>> =
-    LazyLock::new(|| ParallelTranspositionTable::new());
+    LazyLock::new(ParallelTranspositionTable::new);
 
 #[pyclass(name = "Domineering")]
 pub struct PyDomineering(Domineering);

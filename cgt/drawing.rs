@@ -317,7 +317,7 @@ const fn anchor(area: Area) -> V2f {
 
 impl Interactions {
     #[must_use]
-    pub fn new() -> Interactions {
+    pub const fn new() -> Interactions {
         Interactions {
             pointer: Pointer {
                 position: None,
@@ -786,7 +786,7 @@ mod tests {
         // point that it was pressed at
         for step in 1..=4u8 {
             let cursor = V2f {
-                x: 30.0 + f32::from(step) * 25.0,
+                x: f32::from(step).mul_add(25.0, 30.0),
                 y: 50.0,
             };
             interactions.pointer_moved(cursor);

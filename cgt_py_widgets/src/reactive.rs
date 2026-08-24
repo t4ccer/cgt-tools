@@ -10,7 +10,7 @@ use web_sys::{
 };
 
 pub fn checkbox(input: &HtmlInputElement, output: &Mutable<bool>) -> Result<(), JsValue> {
-    let on_html_change = ScopedClosure::<dyn FnMut() -> ()>::new({
+    let on_html_change = ScopedClosure::<dyn FnMut()>::new({
         let checkbox = input.clone();
         let output = output.clone();
         move || output.set(checkbox.checked())
@@ -21,7 +21,7 @@ pub fn checkbox(input: &HtmlInputElement, output: &Mutable<bool>) -> Result<(), 
     wasm_bindgen_futures::spawn_local(output.signal().dedupe().for_each({
         let checkbox = input.clone();
         move |checked| {
-            let _ = checkbox.set_checked(checked);
+            checkbox.set_checked(checked);
             async {}
         }
     }));
@@ -262,7 +262,7 @@ pub trait SelectOption: SelectOptionElement + Sized {
             .dyn_into::<HtmlSelectElement>()?;
         select.set_name(name);
 
-        for (idx, o) in options.iter().filter(|o| o.is_visible(&preset)).enumerate() {
+        for (idx, o) in options.iter().filter(|o| o.is_visible(preset)).enumerate() {
             let option = document
                 .create_element("option")?
                 .dyn_into::<HtmlOptionElement>()?;

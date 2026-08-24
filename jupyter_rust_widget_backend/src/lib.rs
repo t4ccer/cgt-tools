@@ -26,11 +26,7 @@ pub trait RustWidget: Send + Sync + 'static {
 
     fn value<'py>(&mut self) -> impl IntoPyObject<'py>;
 
-    fn into_widget<'py, 'module>(
-        self,
-        py: Python<'py>,
-        module: &'module str,
-    ) -> PyResult<Bound<'py, PyAny>>
+    fn into_widget<'py>(self, py: Python<'py>, module: &str) -> PyResult<Bound<'py, PyAny>>
     where
         Self: Sized,
     {
@@ -120,7 +116,7 @@ impl SomeWidget {
 
     fn _wasm_value(&mut self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         if let WidgetRet::Value(val) = (self.event_handler)(py, WidgetArg::Value) {
-            return val;
+            val
         } else {
             unreachable!()
         }

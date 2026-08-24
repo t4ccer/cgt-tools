@@ -758,10 +758,10 @@ impl CanonicalForm {
                 Thermograph::with_moves(self.left_moves(), self.right_moves())
             }
             CanonicalFormInner::Nus(nus) => {
-                if let Some(nus_integer) = nus.number().to_integer() {
-                    if nus.is_number() {
-                        return Thermograph::with_mast(Rational::new_integer(nus_integer));
-                    }
+                if let Some(nus_integer) = nus.number().to_integer()
+                    && nus.is_number()
+                {
+                    return Thermograph::with_mast(Rational::new_integer(nus_integer));
                 }
 
                 if nus.up_multiple() == 0
@@ -835,10 +835,10 @@ impl CanonicalForm {
     /// temperature `t' < t` for which `G_t'` is infinitesimally close to a number
     #[must_use]
     pub fn cool(&self, temperature: DyadicRationalNumber) -> Self {
-        if let Some(nus) = self.to_nus() {
-            if nus.is_integer() {
-                return self.clone();
-            }
+        if let Some(nus) = self.to_nus()
+            && nus.is_integer()
+        {
+            return self.clone();
         }
 
         if self.temperature() < temperature {
@@ -871,10 +871,10 @@ impl CanonicalForm {
     /// `\int^t G = {\int^t G^L + t | \int^t G^R - t}` otherwise
     #[must_use]
     pub fn heat(&self, temperature: &CanonicalForm) -> Self {
-        if let Some(nus) = self.to_nus() {
-            if nus.is_number() {
-                return self.clone();
-            }
+        if let Some(nus) = self.to_nus()
+            && nus.is_number()
+        {
+            return self.clone();
         }
 
         let mut new_left_moves = Vec::with_capacity(self.left_moves().len());
@@ -899,10 +899,10 @@ impl CanonicalForm {
     #[must_use]
     #[allow(clippy::or_fun_call)]
     pub fn far_star(&self) -> Nimber {
-        if let CanonicalFormInner::Nus(ref nus) = self.inner {
-            if nus.is_nimber() {
-                return Nimber::from(nus.nimber().value() + 1);
-            }
+        if let CanonicalFormInner::Nus(ref nus) = self.inner
+            && nus.is_nimber()
+        {
+            return Nimber::from(nus.nimber().value() + 1);
         }
 
         self.left_moves()
@@ -993,12 +993,11 @@ impl CanonicalForm {
     /// See: The Reduced Canonical Form Of a Game p. 411
     #[must_use]
     pub fn star_projection(&self) -> Self {
-        if let Some(nus) = self.to_nus() {
-            if (nus.nimber() == Nimber::new(0) || nus.nimber() == Nimber::new(1))
-                && nus.up_multiple() == 0
-            {
-                return CanonicalForm::new_nus(Nus::new_number(nus.number()));
-            }
+        if let Some(nus) = self.to_nus()
+            && (nus.nimber() == Nimber::new(0) || nus.nimber() == Nimber::new(1))
+            && nus.up_multiple() == 0
+        {
+            return CanonicalForm::new_nus(Nus::new_number(nus.number()));
         }
 
         CanonicalForm::new_from_moves(

@@ -33,6 +33,7 @@ pub struct Args {
     sum_images: bool,
 }
 
+#[allow(clippy::needless_pass_by_value)]
 pub fn run(args: Args) -> anyhow::Result<()> {
     let padding = 0.5;
 
@@ -68,10 +69,7 @@ pub fn run(args: Args) -> anyhow::Result<()> {
                 )
             {
                 let canonical_form = snort.canonical_form(&tt);
-                if seen_cf
-                    .get(TotalWrapper::from_ref(&canonical_form))
-                    .is_some()
-                {
+                if seen_cf.contains_key(TotalWrapper::from_ref(&canonical_form)) {
                     continue;
                 }
 
@@ -88,7 +86,7 @@ pub fn run(args: Args) -> anyhow::Result<()> {
                     temperature,
                 )?;
                 let reduced = canonical_form.reduced();
-                if seen_reduced.get(TotalWrapper::from_ref(&reduced)).is_none() {
+                if !seen_reduced.contains_key(TotalWrapper::from_ref(&reduced)) {
                     seen_reduced.insert(TotalWrapper::new(reduced), (graph, snort.clone()));
                 }
 
@@ -105,11 +103,11 @@ pub fn run(args: Args) -> anyhow::Result<()> {
 
     let mut out = BufWriter::new(File::create(format!("{}/reduced.tex", args.out_dir))?);
     writeln!(out, "\\begin{{longtable}}{{cccc}}")?;
-    writeln!(out, "  \\caption{{Reduced Canonical Form}}\\\\",)?;
+    writeln!(out, "  \\caption{{Reduced Canonical Form}}\\\\")?;
     writeln!(out, "  Graph & Position & Reduced & Birthday \\\\")?;
     writeln!(out, "  \\midrule \\endhead%")?;
-    for (canonical_form, (graph, snort)) in seen_reduced.iter() {
-        let canonical_form: &CanonicalForm = &canonical_form;
+    for (canonical_form, (graph, snort)) in &seen_reduced {
+        let canonical_form: &CanonicalForm = canonical_form;
         let mut canvas = tikz::Canvas::new();
         snort.draw(&mut canvas);
         writeln!(
@@ -126,12 +124,12 @@ pub fn run(args: Args) -> anyhow::Result<()> {
     eprintln!("Finding own inverses");
     let mut out = BufWriter::new(File::create(format!("{}/own-negative.tex", args.out_dir))?);
     writeln!(out, "\\begin{{longtable}}{{cccc}}")?;
-    writeln!(out, "  \\caption{{Own Inverses}}\\\\",)?;
+    writeln!(out, "  \\caption{{Own Inverses}}\\\\")?;
     writeln!(out, "  Graph & Position & Canonical Form \\\\")?;
     writeln!(out, "  \\midrule \\endhead%")?;
     let bar = ProgressBar::new(seen_cf.len() as u64).with_style(progress_style());
-    for (cf, (graph, snort)) in seen_cf.iter() {
-        let cf: &CanonicalForm = &cf;
+    for (cf, (graph, snort)) in &seen_cf {
+        let cf: &CanonicalForm = cf;
 
         if *cf == -cf {
             let mut canvas = tikz::Canvas::new();
@@ -165,11 +163,11 @@ pub fn run(args: Args) -> anyhow::Result<()> {
         args.out_dir
     ))?);
     writeln!(out, "\\begin{{longtable}}{{ccc}}")?;
-    writeln!(out, "  \\caption{{Realisable as Sums}}\\\\",)?;
+    writeln!(out, "  \\caption{{Realisable as Sums}}\\\\")?;
     writeln!(out, "  $G$ & $H$ & $G + H$\\\\")?;
     writeln!(out, "  \\midrule \\endhead%")?;
-    for (cf1, (graph1, snort1)) in seen_cf.iter() {
-        let cf1: &CanonicalForm = &cf1;
+    for (cf1, (graph1, snort1)) in &seen_cf {
+        let cf1: &CanonicalForm = cf1;
         if *cf1 == CanonicalForm::new_integer(0) {
             continue;
         }
@@ -177,10 +175,10 @@ pub fn run(args: Args) -> anyhow::Result<()> {
         let mut canvas1 = tikz::Canvas::new();
         snort1.draw(&mut canvas1);
 
-        for (cf2, (graph2, snort2)) in seen_cf.iter() {
+        for (cf2, (graph2, snort2)) in &seen_cf {
             bar.inc(1);
 
-            let cf2: &CanonicalForm = &cf2;
+            let cf2: &CanonicalForm = cf2;
             if *cf2 == CanonicalForm::new_integer(0) {
                 continue;
             }

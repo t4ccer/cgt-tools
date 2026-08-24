@@ -22,9 +22,10 @@ atomic_enum! {
 
 impl From<bool> for CachedBool {
     fn from(value: bool) -> CachedBool {
-        match value {
-            true => CachedBool::True,
-            false => CachedBool::False,
+        if value {
+            CachedBool::True
+        } else {
+            CachedBool::False
         }
     }
 }
