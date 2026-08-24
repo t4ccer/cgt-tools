@@ -6,7 +6,7 @@ use cgt::{
         fission::{self, Fission},
     },
 };
-use cgt_py_messages::{GridBackendMessage, GridFrontendMessage, GridPreset, Tile};
+use cgt_py_messages::{GridBackendMessage, GridFrontendMessage, GridPreset, Sequence, Tile};
 use jupyter_rust_widget_backend::{Response, RustWidget};
 use pyo3::{
     Bound, IntoPyObjectExt, Py, PyAny, PyResult, Python, exceptions::PyValueError, pyclass,
@@ -80,6 +80,19 @@ impl PyGrid {
 struct GridWidget {
     preset: GridPreset,
     grid: VecGrid<Tile>,
+
+    /// Which version of the grid is held. A frontend that has fallen behind can send one
+    /// from before an edit made in another, and that must not be taken
+    sequence: Sequence,
+}
+
+impl GridWidget {
+    fn set_grid_message(&self) -> GridFrontendMessage {
+        GridFrontendMessage::SetGrid {
+            sequence: self.sequence,
+            grid: self.grid.clone(),
+        }
+    }
 }
 
 impl RustWidget for GridWidget {
@@ -103,14 +116,22 @@ impl RustWidget for GridWidget {
     fn handle_message(&mut self, event: Self::BackendMessage) -> Response<Self::FrontendMessage> {
         match event {
             GridBackendMessage::Initialized => Response {
-                message: Some(GridFrontendMessage::SetGrid(self.grid.clone())),
+                message: Some(self.set_grid_message()),
                 run_on_update: false,
             },
-            GridBackendMessage::SetGrid { grid } => {
-                self.grid = grid;
+            GridBackendMessage::SetGrid { sequence, grid } => {
+                // Anything numbered at or below what is already held describes a grid this
+                // side has moved on from, and running the update callbacks over it would
+                // report a move that has since been played over
+                let taken = sequence > self.sequence;
+                if taken {
+                    self.sequence = sequence;
+                    self.grid = grid;
+                }
+
                 Response {
-                    message: Some(GridFrontendMessage::SetGrid(self.grid.clone())),
-                    run_on_update: true,
+                    message: Some(self.set_grid_message()),
+                    run_on_update: taken,
                 }
             }
         }
@@ -129,6 +150,7 @@ pub fn make_domineering_widget(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
     GridWidget {
         preset: GridPreset::Domineering,
         grid: FiniteGrid::filled(8, 8, Tile::Taken).unwrap(),
+        sequence: Sequence::INITIAL,
     }
     .into_widget(py, "cgt_py")
 }
@@ -138,6 +160,7 @@ pub fn make_fission_widget(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
     GridWidget {
         preset: GridPreset::Fission,
         grid: FiniteGrid::filled(4, 4, Tile::Empty).unwrap(),
+        sequence: Sequence::INITIAL,
     }
     .into_widget(py, "cgt_py")
 }
@@ -147,6 +170,7 @@ pub fn make_amazons_widget(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
     GridWidget {
         preset: GridPreset::Amazons,
         grid: FiniteGrid::filled(4, 4, Tile::Empty).unwrap(),
+        sequence: Sequence::INITIAL,
     }
     .into_widget(py, "cgt_py")
 }

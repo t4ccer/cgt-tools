@@ -136,17 +136,46 @@ impl_tile_map! {
     }
 }
 
+#[derive(
+    serde::Deserialize, serde::Serialize, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord,
+)]
+pub struct Sequence(u64);
+
+impl Sequence {
+    /// Version of the empty state a frontend starts with, before python has sent it anything
+    pub const UNINITIALIZED: Sequence = Sequence(0);
+
+    /// Version of the state python holds before either side has changed anything. It is past
+    /// [`UNINITIALIZED_SEQUENCE`] so that a frontend, which starts with nothing to show, takes it
+    pub const INITIAL: Sequence = Sequence(1);
+
+    #[must_use]
+    pub const fn next(self) -> Sequence {
+        Sequence(self.0 + 1)
+    }
+
+    pub const fn increment(&mut self) {
+        self.0 += 1;
+    }
+}
+
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(tag = "type")]
 pub enum GridBackendMessage {
     Initialized,
-    SetGrid { grid: VecGrid<Tile> },
+    SetGrid {
+        sequence: Sequence,
+        grid: VecGrid<Tile>,
+    },
 }
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(tag = "type")]
 pub enum GridFrontendMessage {
-    SetGrid(VecGrid<Tile>),
+    SetGrid {
+        sequence: Sequence,
+        grid: VecGrid<Tile>,
+    },
 }
 
 macro_rules! preset {
@@ -346,13 +375,19 @@ pub type WidgetGraph = DirectedGraph<Vertex>;
 #[serde(tag = "type")]
 pub enum GraphBackendMessage {
     Initialized,
-    SetGraph { graph: WidgetGraph },
+    SetGraph {
+        sequence: Sequence,
+        graph: WidgetGraph,
+    },
 }
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(tag = "type")]
 pub enum GraphFrontendMessage {
-    SetGraph(WidgetGraph),
+    SetGraph {
+        sequence: Sequence,
+        graph: WidgetGraph,
+    },
 }
 
 preset! {

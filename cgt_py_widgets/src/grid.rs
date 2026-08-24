@@ -2,7 +2,7 @@ use crate::{
     SyncState,
     canvas::HtmlCanvas,
     reactive::{self, SelectOption, SelectOptionElement},
-    report_edits_to_python,
+    report_edits_to_python, set_edited,
 };
 use cgt::{
     drawing::{Area, Canvas, Color, Hits, Interaction, Interactions},
@@ -228,7 +228,7 @@ impl GridWidget {
                     let Some(new_grid) = resize_edge(&grid.lock_ref().state, edge, grow) else {
                         return Ok(());
                     };
-                    grid.set(SyncState::edited(new_grid));
+                    set_edited(&grid, new_grid);
 
                     Ok(())
                 }
@@ -463,9 +463,10 @@ impl GridWidget {
                     return;
                 }
 
-                grid.set(SyncState::edited(
+                set_edited(
+                    grid,
                     fission.move_in(x, y, player).grid().map(|t| Tile::from(t)),
-                ));
+                );
                 GridWidget::pass_turn(edit_option, alternating_moves, preset);
             }
             EditMode::AmazonsMove(player) => {
@@ -524,7 +525,7 @@ impl GridWidget {
                     return;
                 };
 
-                grid.set(SyncState::edited(played));
+                set_edited(grid, played);
                 amazons_move.set(None);
                 GridWidget::pass_turn(edit_option, alternating_moves, preset);
             }
@@ -591,13 +592,12 @@ impl WasmWidget for GridWidget {
 
     fn handle_message(&mut self, message: Self::FrontendMessage) -> Result<(), JsValue> {
         match message {
-            GridFrontendMessage::SetGrid(new_grid) => {
-                // Python echoes back every grid it is told about
-                // (since there may be multiple frontend instances)
+            GridFrontendMessage::SetGrid {
+                sequence,
+                grid: new_grid,
+            } => {
                 let mut grid = self.grid.lock_mut();
-                if grid.state != new_grid {
-                    *grid = SyncState::from_python(new_grid);
-                }
+                grid.take_from_python(sequence, new_grid);
 
                 Ok(())
             }
@@ -718,8 +718,8 @@ impl WasmWidget for GridWidget {
             },
         );
 
-        report_edits_to_python(&self.grid, &context, |grid| GridBackendMessage::SetGrid {
-            grid,
+        report_edits_to_python(&self.grid, &context, |sequence, grid| {
+            GridBackendMessage::SetGrid { sequence, grid }
         });
 
         context.send_message(&GridBackendMessage::Initialized);

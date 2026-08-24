@@ -13,8 +13,8 @@ use cgt::{
     },
 };
 use cgt_py_messages::{
-    GraphBackendMessage, GraphFrontendMessage, GraphPreset, Vertex, VertexColor, WidgetGraph,
-    layout::arrange,
+    GraphBackendMessage, GraphFrontendMessage, GraphPreset, Sequence, Vertex, VertexColor,
+    WidgetGraph, layout::arrange,
 };
 use jupyter_rust_widget_backend::{Response, RustWidget};
 use pyo3::{
@@ -283,6 +283,16 @@ impl PyGraph {
 struct GraphWidget {
     preset: GraphPreset,
     graph: WidgetGraph,
+    sequence: Sequence,
+}
+
+impl GraphWidget {
+    fn set_graph_message(&self) -> GraphFrontendMessage {
+        GraphFrontendMessage::SetGraph {
+            sequence: self.sequence,
+            graph: self.graph.clone(),
+        }
+    }
 }
 
 impl RustWidget for GraphWidget {
@@ -306,14 +316,19 @@ impl RustWidget for GraphWidget {
     fn handle_message(&mut self, event: Self::BackendMessage) -> Response<Self::FrontendMessage> {
         match event {
             GraphBackendMessage::Initialized => Response {
-                message: Some(GraphFrontendMessage::SetGraph(self.graph.clone())),
+                message: Some(self.set_graph_message()),
                 run_on_update: false,
             },
-            GraphBackendMessage::SetGraph { graph } => {
-                self.graph = graph;
+            GraphBackendMessage::SetGraph { sequence, graph } => {
+                let taken = sequence > self.sequence;
+                if taken {
+                    self.sequence = sequence;
+                    self.graph = graph;
+                }
+
                 Response {
-                    message: Some(GraphFrontendMessage::SetGraph(self.graph.clone())),
-                    run_on_update: true,
+                    message: Some(self.set_graph_message()),
+                    run_on_update: taken,
                 }
             }
         }
@@ -328,6 +343,7 @@ fn make_graph_widget(py: Python<'_>, preset: GraphPreset) -> PyResult<Bound<'_, 
     GraphWidget {
         preset,
         graph: WidgetGraph::empty(&[]),
+        sequence: Sequence::INITIAL,
     }
     .into_widget(py, "cgt_py")
 }

@@ -2,7 +2,7 @@ use crate::{
     SyncState,
     canvas::HtmlCanvas,
     reactive::{self, SelectOption, SelectOptionElement},
-    report_edits_to_python,
+    report_edits_to_python, set_edited,
 };
 use cgt::{
     drawing::{Area, Canvas, Color, Hits, Interaction, Interactions},
@@ -681,12 +681,13 @@ impl GraphWidget {
             return;
         };
 
-        graph.set(SyncState::edited(new_position.graph.as_directed().map(
-            |vertex| Vertex {
+        set_edited(
+            graph,
+            new_position.graph.as_directed().map(|vertex| Vertex {
                 position: vertex.position,
                 color: VertexColor::from(vertex.kind.color()),
-            },
-        )));
+            }),
+        );
         edit.pass_turn(preset);
     }
 
@@ -724,12 +725,13 @@ impl GraphWidget {
             return;
         };
 
-        graph.set(SyncState::edited(new_position.graph.as_directed().map(
-            |vertex| Vertex {
+        set_edited(
+            graph,
+            new_position.graph.as_directed().map(|vertex| Vertex {
                 position: vertex.position,
                 color: VertexColor::from(vertex.color),
-            },
-        )));
+            }),
+        );
         edit.pass_turn(preset);
     }
 
@@ -771,10 +773,13 @@ impl GraphWidget {
             return;
         };
 
-        graph.set(SyncState::edited(new_position.graph.map(|vertex| Vertex {
-            position: vertex.position,
-            color: VertexColor::from(vertex.color),
-        })));
+        set_edited(
+            graph,
+            new_position.graph.map(|vertex| Vertex {
+                position: vertex.position,
+                color: VertexColor::from(vertex.color),
+            }),
+        );
         edit.pass_turn(preset);
     }
 
@@ -1189,13 +1194,12 @@ impl WasmWidget for GraphWidget {
 
     fn handle_message(&mut self, message: Self::FrontendMessage) -> Result<(), JsValue> {
         match message {
-            GraphFrontendMessage::SetGraph(new_graph) => {
-                // Python echoes back every graph it is told about
-                // (since there may be multiple frontend instances)
+            GraphFrontendMessage::SetGraph {
+                sequence,
+                graph: new_graph,
+            } => {
                 let mut graph = self.graph.lock_mut();
-                if graph.state != new_graph {
-                    *graph = SyncState::from_python(new_graph);
-                }
+                graph.take_from_python(sequence, new_graph);
 
                 Ok(())
             }
@@ -1346,8 +1350,8 @@ impl WasmWidget for GraphWidget {
             },
         );
 
-        report_edits_to_python(&self.graph, &context, |graph| {
-            GraphBackendMessage::SetGraph { graph }
+        report_edits_to_python(&self.graph, &context, |sequence, graph| {
+            GraphBackendMessage::SetGraph { sequence, graph }
         });
 
         context.send_message(&GraphBackendMessage::Initialized);
