@@ -5,7 +5,7 @@ use crate::{
     report_edits_to_python,
 };
 use cgt::{
-    drawing::{Canvas, Color, Hits, Interactions},
+    drawing::{Area, Canvas, Color, Hits, Interaction, Interactions},
     grid::{FiniteGrid, Grid as _, vec_grid::VecGrid},
     numeric::v2f::V2f,
     short::partizan::{Player, games::fission},
@@ -260,7 +260,20 @@ fn checked_resize(value: u8, action: ResizeAction) -> Option<u8> {
 
 struct Frame {
     tiles: Hits<(u8, u8)>,
+
+    /// The whole board, which lies behind the tiles and so catches the pointer wherever it
+    /// is between them rather than on one
+    background: Interaction,
+
     domino: Option<[(u8, u8); 2]>,
+}
+
+impl Frame {
+    /// Whether the pointer clicked the board at all, a line between two tiles counting
+    /// just as much as a tile
+    const fn clicked_board(&self) -> bool {
+        self.tiles.clicked.is_some() || self.background.clicked.is_some()
+    }
 }
 
 impl GridWidget {
@@ -286,28 +299,27 @@ impl GridWidget {
             .unwrap()
             .dyn_into::<CanvasRenderingContext2d>()?;
 
-        // Read before the canvas borrows the interactions away
         let cursor = interactions.pointer().position;
+        let domino = match edit_mode {
+            EditMode::DomineeringMove(player) => {
+                cursor.and_then(|cursor| domineering::hovered_domino(grid, player, cursor))
+            }
+            EditMode::FlipCell | EditMode::PlaceObject(_) | EditMode::FissionMove(_) => None,
+        };
 
-        let mut domino = None;
         let mut canvas = HtmlCanvas::new(context, interactions);
-        let tiles = canvas.frame(|canvas| {
-            // The tiles do not cover the gaps between them, which the grid lines are drawn in
+        let frame = canvas.frame(|canvas| {
+            // The tiles do not cover the gaps between them, which the grid lines are drawn
+            // in, so the board behind them is what the pointer finds while it is on a line
+            let background = canvas.interact(Area::Rect {
+                position: V2f::ZERO,
+                size: canvas_size,
+            });
             canvas.rect(V2f::ZERO, canvas_size, Color::BLACK);
             let tiles = grid.draw(canvas, Tile::drawing);
 
-            // Nothing is hovered during the measuring pass, so the domino is only found
-            // during the painting one. A highlight registers no area of its own, so
-            // previewing it cannot disturb hit testing
-            domino = match edit_mode {
-                EditMode::DomineeringMove(player) => {
-                    tiles.hovered.zip(cursor).and_then(|(hovered, cursor)| {
-                        domineering::hovered_domino(grid, player, hovered, cursor)
-                    })
-                }
-                EditMode::FlipCell | EditMode::PlaceObject(_) | EditMode::FissionMove(_) => None,
-            };
-
+            // A highlight registers no area of its own, so previewing the domino cannot
+            // disturb hit testing
             if let (Some(domino), EditMode::DomineeringMove(player)) = (domino, edit_mode) {
                 let color = match player {
                     Player::Left => Color::BLUE,
@@ -318,10 +330,14 @@ impl GridWidget {
                 }
             }
 
-            tiles
+            Frame {
+                tiles,
+                background,
+                domino,
+            }
         });
 
-        Ok(Frame { tiles, domino })
+        Ok(frame)
     }
 
     fn pass_turn(
@@ -345,11 +361,30 @@ impl GridWidget {
         preset: &GridPreset,
         frame: &Frame,
     ) {
+        let mode = edit_option.get().mode;
+
+        if let EditMode::DomineeringMove(_) = mode {
+            // Already chosen and checked while painting the preview
+            let Some(domino) = frame.domino.filter(|_| frame.clicked_board()) else {
+                return;
+            };
+
+            {
+                let mut grid = grid.lock_mut();
+                for (x, y) in domino {
+                    grid.edit().set(x, y, Tile::Taken);
+                }
+            }
+
+            GridWidget::pass_turn(edit_option, alternating_moves, preset);
+            return;
+        }
+
         let Some((x, y)) = frame.tiles.clicked else {
             return;
         };
 
-        match edit_option.get().mode {
+        match mode {
             EditMode::FlipCell => {
                 let mut grid = grid.lock_mut();
                 let flipped = match grid.state.get(x, y) {
@@ -387,21 +422,8 @@ impl GridWidget {
                 GridWidget::pass_turn(edit_option, alternating_moves, preset);
             }
 
-            EditMode::DomineeringMove(_) => {
-                // Already chosen and checked while painting the preview
-                let Some(domino) = frame.domino else {
-                    return;
-                };
-
-                {
-                    let mut grid = grid.lock_mut();
-                    for (x, y) in domino {
-                        grid.edit().set(x, y, Tile::Taken);
-                    }
-                }
-
-                GridWidget::pass_turn(edit_option, alternating_moves, preset);
-            }
+            // Played above, before the click was narrowed down to a tile
+            EditMode::DomineeringMove(_) => {}
         }
     }
 

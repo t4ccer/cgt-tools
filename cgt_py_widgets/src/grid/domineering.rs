@@ -7,18 +7,32 @@ use cgt::{
 };
 use cgt_py_messages::Tile;
 
-pub fn hovered_domino(
-    grid: &VecGrid<Tile>,
-    player: Player,
-    (x, y): (u8, u8),
-    cursor: V2f,
-) -> Option<[(u8, u8); 2]> {
+fn axis_position(coordinate: f32, tile_size: f32, length: u8) -> (u8, bool) {
+    let line = HtmlCanvas::thick_line_weight();
+
+    let pitch = tile_size + line;
+    let index = u8::min(
+        ((coordinate - line) / pitch).floor().max(0.0) as u8,
+        length - 1,
+    );
+
+    let middle = f32::from(index).mul_add(pitch, line) + tile_size * 0.5;
+    (index, coordinate > middle)
+}
+
+pub fn hovered_domino(grid: &VecGrid<Tile>, player: Player, cursor: V2f) -> Option<[(u8, u8); 2]> {
+    let (width, height) = (grid.width(), grid.height());
+    if width == 0 || height == 0 {
+        return None;
+    }
+
     let tile_size = HtmlCanvas::tile_size();
-    let origin = HtmlCanvas::tile_position(x, y);
+    let (column, past_column_middle) = axis_position(cursor.x, tile_size.x, width);
+    let (row, past_row_middle) = axis_position(cursor.y, tile_size.y, height);
 
     let (position, length, past_middle) = match player {
-        Player::Left => (y, grid.height(), cursor.y - origin.y > tile_size.y * 0.5),
-        Player::Right => (x, grid.width(), cursor.x - origin.x > tile_size.x * 0.5),
+        Player::Left => (row, height, past_row_middle),
+        Player::Right => (column, width, past_column_middle),
     };
 
     let onwards = (position + 1 < length).then_some(position);
@@ -34,8 +48,8 @@ pub fn hovered_domino(
         .into_iter()
         .flatten()
         .map(|first| match player {
-            Player::Left => [(x, first), (x, first + 1)],
-            Player::Right => [(first, y), (first + 1, y)],
+            Player::Left => [(column, first), (column, first + 1)],
+            Player::Right => [(first, row), (first + 1, row)],
         })
         .find(|domino| domino_fits(grid, *domino))
 }
@@ -82,41 +96,21 @@ mod tests {
 
         // Left plays vertical dominoes: above the middle reaches up, below reaches down
         assert_eq!(
-            hovered_domino(
-                &grid,
-                Player::Left,
-                (1, 1),
-                off_middle(1, 1, Player::Left, -20.0)
-            ),
+            hovered_domino(&grid, Player::Left, off_middle(1, 1, Player::Left, -20.0)),
             Some([(1, 0), (1, 1)])
         );
         assert_eq!(
-            hovered_domino(
-                &grid,
-                Player::Left,
-                (1, 1),
-                off_middle(1, 1, Player::Left, 20.0)
-            ),
+            hovered_domino(&grid, Player::Left, off_middle(1, 1, Player::Left, 20.0)),
             Some([(1, 1), (1, 2)])
         );
 
         // Right plays horizontal ones
         assert_eq!(
-            hovered_domino(
-                &grid,
-                Player::Right,
-                (1, 1),
-                off_middle(1, 1, Player::Right, -20.0)
-            ),
+            hovered_domino(&grid, Player::Right, off_middle(1, 1, Player::Right, -20.0)),
             Some([(0, 1), (1, 1)])
         );
         assert_eq!(
-            hovered_domino(
-                &grid,
-                Player::Right,
-                (1, 1),
-                off_middle(1, 1, Player::Right, 20.0)
-            ),
+            hovered_domino(&grid, Player::Right, off_middle(1, 1, Player::Right, 20.0)),
             Some([(1, 1), (2, 1)])
         );
     }
@@ -127,40 +121,20 @@ mod tests {
 
         // Top row hovered in its top half still reaches down, bottom row still reaches up
         assert_eq!(
-            hovered_domino(
-                &grid,
-                Player::Left,
-                (1, 0),
-                off_middle(1, 0, Player::Left, -20.0)
-            ),
+            hovered_domino(&grid, Player::Left, off_middle(1, 0, Player::Left, -20.0)),
             Some([(1, 0), (1, 1)])
         );
         assert_eq!(
-            hovered_domino(
-                &grid,
-                Player::Left,
-                (1, 2),
-                off_middle(1, 2, Player::Left, 20.0)
-            ),
+            hovered_domino(&grid, Player::Left, off_middle(1, 2, Player::Left, 20.0)),
             Some([(1, 1), (1, 2)])
         );
 
         assert_eq!(
-            hovered_domino(
-                &grid,
-                Player::Right,
-                (0, 1),
-                off_middle(0, 1, Player::Right, -20.0)
-            ),
+            hovered_domino(&grid, Player::Right, off_middle(0, 1, Player::Right, -20.0)),
             Some([(0, 1), (1, 1)])
         );
         assert_eq!(
-            hovered_domino(
-                &grid,
-                Player::Right,
-                (2, 1),
-                off_middle(2, 1, Player::Right, 20.0)
-            ),
+            hovered_domino(&grid, Player::Right, off_middle(2, 1, Player::Right, 20.0)),
             Some([(1, 1), (2, 1)])
         );
     }
@@ -169,19 +143,101 @@ mod tests {
     fn no_domino_fits_across_a_single_line() {
         // One row: Left has nowhere to put a vertical domino, Right is fine
         let row = empty(3, 1);
-        assert_eq!(
-            hovered_domino(&row, Player::Left, (1, 0), middle_of(1, 0)),
-            None
-        );
-        assert!(hovered_domino(&row, Player::Right, (1, 0), middle_of(1, 0)).is_some());
+        assert_eq!(hovered_domino(&row, Player::Left, middle_of(1, 0)), None);
+        assert!(hovered_domino(&row, Player::Right, middle_of(1, 0)).is_some());
 
         // One column: the other way round
         let column = empty(1, 3);
         assert_eq!(
-            hovered_domino(&column, Player::Right, (0, 1), middle_of(0, 1)),
+            hovered_domino(&column, Player::Right, middle_of(0, 1)),
             None
         );
-        assert!(hovered_domino(&column, Player::Left, (0, 1), middle_of(0, 1)).is_some());
+        assert!(hovered_domino(&column, Player::Left, middle_of(0, 1)).is_some());
+    }
+
+    /// A point on the line drawn between tile `(x, y)` and the next one along the axis
+    /// that `player`'s dominoes run in
+    fn on_line_after(x: u8, y: u8, player: Player) -> V2f {
+        let start = HtmlCanvas::tile_position(x, y);
+        let tile_size = HtmlCanvas::tile_size();
+        let half_line = HtmlCanvas::thick_line_weight() * 0.5;
+        match player {
+            Player::Left => V2f {
+                x: start.x + tile_size.x * 0.5,
+                y: start.y + tile_size.y + half_line,
+            },
+            Player::Right => V2f {
+                x: start.x + tile_size.x + half_line,
+                y: start.y + tile_size.y * 0.5,
+            },
+        }
+    }
+
+    #[test]
+    fn a_line_between_two_tiles_names_the_domino_spanning_it() {
+        let grid = empty(3, 3);
+
+        // Resting on the line below (1, 0) is aiming at the domino covering it and (1, 1)
+        assert_eq!(
+            hovered_domino(&grid, Player::Left, on_line_after(1, 0, Player::Left)),
+            Some([(1, 0), (1, 1)])
+        );
+        assert_eq!(
+            hovered_domino(&grid, Player::Left, on_line_after(1, 1, Player::Left)),
+            Some([(1, 1), (1, 2)])
+        );
+
+        // And the same for the vertical lines that Right's dominoes cross
+        assert_eq!(
+            hovered_domino(&grid, Player::Right, on_line_after(0, 1, Player::Right)),
+            Some([(0, 1), (1, 1)])
+        );
+        assert_eq!(
+            hovered_domino(&grid, Player::Right, on_line_after(1, 1, Player::Right)),
+            Some([(1, 1), (2, 1)])
+        );
+    }
+
+    #[test]
+    fn the_domino_does_not_jump_when_crossing_a_line() {
+        // Either side of the line below (1, 1) names the same domino, so nothing changes
+        // under the cursor as it crosses
+        let grid = empty(3, 3);
+        let line = on_line_after(1, 1, Player::Left);
+
+        for offset in [-1.5, -0.5, 0.5, 1.5] {
+            let cursor = V2f {
+                x: line.x,
+                y: line.y + offset,
+            };
+            assert_eq!(
+                hovered_domino(&grid, Player::Left, cursor),
+                Some([(1, 1), (1, 2)]),
+                "{offset} px from the line"
+            );
+        }
+    }
+
+    #[test]
+    fn the_border_around_the_board_reaches_inwards() {
+        // The outermost lines have only one tile beside them to work with
+        let grid = empty(3, 3);
+
+        assert_eq!(
+            hovered_domino(&grid, Player::Left, V2f { x: 34.0, y: 0.0 }),
+            Some([(0, 0), (0, 1)])
+        );
+        assert_eq!(
+            hovered_domino(
+                &grid,
+                Player::Left,
+                V2f {
+                    x: 34.0,
+                    y: HtmlCanvas::tile_position(0, 2).y + HtmlCanvas::tile_size().y + 1.0,
+                }
+            ),
+            Some([(0, 1), (0, 2)])
+        );
     }
 
     #[test]
@@ -200,12 +256,7 @@ mod tests {
         let mut grid = empty(3, 3);
         grid.set(1, 0, Tile::Taken);
         assert_eq!(
-            hovered_domino(
-                &grid,
-                Player::Left,
-                (1, 1),
-                off_middle(1, 1, Player::Left, -20.0)
-            ),
+            hovered_domino(&grid, Player::Left, off_middle(1, 1, Player::Left, -20.0)),
             Some([(1, 1), (1, 2)])
         );
 
@@ -213,12 +264,7 @@ mod tests {
         let mut grid = empty(3, 3);
         grid.set(2, 1, Tile::Taken);
         assert_eq!(
-            hovered_domino(
-                &grid,
-                Player::Right,
-                (1, 1),
-                off_middle(1, 1, Player::Right, 20.0)
-            ),
+            hovered_domino(&grid, Player::Right, off_middle(1, 1, Player::Right, 20.0)),
             Some([(0, 1), (1, 1)])
         );
     }
@@ -229,21 +275,12 @@ mod tests {
         let mut grid = empty(3, 3);
         grid.set(1, 0, Tile::Taken);
         grid.set(1, 2, Tile::Taken);
-        assert_eq!(
-            hovered_domino(&grid, Player::Left, (1, 1), middle_of(1, 1)),
-            None
-        );
+        assert_eq!(hovered_domino(&grid, Player::Left, middle_of(1, 1)), None);
 
         // A taken tile has nowhere to put a domino either, whichever way it reaches
         let mut grid = empty(3, 3);
         grid.set(1, 1, Tile::Taken);
-        assert_eq!(
-            hovered_domino(&grid, Player::Left, (1, 1), middle_of(1, 1)),
-            None
-        );
-        assert_eq!(
-            hovered_domino(&grid, Player::Right, (1, 1), middle_of(1, 1)),
-            None
-        );
+        assert_eq!(hovered_domino(&grid, Player::Left, middle_of(1, 1)), None);
+        assert_eq!(hovered_domino(&grid, Player::Right, middle_of(1, 1)), None);
     }
 }
