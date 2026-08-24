@@ -106,6 +106,7 @@ impl PyCol {
         let circle = CircleEdge {
             circle_radius: 128.0,
             vertex_radius: svg::Canvas::vertex_radius(),
+            center: V2f { x: 128.0, y: 128.0 },
         };
         circle.layout(&mut graph);
 

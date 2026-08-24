@@ -99,8 +99,13 @@ impl SpringEmbedder {
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct CircleEdge {
+    /// Radius of the circle that the vertices are laid out inside of. They sit
+    /// [`CircleEdge::vertex_radius`] further in, so that they fit within it
     pub circle_radius: f32,
     pub vertex_radius: f32,
+
+    /// Point the circle is centered on
+    pub center: V2f,
 }
 
 impl CircleEdge {
@@ -114,11 +119,60 @@ impl CircleEdge {
             let angle = (2.0 * PI * i.index as f32) / n as f32;
             let vertex_pos = V2f {
                 x: (self.circle_radius - self.vertex_radius)
-                    .mul_add(f32::cos(angle), self.circle_radius),
+                    .mul_add(f32::cos(angle), self.center.x),
                 y: (self.circle_radius - self.vertex_radius)
-                    .mul_add(f32::sin(angle), self.circle_radius),
+                    .mul_add(f32::sin(angle), self.center.y),
             };
             *graph.get_vertex_mut(i).get_inner_mut() = vertex_pos;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{graph::VertexIndex, impl_has};
+
+    #[derive(Clone, Copy)]
+    struct Vertex {
+        position: V2f,
+    }
+
+    impl_has!(Vertex -> position -> V2f);
+
+    #[test]
+    fn circle_edge_places_vertices_around_its_center() {
+        use crate::graph::adjacency_matrix::undirected::UndirectedGraph;
+
+        let center = V2f { x: 320.0, y: 200.0 };
+        let circle = CircleEdge {
+            circle_radius: 200.0,
+            vertex_radius: 16.0,
+            center,
+        };
+
+        let mut graph = UndirectedGraph::empty(
+            &[Vertex {
+                position: V2f::ZERO,
+            }; 8],
+        );
+        circle.layout(&mut graph);
+
+        for vertex in graph.vertex_indices() {
+            let position: V2f = *graph.get_vertex(vertex).get_inner();
+            let distance = V2f::distance(position, center);
+
+            // Vertices sit a whole vertex radius inside the circle, so that they fit in it
+            assert!(
+                (distance - (circle.circle_radius - circle.vertex_radius)).abs() < 0.01,
+                "vertex {} sits {distance} from the center",
+                vertex.index
+            );
+        }
+
+        // The first vertex starts the circle at angle zero, due right of the center
+        let first: V2f = *graph.get_vertex(VertexIndex { index: 0 }).get_inner();
+        assert!((first.x - (center.x + 184.0)).abs() < 0.01);
+        assert!((first.y - center.y).abs() < 0.01);
     }
 }

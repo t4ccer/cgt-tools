@@ -3,6 +3,7 @@ use cgt::{
     graph::{
         Graph, VertexIndex,
         adjacency_matrix::{directed::DirectedGraph, undirected::UndirectedGraph},
+        layout::{Bounds, CircleEdge, SpringEmbedder},
     },
     has::Has,
     impl_has,
@@ -26,8 +27,9 @@ use wasm_bindgen::{
     prelude::{ScopedClosure, wasm_bindgen},
 };
 use web_sys::{
-    CanvasRenderingContext2d, Element, HtmlCanvasElement, HtmlDivElement, HtmlInputElement,
-    HtmlLabelElement, HtmlSelectElement, MouseEvent, ResizeObserver,
+    CanvasRenderingContext2d, Document, Element, HtmlButtonElement, HtmlCanvasElement,
+    HtmlDivElement, HtmlElement, HtmlInputElement, HtmlLabelElement, HtmlSelectElement, MouseEvent,
+    ResizeObserver,
 };
 
 use crate::{SelectOption, SelectOptionElement, canvas::HtmlCanvas};
@@ -125,6 +127,9 @@ struct SharedState {
     edit_mode: EditMode,
     /// Whether the same player keeps moving instead of the players taking turns
     consecutive_moves: bool,
+    /// Whether the layout parameters were touched by hand. Until they are they follow the
+    /// graph, so that laying out a graph drawn after the widget opened still fits it
+    layout_customized: bool,
     state: Option<HtmlState>,
     canvas_size: V2f,
     graph: WidgetGraph,
@@ -224,6 +229,94 @@ const EDGE_VERTEX_OPTIONS: &[EdgeVertexOption] = &[
     },
 ];
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum LayoutAlgorithm {
+    SpringEmbedder,
+    Circle,
+}
+
+/// Layouts do not care which game is being played, so every preset offers both
+const LAYOUT_OPTIONS: &[LayoutOption] = &[
+    LayoutOption {
+        text: "Spring Embedder",
+        algorithm: LayoutAlgorithm::SpringEmbedder,
+        visible_preset: GraphPresetFlag::all(),
+    },
+    LayoutOption {
+        text: "Circle",
+        algorithm: LayoutAlgorithm::Circle,
+        visible_preset: GraphPresetFlag::all(),
+    },
+];
+
+/// Biggest circle the canvas holds. Growing it further to give a crowded graph more
+/// circumference would only push vertices off the canvas, where they cannot be reached, so
+/// a graph too big for its canvas is left overlapping until the canvas is dragged larger
+fn default_circle(canvas_size: V2f) -> CircleEdge {
+    CircleEdge {
+        circle_radius: f32::min(canvas_size.x, canvas_size.y) * 0.5,
+        vertex_radius: HtmlCanvas::vertex_radius(),
+        center: V2f {
+            x: canvas_size.x * 0.5,
+            y: canvas_size.y * 0.5,
+        },
+    }
+}
+
+fn default_spring(vertices: usize, canvas_size: V2f) -> SpringEmbedder {
+    let vertex_radius = HtmlCanvas::vertex_radius();
+
+    // Every iteration walks every pair of vertices, so cap the total work to keep a big
+    // graph from freezing the page for the whole time the button is held down
+    let iterations = usize::clamp(
+        MAX_LAYOUT_WORK / usize::max(vertices * vertices, 1),
+        256,
+        4096,
+    );
+
+    // Give every vertex its own patch of canvas to spread out into, but never ask for
+    // less room than it takes to tell two of them apart
+    let area = canvas_size.x * canvas_size.y;
+    let ideal_spring_length = f32::max(
+        f32::sqrt(area / f32::max(vertices as f32, 1.0)) * 0.5,
+        vertex_radius * 3.0,
+    );
+
+    SpringEmbedder {
+        // Cool down to almost nothing by the last iteration so that the layout settles
+        cooling_rate: f32::powf(0.01, 1.0 / iterations as f32),
+        c_attractive: 1.0,
+        // Holds the balance struck by the values the svg rendering was tuned with, where
+        // a repulsion of 250 went with an ideal length of 40
+        c_repulsive: (250.0 / (40.0 * 40.0)) * ideal_spring_length * ideal_spring_length,
+        ideal_spring_length,
+        iterations,
+        bounds: Some(canvas_bounds(canvas_size, 0.001)),
+    }
+}
+
+/// Keeps the layout within the part of the canvas where a vertex can still be clicked
+fn canvas_bounds(canvas_size: V2f, c_middle_attractive: f32) -> Bounds {
+    let vertex_radius = HtmlCanvas::vertex_radius();
+    Bounds {
+        lower: V2f {
+            x: vertex_radius,
+            y: vertex_radius,
+        },
+        // A canvas too small to have an inside would give the bounds a lower edge above
+        // their upper one, which clamping refuses to do
+        upper: V2f {
+            x: f32::max(vertex_radius, canvas_size.x - vertex_radius),
+            y: f32::max(vertex_radius, canvas_size.y - vertex_radius),
+        },
+        c_middle_attractive: Some(c_middle_attractive),
+    }
+}
+
+/// Ceiling on `iterations * vertices^2` that the default iteration count aims for, and the
+/// ceiling that a hand typed iteration count is held to
+const MAX_LAYOUT_WORK: usize = 1 << 22;
+
 const DEFAULT_CANVAS_SIZE: V2f = V2f { x: 640.0, y: 400.0 };
 const MIN_CANVAS_SIZE: V2f = V2f { x: 240.0, y: 160.0 };
 
@@ -245,6 +338,7 @@ impl GraphWidget {
                 preset,
                 edit_mode,
                 consecutive_moves: false,
+                layout_customized: false,
                 state: None,
                 canvas_size: DEFAULT_CANVAS_SIZE,
                 graph: Graph::empty(&[]),
@@ -565,6 +659,38 @@ impl GraphWidget {
         }
     }
 
+    /// Rearrange the whole graph with the chosen algorithm. Parameters that were never
+    /// touched by hand are recomputed first, since the graph they were last filled in for
+    /// is not the graph being laid out now
+    fn apply_layout(this: &mut SharedState, inputs: &LayoutInputs) {
+        let vertices = this.graph.size();
+        let canvas_size = this.canvas_size;
+
+        if !this.layout_customized {
+            inputs.show_defaults(vertices, canvas_size);
+        }
+
+        match inputs.algorithm(this.preset) {
+            LayoutAlgorithm::Circle => inputs.circle(canvas_size).layout(&mut this.graph),
+            LayoutAlgorithm::SpringEmbedder => {
+                inputs.spring(vertices, canvas_size).layout(&mut this.graph);
+            }
+        }
+
+        // Parameters of one's own choosing are left to put vertices wherever they put
+        // them, but a layout that diverged has to be caught: a position that is not a
+        // number would not even survive being sent back to python
+        for vertex in this.graph.vertex_indices() {
+            let position: &mut V2f = this.graph.get_vertex_mut(vertex).get_inner_mut();
+            if !position.x.is_finite() {
+                position.x = canvas_size.x * 0.5;
+            }
+            if !position.y.is_finite() {
+                position.y = canvas_size.y * 0.5;
+            }
+        }
+    }
+
     /// Hand the turn over to the other player, unless the same player is set to keep moving
     fn pass_turn(this: &mut SharedState) {
         if !this.consecutive_moves
@@ -716,6 +842,309 @@ impl SelectOptionElement for EdgeVertexOption {
     }
 }
 
+#[derive(Clone, Copy)]
+pub(crate) struct LayoutOption {
+    text: &'static str,
+    algorithm: LayoutAlgorithm,
+    visible_preset: GraphPresetFlag,
+}
+
+impl SelectOptionElement for LayoutOption {
+    type Preset = GraphPreset;
+
+    fn text(&self) -> &str {
+        self.text
+    }
+
+    fn is_visible(&self, preset: &Self::Preset) -> bool {
+        preset.intersects(self.visible_preset)
+    }
+}
+
+/// A parameter row of the layout panel, the label naming it and the input holding it
+fn parameter_row(
+    document: &Document,
+    label: &str,
+    input_type: &str,
+    step: &str,
+) -> Result<(HtmlLabelElement, HtmlInputElement), JsValue> {
+    // Wrapping the input in the label associates the two without needing a unique id
+    let row = document
+        .create_element("label")?
+        .dyn_into::<HtmlLabelElement>()?;
+    row.style().set_property("display", "flex")?;
+    row.style().set_property("align-items", "center")?;
+    row.style()
+        .set_property("justify-content", "space-between")?;
+    row.style().set_property("gap", "8px")?;
+
+    let text = document.create_element("span")?;
+    text.set_text_content(Some(label));
+
+    let input = document
+        .create_element("input")?
+        .dyn_into::<HtmlInputElement>()?;
+    input.set_type(input_type);
+    if !step.is_empty() {
+        input.set_step(step);
+        input.set_min("0");
+        input.style().set_property("width", "7em")?;
+    }
+
+    row.append_child(&text)?;
+    row.append_child(&input)?;
+    Ok((row, input))
+}
+
+/// The controls that pick a layout and run it, along with the collapsed panel holding the
+/// parameters of both algorithms
+#[derive(Clone)]
+struct LayoutControls {
+    /// Everything, ready to be put into the widget
+    root: HtmlElement,
+    inputs: LayoutInputs,
+    apply: HtmlButtonElement,
+    reset: HtmlButtonElement,
+    /// Holds every parameter row, so that edits to any of them bubble up to one listener
+    parameters: HtmlDivElement,
+    /// The disclosure the parameters are collapsed into
+    details: HtmlElement,
+    circle_rows: Vec<HtmlLabelElement>,
+    spring_rows: Vec<HtmlLabelElement>,
+}
+
+impl LayoutControls {
+    fn create(document: &Document, preset: GraphPreset) -> Result<LayoutControls, JsValue> {
+        let root = document.create_element("div")?.dyn_into::<HtmlElement>()?;
+        root.style().set_property("margin-bottom", "4px")?;
+
+        let row = document
+            .create_element("div")?
+            .dyn_into::<HtmlDivElement>()?;
+        row.style().set_property("display", "flex")?;
+        row.style().set_property("align-items", "center")?;
+        row.style().set_property("width", "fit-content")?;
+        row.style().set_property("gap", "8px")?;
+
+        let label = document.create_element("span")?;
+        label.set_text_content(Some("Layout"));
+        let algorithm: HtmlSelectElement =
+            SelectOption::create_element(document, "Layout", &preset, LAYOUT_OPTIONS)?;
+        let apply = document
+            .create_element("button")?
+            .dyn_into::<HtmlButtonElement>()?;
+        apply.set_type("button");
+        apply.set_text_content(Some("Apply"));
+
+        row.append_child(&label)?;
+        row.append_child(&algorithm)?;
+        row.append_child(&apply)?;
+
+        let parameters = document
+            .create_element("div")?
+            .dyn_into::<HtmlDivElement>()?;
+        parameters.style().set_property("display", "flex")?;
+        parameters
+            .style()
+            .set_property("flex-direction", "column")?;
+        parameters.style().set_property("width", "fit-content")?;
+        parameters.style().set_property("gap", "4px")?;
+        parameters.style().set_property("padding", "4px 0 0 8px")?;
+
+        let (circle_radius_row, circle_radius) = parameter_row(document, "Radius", "number", "1")?;
+        let (center_x_row, center_x) = parameter_row(document, "Center X", "number", "1")?;
+        let (center_y_row, center_y) = parameter_row(document, "Center Y", "number", "1")?;
+
+        let (iterations_row, iterations) = parameter_row(document, "Iterations", "number", "128")?;
+        let (cooling_rate_row, cooling_rate) =
+            parameter_row(document, "Cooling rate", "number", "0.0001")?;
+        let (c_attractive_row, c_attractive) =
+            parameter_row(document, "Attraction", "number", "0.1")?;
+        let (c_repulsive_row, c_repulsive) = parameter_row(document, "Repulsion", "number", "10")?;
+        let (ideal_spring_length_row, ideal_spring_length) =
+            parameter_row(document, "Ideal edge length", "number", "1")?;
+        let (c_middle_attractive_row, c_middle_attractive) =
+            parameter_row(document, "Pull to center", "number", "0.001")?;
+        let (keep_on_canvas_row, keep_on_canvas) =
+            parameter_row(document, "Keep on canvas", "checkbox", "")?;
+
+        let circle_rows = vec![circle_radius_row, center_x_row, center_y_row];
+        let spring_rows = vec![
+            iterations_row,
+            cooling_rate_row,
+            c_attractive_row,
+            c_repulsive_row,
+            ideal_spring_length_row,
+            c_middle_attractive_row,
+            keep_on_canvas_row,
+        ];
+        for parameter in circle_rows.iter().chain(spring_rows.iter()) {
+            parameters.append_child(parameter)?;
+        }
+
+        let reset = document
+            .create_element("button")?
+            .dyn_into::<HtmlButtonElement>()?;
+        reset.set_type("button");
+        reset.set_text_content(Some("Reset to defaults"));
+        reset.style().set_property("margin-top", "4px")?;
+        parameters.append_child(&reset)?;
+
+        let details = document
+            .create_element("details")?
+            .dyn_into::<HtmlElement>()?;
+        details.style().set_property("margin-top", "4px")?;
+        let summary = document.create_element("summary")?;
+        summary.set_text_content(Some("Layout parameters"));
+        details.append_child(&summary)?;
+        details.append_child(&parameters)?;
+
+        root.append_child(&row)?;
+        root.append_child(&details)?;
+
+        Ok(LayoutControls {
+            root,
+            inputs: LayoutInputs {
+                algorithm,
+                circle_radius,
+                center_x,
+                center_y,
+                iterations,
+                cooling_rate,
+                c_attractive,
+                c_repulsive,
+                ideal_spring_length,
+                c_middle_attractive,
+                keep_on_canvas,
+            },
+            apply,
+            reset,
+            parameters,
+            details,
+            circle_rows,
+            spring_rows,
+        })
+    }
+
+    /// Only the parameters of the chosen algorithm are worth showing
+    fn show_rows_of(&self, algorithm: LayoutAlgorithm) -> Result<(), JsValue> {
+        let display = |shown| if shown { "flex" } else { "none" };
+        for row in &self.circle_rows {
+            row.style()
+                .set_property("display", display(algorithm == LayoutAlgorithm::Circle))?;
+        }
+        for row in &self.spring_rows {
+            row.style().set_property(
+                "display",
+                display(algorithm == LayoutAlgorithm::SpringEmbedder),
+            )?;
+        }
+        Ok(())
+    }
+}
+
+/// Number a parameter input holds, or `fallback` if it was left empty or unreadable
+fn read_number(input: &HtmlInputElement, fallback: f32) -> f32 {
+    let value = input.value_as_number();
+    if value.is_finite() {
+        value as f32
+    } else {
+        fallback
+    }
+}
+
+/// The parameter fields of the layout panel. Every field of both algorithms is here except
+/// the vertex radius and the bounding rectangle, which are what the canvas says they are
+#[derive(Clone)]
+struct LayoutInputs {
+    algorithm: HtmlSelectElement,
+
+    circle_radius: HtmlInputElement,
+    center_x: HtmlInputElement,
+    center_y: HtmlInputElement,
+
+    iterations: HtmlInputElement,
+    cooling_rate: HtmlInputElement,
+    c_attractive: HtmlInputElement,
+    c_repulsive: HtmlInputElement,
+    ideal_spring_length: HtmlInputElement,
+    c_middle_attractive: HtmlInputElement,
+    keep_on_canvas: HtmlInputElement,
+}
+
+impl LayoutInputs {
+    fn algorithm(&self, preset: GraphPreset) -> LayoutAlgorithm {
+        SelectOption::selected_value(&self.algorithm.value(), &preset, LAYOUT_OPTIONS)
+            .map_or(LayoutAlgorithm::Circle, |option| option.algorithm)
+    }
+
+    /// Fill every field with the parameter that suits the graph as it is right now
+    fn show_defaults(&self, vertices: usize, canvas_size: V2f) {
+        let circle = default_circle(canvas_size);
+        self.circle_radius
+            .set_value(&format!("{:.1}", circle.circle_radius));
+        self.center_x.set_value(&format!("{:.1}", circle.center.x));
+        self.center_y.set_value(&format!("{:.1}", circle.center.y));
+
+        let spring = default_spring(vertices, canvas_size);
+        self.iterations.set_value(&spring.iterations.to_string());
+        self.cooling_rate
+            .set_value(&format!("{:.6}", spring.cooling_rate));
+        self.c_attractive
+            .set_value(&format!("{:.2}", spring.c_attractive));
+        self.c_repulsive
+            .set_value(&format!("{:.1}", spring.c_repulsive));
+        self.ideal_spring_length
+            .set_value(&format!("{:.1}", spring.ideal_spring_length));
+        self.c_middle_attractive.set_value(&format!(
+            "{:.4}",
+            spring
+                .bounds
+                .and_then(|bounds| bounds.c_middle_attractive)
+                .unwrap_or(0.0)
+        ));
+        self.keep_on_canvas.set_checked(spring.bounds.is_some());
+    }
+
+    fn circle(&self, canvas_size: V2f) -> CircleEdge {
+        let default = default_circle(canvas_size);
+        CircleEdge {
+            circle_radius: read_number(&self.circle_radius, default.circle_radius),
+            vertex_radius: HtmlCanvas::vertex_radius(),
+            center: V2f {
+                x: read_number(&self.center_x, default.center.x),
+                y: read_number(&self.center_y, default.center.y),
+            },
+        }
+    }
+
+    fn spring(&self, vertices: usize, canvas_size: V2f) -> SpringEmbedder {
+        let default = default_spring(vertices, canvas_size);
+
+        // A hand typed iteration count still has to leave the page responsive
+        let iterations = read_number(&self.iterations, default.iterations as f32);
+        let iterations = usize::min(
+            iterations.max(0.0) as usize,
+            MAX_LAYOUT_WORK / usize::max(vertices * vertices, 1),
+        );
+
+        SpringEmbedder {
+            cooling_rate: read_number(&self.cooling_rate, default.cooling_rate),
+            c_attractive: read_number(&self.c_attractive, default.c_attractive),
+            c_repulsive: read_number(&self.c_repulsive, default.c_repulsive),
+            ideal_spring_length: read_number(
+                &self.ideal_spring_length,
+                default.ideal_spring_length,
+            ),
+            iterations,
+            bounds: self
+                .keep_on_canvas
+                .checked()
+                .then(|| canvas_bounds(canvas_size, read_number(&self.c_middle_attractive, 0.0))),
+        }
+    }
+}
+
 impl WasmWidget for GraphWidget {
     type BackendMessage = GraphBackendMessage;
     type FrontendMessage = GraphFrontendMessage;
@@ -839,6 +1268,86 @@ impl WasmWidget for GraphWidget {
         controls.append_child(&edge_options)?;
         controls.append_child(&move_options)?;
         element.append_child(&controls)?;
+
+        let layout = LayoutControls::create(&document, self.preset)?;
+        layout.inputs.show_defaults(0, DEFAULT_CANVAS_SIZE);
+        layout.show_rows_of(layout.inputs.algorithm(self.preset))?;
+
+        let layout_handler = ScopedClosure::<dyn FnMut() -> Result<(), JsValue>>::new({
+            let preset = self.preset;
+            let layout = layout.clone();
+            move || layout.show_rows_of(layout.inputs.algorithm(preset))
+        });
+        layout
+            .inputs
+            .algorithm
+            .add_event_listener_with_callback("change", layout_handler.as_ref().unchecked_ref())?;
+        layout_handler.forget();
+
+        // Typing into any parameter hands the whole panel over to the user, so that the
+        // defaults stop being recomputed underneath what they entered
+        let customize_handler = ScopedClosure::<dyn FnMut() -> Result<(), JsValue>>::new({
+            let this = Arc::clone(&self.shared);
+            move || {
+                this.lock().unwrap().layout_customized = true;
+                Ok(())
+            }
+        });
+        layout.parameters.add_event_listener_with_callback(
+            "input",
+            customize_handler.as_ref().unchecked_ref(),
+        )?;
+        customize_handler.forget();
+
+        let reset_handler = ScopedClosure::<dyn FnMut() -> Result<(), JsValue>>::new({
+            let this = Arc::clone(&self.shared);
+            let inputs = layout.inputs.clone();
+            move || {
+                let mut this = this.lock().unwrap();
+                this.layout_customized = false;
+                inputs.show_defaults(this.graph.size(), this.canvas_size);
+                Ok(())
+            }
+        });
+        layout
+            .reset
+            .add_event_listener_with_callback("click", reset_handler.as_ref().unchecked_ref())?;
+        reset_handler.forget();
+
+        let open_handler = ScopedClosure::<dyn FnMut() -> Result<(), JsValue>>::new({
+            let this = Arc::clone(&self.shared);
+            let inputs = layout.inputs.clone();
+            move || {
+                let this = this.lock().unwrap();
+                if !this.layout_customized {
+                    inputs.show_defaults(this.graph.size(), this.canvas_size);
+                }
+                Ok(())
+            }
+        });
+        layout
+            .details
+            .add_event_listener_with_callback("toggle", open_handler.as_ref().unchecked_ref())?;
+        open_handler.forget();
+
+        let apply_handler = ScopedClosure::<dyn FnMut() -> Result<(), JsValue>>::new({
+            let this = Arc::clone(&self.shared);
+            let context = context.clone();
+            let inputs = layout.inputs.clone();
+            move || {
+                let mut this = this.lock().unwrap();
+                GraphWidget::apply_layout(&mut this, &inputs);
+                GraphWidget::send_graph(&this, &context);
+                GraphWidget::draw(&mut this)?;
+                Ok(())
+            }
+        });
+        layout
+            .apply
+            .add_event_listener_with_callback("click", apply_handler.as_ref().unchecked_ref())?;
+        apply_handler.forget();
+
+        element.append_child(&layout.root)?;
 
         let canvas_container = document
             .create_element("div")?
