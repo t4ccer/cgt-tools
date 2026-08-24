@@ -132,7 +132,7 @@ impl GridWidget {
                     .next()
                     .unwrap()
                     .mode,
-                consecutive_moves: true,
+                consecutive_moves: false,
                 state: None,
                 grid: FiniteGrid::zero_size(),
                 interactions: Interactions::new(),

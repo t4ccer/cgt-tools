@@ -1,8 +1,13 @@
 use cgt::{
     drawing::{Area, Button, Canvas, Color, Hits, Interaction, Interactions},
-    graph::{Graph, VertexIndex},
+    graph::{Graph, VertexIndex, adjacency_matrix::undirected::UndirectedGraph},
     has::Has,
+    impl_has,
     numeric::v2f::V2f,
+    short::partizan::{
+        Player,
+        games::snort::{self, Snort},
+    },
 };
 use cgt_py_messages::{
     GraphBackendMessage, GraphFrontendMessage, GraphPreset, GraphPresetFlag, Vertex, VertexColor,
@@ -23,6 +28,7 @@ use crate::{SelectOption, SelectOptionElement, canvas::HtmlCanvas};
 
 struct HtmlState {
     canvas: HtmlCanvasElement,
+    edit_mode: HtmlSelectElement,
 
     /// Kept around only so that it keeps observing the canvas container
     _resize_observer: ResizeObserver,
@@ -38,6 +44,7 @@ enum EditMode {
     /// - Clicking on vertex changes the color
     /// - Dragging a vertex moves it without changing the color
     AddColorVertex(VertexColor),
+    SnortMove(Player),
 }
 
 impl EditMode {
@@ -46,7 +53,7 @@ impl EditMode {
         match self {
             EditMode::ToggleEdge => Some(VertexColor::White),
             EditMode::AddColorVertex(color) => Some(color),
-            EditMode::MoveVertex | EditMode::RemoveVertex => None,
+            EditMode::MoveVertex | EditMode::RemoveVertex | EditMode::SnortMove(_) => None,
         }
     }
 
@@ -54,7 +61,18 @@ impl EditMode {
     const fn moves_vertices(self) -> bool {
         match self {
             EditMode::MoveVertex | EditMode::AddColorVertex(_) => true,
-            EditMode::ToggleEdge | EditMode::RemoveVertex => false,
+            EditMode::ToggleEdge | EditMode::RemoveVertex | EditMode::SnortMove(_) => false,
+        }
+    }
+
+    /// The same mode but played by the other player, if the mode plays moves at all
+    const fn opposite_player(self) -> Option<EditMode> {
+        match self {
+            EditMode::MoveVertex
+            | EditMode::ToggleEdge
+            | EditMode::RemoveVertex
+            | EditMode::AddColorVertex(_) => None,
+            EditMode::SnortMove(player) => Some(EditMode::SnortMove(player.opposite())),
         }
     }
 }
@@ -95,13 +113,14 @@ impl Applied {
 }
 
 struct SharedState {
-    #[allow(dead_code)]
     preset: GraphPreset,
     edit_mode: EditMode,
     // TODO: Move into EditMode
     // TODO: This also needs to track what vertex we want to add, either from dropdown
     // or forced for e.g. BipartiteSnort
     edge_creates_vertex: bool,
+    /// Whether the same player keeps moving instead of the players taking turns
+    consecutive_moves: bool,
     state: Option<HtmlState>,
     canvas_size: V2f,
     graph: WidgetGraph,
@@ -153,6 +172,18 @@ const EDIT_OPTIONS: &[EditOption] = &[
         mode: EditMode::RemoveVertex,
         visible_preset: GraphPresetFlag::all(),
     },
+    // Snort
+    EditOption {
+        text: "Left Move",
+        mode: EditMode::SnortMove(Player::Left),
+        visible_preset: GraphPresetFlag::Snort,
+    },
+    EditOption {
+        text: "Right Move",
+        mode: EditMode::SnortMove(Player::Right),
+        visible_preset: GraphPresetFlag::Snort,
+    },
+    // TODO: Col moves
 ];
 
 const DEFAULT_CANVAS_SIZE: V2f = V2f { x: 640.0, y: 400.0 };
@@ -171,6 +202,7 @@ impl GraphWidget {
                 preset,
                 edit_mode: EDIT_OPTIONS[0].mode,
                 edge_creates_vertex: true,
+                consecutive_moves: false,
                 state: None,
                 canvas_size: DEFAULT_CANVAS_SIZE,
                 graph: Graph::empty(&[]),
@@ -199,9 +231,44 @@ fn vertex_position(graph: &WidgetGraph, vertex: VertexIndex) -> V2f {
     *graph.get_vertex(vertex).get_inner()
 }
 
+#[derive(Clone, Copy)]
+struct SnortVertex {
+    kind: snort::VertexKind,
+    position: V2f,
+}
+
+impl_has!(SnortVertex -> kind -> snort::VertexKind);
+
+fn snort_move_in<const COLOR: u8>(
+    position: &Snort<SnortVertex, UndirectedGraph<SnortVertex>>,
+    vertex: VertexIndex,
+) -> Option<Snort<SnortVertex, UndirectedGraph<SnortVertex>>> {
+    position
+        .available_moves_for::<COLOR>()
+        .any(|legal| legal == vertex)
+        .then(|| position.move_in_vertex::<COLOR>(vertex))
+}
+
 impl GraphWidget {
+    fn sync_edit_mode(this: &SharedState) {
+        let Some(state) = &this.state else {
+            return;
+        };
+
+        let current_mode =
+            SelectOption::selected_value(&state.edit_mode.value(), &this.preset, EDIT_OPTIONS);
+        if current_mode.map(|o| o.mode) != Some(this.edit_mode)
+            && let Some(mode) =
+                SelectOption::find_index(|o| o.mode == this.edit_mode, &this.preset, EDIT_OPTIONS)
+        {
+            state.edit_mode.set_value(&mode.to_string());
+        }
+    }
+
     /// Paint the graph and report what the mouse did to it
     fn draw(this: &mut SharedState) -> Result<Frame, JsValue> {
+        GraphWidget::sync_edit_mode(this);
+
         let SharedState {
             state,
             canvas_size,
@@ -360,6 +427,8 @@ impl GraphWidget {
             },
 
             EditMode::ToggleEdge => GraphWidget::drop_edge(this, frame),
+
+            EditMode::SnortMove(player) => GraphWidget::snort_move(this, frame, player),
         };
 
         Applied {
@@ -393,6 +462,52 @@ impl GraphWidget {
 
         let adjacent = this.graph.are_adjacent(from, connected);
         this.graph.connect(from, connected, !adjacent);
+        Applied {
+            changed: true,
+            committed: true,
+        }
+    }
+
+    fn snort_move(this: &mut SharedState, frame: &Frame, player: Player) -> Applied {
+        let Some(clicked) = frame.vertices.clicked else {
+            return Applied::none();
+        };
+
+        let Ok(graph) = this.graph.try_map(|vertex| {
+            snort::VertexColor::try_from(vertex.color).map(|color| SnortVertex {
+                kind: snort::VertexKind::Single(color),
+                position: vertex.position,
+            })
+        }) else {
+            // Should be unreachable
+            return Applied::none();
+        };
+
+        let position = Snort::new(graph);
+        let new_position = match player {
+            Player::Left => {
+                snort_move_in::<{ snort::VertexColor::TintLeft as u8 }>(&position, clicked)
+            }
+            Player::Right => {
+                snort_move_in::<{ snort::VertexColor::TintRight as u8 }>(&position, clicked)
+            }
+        };
+
+        let Some(new_position) = new_position else {
+            return Applied::none();
+        };
+
+        this.graph = new_position.graph.map(|vertex| Vertex {
+            position: vertex.position,
+            color: VertexColor::from(vertex.kind.color()),
+        });
+
+        if !this.consecutive_moves
+            && let Some(new_mode) = this.edit_mode.opposite_player()
+        {
+            this.edit_mode = new_mode;
+        }
+
         Applied {
             changed: true,
             committed: true,
@@ -491,26 +606,46 @@ impl WasmWidget for GraphWidget {
         edge_options.append_child(&edge_creates_vertex)?;
         edge_options.append_child(&edge_options_text)?;
 
+        let move_options = document
+            .create_element("label")?
+            .dyn_into::<HtmlLabelElement>()?;
+        move_options.style().set_property("display", "none")?;
+        move_options.style().set_property("align-items", "center")?;
+        move_options.style().set_property("gap", "4px")?;
+
+        let consecutive_moves = document
+            .create_element("input")?
+            .dyn_into::<HtmlInputElement>()?;
+        consecutive_moves.set_type("checkbox");
+        let move_options_text = document.create_element("span")?;
+        move_options_text.set_text_content(Some("Consecutive Moves"));
+        move_options.append_child(&consecutive_moves)?;
+        move_options.append_child(&move_options_text)?;
+
         let mode_handler = ScopedClosure::<dyn FnMut() -> Result<(), JsValue>>::new({
             let preset = self.preset;
             let this = Arc::clone(&self.shared);
             let mode_select = mode_select.clone();
             let edge_options = edge_options.clone();
             let edge_creates_vertex = edge_creates_vertex.clone();
+            let move_options = move_options.clone();
+            let consecutive_moves = consecutive_moves.clone();
             move || {
                 if let Some(mode) =
                     SelectOption::selected_value(&mode_select.value(), &preset, EDIT_OPTIONS)
                 {
-                    let display = if mode.mode == EditMode::ToggleEdge {
-                        "flex"
-                    } else {
-                        "none"
-                    };
-                    edge_options.style().set_property("display", display)?;
+                    let display = |shown| if shown { "flex" } else { "none" };
+                    edge_options
+                        .style()
+                        .set_property("display", display(mode.mode == EditMode::ToggleEdge))?;
+                    move_options
+                        .style()
+                        .set_property("display", display(mode.mode.opposite_player().is_some()))?;
 
                     let mut this = this.lock().unwrap();
                     this.edit_mode = mode.mode;
                     this.edge_creates_vertex = edge_creates_vertex.checked();
+                    this.consecutive_moves = consecutive_moves.checked();
                     GraphWidget::draw(&mut this)?;
                 }
 
@@ -521,10 +656,13 @@ impl WasmWidget for GraphWidget {
             .add_event_listener_with_callback("change", mode_handler.as_ref().unchecked_ref())?;
         edge_options
             .add_event_listener_with_callback("change", mode_handler.as_ref().unchecked_ref())?;
+        move_options
+            .add_event_listener_with_callback("change", mode_handler.as_ref().unchecked_ref())?;
         mode_handler.forget();
 
         controls.append_child(&mode_select)?;
         controls.append_child(&edge_options)?;
+        controls.append_child(&move_options)?;
         element.append_child(&controls)?;
 
         let canvas_container = document
@@ -642,6 +780,7 @@ impl WasmWidget for GraphWidget {
         let mut this = self.shared.lock().unwrap();
         this.state = Some(HtmlState {
             canvas,
+            edit_mode: mode_select,
             _resize_observer: resize_observer,
         });
 
