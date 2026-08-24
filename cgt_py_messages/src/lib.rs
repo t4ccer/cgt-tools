@@ -1,3 +1,5 @@
+pub mod layout;
+
 use cgt::{
     drawing::{self, Color},
     graph::adjacency_matrix::directed::DirectedGraph,

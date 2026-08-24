@@ -3,7 +3,7 @@ use cgt::{
     graph::{
         Graph, VertexIndex,
         adjacency_matrix::{directed::DirectedGraph, undirected::UndirectedGraph},
-        layout::{Bounds, CircleEdge, SpringEmbedder},
+        layout::{CircleEdge, SpringEmbedder},
     },
     has::Has,
     impl_has,
@@ -19,6 +19,7 @@ use cgt::{
 use cgt_py_messages::{
     GraphBackendMessage, GraphFrontendMessage, GraphPreset, GraphPresetFlag, Vertex, VertexColor,
     WidgetGraph,
+    layout::{default_bounds, default_circle, default_spring, max_spring_iterations},
 };
 use jupyter_rust_widget_frontend::{AnyWidgetModel, Context, WasmWidget};
 use std::sync::{Arc, Mutex};
@@ -258,74 +259,6 @@ const LAYOUT_OPTIONS: &[LayoutOption] = &[
         visible_preset: GraphPresetFlag::all(),
     },
 ];
-
-/// Biggest circle the canvas holds. Growing it further to give a crowded graph more
-/// circumference would only push vertices off the canvas, where they cannot be reached, so
-/// a graph too big for its canvas is left overlapping until the canvas is dragged larger
-fn default_circle(canvas_size: V2f) -> CircleEdge {
-    CircleEdge {
-        circle_radius: f32::min(canvas_size.x, canvas_size.y) * 0.5,
-        vertex_radius: HtmlCanvas::vertex_radius(),
-        center: V2f {
-            x: canvas_size.x * 0.5,
-            y: canvas_size.y * 0.5,
-        },
-    }
-}
-
-fn default_spring(vertices: usize, canvas_size: V2f) -> SpringEmbedder {
-    let vertex_radius = HtmlCanvas::vertex_radius();
-
-    // Every iteration walks every pair of vertices, so cap the total work to keep a big
-    // graph from freezing the page for the whole time the button is held down
-    let iterations = usize::clamp(
-        MAX_LAYOUT_WORK / usize::max(vertices * vertices, 1),
-        256,
-        4096,
-    );
-
-    // Give every vertex its own patch of canvas to spread out into, but never ask for
-    // less room than it takes to tell two of them apart
-    let area = canvas_size.x * canvas_size.y;
-    let ideal_spring_length = f32::max(
-        f32::sqrt(area / f32::max(vertices as f32, 1.0)) * 0.5,
-        vertex_radius * 3.0,
-    );
-
-    SpringEmbedder {
-        // Cool down to almost nothing by the last iteration so that the layout settles
-        cooling_rate: f32::powf(0.01, 1.0 / iterations as f32),
-        c_attractive: 1.0,
-        // Holds the balance struck by the values the svg rendering was tuned with, where
-        // a repulsion of 250 went with an ideal length of 40
-        c_repulsive: (250.0 / (40.0 * 40.0)) * ideal_spring_length * ideal_spring_length,
-        ideal_spring_length,
-        iterations,
-        bounds: Some(canvas_bounds(canvas_size, 0.001)),
-    }
-}
-
-/// Keeps the layout within the part of the canvas where a vertex can still be clicked
-fn canvas_bounds(canvas_size: V2f, c_middle_attractive: f32) -> Bounds {
-    let vertex_radius = HtmlCanvas::vertex_radius();
-    Bounds {
-        lower: V2f {
-            x: vertex_radius,
-            y: vertex_radius,
-        },
-        // A canvas too small to have an inside would give the bounds a lower edge above
-        // their upper one, which clamping refuses to do
-        upper: V2f {
-            x: f32::max(vertex_radius, canvas_size.x - vertex_radius),
-            y: f32::max(vertex_radius, canvas_size.y - vertex_radius),
-        },
-        c_middle_attractive: Some(c_middle_attractive),
-    }
-}
-
-/// Ceiling on `iterations * vertices^2` that the default iteration count aims for, and the
-/// ceiling that a hand typed iteration count is held to
-const MAX_LAYOUT_WORK: usize = 1 << 22;
 
 const DEFAULT_CANVAS_SIZE: V2f = V2f { x: 640.0, y: 400.0 };
 const MIN_CANVAS_SIZE: V2f = V2f { x: 240.0, y: 160.0 };
@@ -1134,13 +1067,13 @@ impl LayoutInputs {
 
     /// Fill every field with the parameter that suits the graph as it is right now
     fn show_defaults(&self, vertices: usize, canvas_size: V2f) {
-        let circle = default_circle(canvas_size);
+        let circle = default_circle::<HtmlCanvas>(canvas_size);
         self.circle_radius
             .set_value(&format!("{:.1}", circle.circle_radius));
         self.center_x.set_value(&format!("{:.1}", circle.center.x));
         self.center_y.set_value(&format!("{:.1}", circle.center.y));
 
-        let spring = default_spring(vertices, canvas_size);
+        let spring = default_spring::<HtmlCanvas>(vertices, canvas_size);
         self.iterations.set_value(&spring.iterations.to_string());
         self.cooling_rate
             .set_value(&format!("{:.6}", spring.cooling_rate));
@@ -1161,7 +1094,7 @@ impl LayoutInputs {
     }
 
     fn circle(&self, canvas_size: V2f) -> CircleEdge {
-        let default = default_circle(canvas_size);
+        let default = default_circle::<HtmlCanvas>(canvas_size);
         CircleEdge {
             circle_radius: read_number(&self.circle_radius, default.circle_radius),
             vertex_radius: HtmlCanvas::vertex_radius(),
@@ -1173,13 +1106,13 @@ impl LayoutInputs {
     }
 
     fn spring(&self, vertices: usize, canvas_size: V2f) -> SpringEmbedder {
-        let default = default_spring(vertices, canvas_size);
+        let default = default_spring::<HtmlCanvas>(vertices, canvas_size);
 
         // A hand typed iteration count still has to leave the page responsive
         let iterations = read_number(&self.iterations, default.iterations as f32);
         let iterations = usize::min(
             iterations.max(0.0) as usize,
-            MAX_LAYOUT_WORK / usize::max(vertices * vertices, 1),
+            max_spring_iterations(vertices),
         );
 
         SpringEmbedder {
@@ -1191,10 +1124,12 @@ impl LayoutInputs {
                 default.ideal_spring_length,
             ),
             iterations,
-            bounds: self
-                .keep_on_canvas
-                .checked()
-                .then(|| canvas_bounds(canvas_size, read_number(&self.c_middle_attractive, 0.0))),
+            bounds: self.keep_on_canvas.checked().then(|| {
+                default_bounds::<HtmlCanvas>(
+                    canvas_size,
+                    read_number(&self.c_middle_attractive, 0.0),
+                )
+            }),
         }
     }
 }

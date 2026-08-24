@@ -1,10 +1,6 @@
 use crate::{graph::PyGraph, py_partizan_game};
 use cgt::{
-    drawing::Canvas,
-    graph::{
-        adjacency_matrix::undirected::UndirectedGraph,
-        layout::{Bounds, CircleEdge, SpringEmbedder},
-    },
+    graph::adjacency_matrix::undirected::UndirectedGraph,
     impl_has,
     numeric::v2f::V2f,
     short::partizan::{
@@ -69,12 +65,10 @@ impl PySnort {
 
     #[getter]
     fn graph(&self) -> PyGraph {
-        // TODO: Maybe we should have 2 graph types where position does not matter
-        let mut graph = self.0.graph.as_directed().map(|v| cgt_py_messages::Vertex {
+        let graph = self.0.graph.as_directed().map(|v| cgt_py_messages::Vertex {
             color: cgt_py_messages::VertexColor::from(v.color()),
             position: V2f::ZERO,
         });
-        crate::graph::layout_circle(&mut graph);
         PyGraph::from_preset(GraphPreset::Snort, graph)
     }
 
@@ -90,41 +84,12 @@ impl PySnort {
     }
 
     fn _repr_svg_(&self) -> String {
-        use cgt::drawing::{Draw, svg};
-
         let mut graph = self.0.graph.map(|&kind| PositionedVertex {
             kind,
             position: V2f::ZERO,
         });
-
-        // Very arbitrary
-
-        let circle = CircleEdge {
-            circle_radius: 128.0,
-            vertex_radius: svg::Canvas::vertex_radius(),
-            center: V2f { x: 128.0, y: 128.0 },
-        };
-        circle.layout(&mut graph);
-
-        let spring_embedder = SpringEmbedder {
-            cooling_rate: 0.99999,
-            c_attractive: 1.0,
-            c_repulsive: 250.0,
-            ideal_spring_length: 40.0,
-            iterations: 1 << 14,
-            bounds: Some(Bounds {
-                lower: V2f::ZERO,
-                upper: V2f { x: 400.0, y: 250.0 },
-                c_middle_attractive: Some(0.001),
-            }),
-        };
-        spring_embedder.layout(&mut graph);
-
-        let snort = Snort::new(graph);
-        let bounding_box = snort.required_canvas::<svg::Canvas>();
-        let mut canvas = svg::Canvas::new(bounding_box);
-        snort.draw(&mut canvas);
-        canvas.to_svg()
+        crate::graph::layout_for_svg(&mut graph);
+        crate::graph::draw_svg(&Snort::new(graph))
     }
 }
 

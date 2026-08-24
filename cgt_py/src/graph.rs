@@ -1,8 +1,8 @@
 use cgt::{
+    drawing::{Draw, svg},
     graph::{
         Graph, VertexIndex,
         adjacency_matrix::{directed::DirectedGraph, undirected::UndirectedGraph},
-        layout::CircleEdge,
     },
     has::Has,
     numeric::v2f::V2f,
@@ -14,6 +14,7 @@ use cgt::{
 };
 use cgt_py_messages::{
     GraphBackendMessage, GraphFrontendMessage, GraphPreset, Vertex, VertexColor, WidgetGraph,
+    layout::arrange,
 };
 use jupyter_rust_widget_backend::{Response, RustWidget};
 use pyo3::{
@@ -72,17 +73,25 @@ pub struct PyGraph {
     pub graph: WidgetGraph,
 }
 
-/// Arrange vertices on a circle. Used for graphs that were not laid out by the user, i.e. these
-/// constructed from raw vertices and edges
-pub fn layout_circle(graph: &mut WidgetGraph) {
-    use cgt::drawing::{Canvas, svg};
+pub const SVG_CANVAS_SIZE: V2f = V2f { x: 400.0, y: 250.0 };
 
-    CircleEdge {
-        circle_radius: 128.0,
-        vertex_radius: svg::Canvas::vertex_radius(),
-        center: V2f { x: 128.0, y: 128.0 },
-    }
-    .layout(graph);
+pub fn layout_for_svg<G, V>(graph: &mut G)
+where
+    G: Graph<V>,
+    V: Has<V2f>,
+{
+    arrange::<svg::Canvas, _, _>(graph, SVG_CANVAS_SIZE);
+}
+
+/// Draw a game onto a fresh svg canvas cut to fit it
+pub fn draw_svg<D>(game: &D) -> String
+where
+    D: Draw,
+{
+    let bounding_box = game.required_canvas::<svg::Canvas>();
+    let mut canvas = svg::Canvas::new(bounding_box);
+    game.draw(&mut canvas);
+    canvas.to_svg()
 }
 
 impl PyGraph {
@@ -168,7 +177,6 @@ impl PyGraph {
             }
         }
 
-        layout_circle(&mut graph);
         Ok(PyGraph {
             known_preset: None,
             directed,
@@ -222,13 +230,14 @@ impl PyGraph {
     fn _repr_svg_(&self) -> String {
         use cgt::drawing::{Canvas, svg};
 
-        // TODO: Detect all V2f::ZERO case and do layout
+        let mut positioned_graph = self.graph.clone();
+        layout_for_svg(&mut positioned_graph);
 
-        let bounding_box = Graph::required_canvas::<svg::Canvas>(&self.graph);
+        let bounding_box = Graph::required_canvas::<svg::Canvas>(&positioned_graph);
         let mut canvas = svg::Canvas::new(bounding_box);
-        self.graph.draw(&mut canvas, |canvas, vertex| {
-            let position: V2f = *self.graph.get_vertex(vertex).get_inner();
-            let color: VertexColor = *self.graph.get_vertex(vertex).get_inner();
+        positioned_graph.draw(&mut canvas, |canvas, vertex| {
+            let position: V2f = *positioned_graph.get_vertex(vertex).get_inner();
+            let color: VertexColor = *positioned_graph.get_vertex(vertex).get_inner();
             canvas.vertex(position, color.color(), vertex)
         });
         canvas.to_svg()
