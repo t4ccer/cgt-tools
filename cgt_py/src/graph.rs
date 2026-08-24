@@ -3,7 +3,9 @@ use cgt::{
     has::Has,
     numeric::v2f::V2f,
 };
-use cgt_py_messages::{GraphBackendMessage, GraphFrontendMessage, VertexColor, WidgetGraph};
+use cgt_py_messages::{
+    GraphBackendMessage, GraphFrontendMessage, GraphPreset, VertexColor, WidgetGraph,
+};
 use jupyter_rust_widget_backend::{Response, RustWidget};
 use pyo3::{Bound, PyAny, PyResult, Python, pyclass, pyfunction, pymethods};
 
@@ -63,6 +65,7 @@ impl PyGraph {
 }
 
 struct GraphWidget {
+    preset: GraphPreset,
     graph: WidgetGraph,
 }
 
@@ -72,12 +75,14 @@ impl RustWidget for GraphWidget {
 
     fn esm(&self) -> String {
         let bundle = include_str!("../../cgt_py_widgets/dist/bundle.js");
+        let preset = format!("const preset = {};", self.preset.into_flag_bits());
         let epilogue = r#" async function render({model, el}) {
-                               await JupyterCGT.render_graph(model, el);
+                               await JupyterCGT.render_graph(model, el, preset);
                            }
                            export default { render }"#;
-        let mut esm = String::with_capacity(bundle.len() + epilogue.len());
+        let mut esm = String::with_capacity(bundle.len() + preset.len() + epilogue.len());
         esm.push_str(bundle);
+        esm.push_str(&preset);
         esm.push_str(epilogue);
         esm
     }
@@ -105,9 +110,19 @@ impl RustWidget for GraphWidget {
     }
 }
 
-#[pyfunction(name = "GraphWidget")]
-pub fn make_graph_widget(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
+#[pyfunction(name = "SnortWidget")]
+pub fn make_snort_widget(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
     GraphWidget {
+        preset: GraphPreset::Snort,
+        graph: UndirectedGraph::empty(&[]),
+    }
+    .into_widget(py, "cgt_py")
+}
+
+#[pyfunction(name = "ColWidget")]
+pub fn make_col_widget(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
+    GraphWidget {
+        preset: GraphPreset::Col,
         graph: UndirectedGraph::empty(&[]),
     }
     .into_widget(py, "cgt_py")

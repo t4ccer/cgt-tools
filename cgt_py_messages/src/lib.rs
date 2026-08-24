@@ -257,7 +257,8 @@ pub struct Vertex {
 impl_has!(Vertex -> position -> V2f);
 impl_has!(Vertex -> color -> VertexColor);
 
-// TODO: Make it all generic over graph
+// TODO: Make it all generic over graph or just use directed graph for everything
+// and do bidirectional arcs depending on the GraphPreset
 pub type WidgetGraph = UndirectedGraph<Vertex>;
 
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -271,4 +272,16 @@ pub enum GraphBackendMessage {
 #[serde(tag = "type")]
 pub enum GraphFrontendMessage {
     SetGraph(WidgetGraph),
+}
+
+preset! {
+    #[derive(Clone, Copy)]
+    pub struct GraphPresetFlag;
+
+    #[derive(Clone, Copy)]
+    pub enum GraphPreset {
+        Snort = 1,
+        Col = 2,
+        // TODO: DigraphPlacement, BipartiteSnort
+    }
 }

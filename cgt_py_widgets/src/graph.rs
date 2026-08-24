@@ -5,7 +5,8 @@ use cgt::{
     numeric::v2f::V2f,
 };
 use cgt_py_messages::{
-    GraphBackendMessage, GraphFrontendMessage, Vertex, VertexColor, WidgetGraph,
+    GraphBackendMessage, GraphFrontendMessage, GraphPreset, GraphPresetFlag, Vertex, VertexColor,
+    WidgetGraph,
 };
 use jupyter_rust_widget_frontend::{AnyWidgetModel, Context, WasmWidget};
 use std::sync::{Arc, Mutex};
@@ -94,6 +95,8 @@ impl Applied {
 }
 
 struct SharedState {
+    #[allow(dead_code)]
+    preset: GraphPreset,
     edit_mode: EditMode,
     // TODO: Move into EditMode
     // TODO: This also needs to track what vertex we want to add, either from dropdown
@@ -109,30 +112,46 @@ const EDIT_OPTIONS: &[EditOption] = &[
     EditOption {
         text: "Add White Vertex",
         mode: EditMode::AddColorVertex(VertexColor::White),
+        visible_preset: GraphPresetFlag::from_slice(&[
+            GraphPresetFlag::Snort,
+            GraphPresetFlag::Col,
+        ]),
     },
     EditOption {
         text: "Add Blue Vertex",
         mode: EditMode::AddColorVertex(VertexColor::Blue),
+        visible_preset: GraphPresetFlag::from_slice(&[
+            GraphPresetFlag::Snort,
+            GraphPresetFlag::Col,
+        ]),
     },
     EditOption {
         text: "Add Red Vertex",
         mode: EditMode::AddColorVertex(VertexColor::Red),
+        visible_preset: GraphPresetFlag::from_slice(&[
+            GraphPresetFlag::Snort,
+            GraphPresetFlag::Col,
+        ]),
     },
     EditOption {
         text: "Add Green Vertex",
         mode: EditMode::AddColorVertex(VertexColor::Green),
+        visible_preset: GraphPresetFlag::from_slice(&[]),
     },
     EditOption {
         text: "Move Vertex",
         mode: EditMode::MoveVertex,
+        visible_preset: GraphPresetFlag::all(),
     },
     EditOption {
         text: "Add/Remove Edge",
         mode: EditMode::ToggleEdge,
+        visible_preset: GraphPresetFlag::all(),
     },
     EditOption {
         text: "Remove Vertex",
         mode: EditMode::RemoveVertex,
+        visible_preset: GraphPresetFlag::all(),
     },
 ];
 
@@ -140,13 +159,16 @@ const DEFAULT_CANVAS_SIZE: V2f = V2f { x: 640.0, y: 400.0 };
 const MIN_CANVAS_SIZE: V2f = V2f { x: 240.0, y: 160.0 };
 
 struct GraphWidget {
+    preset: GraphPreset,
     shared: Arc<Mutex<SharedState>>,
 }
 
 impl GraphWidget {
-    fn new() -> GraphWidget {
+    fn new(preset: GraphPreset) -> GraphWidget {
         GraphWidget {
+            preset,
             shared: Arc::new(Mutex::new(SharedState {
+                preset,
                 edit_mode: EDIT_OPTIONS[0].mode,
                 edge_creates_vertex: true,
                 state: None,
@@ -400,18 +422,18 @@ impl GraphWidget {
 pub(crate) struct EditOption {
     text: &'static str,
     mode: EditMode,
+    visible_preset: GraphPresetFlag,
 }
 
 impl SelectOptionElement for EditOption {
-    // TODO: Game presets
-    type Preset = ();
+    type Preset = GraphPreset;
 
     fn text(&self) -> &str {
         self.text
     }
 
-    fn is_visible(&self, (): &Self::Preset) -> bool {
-        true
+    fn is_visible(&self, preset: &Self::Preset) -> bool {
+        preset.intersects(self.visible_preset)
     }
 }
 
@@ -449,7 +471,7 @@ impl WasmWidget for GraphWidget {
         controls.style().set_property("margin-bottom", "4px")?;
 
         let mode_select: HtmlSelectElement =
-            SelectOption::create_element(&document, "Edit mode", &(), EDIT_OPTIONS)?;
+            SelectOption::create_element(&document, "Edit mode", &self.preset, EDIT_OPTIONS)?;
 
         // Wrapping the checkbox in the label associates the two without needing a unique id
         let edge_options = document
@@ -470,13 +492,14 @@ impl WasmWidget for GraphWidget {
         edge_options.append_child(&edge_options_text)?;
 
         let mode_handler = ScopedClosure::<dyn FnMut() -> Result<(), JsValue>>::new({
+            let preset = self.preset;
             let this = Arc::clone(&self.shared);
             let mode_select = mode_select.clone();
             let edge_options = edge_options.clone();
             let edge_creates_vertex = edge_creates_vertex.clone();
             move || {
                 if let Some(mode) =
-                    SelectOption::selected_value(&mode_select.value(), &(), EDIT_OPTIONS)
+                    SelectOption::selected_value(&mode_select.value(), &preset, EDIT_OPTIONS)
                 {
                     let display = if mode.mode == EditMode::ToggleEdge {
                         "flex"
@@ -630,6 +653,12 @@ impl WasmWidget for GraphWidget {
 }
 
 #[wasm_bindgen]
-pub fn render_graph_widget_impl(model: AnyWidgetModel, el: Element) -> Result<(), JsValue> {
-    GraphWidget::new().render(model, el)
+pub fn render_graph_widget_impl(
+    model: AnyWidgetModel,
+    el: Element,
+    raw_preset: u32,
+) -> Result<(), JsValue> {
+    let preset = GraphPreset::from_flag_bits(raw_preset).unwrap();
+    let widget = GraphWidget::new(preset);
+    widget.render(model, el)
 }
