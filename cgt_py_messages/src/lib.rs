@@ -1,5 +1,8 @@
 use cgt::{
+    graph::adjacency_matrix::undirected::UndirectedGraph,
     grid::vec_grid::VecGrid,
+    impl_has,
+    numeric::v2f::V2f,
     short::partizan::games::{amazons, domineering, fission},
 };
 
@@ -155,4 +158,64 @@ bitflags::bitflags! {
         const FISSION = GridPreset::Fission.into_flag_bits();
         const AMAZONS = GridPreset::Amazons.into_flag_bits();
     }
+}
+
+/// Color of a graph vertex. Not tied to any game yet
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(tag = "type")]
+pub enum VertexColor {
+    White,
+    Blue,
+    Red,
+    Green,
+}
+
+impl VertexColor {
+    /// Color to paint the vertex with, as `0xRRGGBB`
+    pub const fn rgb(self) -> u32 {
+        // TODO: Use our Color module
+        match self {
+            VertexColor::White => 0xf5f5f5,
+            VertexColor::Blue => 0x4e4afb,
+            VertexColor::Red => 0xf92672,
+            VertexColor::Green => 0xa6e22e,
+        }
+    }
+}
+
+impl std::fmt::Display for VertexColor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            VertexColor::White => write!(f, "White"),
+            VertexColor::Blue => write!(f, "Blue"),
+            VertexColor::Red => write!(f, "Red"),
+            VertexColor::Green => write!(f, "Green"),
+        }
+    }
+}
+
+/// Graph vertex as drawn by the widget. Games will add their own data here
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone, Copy, PartialEq)]
+pub struct Vertex {
+    pub position: V2f,
+    pub color: VertexColor,
+}
+
+impl_has!(Vertex -> position -> V2f);
+impl_has!(Vertex -> color -> VertexColor);
+
+// TODO: Make it all generic over graph
+pub type WidgetGraph = UndirectedGraph<Vertex>;
+
+#[derive(serde::Deserialize, serde::Serialize)]
+#[serde(tag = "type")]
+pub enum GraphBackendMessage {
+    Initialized,
+    SetGraph { graph: WidgetGraph },
+}
+
+#[derive(serde::Deserialize, serde::Serialize)]
+#[serde(tag = "type")]
+pub enum GraphFrontendMessage {
+    SetGraph(WidgetGraph),
 }

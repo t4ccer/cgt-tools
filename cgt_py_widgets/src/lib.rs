@@ -1,13 +1,19 @@
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::{Document, HtmlOptionElement, HtmlSelectElement};
 
+pub mod graph;
 pub mod grid;
 
-#[derive(Clone, Copy)]
-pub(crate) enum ActiveElement<T> {
+/// What the cursor is doing to an element of the widget. `D` carries whatever a drag
+/// needs to keep track of, widgets that only ever click their elements leave it out
+#[derive(Clone, Copy, PartialEq)]
+pub(crate) enum ActiveElement<T, D = ()> {
     None,
     Hover(T),
     Pressed(T),
+
+    /// Pressed, and following the cursor until it is released
+    Dragging(T, D),
 }
 
 pub(crate) trait SelectOptionElement {

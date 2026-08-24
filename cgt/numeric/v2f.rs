@@ -6,6 +6,7 @@ use std::ops::{Add, AddAssign, Mul, Neg, Sub, SubAssign};
 
 /// Two dimensional vector
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct V2f {
     /// Horizontal component
     pub x: f32,

@@ -577,7 +577,10 @@ impl WasmWidget for GridWidget {
                 if let Some((grid_x, grid_y)) = mouse_event_to_grid(&event) {
                     let mut this = this.lock().unwrap();
                     match this.active_cell {
-                        ActiveElement::None | ActiveElement::Pressed(_) => Ok(()),
+                        // Tiles are clicked, never dragged
+                        ActiveElement::None
+                        | ActiveElement::Pressed(_)
+                        | ActiveElement::Dragging(..) => Ok(()),
                         ActiveElement::Hover(_) => {
                             this.active_cell = ActiveElement::Pressed((grid_x, grid_y));
                             GridWidget::draw_grid(&this)
@@ -605,7 +608,9 @@ impl WasmWidget for GridWidget {
                                 GridWidget::handle_edit(&mut this, x, y, &context)?;
                             }
                         }
-                        ActiveElement::None | ActiveElement::Hover(_) => {}
+                        ActiveElement::None
+                        | ActiveElement::Hover(_)
+                        | ActiveElement::Dragging(..) => {}
                     }
                     this.active_cell = ActiveElement::Hover((grid_x, grid_y));
                     GridWidget::draw_grid(&this)
@@ -627,7 +632,8 @@ impl WasmWidget for GridWidget {
                 let mut this = this.lock().unwrap();
 
                 match (this.active_cell, new_hover) {
-                    (ActiveElement::None, None) | (ActiveElement::Pressed(_), _) => Ok(()),
+                    (ActiveElement::None, None)
+                    | (ActiveElement::Pressed(_) | ActiveElement::Dragging(..), _) => Ok(()),
                     (ActiveElement::Hover(_), None) => {
                         this.active_cell = ActiveElement::None;
                         GridWidget::draw_grid(&this)

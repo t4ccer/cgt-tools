@@ -9,6 +9,7 @@ pub mod canonical_form;
 pub mod domineering;
 pub mod dyadic_rational_number;
 pub mod fission;
+pub mod graph;
 pub mod grid;
 pub mod snort;
 pub mod thermograph;
@@ -74,6 +75,7 @@ fn cgt_py(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(grid::make_domineering_widget, m)?)?;
     m.add_function(wrap_pyfunction!(grid::make_fission_widget, m)?)?;
     m.add_function(wrap_pyfunction!(grid::make_amazons_widget, m)?)?;
+    m.add_function(wrap_pyfunction!(graph::make_graph_widget, m)?)?;
     m.add_class::<crate::amazons::PyAmazons>()?;
     m.add_class::<crate::bipartite_snort::PyBipartiteSnort>()?;
     m.add_class::<crate::canonical_form::PyCanonicalForm>()?;
