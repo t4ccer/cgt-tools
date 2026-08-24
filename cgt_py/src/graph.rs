@@ -4,7 +4,10 @@ use cgt::{
     },
     has::Has,
     numeric::v2f::V2f,
-    short::partizan::games::snort::{self, Snort},
+    short::partizan::games::{
+        col::{self, Col},
+        snort::{self, Snort},
+    },
 };
 use cgt_py_messages::{
     GraphBackendMessage, GraphFrontendMessage, GraphPreset, Vertex, VertexColor, WidgetGraph,
@@ -15,22 +18,22 @@ use pyo3::{
     pyfunction, pymethods,
 };
 
-use crate::snort::PySnort;
+use crate::{col::PyCol, snort::PySnort};
 
 #[derive(Debug)]
 #[pyclass(name = "VertexColors")]
 pub struct PyVertexColors {
     #[pyo3(get)]
-    white: Vec<u32>,
+    pub(crate) white: Vec<u32>,
 
     #[pyo3(get)]
-    blue: Vec<u32>,
+    pub(crate) blue: Vec<u32>,
 
     #[pyo3(get)]
-    red: Vec<u32>,
+    pub(crate) red: Vec<u32>,
 
     #[pyo3(get)]
-    green: Vec<u32>,
+    pub(crate) green: Vec<u32>,
 }
 
 impl PyVertexColors {
@@ -218,9 +221,8 @@ impl PyGraph {
     }
 
     #[getter]
-    fn col(&self) -> PyResult<()> {
-        // TODO: fn col once we have PyCol
-        todo!()
+    pub fn col(&self) -> PyResult<PyCol> {
+        Ok(PyCol(Col::new(self.try_into_graph::<col::VertexColor>()?)))
     }
 }
 
