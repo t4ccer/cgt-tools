@@ -85,6 +85,8 @@ fn cgt_py(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<crate::domineering::PyDomineering>()?;
     m.add_class::<crate::dyadic_rational_number::PyDyadicRationalNumber>()?;
     m.add_class::<crate::fission::PyFission>()?;
+    m.add_class::<crate::graph::PyGraph>()?;
+    m.add_class::<crate::graph::PyVertexColors>()?;
     m.add_class::<crate::snort::PySnort>()?;
     m.add_class::<crate::thermograph::PyThermograph>()?;
 

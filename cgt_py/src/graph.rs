@@ -1,11 +1,13 @@
 use cgt::{
-    graph::{Graph, adjacency_matrix::undirected::UndirectedGraph},
+    graph::{
+        Graph, VertexIndex, adjacency_matrix::undirected::UndirectedGraph, layout::CircleEdge,
+    },
     has::Has,
     numeric::v2f::V2f,
     short::partizan::games::snort::{self, Snort},
 };
 use cgt_py_messages::{
-    GraphBackendMessage, GraphFrontendMessage, GraphPreset, VertexColor, WidgetGraph,
+    GraphBackendMessage, GraphFrontendMessage, GraphPreset, Vertex, VertexColor, WidgetGraph,
 };
 use jupyter_rust_widget_backend::{Response, RustWidget};
 use pyo3::{
@@ -15,10 +17,59 @@ use pyo3::{
 
 use crate::snort::PySnort;
 
+#[derive(Debug)]
+#[pyclass(name = "VertexColors")]
+pub struct PyVertexColors {
+    #[pyo3(get)]
+    white: Vec<u32>,
+
+    #[pyo3(get)]
+    blue: Vec<u32>,
+
+    #[pyo3(get)]
+    red: Vec<u32>,
+
+    #[pyo3(get)]
+    green: Vec<u32>,
+}
+
+impl PyVertexColors {
+    fn new() -> PyVertexColors {
+        PyVertexColors {
+            white: Vec::new(),
+            blue: Vec::new(),
+            red: Vec::new(),
+            green: Vec::new(),
+        }
+    }
+}
+
+#[pymethods]
+impl PyVertexColors {
+    fn __repr__(&self) -> String {
+        format!(
+            "{{white={:?}, blue={:?}, red={:?}, green={:?}}}",
+            &self.white, &self.blue, &self.red, &self.green,
+        )
+    }
+}
+
 #[pyclass(name = "Graph")]
 pub struct PyGraph {
-    known_preset: Option<GraphPreset>,
-    graph: WidgetGraph,
+    pub known_preset: Option<GraphPreset>,
+    pub graph: WidgetGraph,
+}
+
+/// Arrange vertices on a circle. Used for graphs that were not laid out by the user, i.e. these
+/// constructed from raw vertices and edges
+pub fn layout_circle(graph: &mut WidgetGraph) {
+    use cgt::drawing::{Canvas, svg};
+
+    CircleEdge {
+        circle_radius: 128.0,
+        vertex_radius: svg::Canvas::vertex_radius(),
+    }
+    .layout(graph);
 }
 
 impl PyGraph {
@@ -35,43 +86,105 @@ impl PyGraph {
 
 #[pymethods]
 impl PyGraph {
+    #[new]
+    #[pyo3(signature = (vertices, edges, white = None, blue = None, red = None, green = None))]
+    pub fn new(
+        vertices: u32,
+        edges: Vec<(u32, u32)>,
+        white: Option<Vec<u32>>,
+        blue: Option<Vec<u32>>,
+        red: Option<Vec<u32>>,
+        green: Option<Vec<u32>>,
+    ) -> PyResult<PyGraph> {
+        let mut colors = vec![VertexColor::White; vertices as usize];
+        for (color, indices) in [
+            (VertexColor::White, white),
+            (VertexColor::Blue, blue),
+            (VertexColor::Red, red),
+            (VertexColor::Green, green),
+        ] {
+            for v_idx in indices.into_iter().flatten() {
+                match colors.get_mut(v_idx as usize) {
+                    Some(vertex_color) => *vertex_color = color,
+                    None => {
+                        return Err(PyValueError::new_err(format!(
+                            "Invalid {color} vertex: {v_idx}",
+                        )));
+                    }
+                }
+            }
+        }
+        let vertices = colors
+            .into_iter()
+            .map(|color| Vertex {
+                color,
+                position: V2f::ZERO,
+            })
+            .collect::<Vec<_>>();
+
+        let mut graph_edges = Vec::with_capacity(edges.len());
+        for (u, v) in edges {
+            if u as usize >= vertices.len() || v as usize >= vertices.len() {
+                return Err(PyValueError::new_err(format!("Invalid edge: ({u}, {v})")));
+            }
+            graph_edges.push((
+                VertexIndex { index: u as usize },
+                VertexIndex { index: v as usize },
+            ));
+        }
+
+        let mut graph = UndirectedGraph::from_edges(&graph_edges, &vertices);
+        layout_circle(&mut graph);
+        Ok(PyGraph {
+            known_preset: None,
+            graph,
+        })
+    }
+
     #[getter]
-    fn vertices(&self) -> u32 {
+    pub(crate) fn vertices(&self) -> u32 {
         self.graph.size() as u32
     }
 
     #[getter]
-    fn edges(&self) -> Vec<(u32, u32)> {
+    pub(crate) fn edges(&self) -> Vec<(u32, u32)> {
         self.graph
             .edges()
             .map(|(u, v)| (u.index as u32, v.index as u32))
             .collect()
     }
 
-    // TODO: This should be a dict or something
-    /// Color of each vertex, in vertex order
     #[getter]
-    fn colors(&self) -> Vec<String> {
-        self.graph
-            .vertices()
-            .map(|vertex| {
-                let color: VertexColor = *vertex.get_inner();
-                color.to_string()
-            })
-            .collect()
+    pub(crate) fn colors(&self) -> PyVertexColors {
+        let mut colors = PyVertexColors::new();
+        for v_idx in self.graph.vertex_indices() {
+            match self.graph.get_vertex(v_idx).color {
+                VertexColor::White => colors.white.push(v_idx.index as u32),
+                VertexColor::Blue => colors.blue.push(v_idx.index as u32),
+                VertexColor::Red => colors.red.push(v_idx.index as u32),
+                VertexColor::Green => colors.green.push(v_idx.index as u32),
+            }
+        }
+        colors
     }
 
     fn __repr__(&self) -> String {
+        let colors = self.colors();
         format!(
-            "Graph({}, {:?}, {:?})",
+            "Graph({}, {:?}, white={:?}, blue={:?}, red={:?}, green={:?})",
             self.vertices(),
             self.edges(),
-            self.colors()
+            &colors.white,
+            &colors.blue,
+            &colors.red,
+            &colors.green,
         )
     }
 
     fn _repr_svg_(&self) -> String {
         use cgt::drawing::{Canvas, svg};
+
+        // TODO: Detect all V2f::ZERO case and do layout
 
         let bounding_box = Graph::required_canvas::<svg::Canvas>(&self.graph);
         let mut canvas = svg::Canvas::new(bounding_box);
@@ -97,7 +210,7 @@ impl PyGraph {
     }
 
     #[getter]
-    fn snort(&self) -> PyResult<PySnort> {
+    pub fn snort(&self) -> PyResult<PySnort> {
         let graph = self
             .try_into_graph::<snort::VertexColor>()?
             .map(|&color| snort::VertexKind::Single(color));

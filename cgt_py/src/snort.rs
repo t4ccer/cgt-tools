@@ -1,8 +1,8 @@
-use crate::py_partizan_game;
+use crate::{graph::PyGraph, py_partizan_game};
 use cgt::{
     drawing::Canvas,
     graph::{
-        Graph, VertexIndex,
+        Graph,
         adjacency_matrix::undirected::UndirectedGraph,
         layout::{Bounds, CircleEdge, SpringEmbedder},
     },
@@ -13,7 +13,10 @@ use cgt::{
         transposition_table::ParallelTranspositionTable,
     },
 };
-use pyo3::{PyErr, PyResult, pyclass, pymethods};
+use cgt_py_messages::GraphPreset;
+use pyo3::{
+    Bound, PyAny, PyResult, exceptions::PyTypeError, pyclass, pymethods, types::PyAnyMethods,
+};
 use std::sync::LazyLock;
 
 #[derive(Debug, Clone, Copy)]
@@ -35,101 +38,58 @@ pub struct PySnort(pub Snort<VertexKind, UndirectedGraph<VertexKind>>);
 #[pymethods]
 impl PySnort {
     #[new]
+    #[pyo3(signature = (graph, edges = None, white = None, blue = None, red = None, green = None))]
     pub fn new(
-        vertices: u32,
-        edges: Vec<(u32, u32)>,
-        blue: Vec<u32>,
-        red: Vec<u32>,
+        graph: &Bound<'_, PyAny>,
+        edges: Option<Vec<(u32, u32)>>,
+        white: Option<Vec<u32>>,
+        blue: Option<Vec<u32>>,
+        red: Option<Vec<u32>>,
+        green: Option<Vec<u32>>,
     ) -> PyResult<PySnort> {
-        for &(u, v) in &edges {
-            if u >= vertices || v >= vertices {
-                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                    "Invalid edge: ({u}, {v})",
-                )));
+        if let Ok(graph) = graph.cast::<PyGraph>() {
+            if edges.is_some()
+                || white.is_some()
+                || blue.is_some()
+                || red.is_some()
+                || green.is_some()
+            {
+                return Err(PyTypeError::new_err(
+                    "Snort() takes no other arguments when constructed from a Graph",
+                ));
             }
-        }
-        let edges = edges
-            .into_iter()
-            .map(|(u, v)| {
-                (
-                    VertexIndex { index: u as usize },
-                    VertexIndex { index: v as usize },
-                )
-            })
-            .collect::<Vec<_>>();
-
-        let mut vertices = vec![VertexKind::Single(VertexColor::Empty); vertices as usize];
-        for &blue_idx in &blue {
-            match vertices.get_mut(blue_idx as usize) {
-                Some(kind) => *kind.color_mut() = VertexColor::TintLeft,
-                None => {
-                    return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                        "Invalid blue vertex: {blue_idx}",
-                    )));
-                }
-            }
-        }
-        for &red_idx in &red {
-            match vertices.get_mut(red_idx as usize) {
-                Some(kind) => *kind.color_mut() = VertexColor::TintRight,
-                None => {
-                    return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                        "Invalid red vertex: {red_idx}",
-                    )));
-                }
-            }
+            return graph.borrow().snort();
         }
 
-        Ok(PySnort(Snort::new(UndirectedGraph::from_edges(
-            &edges, &vertices,
-        ))))
+        let vertices = graph.extract::<u32>()?;
+        let Some(edges) = edges else {
+            return Err(PyTypeError::new_err("Snort() missing argument: 'edges'"));
+        };
+        PyGraph::new(vertices, edges, white, blue, red, green)?.snort()
     }
 
     #[getter]
-    fn vertices(&self) -> u32 {
-        self.0.graph.size() as u32
-    }
-
-    #[getter]
-    fn edges(&self) -> Vec<(u32, u32)> {
-        self.0
-            .graph
-            .edges()
-            .map(move |(u, v)| (u.index as u32, v.index as u32))
-            .collect::<Vec<_>>()
-    }
-
-    #[getter]
-    fn blue(&self) -> Vec<u32> {
-        self.0
-            .graph
-            .vertex_indices()
-            .filter_map(|idx| {
-                matches!(self.0.graph.get_vertex(idx).color(), VertexColor::TintLeft)
-                    .then_some(idx.index as u32)
-            })
-            .collect()
-    }
-
-    #[getter]
-    fn red(&self) -> Vec<u32> {
-        self.0
-            .graph
-            .vertex_indices()
-            .filter_map(|idx| {
-                matches!(self.0.graph.get_vertex(idx).color(), VertexColor::TintRight)
-                    .then_some(idx.index as u32)
-            })
-            .collect()
+    fn graph(&self) -> PyGraph {
+        // TODO: Maybe we should have 2 graph types where position does not matter
+        let mut graph = self.0.graph.map(|v| cgt_py_messages::Vertex {
+            color: cgt_py_messages::VertexColor::from(v.color()),
+            position: V2f::ZERO,
+        });
+        crate::graph::layout_circle(&mut graph);
+        PyGraph {
+            known_preset: Some(GraphPreset::Snort),
+            graph,
+        }
     }
 
     fn __repr__(&self) -> String {
+        let graph = self.graph();
         format!(
-            "Snort({}, {:?}, {:?}, {:?})",
-            self.vertices(),
-            self.edges(),
-            self.blue(),
-            self.red(),
+            "Snort({}, {:?}, blue={:?}, red={:?})",
+            graph.vertices(),
+            graph.edges(),
+            &graph.colors().blue,
+            &graph.colors().red,
         )
     }
 
