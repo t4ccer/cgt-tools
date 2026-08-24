@@ -64,6 +64,15 @@ where
         }
     }
 
+    /// Iterator over vertices where given player can move
+    pub fn available_moves_for<const COLOR: u8>(&self) -> impl Iterator<Item = VertexIndex> + '_ {
+        // const ADT generics are unstable, so here we go
+        let own_color: VertexColor = const { VertexColor::try_from_u8(COLOR) };
+        self.graph
+            .vertex_indices()
+            .filter(move |&v_idx| *self.graph.get_vertex(v_idx).get_inner() == own_color)
+    }
+
     /// Return position after player move in a given vertex. Note that it does not check
     /// if the move is legal
     #[must_use]
@@ -76,14 +85,9 @@ where
     }
 
     fn moves_for<const COLOR: u8>(&self) -> Vec<Self> {
-        let own_color: VertexColor = const { VertexColor::try_from_u8(COLOR) };
-        let mut moves = Vec::new();
-        for v in self.graph.vertex_indices() {
-            if *self.graph.get_vertex(v).get_inner() == own_color {
-                moves.push(self.move_in_vertex(v));
-            }
-        }
-        moves
+        self.available_moves_for::<COLOR>()
+            .map(|v| self.move_in_vertex(v))
+            .collect()
     }
 }
 

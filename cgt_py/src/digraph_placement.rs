@@ -2,13 +2,13 @@ use crate::{graph::PyGraph, py_partizan_game};
 use cgt::{
     drawing::Canvas,
     graph::{
-        adjacency_matrix::undirected::UndirectedGraph,
+        adjacency_matrix::directed::DirectedGraph,
         layout::{Bounds, CircleEdge, SpringEmbedder},
     },
     impl_has,
     numeric::v2f::V2f,
     short::partizan::{
-        games::snort::{Snort, VertexKind},
+        games::digraph_placement::{DigraphPlacement, VertexColor},
         transposition_table::ParallelTranspositionTable,
     },
 };
@@ -20,68 +20,65 @@ use std::sync::LazyLock;
 
 #[derive(Debug, Clone, Copy)]
 pub struct PositionedVertex {
-    kind: VertexKind,
+    color: VertexColor,
     position: V2f,
 }
 
-impl_has!(PositionedVertex -> kind -> VertexKind);
+impl_has!(PositionedVertex -> color -> VertexColor);
 impl_has!(PositionedVertex -> position -> V2f);
 
 static TRANSPOSITION_TABLE: LazyLock<
-    ParallelTranspositionTable<Snort<VertexKind, UndirectedGraph<VertexKind>>>,
+    ParallelTranspositionTable<DigraphPlacement<VertexColor, DirectedGraph<VertexColor>>>,
 > = LazyLock::new(|| ParallelTranspositionTable::new());
 
-#[pyclass(name = "Snort")]
-pub struct PySnort(pub Snort<VertexKind, UndirectedGraph<VertexKind>>);
+#[pyclass(name = "DigraphPlacement")]
+pub struct PyDigraphPlacement(pub DigraphPlacement<VertexColor, DirectedGraph<VertexColor>>);
 
 #[pymethods]
-impl PySnort {
+impl PyDigraphPlacement {
     #[new]
-    #[pyo3(signature = (graph, edges = None, white = None, blue = None, red = None, green = None))]
+    #[pyo3(signature = (graph, edges = None, blue = None, red = None))]
     pub fn new(
         graph: &Bound<'_, PyAny>,
         edges: Option<Vec<(u32, u32)>>,
-        white: Option<Vec<u32>>,
         blue: Option<Vec<u32>>,
         red: Option<Vec<u32>>,
-        green: Option<Vec<u32>>,
-    ) -> PyResult<PySnort> {
+    ) -> PyResult<PyDigraphPlacement> {
         if let Ok(graph) = graph.cast::<PyGraph>() {
-            if edges.is_some()
-                || white.is_some()
-                || blue.is_some()
-                || red.is_some()
-                || green.is_some()
-            {
+            if edges.is_some() || blue.is_some() || red.is_some() {
                 return Err(PyTypeError::new_err(
-                    "Snort() takes no other arguments when constructed from a Graph",
+                    "DigraphPlacement() takes no other arguments when constructed from a Graph",
                 ));
             }
-            return graph.borrow().snort();
+            return graph.borrow().digraph_placement();
         }
 
         let vertices = graph.extract::<u32>()?;
         let Some(edges) = edges else {
-            return Err(PyTypeError::new_err("Snort() missing argument: 'edges'"));
+            return Err(PyTypeError::new_err(
+                "DigraphPlacement() missing argument: 'edges'",
+            ));
         };
-        PyGraph::new(vertices, edges, false, white, blue, red, green)?.snort()
+        // Every vertex belongs to one of the players, so vertices left out of both lists stay
+        // white and are rejected when the graph is turned into a position
+        PyGraph::new(vertices, edges, true, None, blue, red, None)?.digraph_placement()
     }
 
     #[getter]
     fn graph(&self) -> PyGraph {
         // TODO: Maybe we should have 2 graph types where position does not matter
-        let mut graph = self.0.graph.as_directed().map(|v| cgt_py_messages::Vertex {
-            color: cgt_py_messages::VertexColor::from(v.color()),
+        let mut graph = self.0.graph.map(|&color| cgt_py_messages::Vertex {
+            color: cgt_py_messages::VertexColor::from(color),
             position: V2f::ZERO,
         });
         crate::graph::layout_circle(&mut graph);
-        PyGraph::from_preset(GraphPreset::Snort, graph)
+        PyGraph::from_preset(GraphPreset::DigraphPlacement, graph)
     }
 
     fn __repr__(&self) -> String {
         let graph = self.graph();
         format!(
-            "Snort({}, {:?}, blue={:?}, red={:?})",
+            "DigraphPlacement({}, {:?}, blue={:?}, red={:?})",
             graph.vertices(),
             graph.edges(),
             &graph.colors().blue,
@@ -92,8 +89,8 @@ impl PySnort {
     fn _repr_svg_(&self) -> String {
         use cgt::drawing::{Draw, svg};
 
-        let mut graph = self.0.graph.map(|&kind| PositionedVertex {
-            kind,
+        let mut graph = self.0.graph.map(|&color| PositionedVertex {
+            color,
             position: V2f::ZERO,
         });
 
@@ -119,12 +116,12 @@ impl PySnort {
         };
         spring_embedder.layout(&mut graph);
 
-        let snort = Snort::new(graph);
-        let bounding_box = snort.required_canvas::<svg::Canvas>();
+        let digraph_placement = DigraphPlacement::new(graph);
+        let bounding_box = digraph_placement.required_canvas::<svg::Canvas>();
         let mut canvas = svg::Canvas::new(bounding_box);
-        snort.draw(&mut canvas);
+        digraph_placement.draw(&mut canvas);
         canvas.to_svg()
     }
 }
 
-py_partizan_game!(PySnort);
+py_partizan_game!(PyDigraphPlacement);

@@ -13,6 +13,32 @@ use crate::graph::{
 pub struct UndirectedGraph<V>(directed::DirectedGraph<V>);
 
 impl<V> UndirectedGraph<V> {
+    /// Create an undirected graph from a directed one, connecting vertices that are adjacent
+    /// in either direction
+    #[must_use]
+    pub fn from_directed(graph: &directed::DirectedGraph<V>) -> Self
+    where
+        V: Clone,
+    {
+        let mut undirected = Self(graph.clone());
+        for (u, v) in graph.edges() {
+            undirected.connect(u, v, true);
+        }
+        undirected
+    }
+
+    /// View the graph as a directed one where every edge is a pair of opposite arcs
+    #[must_use]
+    pub const fn as_directed(&self) -> &directed::DirectedGraph<V> {
+        &self.0
+    }
+
+    /// Convert into a directed graph where every edge is a pair of opposite arcs
+    #[must_use]
+    pub fn into_directed(self) -> directed::DirectedGraph<V> {
+        self.0
+    }
+
     /// Map vertex values
     #[must_use]
     pub fn map<R>(&self, f: impl FnMut(&V) -> R) -> UndirectedGraph<R> {
@@ -293,4 +319,22 @@ fn edges() {
 fn connected() {
     let m = test_matrix();
     assert!(m.is_connected());
+}
+
+#[test]
+fn directed_roundtrip() {
+    let m = test_matrix();
+    assert_eq!(UndirectedGraph::from_directed(m.as_directed()), m);
+}
+
+#[test]
+fn from_directed_symmetrizes() {
+    // Same edges as `test_matrix` but each of them pointing only one way
+    let mut directed = directed::DirectedGraph::empty(&[(), (), (), ()]);
+    directed.connect(VertexIndex { index: 3 }, VertexIndex { index: 0 }, true);
+    directed.connect(VertexIndex { index: 2 }, VertexIndex { index: 3 }, true);
+    directed.connect(VertexIndex { index: 1 }, VertexIndex { index: 3 }, true);
+    directed.connect(VertexIndex { index: 0 }, VertexIndex { index: 1 }, true);
+
+    assert_eq!(UndirectedGraph::from_directed(&directed), test_matrix());
 }

@@ -2,7 +2,6 @@ use crate::{graph::PyGraph, py_partizan_game};
 use cgt::{
     drawing::Canvas,
     graph::{
-        Graph,
         adjacency_matrix::undirected::UndirectedGraph,
         layout::{Bounds, CircleEdge, SpringEmbedder},
     },
@@ -65,21 +64,22 @@ impl PyCol {
         let Some(edges) = edges else {
             return Err(PyTypeError::new_err("Col() missing argument: 'edges'"));
         };
-        PyGraph::new(vertices, edges, white, blue, red, green)?.col()
+        PyGraph::new(vertices, edges, false, white, blue, red, green)?.col()
     }
 
     #[getter]
     fn graph(&self) -> PyGraph {
         // TODO: Maybe we should have 2 graph types where position does not matter
-        let mut graph = self.0.graph.map(|&color| cgt_py_messages::Vertex {
-            color: cgt_py_messages::VertexColor::from(color),
-            position: V2f::ZERO,
-        });
+        let mut graph = self
+            .0
+            .graph
+            .as_directed()
+            .map(|&color| cgt_py_messages::Vertex {
+                color: cgt_py_messages::VertexColor::from(color),
+                position: V2f::ZERO,
+            });
         crate::graph::layout_circle(&mut graph);
-        PyGraph {
-            known_preset: Some(GraphPreset::Col),
-            graph,
-        }
+        PyGraph::from_preset(GraphPreset::Col, graph)
     }
 
     fn __repr__(&self) -> String {

@@ -7,6 +7,7 @@ pub mod amazons;
 pub mod bipartite_snort;
 pub mod canonical_form;
 pub mod col;
+pub mod digraph_placement;
 pub mod domineering;
 pub mod dyadic_rational_number;
 pub mod fission;
@@ -79,11 +80,13 @@ fn cgt_py(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     m.add_function(wrap_pyfunction!(graph::make_snort_widget, m)?)?;
     m.add_function(wrap_pyfunction!(graph::make_col_widget, m)?)?;
+    m.add_function(wrap_pyfunction!(graph::make_digraph_placement_widget, m)?)?;
 
     m.add_class::<crate::amazons::PyAmazons>()?;
     m.add_class::<crate::bipartite_snort::PyBipartiteSnort>()?;
     m.add_class::<crate::canonical_form::PyCanonicalForm>()?;
     m.add_class::<crate::col::PyCol>()?;
+    m.add_class::<crate::digraph_placement::PyDigraphPlacement>()?;
     m.add_class::<crate::domineering::PyDomineering>()?;
     m.add_class::<crate::dyadic_rational_number::PyDyadicRationalNumber>()?;
     m.add_class::<crate::fission::PyFission>()?;

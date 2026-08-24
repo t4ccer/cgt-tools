@@ -474,6 +474,29 @@ pub trait Canvas {
 
     fn line(&mut self, start: V2f, end: V2f, weight: f32, color: Color);
 
+    /// Draw a line with an arrow head at its `end`, pointing away from `start`
+    fn arrow(&mut self, start: V2f, end: V2f, weight: f32, color: Color) {
+        self.line(start, end, weight, color);
+
+        let size = Self::vertex_radius() * 0.3;
+        let direction = V2f::direction(start, end);
+
+        // Both barbs sit behind the tip, offset to either side of the line
+        for side in [size, -size] {
+            self.line(
+                end,
+                V2f {
+                    x: direction.y.mul_add(side, direction.x.mul_add(-size, end.x)),
+                    y: direction
+                        .x
+                        .mul_add(-side, direction.y.mul_add(-size, end.y)),
+                },
+                weight,
+                color,
+            );
+        }
+    }
+
     fn text(&mut self, position: V2f, text: Arguments<'_>, alignment: TextAlignment, color: Color);
 
     fn large_char(&mut self, letter: char, position: V2f, color: Color);

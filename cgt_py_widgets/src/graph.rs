@@ -1,12 +1,18 @@
 use cgt::{
     drawing::{Area, Button, Canvas, Color, Hits, Interaction, Interactions},
-    graph::{Graph, VertexIndex, adjacency_matrix::undirected::UndirectedGraph},
+    graph::{
+        Graph, VertexIndex,
+        adjacency_matrix::{directed::DirectedGraph, undirected::UndirectedGraph},
+    },
     has::Has,
     impl_has,
     numeric::v2f::V2f,
     short::partizan::{
         Player,
-        games::snort::{self, Snort},
+        games::{
+            digraph_placement::{self, DigraphPlacement},
+            snort::{self, Snort},
+        },
     },
 };
 use cgt_py_messages::{
@@ -44,16 +50,17 @@ enum EditMode {
     /// - Clicking on vertex changes the color
     /// - Dragging a vertex moves it without changing the color
     AddColorVertex(VertexColor),
-    SnortMove(Player),
+    /// Play a move of the preset's game as a given player
+    GameMove(Player),
 }
 
 impl EditMode {
     /// Color of the vertex that clicking on empty canvas adds, if the mode adds one at all
-    const fn new_vertex_color(self) -> Option<VertexColor> {
+    const fn new_vertex_color(self, preset: GraphPreset) -> Option<VertexColor> {
         match self {
-            EditMode::ToggleEdge => Some(VertexColor::White),
+            EditMode::ToggleEdge => Some(preset.default_vertex_color()),
             EditMode::AddColorVertex(color) => Some(color),
-            EditMode::MoveVertex | EditMode::RemoveVertex | EditMode::SnortMove(_) => None,
+            EditMode::MoveVertex | EditMode::RemoveVertex | EditMode::GameMove(_) => None,
         }
     }
 
@@ -61,7 +68,7 @@ impl EditMode {
     const fn moves_vertices(self) -> bool {
         match self {
             EditMode::MoveVertex | EditMode::AddColorVertex(_) => true,
-            EditMode::ToggleEdge | EditMode::RemoveVertex | EditMode::SnortMove(_) => false,
+            EditMode::ToggleEdge | EditMode::RemoveVertex | EditMode::GameMove(_) => false,
         }
     }
 
@@ -72,7 +79,7 @@ impl EditMode {
             | EditMode::ToggleEdge
             | EditMode::RemoveVertex
             | EditMode::AddColorVertex(_) => None,
-            EditMode::SnortMove(player) => Some(EditMode::SnortMove(player.opposite())),
+            EditMode::GameMove(player) => Some(EditMode::GameMove(player.opposite())),
         }
     }
 }
@@ -142,6 +149,7 @@ const EDIT_OPTIONS: &[EditOption] = &[
         visible_preset: GraphPresetFlag::from_slice(&[
             GraphPresetFlag::Snort,
             GraphPresetFlag::Col,
+            GraphPresetFlag::DigraphPlacement,
         ]),
     },
     EditOption {
@@ -150,6 +158,7 @@ const EDIT_OPTIONS: &[EditOption] = &[
         visible_preset: GraphPresetFlag::from_slice(&[
             GraphPresetFlag::Snort,
             GraphPresetFlag::Col,
+            GraphPresetFlag::DigraphPlacement,
         ]),
     },
     EditOption {
@@ -172,18 +181,23 @@ const EDIT_OPTIONS: &[EditOption] = &[
         mode: EditMode::RemoveVertex,
         visible_preset: GraphPresetFlag::all(),
     },
-    // Snort
+    // TODO: Col moves
     EditOption {
         text: "Left Move",
-        mode: EditMode::SnortMove(Player::Left),
-        visible_preset: GraphPresetFlag::Snort,
+        mode: EditMode::GameMove(Player::Left),
+        visible_preset: GraphPresetFlag::from_slice(&[
+            GraphPresetFlag::Snort,
+            GraphPresetFlag::DigraphPlacement,
+        ]),
     },
     EditOption {
         text: "Right Move",
-        mode: EditMode::SnortMove(Player::Right),
-        visible_preset: GraphPresetFlag::Snort,
+        mode: EditMode::GameMove(Player::Right),
+        visible_preset: GraphPresetFlag::from_slice(&[
+            GraphPresetFlag::Snort,
+            GraphPresetFlag::DigraphPlacement,
+        ]),
     },
-    // TODO: Col moves
 ];
 
 const DEFAULT_CANVAS_SIZE: V2f = V2f { x: 640.0, y: 400.0 };
@@ -196,11 +210,16 @@ struct GraphWidget {
 
 impl GraphWidget {
     fn new(preset: GraphPreset) -> GraphWidget {
+        // The dropdown starts on its first option, which is not the same one for every
+        // preset, so the widget has to start in whatever mode that turns out to be
+        let edit_mode = SelectOption::selected_value("0", &preset, EDIT_OPTIONS)
+            .map_or(EditMode::MoveVertex, |option| option.mode);
+
         GraphWidget {
             preset,
             shared: Arc::new(Mutex::new(SharedState {
                 preset,
-                edit_mode: EDIT_OPTIONS[0].mode,
+                edit_mode,
                 edge_creates_vertex: true,
                 consecutive_moves: false,
                 state: None,
@@ -249,6 +268,27 @@ fn snort_move_in<const COLOR: u8>(
         .then(|| position.move_in_vertex::<COLOR>(vertex))
 }
 
+#[derive(Clone, Copy)]
+struct DigraphPlacementVertex {
+    color: digraph_placement::VertexColor,
+    position: V2f,
+}
+
+impl_has!(DigraphPlacementVertex -> color -> digraph_placement::VertexColor);
+
+type DigraphPlacementPosition =
+    DigraphPlacement<DigraphPlacementVertex, DirectedGraph<DigraphPlacementVertex>>;
+
+fn digraph_placement_move_in<const COLOR: u8>(
+    position: &DigraphPlacementPosition,
+    vertex: VertexIndex,
+) -> Option<DigraphPlacementPosition> {
+    position
+        .available_moves_for::<COLOR>()
+        .any(|legal| legal == vertex)
+        .then(|| position.move_in_vertex(vertex))
+}
+
 impl GraphWidget {
     fn sync_edit_mode(this: &SharedState) {
         let Some(state) = &this.state else {
@@ -275,6 +315,7 @@ impl GraphWidget {
             graph,
             interactions,
             edit_mode,
+            preset,
             ..
         } = this;
 
@@ -290,6 +331,7 @@ impl GraphWidget {
 
         let canvas_size = *canvas_size;
         let edit_mode = *edit_mode;
+        let preset = *preset;
         let graph: &WidgetGraph = graph;
 
         let mut canvas = HtmlCanvas::new(context, interactions);
@@ -309,7 +351,7 @@ impl GraphWidget {
             });
 
             if edit_mode == EditMode::ToggleEdge {
-                GraphWidget::draw_new_edge(canvas, graph, &vertices);
+                GraphWidget::draw_new_edge(canvas, graph, preset, &vertices);
             }
 
             Frame {
@@ -322,7 +364,12 @@ impl GraphWidget {
     /// Paint the edge that is being dragged out of a vertex. It is painted on top of the
     /// graph, but starts and ends at the rim of the vertices it connects rather than at
     /// their centers, the same way that the edges of the graph itself do
-    fn draw_new_edge(canvas: &mut HtmlCanvas<'_>, graph: &WidgetGraph, hits: &Hits<VertexIndex>) {
+    fn draw_new_edge(
+        canvas: &mut HtmlCanvas<'_>,
+        graph: &WidgetGraph,
+        preset: GraphPreset,
+        hits: &Hits<VertexIndex>,
+    ) {
         let Some((from, drag)) = hits.dragged else {
             return;
         };
@@ -350,7 +397,13 @@ impl GraphWidget {
         } else {
             Color::BLUE
         };
-        canvas.line(start, end, HtmlCanvas::thin_line_weight(), color);
+
+        // Arrow head so that it is clear which way around the edge is about to go
+        if preset.directed_edges() {
+            canvas.arrow(start, end, HtmlCanvas::thin_line_weight(), color);
+        } else {
+            canvas.line(start, end, HtmlCanvas::thin_line_weight(), color);
+        }
     }
 
     fn send_graph(this: &SharedState, context: &Context<GraphBackendMessage>) {
@@ -390,7 +443,7 @@ impl GraphWidget {
         let moved = GraphWidget::move_dragged_vertex(this, frame);
 
         if let Some(position) = frame.background.clicked
-            && let Some(color) = this.edit_mode.new_vertex_color()
+            && let Some(color) = this.edit_mode.new_vertex_color(this.preset)
         {
             GraphWidget::add_vertex_at(this, position, color);
             return Applied {
@@ -428,12 +481,29 @@ impl GraphWidget {
 
             EditMode::ToggleEdge => GraphWidget::drop_edge(this, frame),
 
-            EditMode::SnortMove(player) => GraphWidget::snort_move(this, frame, player),
+            EditMode::GameMove(player) => match this.preset {
+                GraphPreset::Snort => GraphWidget::snort_move(this, frame, player),
+                GraphPreset::DigraphPlacement => {
+                    GraphWidget::digraph_placement_move(this, frame, player)
+                }
+                // TODO: Col moves
+                GraphPreset::Col => Applied::none(),
+            },
         };
 
         Applied {
             changed: moved.changed || applied.changed,
             committed: moved.committed || applied.committed,
+        }
+    }
+
+    /// Connect or disconnect two vertices. Games played on undirected graphs store an edge
+    /// as a pair of opposite arcs, so for them the edge is dragged out in both directions
+    /// at once
+    fn connect(this: &mut SharedState, from: VertexIndex, to: VertexIndex, connect: bool) {
+        this.graph.connect(from, to, connect);
+        if !this.preset.directed_edges() {
+            this.graph.connect(to, from, connect);
         }
     }
 
@@ -448,10 +518,10 @@ impl GraphWidget {
             None if this.edge_creates_vertex => {
                 let color = this
                     .edit_mode
-                    .new_vertex_color()
-                    .unwrap_or(VertexColor::White);
+                    .new_vertex_color(this.preset)
+                    .unwrap_or(this.preset.default_vertex_color());
                 let target = GraphWidget::add_vertex_at(this, drag.cursor, color);
-                this.graph.connect(from, target, true);
+                GraphWidget::connect(this, from, target, true);
                 return Applied {
                     changed: true,
                     committed: true,
@@ -461,10 +531,19 @@ impl GraphWidget {
         };
 
         let adjacent = this.graph.are_adjacent(from, connected);
-        this.graph.connect(from, connected, !adjacent);
+        GraphWidget::connect(this, from, connected, !adjacent);
         Applied {
             changed: true,
             committed: true,
+        }
+    }
+
+    /// Hand the turn over to the other player, unless the same player is set to keep moving
+    fn pass_turn(this: &mut SharedState) {
+        if !this.consecutive_moves
+            && let Some(new_mode) = this.edit_mode.opposite_player()
+        {
+            this.edit_mode = new_mode;
         }
     }
 
@@ -483,7 +562,7 @@ impl GraphWidget {
             return Applied::none();
         };
 
-        let position = Snort::new(graph);
+        let position = Snort::new(UndirectedGraph::from_directed(&graph));
         let new_position = match player {
             Player::Left => {
                 snort_move_in::<{ snort::VertexColor::TintLeft as u8 }>(&position, clicked)
@@ -497,16 +576,55 @@ impl GraphWidget {
             return Applied::none();
         };
 
-        this.graph = new_position.graph.map(|vertex| Vertex {
+        this.graph = new_position.graph.as_directed().map(|vertex| Vertex {
             position: vertex.position,
             color: VertexColor::from(vertex.kind.color()),
         });
+        GraphWidget::pass_turn(this);
 
-        if !this.consecutive_moves
-            && let Some(new_mode) = this.edit_mode.opposite_player()
-        {
-            this.edit_mode = new_mode;
+        Applied {
+            changed: true,
+            committed: true,
         }
+    }
+
+    fn digraph_placement_move(this: &mut SharedState, frame: &Frame, player: Player) -> Applied {
+        let Some(clicked) = frame.vertices.clicked else {
+            return Applied::none();
+        };
+
+        let Ok(graph) = this.graph.try_map(|vertex| {
+            digraph_placement::VertexColor::try_from(vertex.color).map(|color| {
+                DigraphPlacementVertex {
+                    color,
+                    position: vertex.position,
+                }
+            })
+        }) else {
+            // Reachable only if the graph got a vertex of a color that the game has no
+            // move for, e.g. by editing it as another game first
+            return Applied::none();
+        };
+
+        let position = DigraphPlacement::new(graph);
+        let new_position = match player {
+            Player::Left => digraph_placement_move_in::<
+                { digraph_placement::VertexColor::Left as u8 },
+            >(&position, clicked),
+            Player::Right => digraph_placement_move_in::<
+                { digraph_placement::VertexColor::Right as u8 },
+            >(&position, clicked),
+        };
+
+        let Some(new_position) = new_position else {
+            return Applied::none();
+        };
+
+        this.graph = new_position.graph.map(|vertex| Vertex {
+            position: vertex.position,
+            color: VertexColor::from(vertex.color),
+        });
+        GraphWidget::pass_turn(this);
 
         Applied {
             changed: true,

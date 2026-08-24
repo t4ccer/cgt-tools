@@ -153,7 +153,6 @@ pub trait Graph<V>: Sized {
         C: Canvas,
     {
         let radius = C::vertex_radius();
-        let arrow_head_size = radius * 0.3;
 
         for this_vertex_idx in self.vertex_indices() {
             let this_position: V2f = *self.get_vertex(this_vertex_idx).get_inner();
@@ -169,42 +168,18 @@ pub trait Graph<V>: Sized {
                         continue;
                     }
 
-                    canvas.line(
-                        edge_start_pos,
-                        edge_end_pos,
-                        C::thin_line_weight(),
-                        Color::BLACK,
-                    );
-
                     // If connection is both ways then we do not draw arrow heads
-                    if !adjacent_both_ways {
+                    if adjacent_both_ways {
                         canvas.line(
+                            edge_start_pos,
                             edge_end_pos,
-                            V2f {
-                                x: direction.y.mul_add(
-                                    arrow_head_size,
-                                    direction.x.mul_add(-arrow_head_size, edge_end_pos.x),
-                                ),
-                                y: direction.x.mul_add(
-                                    -arrow_head_size,
-                                    direction.y.mul_add(-arrow_head_size, edge_end_pos.y),
-                                ),
-                            },
                             C::thin_line_weight(),
                             Color::BLACK,
                         );
-                        canvas.line(
+                    } else {
+                        canvas.arrow(
+                            edge_start_pos,
                             edge_end_pos,
-                            V2f {
-                                x: direction.y.mul_add(
-                                    -arrow_head_size,
-                                    direction.x.mul_add(-arrow_head_size, edge_end_pos.x),
-                                ),
-                                y: direction.x.mul_add(
-                                    arrow_head_size,
-                                    direction.y.mul_add(-arrow_head_size, edge_end_pos.y),
-                                ),
-                            },
                             C::thin_line_weight(),
                             Color::BLACK,
                         );

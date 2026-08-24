@@ -1,11 +1,14 @@
 use cgt::{
     graph::{
-        Graph, VertexIndex, adjacency_matrix::undirected::UndirectedGraph, layout::CircleEdge,
+        Graph, VertexIndex,
+        adjacency_matrix::{directed::DirectedGraph, undirected::UndirectedGraph},
+        layout::CircleEdge,
     },
     has::Has,
     numeric::v2f::V2f,
     short::partizan::games::{
         col::{self, Col},
+        digraph_placement::{self, DigraphPlacement},
         snort::{self, Snort},
     },
 };
@@ -18,7 +21,7 @@ use pyo3::{
     pyfunction, pymethods,
 };
 
-use crate::{col::PyCol, snort::PySnort};
+use crate::{col::PyCol, digraph_placement::PyDigraphPlacement, snort::PySnort};
 
 #[derive(Debug)]
 #[pyclass(name = "VertexColors")]
@@ -60,6 +63,12 @@ impl PyVertexColors {
 #[pyclass(name = "Graph")]
 pub struct PyGraph {
     pub known_preset: Option<GraphPreset>,
+
+    /// Whether the edges of the graph point one way. Undirected edges are stored as a pair
+    /// of opposite arcs, so this only decides how edges are added and reported back
+    #[pyo3(get)]
+    pub directed: bool,
+
     pub graph: WidgetGraph,
 }
 
@@ -76,7 +85,16 @@ pub fn layout_circle(graph: &mut WidgetGraph) {
 }
 
 impl PyGraph {
-    fn try_into_graph<T>(&self) -> PyResult<UndirectedGraph<T>>
+    /// Graph of a game whose position the widget of a given preset holds
+    pub fn from_preset(preset: GraphPreset, graph: WidgetGraph) -> PyGraph {
+        PyGraph {
+            known_preset: Some(preset),
+            directed: preset.directed_edges(),
+            graph,
+        }
+    }
+
+    fn try_into_graph<T>(&self) -> PyResult<DirectedGraph<T>>
     where
         T: TryFrom<VertexColor>,
         T::Error: std::error::Error,
@@ -85,15 +103,26 @@ impl PyGraph {
             .try_map(|&v| T::try_from(v.color))
             .map_err(|err| PyValueError::new_err(err.to_string()))
     }
+
+    /// The same as [`PyGraph::try_into_graph`] but for games played on undirected graphs.
+    /// Vertices connected either way end up connected both ways
+    fn try_into_undirected_graph<T>(&self) -> PyResult<UndirectedGraph<T>>
+    where
+        T: TryFrom<VertexColor> + Clone,
+        T::Error: std::error::Error,
+    {
+        Ok(UndirectedGraph::from_directed(&self.try_into_graph::<T>()?))
+    }
 }
 
 #[pymethods]
 impl PyGraph {
     #[new]
-    #[pyo3(signature = (vertices, edges, white = None, blue = None, red = None, green = None))]
+    #[pyo3(signature = (vertices, edges, *, directed = false, white = None, blue = None, red = None, green = None))]
     pub fn new(
         vertices: u32,
         edges: Vec<(u32, u32)>,
+        directed: bool,
         white: Option<Vec<u32>>,
         blue: Option<Vec<u32>>,
         red: Option<Vec<u32>>,
@@ -125,21 +154,23 @@ impl PyGraph {
             })
             .collect::<Vec<_>>();
 
-        let mut graph_edges = Vec::with_capacity(edges.len());
+        let mut graph = WidgetGraph::empty(&vertices);
         for (u, v) in edges {
             if u as usize >= vertices.len() || v as usize >= vertices.len() {
                 return Err(PyValueError::new_err(format!("Invalid edge: ({u}, {v})")));
             }
-            graph_edges.push((
-                VertexIndex { index: u as usize },
-                VertexIndex { index: v as usize },
-            ));
+            let u = VertexIndex { index: u as usize };
+            let v = VertexIndex { index: v as usize };
+            graph.connect(u, v, true);
+            if !directed {
+                graph.connect(v, u, true);
+            }
         }
 
-        let mut graph = UndirectedGraph::from_edges(&graph_edges, &vertices);
         layout_circle(&mut graph);
         Ok(PyGraph {
             known_preset: None,
+            directed,
             graph,
         })
     }
@@ -153,6 +184,8 @@ impl PyGraph {
     pub(crate) fn edges(&self) -> Vec<(u32, u32)> {
         self.graph
             .edges()
+            // An undirected edge is a pair of opposite arcs, report it only once
+            .filter(|&(u, v)| self.directed || u <= v || !self.graph.are_adjacent(v, u))
             .map(|(u, v)| (u.index as u32, v.index as u32))
             .collect()
     }
@@ -174,9 +207,10 @@ impl PyGraph {
     fn __repr__(&self) -> String {
         let colors = self.colors();
         format!(
-            "Graph({}, {:?}, white={:?}, blue={:?}, red={:?}, green={:?})",
+            "Graph({}, {:?}, directed={}, white={:?}, blue={:?}, red={:?}, green={:?})",
             self.vertices(),
             self.edges(),
+            if self.directed { "True" } else { "False" },
             &colors.white,
             &colors.blue,
             &colors.red,
@@ -205,6 +239,7 @@ impl PyGraph {
             Some(preset) => match preset {
                 GraphPreset::Snort => self.snort()?.into_py_any(py),
                 GraphPreset::Col => self.col()?.into_py_any(py),
+                GraphPreset::DigraphPlacement => self.digraph_placement()?.into_py_any(py),
             },
             None => Err(PyValueError::new_err(
                 "This graph is not associated with any game",
@@ -215,14 +250,23 @@ impl PyGraph {
     #[getter]
     pub fn snort(&self) -> PyResult<PySnort> {
         let graph = self
-            .try_into_graph::<snort::VertexColor>()?
+            .try_into_undirected_graph::<snort::VertexColor>()?
             .map(|&color| snort::VertexKind::Single(color));
         Ok(PySnort(Snort::new(graph)))
     }
 
     #[getter]
     pub fn col(&self) -> PyResult<PyCol> {
-        Ok(PyCol(Col::new(self.try_into_graph::<col::VertexColor>()?)))
+        Ok(PyCol(Col::new(
+            self.try_into_undirected_graph::<col::VertexColor>()?,
+        )))
+    }
+
+    #[getter]
+    pub fn digraph_placement(&self) -> PyResult<PyDigraphPlacement> {
+        Ok(PyDigraphPlacement(DigraphPlacement::new(
+            self.try_into_graph::<digraph_placement::VertexColor>()?,
+        )))
     }
 }
 
@@ -266,27 +310,29 @@ impl RustWidget for GraphWidget {
     }
 
     fn value<'py>(&mut self) -> impl pyo3::IntoPyObject<'py> {
-        PyGraph {
-            known_preset: Some(self.preset),
-            graph: self.graph.clone(),
-        }
+        PyGraph::from_preset(self.preset, self.graph.clone())
     }
+}
+
+fn make_graph_widget(py: Python<'_>, preset: GraphPreset) -> PyResult<Bound<'_, PyAny>> {
+    GraphWidget {
+        preset,
+        graph: WidgetGraph::empty(&[]),
+    }
+    .into_widget(py, "cgt_py")
 }
 
 #[pyfunction(name = "SnortWidget")]
 pub fn make_snort_widget(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
-    GraphWidget {
-        preset: GraphPreset::Snort,
-        graph: UndirectedGraph::empty(&[]),
-    }
-    .into_widget(py, "cgt_py")
+    make_graph_widget(py, GraphPreset::Snort)
 }
 
 #[pyfunction(name = "ColWidget")]
 pub fn make_col_widget(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
-    GraphWidget {
-        preset: GraphPreset::Col,
-        graph: UndirectedGraph::empty(&[]),
-    }
-    .into_widget(py, "cgt_py")
+    make_graph_widget(py, GraphPreset::Col)
+}
+
+#[pyfunction(name = "DigraphPlacementWidget")]
+pub fn make_digraph_placement_widget(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
+    make_graph_widget(py, GraphPreset::DigraphPlacement)
 }

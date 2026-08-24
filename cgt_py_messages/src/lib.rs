@@ -1,10 +1,10 @@
 use cgt::{
     drawing::{self, Color},
-    graph::adjacency_matrix::undirected::UndirectedGraph,
+    graph::adjacency_matrix::directed::DirectedGraph,
     grid::vec_grid::VecGrid,
     impl_has,
     numeric::v2f::V2f,
-    short::partizan::games::{amazons, col, domineering, fission, snort},
+    short::partizan::games::{amazons, col, digraph_placement, domineering, fission, snort},
 };
 
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone, Copy, PartialEq, Eq)]
@@ -298,6 +298,13 @@ impl_vertex_map! {
     }
 }
 
+impl_vertex_map! {
+    match digraph_placement::VertexColor {
+        Left => Blue,
+        Right => Red,
+    }
+}
+
 impl VertexColor {
     pub const fn color(self) -> Color {
         match self {
@@ -329,9 +336,9 @@ pub struct Vertex {
 impl_has!(Vertex -> position -> V2f);
 impl_has!(Vertex -> color -> VertexColor);
 
-// TODO: Make it all generic over graph or just use directed graph for everything
-// and do bidirectional arcs depending on the GraphPreset
-pub type WidgetGraph = UndirectedGraph<Vertex>;
+/// Graph behind every graph widget. It is always directed - games with undirected edges
+/// store each of them as a pair of opposite arcs, see [`GraphPreset::directed_edges`]
+pub type WidgetGraph = DirectedGraph<Vertex>;
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(tag = "type")]
@@ -354,6 +361,27 @@ preset! {
     pub enum GraphPreset {
         Snort = 1,
         Col = 2,
-        // TODO: DigraphPlacement, BipartiteSnort
+        DigraphPlacement = 3,
+        // TODO: BipartiteSnort
+    }
+}
+
+impl GraphPreset {
+    /// Whether edges of the preset's game point one way. Edges of games played on undirected
+    /// graphs are stored as a pair of opposite arcs, so connecting two vertices adds both
+    pub const fn directed_edges(self) -> bool {
+        match self {
+            GraphPreset::Snort | GraphPreset::Col => false,
+            GraphPreset::DigraphPlacement => true,
+        }
+    }
+
+    /// Color of a vertex added without the user picking one. Games that have no uncolored
+    /// vertex have to start somewhere
+    pub const fn default_vertex_color(self) -> VertexColor {
+        match self {
+            GraphPreset::Snort | GraphPreset::Col => VertexColor::White,
+            GraphPreset::DigraphPlacement => VertexColor::Blue,
+        }
     }
 }
