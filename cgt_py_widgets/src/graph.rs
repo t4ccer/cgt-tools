@@ -17,6 +17,7 @@ use cgt::{
     short::partizan::{
         Player,
         games::{
+            col::{self, Col},
             digraph_placement::{self, DigraphPlacement},
             snort::{self, Snort},
         },
@@ -103,8 +104,11 @@ const PLAYER_VERTEX: GraphPresetFlag = GraphPresetFlag::from_slice(&[
 
 const GREEN_VERTEX: GraphPresetFlag = GraphPresetFlag::from_slice(&[]);
 
-const PLAYABLE: GraphPresetFlag =
-    GraphPresetFlag::from_slice(&[GraphPresetFlag::Snort, GraphPresetFlag::DigraphPlacement]);
+const PLAYABLE: GraphPresetFlag = GraphPresetFlag::from_slice(&[
+    GraphPresetFlag::Snort,
+    GraphPresetFlag::Col,
+    GraphPresetFlag::DigraphPlacement,
+]);
 
 const EDIT_OPTIONS: &[EditOption] = &[
     EditOption {
@@ -142,7 +146,6 @@ const EDIT_OPTIONS: &[EditOption] = &[
         mode: EditMode::RemoveVertex,
         visible_preset: GraphPresetFlag::all(),
     },
-    // TODO: Col moves
     EditOption {
         text: "Left Move",
         mode: EditMode::GameMove(Player::Left),
@@ -286,6 +289,24 @@ fn snort_move_in<const COLOR: u8>(
     position: &Snort<SnortVertex, UndirectedGraph<SnortVertex>>,
     vertex: VertexIndex,
 ) -> Option<Snort<SnortVertex, UndirectedGraph<SnortVertex>>> {
+    position
+        .available_moves_for::<COLOR>()
+        .any(|legal| legal == vertex)
+        .then(|| position.move_in_vertex::<COLOR>(vertex))
+}
+
+#[derive(Clone, Copy)]
+struct ColVertex {
+    color: col::VertexColor,
+    position: V2f,
+}
+
+impl_has!(ColVertex -> color -> col::VertexColor);
+
+fn col_move_in<const COLOR: u8>(
+    position: &Col<ColVertex, UndirectedGraph<ColVertex>>,
+    vertex: VertexIndex,
+) -> Option<Col<ColVertex, UndirectedGraph<ColVertex>>> {
     position
         .available_moves_for::<COLOR>()
         .any(|legal| legal == vertex)
@@ -505,6 +526,9 @@ impl GraphWidget {
                 GraphPreset::Snort => {
                     GraphWidget::snort_move(graph, edit, consecutive_moves, preset, frame, player);
                 }
+                GraphPreset::Col => {
+                    GraphWidget::col_move(graph, edit, consecutive_moves, preset, frame, player);
+                }
                 GraphPreset::DigraphPlacement => GraphWidget::digraph_placement_move(
                     graph,
                     edit,
@@ -513,8 +537,6 @@ impl GraphWidget {
                     frame,
                     player,
                 ),
-                // TODO: Col moves
-                GraphPreset::Col => {}
             },
         }
     }
@@ -670,6 +692,50 @@ impl GraphWidget {
             |vertex| Vertex {
                 position: vertex.position,
                 color: VertexColor::from(vertex.kind.color()),
+            },
+        )));
+        edit.pass_turn(consecutive_moves.get(), preset);
+    }
+
+    fn col_move(
+        graph: &Mutable<SyncState<WidgetGraph>>,
+        edit: &EditModeInputs,
+        consecutive_moves: &Mutable<bool>,
+        preset: GraphPreset,
+        frame: &Frame,
+        player: Player,
+    ) {
+        let Some(clicked) = frame.vertices.clicked else {
+            return;
+        };
+
+        let Ok(col_graph) = graph.lock_ref().state.try_map(|vertex| {
+            col::VertexColor::try_from(vertex.color).map(|color| ColVertex {
+                color,
+                position: vertex.position,
+            })
+        }) else {
+            // Reachable only if the graph got a vertex of a color that the game has no
+            // move for, e.g. by editing it as another game first
+            return;
+        };
+
+        let position = Col::new(UndirectedGraph::from_directed(&col_graph));
+        let new_position = match player {
+            Player::Left => col_move_in::<{ col::VertexColor::TintLeft as u8 }>(&position, clicked),
+            Player::Right => {
+                col_move_in::<{ col::VertexColor::TintRight as u8 }>(&position, clicked)
+            }
+        };
+
+        let Some(new_position) = new_position else {
+            return;
+        };
+
+        graph.set(SyncState::edited(new_position.graph.as_directed().map(
+            |vertex| Vertex {
+                position: vertex.position,
+                color: VertexColor::from(vertex.color),
             },
         )));
         edit.pass_turn(consecutive_moves.get(), preset);
