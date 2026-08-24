@@ -215,6 +215,7 @@ const MIN_CANVAS_SIZE: V2f = V2f { x: 240.0, y: 160.0 };
 struct EditModeInputs {
     option: Mutable<EditOption>,
     edge_vertex: Mutable<EdgeVertexOption>,
+    consecutive_moves: Mutable<bool>,
 }
 
 impl EditModeInputs {
@@ -226,11 +227,12 @@ impl EditModeInputs {
             edge_vertex: Mutable::new(
                 SelectOption::selected_value_idx(0, &preset, EDGE_VERTEX_OPTIONS).unwrap(),
             ),
+            consecutive_moves: Mutable::new(false),
         }
     }
 
-    fn pass_turn(&self, consecutive_moves: bool, preset: GraphPreset) {
-        if !consecutive_moves
+    fn pass_turn(&self, preset: GraphPreset) {
+        if !self.consecutive_moves.get()
             && let Some(new_mode) = self.option.get().mode.opposite_player()
             && let Some(new_option) =
                 SelectOption::find(|o| o.mode == new_mode, &preset, EDIT_OPTIONS)
@@ -243,7 +245,6 @@ impl EditModeInputs {
 struct GraphWidget {
     preset: GraphPreset,
     edit: EditModeInputs,
-    consecutive_moves: Mutable<bool>,
     layout: LayoutInputs,
     /// Size of the canvas, which the user is free to resize
     canvas_size: Mutable<V2f>,
@@ -256,7 +257,6 @@ impl GraphWidget {
         GraphWidget {
             preset,
             edit: EditModeInputs::new(preset),
-            consecutive_moves: Mutable::new(false),
             layout: LayoutInputs::new(preset),
             canvas_size: Mutable::new(DEFAULT_CANVAS_SIZE),
             graph: Mutable::new(SyncState::uninitialized(Graph::empty(&[]))),
@@ -482,7 +482,6 @@ impl GraphWidget {
         graph: &Mutable<SyncState<WidgetGraph>>,
         canvas_size: V2f,
         edit: &EditModeInputs,
-        consecutive_moves: &Mutable<bool>,
         preset: GraphPreset,
         frame: &Frame,
     ) {
@@ -524,19 +523,14 @@ impl GraphWidget {
 
             EditMode::GameMove(player) => match preset {
                 GraphPreset::Snort => {
-                    GraphWidget::snort_move(graph, edit, consecutive_moves, preset, frame, player);
+                    GraphWidget::snort_move(graph, edit, preset, frame, player);
                 }
                 GraphPreset::Col => {
-                    GraphWidget::col_move(graph, edit, consecutive_moves, preset, frame, player);
+                    GraphWidget::col_move(graph, edit, preset, frame, player);
                 }
-                GraphPreset::DigraphPlacement => GraphWidget::digraph_placement_move(
-                    graph,
-                    edit,
-                    consecutive_moves,
-                    preset,
-                    frame,
-                    player,
-                ),
+                GraphPreset::DigraphPlacement => {
+                    GraphWidget::digraph_placement_move(graph, edit, preset, frame, player)
+                }
             },
         }
     }
@@ -655,7 +649,6 @@ impl GraphWidget {
     fn snort_move(
         graph: &Mutable<SyncState<WidgetGraph>>,
         edit: &EditModeInputs,
-        consecutive_moves: &Mutable<bool>,
         preset: GraphPreset,
         frame: &Frame,
         player: Player,
@@ -694,13 +687,12 @@ impl GraphWidget {
                 color: VertexColor::from(vertex.kind.color()),
             },
         )));
-        edit.pass_turn(consecutive_moves.get(), preset);
+        edit.pass_turn(preset);
     }
 
     fn col_move(
         graph: &Mutable<SyncState<WidgetGraph>>,
         edit: &EditModeInputs,
-        consecutive_moves: &Mutable<bool>,
         preset: GraphPreset,
         frame: &Frame,
         player: Player,
@@ -738,13 +730,12 @@ impl GraphWidget {
                 color: VertexColor::from(vertex.color),
             },
         )));
-        edit.pass_turn(consecutive_moves.get(), preset);
+        edit.pass_turn(preset);
     }
 
     fn digraph_placement_move(
         graph: &Mutable<SyncState<WidgetGraph>>,
         edit: &EditModeInputs,
-        consecutive_moves: &Mutable<bool>,
         preset: GraphPreset,
         frame: &Frame,
         player: Player,
@@ -784,7 +775,7 @@ impl GraphWidget {
             position: vertex.position,
             color: VertexColor::from(vertex.color),
         })));
-        edit.pass_turn(consecutive_moves.get(), preset);
+        edit.pass_turn(preset);
     }
 
     fn update(
@@ -793,7 +784,6 @@ impl GraphWidget {
         canvas_size: &Mutable<V2f>,
         interactions: &Mutable<Interactions>,
         edit: &EditModeInputs,
-        consecutive_moves: &Mutable<bool>,
         preset: GraphPreset,
     ) -> Result<(), JsValue> {
         let frame = GraphWidget::draw(
@@ -804,14 +794,7 @@ impl GraphWidget {
             edit.option.get().mode,
             preset,
         )?;
-        GraphWidget::apply(
-            graph,
-            canvas_size.get(),
-            edit,
-            consecutive_moves,
-            preset,
-            &frame,
-        );
+        GraphWidget::apply(graph, canvas_size.get(), edit, preset, &frame);
 
         Ok(())
     }
@@ -1273,7 +1256,7 @@ impl WasmWidget for GraphWidget {
             .create_element("input")?
             .dyn_into::<HtmlInputElement>()?;
         consecutive_moves.set_type("checkbox");
-        reactive::checkbox(&consecutive_moves, &self.consecutive_moves)?;
+        reactive::checkbox(&consecutive_moves, &self.edit.consecutive_moves)?;
 
         let move_options_text = document.create_element("span")?;
         move_options_text.set_text_content(Some("Consecutive Moves"));
@@ -1356,18 +1339,9 @@ impl WasmWidget for GraphWidget {
                 let canvas_size = self.canvas_size.clone();
                 let interactions = self.interactions.clone();
                 let edit = self.edit.clone();
-                let consecutive_moves = self.consecutive_moves.clone();
                 let preset = self.preset;
                 move || {
-                    GraphWidget::update(
-                        &canvas,
-                        &graph,
-                        &canvas_size,
-                        &interactions,
-                        &edit,
-                        &consecutive_moves,
-                        preset,
-                    )
+                    GraphWidget::update(&canvas, &graph, &canvas_size, &interactions, &edit, preset)
                 }
             },
         );
