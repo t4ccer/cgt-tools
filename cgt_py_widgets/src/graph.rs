@@ -75,6 +75,16 @@ impl EditMode {
         }
     }
 
+    /// Whether both are the same entry of the edit mode dropdown. The vertex that
+    /// [`EditMode::ToggleEdge`] carries comes from a dropdown of its own, so it is not
+    /// what tells one entry from another
+    fn is_same_option(self, other: EditMode) -> bool {
+        match (self, other) {
+            (EditMode::ToggleEdge(_), EditMode::ToggleEdge(_)) => true,
+            _ => self == other,
+        }
+    }
+
     /// The same mode but played by the other player, if the mode plays moves at all
     const fn opposite_player(self) -> Option<EditMode> {
         match self {
@@ -152,6 +162,11 @@ const PLAYABLE: GraphPresetFlag =
 
 const EDIT_OPTIONS: &[EditOption] = &[
     EditOption {
+        text: "Add/Remove Edge",
+        mode: EditMode::ToggleEdge(None), // Will be set later
+        visible_preset: GraphPresetFlag::all(),
+    },
+    EditOption {
         text: "Add White Vertex",
         mode: EditMode::AddColorVertex(VertexColor::White),
         visible_preset: UNCOLORED_VERTEX,
@@ -174,11 +189,6 @@ const EDIT_OPTIONS: &[EditOption] = &[
     EditOption {
         text: "Move Vertex",
         mode: EditMode::MoveVertex,
-        visible_preset: GraphPresetFlag::all(),
-    },
-    EditOption {
-        text: "Add/Remove Edge",
-        mode: EditMode::ToggleEdge(None),
         visible_preset: GraphPresetFlag::all(),
     },
     EditOption {
@@ -329,8 +339,15 @@ impl GraphWidget {
     fn new(preset: GraphPreset) -> GraphWidget {
         // Both dropdowns start on their first option, which is not the same one for every
         // preset, so the widget has to start on whatever those turn out to be
-        let edit_mode = SelectOption::selected_value("0", &preset, EDIT_OPTIONS)
+        let mut edit_mode = SelectOption::selected_value("0", &preset, EDIT_OPTIONS)
             .map_or(EditMode::MoveVertex, |option| option.mode);
+
+        // The vertex to leave behind is a dropdown of its own, so the mode the options
+        // table carries has a hole in it that only that dropdown can fill
+        if let EditMode::ToggleEdge(edge_vertex) = &mut edit_mode {
+            *edge_vertex = SelectOption::selected_value("0", &preset, EDGE_VERTEX_OPTIONS)
+                .and_then(|option| option.color);
+        }
 
         GraphWidget {
             preset,
@@ -346,6 +363,24 @@ impl GraphWidget {
             })),
         }
     }
+}
+
+/// Show only those of the extra controls that the mode has a use for. Has to run when the
+/// widget is first put together as well as on every change, since the mode it opens in was
+/// never picked from the dropdown
+fn show_options_of(
+    mode: EditMode,
+    edge_options: &HtmlLabelElement,
+    move_options: &HtmlLabelElement,
+) -> Result<(), JsValue> {
+    let display = |shown| if shown { "flex" } else { "none" };
+    edge_options
+        .style()
+        .set_property("display", display(matches!(mode, EditMode::ToggleEdge(_))))?;
+    move_options
+        .style()
+        .set_property("display", display(mode.opposite_player().is_some()))?;
+    Ok(())
 }
 
 fn mouse_event_to_canvas(event: &MouseEvent) -> V2f {
@@ -414,9 +449,12 @@ impl GraphWidget {
 
         let current_mode =
             SelectOption::selected_value(&state.edit_mode.value(), &this.preset, EDIT_OPTIONS);
-        if current_mode.map(|o| o.mode) != Some(this.edit_mode)
-            && let Some(mode) =
-                SelectOption::find_index(|o| o.mode == this.edit_mode, &this.preset, EDIT_OPTIONS)
+        if !current_mode.is_some_and(|o| o.mode.is_same_option(this.edit_mode))
+            && let Some(mode) = SelectOption::find_index(
+                |o| o.mode.is_same_option(this.edit_mode),
+                &this.preset,
+                EDIT_OPTIONS,
+            )
         {
             state.edit_mode.set_value(&mode.to_string());
         }
@@ -573,15 +611,7 @@ impl GraphWidget {
             EditMode::MoveVertex => Applied::none(),
 
             EditMode::AddColorVertex(new_color) => match frame.vertices.clicked {
-                Some(vertex) => {
-                    let color: &mut VertexColor = this.graph.get_vertex_mut(vertex).get_inner_mut();
-                    let changed = *color != new_color;
-                    *color = new_color;
-                    Applied {
-                        changed,
-                        committed: changed,
-                    }
-                }
+                Some(vertex) => GraphWidget::recolor_vertex(this, vertex, new_color),
                 None => Applied::none(),
             },
 
@@ -624,11 +654,35 @@ impl GraphWidget {
         }
     }
 
+    /// Repaint a vertex, which is nothing worth reporting if it already had that color
+    fn recolor_vertex(
+        this: &mut SharedState,
+        vertex: VertexIndex,
+        new_color: VertexColor,
+    ) -> Applied {
+        let color: &mut VertexColor = this.graph.get_vertex_mut(vertex).get_inner_mut();
+        let changed = *color != new_color;
+        *color = new_color;
+        Applied {
+            changed,
+            committed: changed,
+        }
+    }
+
     fn drop_edge(
         this: &mut SharedState,
         frame: &Frame,
         edge_vertex: Option<VertexColor>,
     ) -> Applied {
+        // Clicking a vertex rather than dragging an edge out of it paints it the color
+        // that dropping an edge on empty canvas would have created, and a dropdown set to
+        // create nothing paints nothing
+        if let Some(vertex) = frame.vertices.clicked {
+            return edge_vertex.map_or_else(Applied::none, |new_color| {
+                GraphWidget::recolor_vertex(this, vertex, new_color)
+            });
+        }
+
         let Some((from, drag)) = frame.vertices.dragged.filter(|(_, drag)| drag.dropped) else {
             return Applied::none();
         };
@@ -1228,14 +1282,7 @@ impl WasmWidget for GraphWidget {
                 if let Some(mode) =
                     SelectOption::selected_value(&mode_select.value(), &preset, EDIT_OPTIONS)
                 {
-                    let display = |shown| if shown { "flex" } else { "none" };
-                    edge_options.style().set_property(
-                        "display",
-                        display(matches!(mode.mode, EditMode::ToggleEdge(_))),
-                    )?;
-                    move_options
-                        .style()
-                        .set_property("display", display(mode.mode.opposite_player().is_some()))?;
+                    show_options_of(mode.mode, &edge_options, &move_options)?;
 
                     let mut this = this.lock().unwrap();
                     this.edit_mode = mode.mode;
@@ -1268,6 +1315,12 @@ impl WasmWidget for GraphWidget {
         controls.append_child(&edge_options)?;
         controls.append_child(&move_options)?;
         element.append_child(&controls)?;
+
+        show_options_of(
+            self.shared.lock().unwrap().edit_mode,
+            &edge_options,
+            &move_options,
+        )?;
 
         let layout = LayoutControls::create(&document, self.preset)?;
         layout.inputs.show_defaults(0, DEFAULT_CANVAS_SIZE);
