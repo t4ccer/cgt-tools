@@ -12,9 +12,6 @@ pub mod tikz;
 #[cfg(feature = "tiny_skia")]
 pub mod tiny_skia;
 
-#[cfg(feature = "imgui")]
-pub mod imgui;
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Color {
     pub r: u8,
@@ -62,25 +59,6 @@ impl Color {
 impl From<Color> for ::tiny_skia::Color {
     fn from(color: Color) -> ::tiny_skia::Color {
         ::tiny_skia::Color::from_rgba8(color.r, color.g, color.b, color.a)
-    }
-}
-
-#[cfg(feature = "imgui")]
-impl From<Color> for ::imgui::ImColor32 {
-    fn from(color: Color) -> ::imgui::ImColor32 {
-        ::imgui::ImColor32::from_rgba(color.r, color.g, color.b, color.a)
-    }
-}
-
-#[cfg(feature = "mint")]
-impl From<Color> for ::mint::Vector4<f32> {
-    fn from(color: Color) -> ::mint::Vector4<f32> {
-        ::mint::Vector4 {
-            x: color.r as f32 / 255.0,
-            y: color.g as f32 / 255.0,
-            z: color.b as f32 / 255.0,
-            w: color.a as f32 / 255.0,
-        }
     }
 }
 

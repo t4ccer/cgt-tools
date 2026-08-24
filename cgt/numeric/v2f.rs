@@ -15,16 +15,6 @@ pub struct V2f {
     pub y: f32,
 }
 
-#[cfg(feature = "mint")]
-impl From<V2f> for mint::Vector2<f32> {
-    fn from(value: V2f) -> Self {
-        Self {
-            x: value.x,
-            y: value.y,
-        }
-    }
-}
-
 impl From<[f32; 2]> for V2f {
     fn from([x, y]: [f32; 2]) -> Self {
         Self { x, y }
