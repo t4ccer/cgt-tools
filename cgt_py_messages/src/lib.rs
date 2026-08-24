@@ -356,7 +356,7 @@ pub enum GraphFrontendMessage {
 }
 
 preset! {
-    #[derive(Clone, Copy, Debug)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     pub struct GraphPresetFlag;
 
     #[derive(Clone, Copy, Debug)]

@@ -1,9 +1,11 @@
 use crate::{
+    SyncState,
     canvas::HtmlCanvas,
-    reactive::{SelectOption, SelectOptionElement},
+    reactive::{self, SelectOption, SelectOptionElement},
+    report_edits_to_python,
 };
 use cgt::{
-    drawing::{Area, Button, Canvas, Color, Hits, Interaction, Interactions},
+    drawing::{Area, Canvas, Color, Hits, Interaction, Interactions},
     graph::{
         Graph, VertexIndex,
         adjacency_matrix::{directed::DirectedGraph, undirected::UndirectedGraph},
@@ -25,30 +27,24 @@ use cgt_py_messages::{
     WidgetGraph,
     layout::{default_bounds, default_circle, default_spring, max_spring_iterations},
 };
+use futures_signals::{
+    map_ref,
+    signal::{Mutable, SignalExt},
+};
 use jupyter_rust_widget_frontend::{AnyWidgetModel, Context, WasmWidget};
-use std::sync::{Arc, Mutex};
 use wasm_bindgen::{
     JsCast, JsValue,
     prelude::{ScopedClosure, wasm_bindgen},
 };
 use web_sys::{
     CanvasRenderingContext2d, Document, Element, HtmlButtonElement, HtmlCanvasElement,
-    HtmlDivElement, HtmlElement, HtmlInputElement, HtmlLabelElement, HtmlSelectElement, MouseEvent,
-    ResizeObserver,
+    HtmlDivElement, HtmlElement, HtmlInputElement, HtmlLabelElement,
 };
-
-struct HtmlState {
-    canvas: HtmlCanvasElement,
-    edit_mode: HtmlSelectElement,
-
-    /// Kept around only so that it keeps observing the canvas container
-    _resize_observer: ResizeObserver,
-}
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum EditMode {
     MoveVertex,
-    ToggleEdge(Option<VertexColor>),
+    ToggleEdge,
     RemoveVertex,
     /// This is 3 in 1
     /// - Clicking on canvas adds a vertex of this color
@@ -62,9 +58,9 @@ enum EditMode {
 impl EditMode {
     /// Color of the vertex that clicking on empty canvas adds, if the mode adds one at all.
     /// [`EditMode::ToggleEdge`] adds whichever vertex its own dropdown is set to
-    const fn new_vertex_color(self) -> Option<VertexColor> {
+    const fn new_vertex_color(self, edge_vertex: Option<VertexColor>) -> Option<VertexColor> {
         match self {
-            EditMode::ToggleEdge(edge_vertex) => edge_vertex,
+            EditMode::ToggleEdge => edge_vertex,
             EditMode::AddColorVertex(color) => Some(color),
             EditMode::MoveVertex | EditMode::RemoveVertex | EditMode::GameMove(_) => None,
         }
@@ -74,17 +70,7 @@ impl EditMode {
     const fn moves_vertices(self) -> bool {
         match self {
             EditMode::MoveVertex | EditMode::AddColorVertex(_) => true,
-            EditMode::ToggleEdge(_) | EditMode::RemoveVertex | EditMode::GameMove(_) => false,
-        }
-    }
-
-    /// Whether both are the same entry of the edit mode dropdown. The vertex that
-    /// [`EditMode::ToggleEdge`] carries comes from a dropdown of its own, so it is not
-    /// what tells one entry from another
-    fn is_same_option(self, other: EditMode) -> bool {
-        match (self, other) {
-            (EditMode::ToggleEdge(_), EditMode::ToggleEdge(_)) => true,
-            _ => self == other,
+            EditMode::ToggleEdge | EditMode::RemoveVertex | EditMode::GameMove(_) => false,
         }
     }
 
@@ -92,7 +78,7 @@ impl EditMode {
     const fn opposite_player(self) -> Option<EditMode> {
         match self {
             EditMode::MoveVertex
-            | EditMode::ToggleEdge(_)
+            | EditMode::ToggleEdge
             | EditMode::RemoveVertex
             | EditMode::AddColorVertex(_) => None,
             EditMode::GameMove(player) => Some(EditMode::GameMove(player.opposite())),
@@ -104,49 +90,6 @@ impl EditMode {
 struct Frame {
     vertices: Hits<VertexIndex>,
     background: Interaction,
-}
-
-impl Frame {
-    fn new() -> Self {
-        Self {
-            vertices: Hits::new(),
-            background: Interaction::NONE,
-        }
-    }
-}
-
-/// What applying a [`Frame`] to the graph did
-#[derive(Clone, Copy)]
-struct Applied {
-    /// The graph was modified, so the canvas has to be painted again
-    changed: bool,
-
-    /// The change is finished, so the backend should hear about it. Vertices being dragged
-    /// around change on every frame but are only worth sending once they are dropped
-    committed: bool,
-}
-
-impl Applied {
-    fn none() -> Self {
-        Self {
-            changed: false,
-            committed: false,
-        }
-    }
-}
-
-struct SharedState {
-    preset: GraphPreset,
-    edit_mode: EditMode,
-    /// Whether the same player keeps moving instead of the players taking turns
-    consecutive_moves: bool,
-    /// Whether the layout parameters were touched by hand. Until they are they follow the
-    /// graph, so that laying out a graph drawn after the widget opened still fits it
-    layout_customized: bool,
-    state: Option<HtmlState>,
-    canvas_size: V2f,
-    graph: WidgetGraph,
-    interactions: Interactions,
 }
 
 const UNCOLORED_VERTEX: GraphPresetFlag =
@@ -166,7 +109,7 @@ const PLAYABLE: GraphPresetFlag =
 const EDIT_OPTIONS: &[EditOption] = &[
     EditOption {
         text: "Add/Remove Edge",
-        mode: EditMode::ToggleEdge(None), // Will be set later
+        mode: EditMode::ToggleEdge,
         visible_preset: GraphPresetFlag::all(),
     },
     EditOption {
@@ -265,63 +208,57 @@ const LAYOUT_OPTIONS: &[LayoutOption] = &[
 const DEFAULT_CANVAS_SIZE: V2f = V2f { x: 640.0, y: 400.0 };
 const MIN_CANVAS_SIZE: V2f = V2f { x: 240.0, y: 160.0 };
 
-struct GraphWidget {
-    preset: GraphPreset,
-    shared: Arc<Mutex<SharedState>>,
+#[derive(Clone)]
+struct EditModeInputs {
+    option: Mutable<EditOption>,
+    edge_vertex: Mutable<EdgeVertexOption>,
 }
 
-impl GraphWidget {
-    fn new(preset: GraphPreset) -> GraphWidget {
-        // Both dropdowns start on their first option, which is not the same one for every
-        // preset, so the widget has to start on whatever those turn out to be
-        let mut edit_mode = SelectOption::selected_value("0", &preset, EDIT_OPTIONS)
-            .map_or(EditMode::MoveVertex, |option| option.mode);
-
-        // The vertex to leave behind is a dropdown of its own, so the mode the options
-        // table carries has a hole in it that only that dropdown can fill
-        if let EditMode::ToggleEdge(edge_vertex) = &mut edit_mode {
-            *edge_vertex = SelectOption::selected_value("0", &preset, EDGE_VERTEX_OPTIONS)
-                .and_then(|option| option.color);
+impl EditModeInputs {
+    fn new(preset: GraphPreset) -> EditModeInputs {
+        EditModeInputs {
+            option: Mutable::new(
+                SelectOption::selected_value_idx(0, &preset, EDIT_OPTIONS).unwrap(),
+            ),
+            edge_vertex: Mutable::new(
+                SelectOption::selected_value_idx(0, &preset, EDGE_VERTEX_OPTIONS).unwrap(),
+            ),
         }
+    }
 
-        GraphWidget {
-            preset,
-            shared: Arc::new(Mutex::new(SharedState {
-                preset,
-                edit_mode,
-                consecutive_moves: false,
-                layout_customized: false,
-                state: None,
-                canvas_size: DEFAULT_CANVAS_SIZE,
-                graph: Graph::empty(&[]),
-                interactions: Interactions::new(),
-            })),
+    fn pass_turn(&self, consecutive_moves: bool, preset: GraphPreset) {
+        if !consecutive_moves
+            && let Some(new_mode) = self.option.get().mode.opposite_player()
+            && let Some(new_option) =
+                SelectOption::find(|o| o.mode == new_mode, &preset, EDIT_OPTIONS)
+        {
+            self.option.set(new_option);
         }
     }
 }
 
-/// Show only those of the extra controls that the mode has a use for. Has to run when the
-/// widget is first put together as well as on every change, since the mode it opens in was
-/// never picked from the dropdown
-fn show_options_of(
-    mode: EditMode,
-    edge_options: &HtmlLabelElement,
-    move_options: &HtmlLabelElement,
-) -> Result<(), JsValue> {
-    let display = |shown| if shown { "flex" } else { "none" };
-    edge_options
-        .style()
-        .set_property("display", display(matches!(mode, EditMode::ToggleEdge(_))))?;
-    move_options
-        .style()
-        .set_property("display", display(mode.opposite_player().is_some()))?;
-    Ok(())
+struct GraphWidget {
+    preset: GraphPreset,
+    edit: EditModeInputs,
+    consecutive_moves: Mutable<bool>,
+    layout: LayoutInputs,
+    /// Size of the canvas, which the user is free to resize
+    canvas_size: Mutable<V2f>,
+    graph: Mutable<SyncState<WidgetGraph>>,
+    interactions: Mutable<Interactions>,
 }
 
-fn mouse_event_to_canvas(event: &MouseEvent) -> V2f {
-    V2f {
-        x: event.offset_x() as f32,
-        y: event.offset_y() as f32,
+impl GraphWidget {
+    fn new(preset: GraphPreset) -> GraphWidget {
+        GraphWidget {
+            preset,
+            edit: EditModeInputs::new(preset),
+            consecutive_moves: Mutable::new(false),
+            layout: LayoutInputs::new(preset),
+            canvas_size: Mutable::new(DEFAULT_CANVAS_SIZE),
+            graph: Mutable::new(SyncState::uninitialized(Graph::empty(&[]))),
+            interactions: Mutable::new(Interactions::new()),
+        }
     }
 }
 
@@ -377,52 +314,27 @@ fn digraph_placement_move_in<const COLOR: u8>(
 }
 
 impl GraphWidget {
-    fn sync_edit_mode(this: &SharedState) {
-        let Some(state) = &this.state else {
-            return;
-        };
-
-        let current_mode =
-            SelectOption::selected_value(&state.edit_mode.value(), &this.preset, EDIT_OPTIONS);
-        if !current_mode.is_some_and(|o| o.mode.is_same_option(this.edit_mode))
-            && let Some(mode) = SelectOption::find_index(
-                |o| o.mode.is_same_option(this.edit_mode),
-                &this.preset,
-                EDIT_OPTIONS,
-            )
-        {
-            state.edit_mode.set_value(&mode.to_string());
-        }
-    }
-
     /// Paint the graph and report what the mouse did to it
-    fn draw(this: &mut SharedState) -> Result<Frame, JsValue> {
-        GraphWidget::sync_edit_mode(this);
+    fn draw(
+        canvas: &HtmlCanvasElement,
+        graph: &WidgetGraph,
+        canvas_size: V2f,
+        interactions: &mut Interactions,
+        edit_mode: EditMode,
+        preset: GraphPreset,
+    ) -> Result<Frame, JsValue> {
+        // Resizing a canvas wipes it, so it is only resized when it is the wrong size
+        if canvas.width() != canvas_size.x as u32 {
+            canvas.set_width(canvas_size.x as u32);
+        }
+        if canvas.height() != canvas_size.y as u32 {
+            canvas.set_height(canvas_size.y as u32);
+        }
 
-        let SharedState {
-            state,
-            canvas_size,
-            graph,
-            interactions,
-            edit_mode,
-            preset,
-            ..
-        } = this;
-
-        let Some(state) = state else {
-            return Ok(Frame::new());
-        };
-
-        let context = state
-            .canvas
+        let context = canvas
             .get_context("2d")?
             .unwrap()
             .dyn_into::<CanvasRenderingContext2d>()?;
-
-        let canvas_size = *canvas_size;
-        let edit_mode = *edit_mode;
-        let preset = *preset;
-        let graph: &WidgetGraph = graph;
 
         let mut canvas = HtmlCanvas::new(context, interactions);
         Ok(canvas.frame(|canvas| {
@@ -440,7 +352,7 @@ impl GraphWidget {
                 canvas.vertex(position, color.color(), vertex)
             });
 
-            if matches!(edit_mode, EditMode::ToggleEdge(_)) {
+            if matches!(edit_mode, EditMode::ToggleEdge) {
                 GraphWidget::draw_new_edge(canvas, graph, preset, &vertices);
             }
 
@@ -496,181 +408,219 @@ impl GraphWidget {
         }
     }
 
-    fn send_graph(this: &SharedState, context: &Context<GraphBackendMessage>) {
-        context.send_message(&GraphBackendMessage::SetGraph {
-            graph: this.graph.clone(),
-        });
-    }
-
-    fn add_vertex_at(this: &mut SharedState, position: V2f, color: VertexColor) -> VertexIndex {
-        this.graph.add_vertex(Vertex {
-            position: clamp_to_canvas(position, this.canvas_size),
+    fn add_vertex_at(
+        graph: &mut WidgetGraph,
+        canvas_size: V2f,
+        position: V2f,
+        color: VertexColor,
+    ) -> VertexIndex {
+        graph.add_vertex(Vertex {
+            position: clamp_to_canvas(position, canvas_size),
             color,
         })
     }
 
-    fn move_dragged_vertex(this: &mut SharedState, frame: &Frame) -> Applied {
+    fn move_dragged_vertex(
+        graph: &Mutable<SyncState<WidgetGraph>>,
+        canvas_size: V2f,
+        edit_mode: EditMode,
+        frame: &Frame,
+    ) {
         let Some((vertex, drag)) = frame
             .vertices
             .dragged
-            .filter(|_| this.edit_mode.moves_vertices())
+            .filter(|_| edit_mode.moves_vertices())
         else {
-            return Applied::none();
+            return;
         };
 
-        let new_position = clamp_to_canvas(drag.position(), this.canvas_size);
-        let position: &mut V2f = this.graph.get_vertex_mut(vertex).get_inner_mut();
-        let changed = *position != new_position;
-        *position = new_position;
+        let new_position = clamp_to_canvas(drag.position(), canvas_size);
+        let mut graph = graph.lock_mut();
+        let moved = vertex_position(&graph.state, vertex) != new_position;
 
-        Applied {
-            changed,
-            committed: drag.dropped,
+        // Every frame that the pointer holds a vertex down for drags it again, so a vertex
+        // that is already where the pointer left it must not be written to: that would
+        // report a change, which would paint the frame that reports the drag once more,
+        // and so on forever
+        if drag.dropped {
+            // A drag that took the vertex nowhere is not worth reporting to python
+            if moved || graph.is_in_progress() {
+                let position: &mut V2f = graph.edit().get_vertex_mut(vertex).get_inner_mut();
+                *position = new_position;
+            }
+        } else if moved {
+            let position: &mut V2f = graph
+                .edit_in_progress()
+                .get_vertex_mut(vertex)
+                .get_inner_mut();
+            *position = new_position;
         }
     }
 
-    fn apply(this: &mut SharedState, frame: &Frame) -> Applied {
-        let moved = GraphWidget::move_dragged_vertex(this, frame);
+    fn apply(
+        graph: &Mutable<SyncState<WidgetGraph>>,
+        canvas_size: V2f,
+        edit: &EditModeInputs,
+        consecutive_moves: &Mutable<bool>,
+        preset: GraphPreset,
+        frame: &Frame,
+    ) {
+        let edit_mode = edit.option.get().mode;
+        GraphWidget::move_dragged_vertex(graph, canvas_size, edit_mode, frame);
 
         if let Some(position) = frame.background.clicked
-            && let Some(color) = this.edit_mode.new_vertex_color()
+            && let Some(color) = edit_mode.new_vertex_color(edit.edge_vertex.get().color)
         {
-            GraphWidget::add_vertex_at(this, position, color);
-            return Applied {
-                changed: true,
-                committed: true,
-            };
+            let mut state = graph.lock_mut();
+            GraphWidget::add_vertex_at(state.edit(), canvas_size, position, color);
+            return;
         }
 
-        let applied = match this.edit_mode {
-            EditMode::MoveVertex => Applied::none(),
+        match edit_mode {
+            EditMode::MoveVertex => {}
 
-            EditMode::AddColorVertex(new_color) => match frame.vertices.clicked {
-                Some(vertex) => GraphWidget::recolor_vertex(this, vertex, new_color),
-                None => Applied::none(),
-            },
-
-            EditMode::RemoveVertex => match frame.vertices.clicked {
-                Some(vertex) => {
-                    this.graph.remove_vertex(vertex);
-                    Applied {
-                        changed: true,
-                        committed: true,
-                    }
+            EditMode::AddColorVertex(new_color) => {
+                if let Some(vertex) = frame.vertices.clicked {
+                    GraphWidget::recolor_vertex(graph, vertex, new_color);
                 }
-                None => Applied::none(),
-            },
+            }
 
-            EditMode::ToggleEdge(edge_vertex) => GraphWidget::drop_edge(this, frame, edge_vertex),
-
-            EditMode::GameMove(player) => match this.preset {
-                GraphPreset::Snort => GraphWidget::snort_move(this, frame, player),
-                GraphPreset::DigraphPlacement => {
-                    GraphWidget::digraph_placement_move(this, frame, player)
+            EditMode::RemoveVertex => {
+                if let Some(vertex) = frame.vertices.clicked {
+                    graph.lock_mut().edit().remove_vertex(vertex);
                 }
+            }
+
+            EditMode::ToggleEdge => {
+                GraphWidget::drop_edge(
+                    graph,
+                    canvas_size,
+                    preset,
+                    frame,
+                    edit.edge_vertex.get().color,
+                );
+            }
+
+            EditMode::GameMove(player) => match preset {
+                GraphPreset::Snort => {
+                    GraphWidget::snort_move(graph, edit, consecutive_moves, preset, frame, player);
+                }
+                GraphPreset::DigraphPlacement => GraphWidget::digraph_placement_move(
+                    graph,
+                    edit,
+                    consecutive_moves,
+                    preset,
+                    frame,
+                    player,
+                ),
                 // TODO: Col moves
-                GraphPreset::Col => Applied::none(),
+                GraphPreset::Col => {}
             },
-        };
-
-        Applied {
-            changed: moved.changed || applied.changed,
-            committed: moved.committed || applied.committed,
         }
     }
 
     /// Connect or disconnect two vertices. Games played on undirected graphs store an edge
     /// as a pair of opposite arcs, so for them the edge is dragged out in both directions
     /// at once
-    fn connect(this: &mut SharedState, from: VertexIndex, to: VertexIndex, connect: bool) {
-        this.graph.connect(from, to, connect);
-        if !this.preset.directed_edges() {
-            this.graph.connect(to, from, connect);
+    fn connect(
+        graph: &mut WidgetGraph,
+        preset: GraphPreset,
+        from: VertexIndex,
+        to: VertexIndex,
+        connect: bool,
+    ) {
+        graph.connect(from, to, connect);
+        if !preset.directed_edges() {
+            graph.connect(to, from, connect);
         }
     }
 
     /// Repaint a vertex, which is nothing worth reporting if it already had that color
     fn recolor_vertex(
-        this: &mut SharedState,
+        graph: &Mutable<SyncState<WidgetGraph>>,
         vertex: VertexIndex,
         new_color: VertexColor,
-    ) -> Applied {
-        let color: &mut VertexColor = this.graph.get_vertex_mut(vertex).get_inner_mut();
-        let changed = *color != new_color;
-        *color = new_color;
-        Applied {
-            changed,
-            committed: changed,
+    ) {
+        let mut graph = graph.lock_mut();
+        let color: &VertexColor = graph.state.get_vertex(vertex).get_inner();
+        if *color != new_color {
+            let color: &mut VertexColor = graph.edit().get_vertex_mut(vertex).get_inner_mut();
+            *color = new_color;
         }
     }
 
     fn drop_edge(
-        this: &mut SharedState,
+        graph: &Mutable<SyncState<WidgetGraph>>,
+        canvas_size: V2f,
+        preset: GraphPreset,
         frame: &Frame,
         edge_vertex: Option<VertexColor>,
-    ) -> Applied {
+    ) {
         // Clicking a vertex rather than dragging an edge out of it paints it the color
         // that dropping an edge on empty canvas would have created, and a dropdown set to
         // create nothing paints nothing
         if let Some(vertex) = frame.vertices.clicked {
-            return edge_vertex.map_or_else(Applied::none, |new_color| {
-                GraphWidget::recolor_vertex(this, vertex, new_color)
-            });
+            if let Some(new_color) = edge_vertex {
+                GraphWidget::recolor_vertex(graph, vertex, new_color);
+            }
+
+            return;
         }
 
         let Some((from, drag)) = frame.vertices.dragged.filter(|(_, drag)| drag.dropped) else {
-            return Applied::none();
+            return;
         };
 
-        let connected = match frame.vertices.hovered {
-            Some(target) if target == from => return Applied::none(),
-            Some(target) => target,
+        match frame.vertices.hovered {
+            Some(target) if target == from => {}
+            Some(target) => {
+                let mut state = graph.lock_mut();
+                let graph = state.edit();
+                let adjacent = graph.are_adjacent(from, target);
+                GraphWidget::connect(graph, preset, from, target, !adjacent);
+            }
             // Dropped on empty canvas, so the edge only lands somewhere if the dropdown
             // is set to leave a vertex behind
             None => {
                 let Some(color) = edge_vertex else {
-                    return Applied::none();
+                    return;
                 };
-                let target = GraphWidget::add_vertex_at(this, drag.cursor, color);
-                GraphWidget::connect(this, from, target, true);
-                return Applied {
-                    changed: true,
-                    committed: true,
-                };
-            }
-        };
 
-        let adjacent = this.graph.are_adjacent(from, connected);
-        GraphWidget::connect(this, from, connected, !adjacent);
-        Applied {
-            changed: true,
-            committed: true,
+                let mut state = graph.lock_mut();
+                let graph = state.edit();
+                let target = GraphWidget::add_vertex_at(graph, canvas_size, drag.cursor, color);
+                GraphWidget::connect(graph, preset, from, target, true);
+            }
         }
     }
 
     /// Rearrange the whole graph with the chosen algorithm. Parameters that were never
     /// touched by hand are recomputed first, since the graph they were last filled in for
     /// is not the graph being laid out now
-    fn apply_layout(this: &mut SharedState, inputs: &LayoutInputs) {
-        let vertices = this.graph.size();
-        let canvas_size = this.canvas_size;
+    fn apply_layout(
+        graph: &Mutable<SyncState<WidgetGraph>>,
+        canvas_size: V2f,
+        inputs: &LayoutInputs,
+    ) {
+        let vertices = graph.lock_ref().state.size();
 
-        if !this.layout_customized {
+        if !inputs.customized.get() {
             inputs.show_defaults(vertices, canvas_size);
         }
 
-        match inputs.algorithm(this.preset) {
-            LayoutAlgorithm::Circle => inputs.circle(canvas_size).layout(&mut this.graph),
-            LayoutAlgorithm::SpringEmbedder => {
-                inputs.spring(vertices, canvas_size).layout(&mut this.graph);
-            }
+        let mut state = graph.lock_mut();
+        let graph = state.edit();
+
+        match inputs.algorithm.get().algorithm {
+            LayoutAlgorithm::Circle => inputs.circle().layout(graph),
+            LayoutAlgorithm::SpringEmbedder => inputs.spring(vertices, canvas_size).layout(graph),
         }
 
         // Parameters of one's own choosing are left to put vertices wherever they put
         // them, but a layout that diverged has to be caught: a position that is not a
         // number would not even survive being sent back to python
-        for vertex in this.graph.vertex_indices() {
-            let position: &mut V2f = this.graph.get_vertex_mut(vertex).get_inner_mut();
+        for vertex in graph.vertex_indices() {
+            let position: &mut V2f = graph.get_vertex_mut(vertex).get_inner_mut();
             if !position.x.is_finite() {
                 position.x = canvas_size.x * 0.5;
             }
@@ -680,31 +630,29 @@ impl GraphWidget {
         }
     }
 
-    /// Hand the turn over to the other player, unless the same player is set to keep moving
-    fn pass_turn(this: &mut SharedState) {
-        if !this.consecutive_moves
-            && let Some(new_mode) = this.edit_mode.opposite_player()
-        {
-            this.edit_mode = new_mode;
-        }
-    }
-
-    fn snort_move(this: &mut SharedState, frame: &Frame, player: Player) -> Applied {
+    fn snort_move(
+        graph: &Mutable<SyncState<WidgetGraph>>,
+        edit: &EditModeInputs,
+        consecutive_moves: &Mutable<bool>,
+        preset: GraphPreset,
+        frame: &Frame,
+        player: Player,
+    ) {
         let Some(clicked) = frame.vertices.clicked else {
-            return Applied::none();
+            return;
         };
 
-        let Ok(graph) = this.graph.try_map(|vertex| {
+        let Ok(snort_graph) = graph.lock_ref().state.try_map(|vertex| {
             snort::VertexColor::try_from(vertex.color).map(|color| SnortVertex {
                 kind: snort::VertexKind::Single(color),
                 position: vertex.position,
             })
         }) else {
             // Should be unreachable
-            return Applied::none();
+            return;
         };
 
-        let position = Snort::new(UndirectedGraph::from_directed(&graph));
+        let position = Snort::new(UndirectedGraph::from_directed(&snort_graph));
         let new_position = match player {
             Player::Left => {
                 snort_move_in::<{ snort::VertexColor::TintLeft as u8 }>(&position, clicked)
@@ -715,27 +663,31 @@ impl GraphWidget {
         };
 
         let Some(new_position) = new_position else {
-            return Applied::none();
+            return;
         };
 
-        this.graph = new_position.graph.as_directed().map(|vertex| Vertex {
-            position: vertex.position,
-            color: VertexColor::from(vertex.kind.color()),
-        });
-        GraphWidget::pass_turn(this);
-
-        Applied {
-            changed: true,
-            committed: true,
-        }
+        graph.set(SyncState::edited(new_position.graph.as_directed().map(
+            |vertex| Vertex {
+                position: vertex.position,
+                color: VertexColor::from(vertex.kind.color()),
+            },
+        )));
+        edit.pass_turn(consecutive_moves.get(), preset);
     }
 
-    fn digraph_placement_move(this: &mut SharedState, frame: &Frame, player: Player) -> Applied {
+    fn digraph_placement_move(
+        graph: &Mutable<SyncState<WidgetGraph>>,
+        edit: &EditModeInputs,
+        consecutive_moves: &Mutable<bool>,
+        preset: GraphPreset,
+        frame: &Frame,
+        player: Player,
+    ) {
         let Some(clicked) = frame.vertices.clicked else {
-            return Applied::none();
+            return;
         };
 
-        let Ok(graph) = this.graph.try_map(|vertex| {
+        let Ok(placement_graph) = graph.lock_ref().state.try_map(|vertex| {
             digraph_placement::VertexColor::try_from(vertex.color).map(|color| {
                 DigraphPlacementVertex {
                     color,
@@ -745,10 +697,10 @@ impl GraphWidget {
         }) else {
             // Reachable only if the graph got a vertex of a color that the game has no
             // move for, e.g. by editing it as another game first
-            return Applied::none();
+            return;
         };
 
-        let position = DigraphPlacement::new(graph);
+        let position = DigraphPlacement::new(placement_graph);
         let new_position = match player {
             Player::Left => digraph_placement_move_in::<
                 { digraph_placement::VertexColor::Left as u8 },
@@ -759,41 +711,47 @@ impl GraphWidget {
         };
 
         let Some(new_position) = new_position else {
-            return Applied::none();
+            return;
         };
 
-        this.graph = new_position.graph.map(|vertex| Vertex {
+        graph.set(SyncState::edited(new_position.graph.map(|vertex| Vertex {
             position: vertex.position,
             color: VertexColor::from(vertex.color),
-        });
-        GraphWidget::pass_turn(this);
-
-        Applied {
-            changed: true,
-            committed: true,
-        }
+        })));
+        edit.pass_turn(consecutive_moves.get(), preset);
     }
 
     fn update(
-        this: &mut SharedState,
-        context: &Context<GraphBackendMessage>,
+        canvas: &HtmlCanvasElement,
+        graph: &Mutable<SyncState<WidgetGraph>>,
+        canvas_size: &Mutable<V2f>,
+        interactions: &Mutable<Interactions>,
+        edit: &EditModeInputs,
+        consecutive_moves: &Mutable<bool>,
+        preset: GraphPreset,
     ) -> Result<(), JsValue> {
-        let settling = matches!(this.interactions.pointer().button, Button::Released(_));
-
-        let frame = GraphWidget::draw(this)?;
-        let applied = GraphWidget::apply(this, &frame);
-        if applied.committed {
-            GraphWidget::send_graph(this, context);
-        }
-        if applied.changed || settling {
-            GraphWidget::draw(this)?;
-        }
+        let frame = GraphWidget::draw(
+            canvas,
+            &graph.lock_ref().state,
+            canvas_size.get(),
+            &mut interactions.lock_mut(),
+            edit.option.get().mode,
+            preset,
+        )?;
+        GraphWidget::apply(
+            graph,
+            canvas_size.get(),
+            edit,
+            consecutive_moves,
+            preset,
+            &frame,
+        );
 
         Ok(())
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) struct EditOption {
     text: &'static str,
     mode: EditMode,
@@ -812,7 +770,7 @@ impl SelectOptionElement for EditOption {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) struct EdgeVertexOption {
     text: &'static str,
     color: Option<VertexColor>,
@@ -831,7 +789,7 @@ impl SelectOptionElement for EdgeVertexOption {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) struct LayoutOption {
     text: &'static str,
     algorithm: LayoutAlgorithm,
@@ -855,7 +813,6 @@ fn parameter_row(
     document: &Document,
     label: &str,
     input_type: &str,
-    step: &str,
 ) -> Result<(HtmlLabelElement, HtmlInputElement), JsValue> {
     // Wrapping the input in the label associates the two without needing a unique id
     let row = document
@@ -874,264 +831,305 @@ fn parameter_row(
         .create_element("input")?
         .dyn_into::<HtmlInputElement>()?;
     input.set_type(input_type);
-    if !step.is_empty() {
-        input.set_step(step);
-        input.set_min("0");
-        input.style().set_property("width", "7em")?;
-    }
 
     row.append_child(&text)?;
     row.append_child(&input)?;
     Ok((row, input))
 }
 
+/// A parameter row holding a number, shown with `decimals` digits after the point
+fn number_row(
+    document: &Document,
+    label: &str,
+    step: &str,
+    decimals: usize,
+    value: &Mutable<f32>,
+) -> Result<HtmlLabelElement, JsValue> {
+    let (row, input) = parameter_row(document, label, "number")?;
+    input.set_step(step);
+    input.set_min("0");
+    input.style().set_property("width", "7em")?;
+    reactive::input_f32(&input, value, decimals)?;
+
+    Ok(row)
+}
+
+/// A parameter row holding a flag
+fn checkbox_row(
+    document: &Document,
+    label: &str,
+    value: &Mutable<bool>,
+) -> Result<HtmlLabelElement, JsValue> {
+    let (row, input) = parameter_row(document, label, "checkbox")?;
+    reactive::checkbox(&input, value)?;
+
+    Ok(row)
+}
+
 /// The controls that pick a layout and run it, along with the collapsed panel holding the
 /// parameters of both algorithms
-#[derive(Clone)]
-struct LayoutControls {
-    /// Everything, ready to be put into the widget
-    root: HtmlElement,
-    inputs: LayoutInputs,
-    apply: HtmlButtonElement,
-    reset: HtmlButtonElement,
-    /// Holds every parameter row, so that edits to any of them bubble up to one listener
-    parameters: HtmlDivElement,
-    /// The disclosure the parameters are collapsed into
-    details: HtmlElement,
-    circle_rows: Vec<HtmlLabelElement>,
-    spring_rows: Vec<HtmlLabelElement>,
-}
+fn layout_controls(
+    document: &Document,
+    preset: GraphPreset,
+    inputs: &LayoutInputs,
+    graph: &Mutable<SyncState<WidgetGraph>>,
+    canvas_size: &Mutable<V2f>,
+) -> Result<HtmlElement, JsValue> {
+    let root = document.create_element("div")?.dyn_into::<HtmlElement>()?;
+    root.style().set_property("margin-bottom", "4px")?;
 
-impl LayoutControls {
-    fn create(document: &Document, preset: GraphPreset) -> Result<LayoutControls, JsValue> {
-        let root = document.create_element("div")?.dyn_into::<HtmlElement>()?;
-        root.style().set_property("margin-bottom", "4px")?;
+    let row = document
+        .create_element("div")?
+        .dyn_into::<HtmlDivElement>()?;
+    row.style().set_property("display", "flex")?;
+    row.style().set_property("align-items", "center")?;
+    row.style().set_property("width", "fit-content")?;
+    row.style().set_property("gap", "8px")?;
 
-        let row = document
-            .create_element("div")?
-            .dyn_into::<HtmlDivElement>()?;
-        row.style().set_property("display", "flex")?;
-        row.style().set_property("align-items", "center")?;
-        row.style().set_property("width", "fit-content")?;
-        row.style().set_property("gap", "8px")?;
+    let label = document.create_element("span")?;
+    label.set_text_content(Some("Layout"));
+    let algorithm = SelectOption::create_element_reactive(
+        document,
+        "Layout",
+        preset,
+        LAYOUT_OPTIONS,
+        inputs.algorithm.clone(),
+    )?;
 
-        let label = document.create_element("span")?;
-        label.set_text_content(Some("Layout"));
-        let algorithm: HtmlSelectElement =
-            SelectOption::create_element(document, "Layout", &preset, LAYOUT_OPTIONS)?;
-        let apply = document
-            .create_element("button")?
-            .dyn_into::<HtmlButtonElement>()?;
-        apply.set_type("button");
-        apply.set_text_content(Some("Apply"));
+    let apply = document
+        .create_element("button")?
+        .dyn_into::<HtmlButtonElement>()?;
+    apply.set_type("button");
+    apply.set_text_content(Some("Apply"));
 
-        row.append_child(&label)?;
-        row.append_child(&algorithm)?;
-        row.append_child(&apply)?;
+    let apply_handler = ScopedClosure::<dyn FnMut()>::new({
+        let inputs = inputs.clone();
+        let graph = graph.clone();
+        let canvas_size = canvas_size.clone();
+        move || GraphWidget::apply_layout(&graph, canvas_size.get(), &inputs)
+    });
+    apply.add_event_listener_with_callback("click", apply_handler.as_ref().unchecked_ref())?;
+    apply_handler.forget();
 
-        let parameters = document
-            .create_element("div")?
-            .dyn_into::<HtmlDivElement>()?;
-        parameters.style().set_property("display", "flex")?;
-        parameters
-            .style()
-            .set_property("flex-direction", "column")?;
-        parameters.style().set_property("width", "fit-content")?;
-        parameters.style().set_property("gap", "4px")?;
-        parameters.style().set_property("padding", "4px 0 0 8px")?;
+    row.append_child(&label)?;
+    row.append_child(&algorithm)?;
+    row.append_child(&apply)?;
 
-        let (circle_radius_row, circle_radius) = parameter_row(document, "Radius", "number", "1")?;
-        let (center_x_row, center_x) = parameter_row(document, "Center X", "number", "1")?;
-        let (center_y_row, center_y) = parameter_row(document, "Center Y", "number", "1")?;
+    let parameters = document
+        .create_element("div")?
+        .dyn_into::<HtmlDivElement>()?;
+    parameters.style().set_property("display", "flex")?;
+    parameters
+        .style()
+        .set_property("flex-direction", "column")?;
+    parameters.style().set_property("width", "fit-content")?;
+    parameters.style().set_property("gap", "4px")?;
+    parameters.style().set_property("padding", "4px 0 0 8px")?;
 
-        let (iterations_row, iterations) = parameter_row(document, "Iterations", "number", "128")?;
-        let (cooling_rate_row, cooling_rate) =
-            parameter_row(document, "Cooling rate", "number", "0.0001")?;
-        let (c_attractive_row, c_attractive) =
-            parameter_row(document, "Attraction", "number", "0.1")?;
-        let (c_repulsive_row, c_repulsive) = parameter_row(document, "Repulsion", "number", "10")?;
-        let (ideal_spring_length_row, ideal_spring_length) =
-            parameter_row(document, "Ideal edge length", "number", "1")?;
-        let (c_middle_attractive_row, c_middle_attractive) =
-            parameter_row(document, "Pull to center", "number", "0.001")?;
-        let (keep_on_canvas_row, keep_on_canvas) =
-            parameter_row(document, "Keep on canvas", "checkbox", "")?;
+    let circle_rows = [
+        number_row(document, "Radius", "1", 1, &inputs.circle_radius)?,
+        number_row(document, "Center X", "1", 1, &inputs.center_x)?,
+        number_row(document, "Center Y", "1", 1, &inputs.center_y)?,
+    ];
+    let spring_rows = [
+        number_row(document, "Iterations", "128", 0, &inputs.iterations)?,
+        number_row(document, "Cooling rate", "0.0001", 6, &inputs.cooling_rate)?,
+        number_row(document, "Attraction", "0.1", 2, &inputs.c_attractive)?,
+        number_row(document, "Repulsion", "10", 1, &inputs.c_repulsive)?,
+        number_row(
+            document,
+            "Ideal edge length",
+            "1",
+            1,
+            &inputs.ideal_spring_length,
+        )?,
+        number_row(
+            document,
+            "Pull to center",
+            "0.001",
+            4,
+            &inputs.c_middle_attractive,
+        )?,
+        checkbox_row(document, "Keep on canvas", &inputs.keep_on_canvas)?,
+    ];
 
-        let circle_rows = vec![circle_radius_row, center_x_row, center_y_row];
-        let spring_rows = vec![
-            iterations_row,
-            cooling_rate_row,
-            c_attractive_row,
-            c_repulsive_row,
-            ideal_spring_length_row,
-            c_middle_attractive_row,
-            keep_on_canvas_row,
-        ];
-        for parameter in circle_rows.iter().chain(spring_rows.iter()) {
-            parameters.append_child(parameter)?;
-        }
-
-        let reset = document
-            .create_element("button")?
-            .dyn_into::<HtmlButtonElement>()?;
-        reset.set_type("button");
-        reset.set_text_content(Some("Reset to defaults"));
-        reset.style().set_property("margin-top", "4px")?;
-        parameters.append_child(&reset)?;
-
-        let details = document
-            .create_element("details")?
-            .dyn_into::<HtmlElement>()?;
-        details.style().set_property("margin-top", "4px")?;
-        let summary = document.create_element("summary")?;
-        summary.set_text_content(Some("Layout parameters"));
-        details.append_child(&summary)?;
-        details.append_child(&parameters)?;
-
-        root.append_child(&row)?;
-        root.append_child(&details)?;
-
-        Ok(LayoutControls {
-            root,
-            inputs: LayoutInputs {
-                algorithm,
-                circle_radius,
-                center_x,
-                center_y,
-                iterations,
-                cooling_rate,
-                c_attractive,
-                c_repulsive,
-                ideal_spring_length,
-                c_middle_attractive,
-                keep_on_canvas,
-            },
-            apply,
-            reset,
-            parameters,
-            details,
-            circle_rows,
-            spring_rows,
-        })
+    // Only the parameters of the chosen algorithm are worth showing
+    let circle = circle_rows.iter().map(|row| (row, LayoutAlgorithm::Circle));
+    let spring = spring_rows
+        .iter()
+        .map(|row| (row, LayoutAlgorithm::SpringEmbedder));
+    for (row, shown_for) in circle.chain(spring) {
+        parameters.append_child(row)?;
+        reactive::style_set_property(
+            HtmlElement::from(row.clone()),
+            "display",
+            inputs.algorithm.signal().map(move |option| {
+                if option.algorithm == shown_for {
+                    "flex"
+                } else {
+                    "none"
+                }
+            }),
+        )?;
     }
 
-    /// Only the parameters of the chosen algorithm are worth showing
-    fn show_rows_of(&self, algorithm: LayoutAlgorithm) -> Result<(), JsValue> {
-        let display = |shown| if shown { "flex" } else { "none" };
-        for row in &self.circle_rows {
-            row.style()
-                .set_property("display", display(algorithm == LayoutAlgorithm::Circle))?;
+    // Typing into any parameter hands the whole panel over to the user, so that the
+    // defaults stop being recomputed underneath what they entered
+    let customize_handler = ScopedClosure::<dyn FnMut()>::new({
+        let customized = inputs.customized.clone();
+        move || customized.set_neq(true)
+    });
+    parameters
+        .add_event_listener_with_callback("input", customize_handler.as_ref().unchecked_ref())?;
+    customize_handler.forget();
+
+    let reset = document
+        .create_element("button")?
+        .dyn_into::<HtmlButtonElement>()?;
+    reset.set_type("button");
+    reset.set_text_content(Some("Reset to defaults"));
+    reset.style().set_property("margin-top", "4px")?;
+    parameters.append_child(&reset)?;
+
+    let reset_handler = ScopedClosure::<dyn FnMut()>::new({
+        let inputs = inputs.clone();
+        let graph = graph.clone();
+        let canvas_size = canvas_size.clone();
+        move || {
+            inputs.customized.set_neq(false);
+            inputs.show_defaults(graph.lock_ref().state.size(), canvas_size.get());
         }
-        for row in &self.spring_rows {
-            row.style().set_property(
-                "display",
-                display(algorithm == LayoutAlgorithm::SpringEmbedder),
-            )?;
+    });
+    reset.add_event_listener_with_callback("click", reset_handler.as_ref().unchecked_ref())?;
+    reset_handler.forget();
+
+    let details = document
+        .create_element("details")?
+        .dyn_into::<HtmlElement>()?;
+    details.style().set_property("margin-top", "4px")?;
+    let summary = document.create_element("summary")?;
+    summary.set_text_content(Some("Layout parameters"));
+    details.append_child(&summary)?;
+    details.append_child(&parameters)?;
+
+    // The panel is opened onto the graph as it is now, not as it was when the widget did
+    let open_handler = ScopedClosure::<dyn FnMut()>::new({
+        let inputs = inputs.clone();
+        let graph = graph.clone();
+        let canvas_size = canvas_size.clone();
+        move || {
+            if !inputs.customized.get() {
+                inputs.show_defaults(graph.lock_ref().state.size(), canvas_size.get());
+            }
         }
-        Ok(())
-    }
+    });
+    details.add_event_listener_with_callback("toggle", open_handler.as_ref().unchecked_ref())?;
+    open_handler.forget();
+
+    root.append_child(&row)?;
+    root.append_child(&details)?;
+
+    Ok(root)
 }
 
-/// Number a parameter input holds, or `fallback` if it was left empty or unreadable
-fn read_number(input: &HtmlInputElement, fallback: f32) -> f32 {
-    let value = input.value_as_number();
-    if value.is_finite() {
-        value as f32
-    } else {
-        fallback
-    }
-}
-
-/// The parameter fields of the layout panel. Every field of both algorithms is here except
+/// The parameters of the layout panel. Every parameter of both algorithms is here except
 /// the vertex radius and the bounding rectangle, which are what the canvas says they are
 #[derive(Clone)]
 struct LayoutInputs {
-    algorithm: HtmlSelectElement,
+    algorithm: Mutable<LayoutOption>,
 
-    circle_radius: HtmlInputElement,
-    center_x: HtmlInputElement,
-    center_y: HtmlInputElement,
+    circle_radius: Mutable<f32>,
+    center_x: Mutable<f32>,
+    center_y: Mutable<f32>,
 
-    iterations: HtmlInputElement,
-    cooling_rate: HtmlInputElement,
-    c_attractive: HtmlInputElement,
-    c_repulsive: HtmlInputElement,
-    ideal_spring_length: HtmlInputElement,
-    c_middle_attractive: HtmlInputElement,
-    keep_on_canvas: HtmlInputElement,
+    iterations: Mutable<f32>,
+    cooling_rate: Mutable<f32>,
+    c_attractive: Mutable<f32>,
+    c_repulsive: Mutable<f32>,
+    ideal_spring_length: Mutable<f32>,
+    c_middle_attractive: Mutable<f32>,
+    keep_on_canvas: Mutable<bool>,
+
+    /// Whether the parameters were touched by hand. Until they are they follow the graph,
+    /// so that laying out a graph drawn after the widget opened still fits it
+    customized: Mutable<bool>,
 }
 
 impl LayoutInputs {
-    fn algorithm(&self, preset: GraphPreset) -> LayoutAlgorithm {
-        SelectOption::selected_value(&self.algorithm.value(), &preset, LAYOUT_OPTIONS)
-            .map_or(LayoutAlgorithm::Circle, |option| option.algorithm)
+    fn new(preset: GraphPreset) -> LayoutInputs {
+        let inputs = LayoutInputs {
+            algorithm: Mutable::new(
+                SelectOption::selected_value_idx(0, &preset, LAYOUT_OPTIONS).unwrap(),
+            ),
+            circle_radius: Mutable::new(0.0),
+            center_x: Mutable::new(0.0),
+            center_y: Mutable::new(0.0),
+            iterations: Mutable::new(0.0),
+            cooling_rate: Mutable::new(0.0),
+            c_attractive: Mutable::new(0.0),
+            c_repulsive: Mutable::new(0.0),
+            ideal_spring_length: Mutable::new(0.0),
+            c_middle_attractive: Mutable::new(0.0),
+            keep_on_canvas: Mutable::new(false),
+            customized: Mutable::new(false),
+        };
+
+        // An empty graph on a canvas of the size the widget opens at is all there is to go
+        // on until python sends a graph down
+        inputs.show_defaults(0, DEFAULT_CANVAS_SIZE);
+        inputs
     }
 
-    /// Fill every field with the parameter that suits the graph as it is right now
+    /// Fill every parameter with the one that suits the graph as it is right now
     fn show_defaults(&self, vertices: usize, canvas_size: V2f) {
         let circle = default_circle::<HtmlCanvas>(canvas_size);
-        self.circle_radius
-            .set_value(&format!("{:.1}", circle.circle_radius));
-        self.center_x.set_value(&format!("{:.1}", circle.center.x));
-        self.center_y.set_value(&format!("{:.1}", circle.center.y));
+        self.circle_radius.set_neq(circle.circle_radius);
+        self.center_x.set_neq(circle.center.x);
+        self.center_y.set_neq(circle.center.y);
 
         let spring = default_spring::<HtmlCanvas>(vertices, canvas_size);
-        self.iterations.set_value(&spring.iterations.to_string());
-        self.cooling_rate
-            .set_value(&format!("{:.6}", spring.cooling_rate));
-        self.c_attractive
-            .set_value(&format!("{:.2}", spring.c_attractive));
-        self.c_repulsive
-            .set_value(&format!("{:.1}", spring.c_repulsive));
-        self.ideal_spring_length
-            .set_value(&format!("{:.1}", spring.ideal_spring_length));
-        self.c_middle_attractive.set_value(&format!(
-            "{:.4}",
+        self.iterations.set_neq(spring.iterations as f32);
+        self.cooling_rate.set_neq(spring.cooling_rate);
+        self.c_attractive.set_neq(spring.c_attractive);
+        self.c_repulsive.set_neq(spring.c_repulsive);
+        self.ideal_spring_length.set_neq(spring.ideal_spring_length);
+        self.c_middle_attractive.set_neq(
             spring
                 .bounds
                 .and_then(|bounds| bounds.c_middle_attractive)
-                .unwrap_or(0.0)
-        ));
-        self.keep_on_canvas.set_checked(spring.bounds.is_some());
+                .unwrap_or(0.0),
+        );
+        self.keep_on_canvas.set_neq(spring.bounds.is_some());
     }
 
-    fn circle(&self, canvas_size: V2f) -> CircleEdge {
-        let default = default_circle::<HtmlCanvas>(canvas_size);
+    fn circle(&self) -> CircleEdge {
         CircleEdge {
-            circle_radius: read_number(&self.circle_radius, default.circle_radius),
+            circle_radius: self.circle_radius.get(),
             vertex_radius: HtmlCanvas::vertex_radius(),
             center: V2f {
-                x: read_number(&self.center_x, default.center.x),
-                y: read_number(&self.center_y, default.center.y),
+                x: self.center_x.get(),
+                y: self.center_y.get(),
             },
         }
     }
 
     fn spring(&self, vertices: usize, canvas_size: V2f) -> SpringEmbedder {
-        let default = default_spring::<HtmlCanvas>(vertices, canvas_size);
-
         // A hand typed iteration count still has to leave the page responsive
-        let iterations = read_number(&self.iterations, default.iterations as f32);
         let iterations = usize::min(
-            iterations.max(0.0) as usize,
+            self.iterations.get().max(0.0) as usize,
             max_spring_iterations(vertices),
         );
 
         SpringEmbedder {
-            cooling_rate: read_number(&self.cooling_rate, default.cooling_rate),
-            c_attractive: read_number(&self.c_attractive, default.c_attractive),
-            c_repulsive: read_number(&self.c_repulsive, default.c_repulsive),
-            ideal_spring_length: read_number(
-                &self.ideal_spring_length,
-                default.ideal_spring_length,
-            ),
+            cooling_rate: self.cooling_rate.get(),
+            c_attractive: self.c_attractive.get(),
+            c_repulsive: self.c_repulsive.get(),
+            ideal_spring_length: self.ideal_spring_length.get(),
             iterations,
-            bounds: self.keep_on_canvas.checked().then(|| {
-                default_bounds::<HtmlCanvas>(
-                    canvas_size,
-                    read_number(&self.c_middle_attractive, 0.0),
-                )
-            }),
+            bounds: self
+                .keep_on_canvas
+                .get()
+                .then(|| default_bounds::<HtmlCanvas>(canvas_size, self.c_middle_attractive.get())),
         }
     }
 }
@@ -1143,10 +1141,13 @@ impl WasmWidget for GraphWidget {
     fn handle_message(&mut self, message: Self::FrontendMessage) -> Result<(), JsValue> {
         match message {
             GraphFrontendMessage::SetGraph(new_graph) => {
-                // Do not send that graph back to python
-                let mut this = self.shared.lock().unwrap();
-                this.graph = new_graph;
-                GraphWidget::draw(&mut this)?;
+                // Python echoes back every graph it is told about
+                // (since there may be multiple frontend instances)
+                let mut graph = self.graph.lock_mut();
+                if graph.state != new_graph {
+                    *graph = SyncState::from_python(new_graph);
+                }
+
                 Ok(())
             }
         }
@@ -1169,22 +1170,27 @@ impl WasmWidget for GraphWidget {
         controls.style().set_property("gap", "8px")?;
         controls.style().set_property("margin-bottom", "4px")?;
 
-        let mode_select: HtmlSelectElement =
-            SelectOption::create_element(&document, "Edit mode", &self.preset, EDIT_OPTIONS)?;
+        let mode_select = SelectOption::create_element_reactive(
+            &document,
+            "Edit mode",
+            self.preset,
+            EDIT_OPTIONS,
+            self.edit.option.clone(),
+        )?;
 
         // Wrapping the dropdown in the label associates the two without needing a unique id
         let edge_options = document
             .create_element("label")?
             .dyn_into::<HtmlLabelElement>()?;
-        edge_options.style().set_property("display", "none")?;
         edge_options.style().set_property("align-items", "center")?;
         edge_options.style().set_property("gap", "4px")?;
 
-        let edge_vertex: HtmlSelectElement = SelectOption::create_element(
+        let edge_vertex = SelectOption::create_element_reactive(
             &document,
             "Edge vertex",
-            &self.preset,
+            self.preset,
             EDGE_VERTEX_OPTIONS,
+            self.edit.edge_vertex.clone(),
         )?;
         let edge_options_text = document.create_element("span")?;
         edge_options_text.set_text_content(Some("New vertex"));
@@ -1194,7 +1200,6 @@ impl WasmWidget for GraphWidget {
         let move_options = document
             .create_element("label")?
             .dyn_into::<HtmlLabelElement>()?;
-        move_options.style().set_property("display", "none")?;
         move_options.style().set_property("align-items", "center")?;
         move_options.style().set_property("gap", "4px")?;
 
@@ -1202,142 +1207,50 @@ impl WasmWidget for GraphWidget {
             .create_element("input")?
             .dyn_into::<HtmlInputElement>()?;
         consecutive_moves.set_type("checkbox");
+        reactive::checkbox(&consecutive_moves, &self.consecutive_moves)?;
+
         let move_options_text = document.create_element("span")?;
         move_options_text.set_text_content(Some("Consecutive Moves"));
         move_options.append_child(&consecutive_moves)?;
         move_options.append_child(&move_options_text)?;
 
-        let mode_handler = ScopedClosure::<dyn FnMut() -> Result<(), JsValue>>::new({
-            let preset = self.preset;
-            let this = Arc::clone(&self.shared);
-            let mode_select = mode_select.clone();
-            let edge_options = edge_options.clone();
-            let edge_vertex_select = edge_vertex.clone();
-            let move_options = move_options.clone();
-            let consecutive_moves = consecutive_moves.clone();
-            move || {
-                if let Some(mode) =
-                    SelectOption::selected_value(&mode_select.value(), &preset, EDIT_OPTIONS)
-                {
-                    show_options_of(mode.mode, &edge_options, &move_options)?;
-
-                    let mut this = this.lock().unwrap();
-                    this.edit_mode = mode.mode;
-
-                    if let EditMode::ToggleEdge(edge_vertex) = &mut this.edit_mode {
-                        *edge_vertex = SelectOption::selected_value(
-                            &edge_vertex_select.value(),
-                            &preset,
-                            EDGE_VERTEX_OPTIONS,
-                        )
-                        .and_then(|option| option.color);
-                    }
-
-                    this.consecutive_moves = consecutive_moves.checked();
-                    GraphWidget::draw(&mut this)?;
+        // Show only those of the extra controls that the mode has a use for
+        reactive::style_set_property(
+            HtmlElement::from(edge_options.clone()),
+            "display",
+            self.edit.option.signal().map(|option| {
+                if matches!(option.mode, EditMode::ToggleEdge) {
+                    "flex"
+                } else {
+                    "none"
                 }
-
-                Ok(())
-            }
-        });
-        mode_select
-            .add_event_listener_with_callback("change", mode_handler.as_ref().unchecked_ref())?;
-        edge_options
-            .add_event_listener_with_callback("change", mode_handler.as_ref().unchecked_ref())?;
-        move_options
-            .add_event_listener_with_callback("change", mode_handler.as_ref().unchecked_ref())?;
-        mode_handler.forget();
+            }),
+        )?;
+        reactive::style_set_property(
+            HtmlElement::from(move_options.clone()),
+            "display",
+            self.edit.option.signal().map(|option| {
+                if option.mode.opposite_player().is_some() {
+                    "flex"
+                } else {
+                    "none"
+                }
+            }),
+        )?;
 
         controls.append_child(&mode_select)?;
         controls.append_child(&edge_options)?;
         controls.append_child(&move_options)?;
         element.append_child(&controls)?;
 
-        show_options_of(
-            self.shared.lock().unwrap().edit_mode,
-            &edge_options,
-            &move_options,
+        let layout = layout_controls(
+            &document,
+            self.preset,
+            &self.layout,
+            &self.graph,
+            &self.canvas_size,
         )?;
-
-        let layout = LayoutControls::create(&document, self.preset)?;
-        layout.inputs.show_defaults(0, DEFAULT_CANVAS_SIZE);
-        layout.show_rows_of(layout.inputs.algorithm(self.preset))?;
-
-        let layout_handler = ScopedClosure::<dyn FnMut() -> Result<(), JsValue>>::new({
-            let preset = self.preset;
-            let layout = layout.clone();
-            move || layout.show_rows_of(layout.inputs.algorithm(preset))
-        });
-        layout
-            .inputs
-            .algorithm
-            .add_event_listener_with_callback("change", layout_handler.as_ref().unchecked_ref())?;
-        layout_handler.forget();
-
-        // Typing into any parameter hands the whole panel over to the user, so that the
-        // defaults stop being recomputed underneath what they entered
-        let customize_handler = ScopedClosure::<dyn FnMut() -> Result<(), JsValue>>::new({
-            let this = Arc::clone(&self.shared);
-            move || {
-                this.lock().unwrap().layout_customized = true;
-                Ok(())
-            }
-        });
-        layout.parameters.add_event_listener_with_callback(
-            "input",
-            customize_handler.as_ref().unchecked_ref(),
-        )?;
-        customize_handler.forget();
-
-        let reset_handler = ScopedClosure::<dyn FnMut() -> Result<(), JsValue>>::new({
-            let this = Arc::clone(&self.shared);
-            let inputs = layout.inputs.clone();
-            move || {
-                let mut this = this.lock().unwrap();
-                this.layout_customized = false;
-                inputs.show_defaults(this.graph.size(), this.canvas_size);
-                Ok(())
-            }
-        });
-        layout
-            .reset
-            .add_event_listener_with_callback("click", reset_handler.as_ref().unchecked_ref())?;
-        reset_handler.forget();
-
-        let open_handler = ScopedClosure::<dyn FnMut() -> Result<(), JsValue>>::new({
-            let this = Arc::clone(&self.shared);
-            let inputs = layout.inputs.clone();
-            move || {
-                let this = this.lock().unwrap();
-                if !this.layout_customized {
-                    inputs.show_defaults(this.graph.size(), this.canvas_size);
-                }
-                Ok(())
-            }
-        });
-        layout
-            .details
-            .add_event_listener_with_callback("toggle", open_handler.as_ref().unchecked_ref())?;
-        open_handler.forget();
-
-        let apply_handler = ScopedClosure::<dyn FnMut() -> Result<(), JsValue>>::new({
-            let this = Arc::clone(&self.shared);
-            let context = context.clone();
-            let inputs = layout.inputs.clone();
-            move || {
-                let mut this = this.lock().unwrap();
-                GraphWidget::apply_layout(&mut this, &inputs);
-                GraphWidget::send_graph(&this, &context);
-                GraphWidget::draw(&mut this)?;
-                Ok(())
-            }
-        });
-        layout
-            .apply
-            .add_event_listener_with_callback("click", apply_handler.as_ref().unchecked_ref())?;
-        apply_handler.forget();
-
-        element.append_child(&layout.root)?;
+        element.append_child(&layout)?;
 
         let canvas_container = document
             .create_element("div")?
@@ -1353,112 +1266,50 @@ impl WasmWidget for GraphWidget {
         let canvas = document
             .create_element("canvas")?
             .dyn_into::<HtmlCanvasElement>()?;
-        canvas.set_width(DEFAULT_CANVAS_SIZE.x as u32);
-        canvas.set_height(DEFAULT_CANVAS_SIZE.y as u32);
         canvas.style().set_property("display", "block")?;
         canvas.style().set_property("width", "100%")?;
         canvas.style().set_property("height", "100%")?;
         canvas.style().set_property("user-select", "none")?;
-
-        let down_handler = ScopedClosure::<dyn FnMut(MouseEvent) -> Result<(), JsValue>>::new({
-            let this = Arc::clone(&self.shared);
-            let context = context.clone();
-            move |event: MouseEvent| {
-                if event.button() != 0 {
-                    return Ok(());
-                }
-
-                let mut this = this.lock().unwrap();
-                this.interactions
-                    .pointer_pressed(mouse_event_to_canvas(&event));
-                GraphWidget::update(&mut this, &context)
-            }
-        });
-        canvas
-            .add_event_listener_with_callback("mousedown", down_handler.as_ref().unchecked_ref())?;
-        down_handler.forget();
-
-        let move_handler = ScopedClosure::<dyn FnMut(MouseEvent) -> Result<(), JsValue>>::new({
-            let this = Arc::clone(&self.shared);
-            let context = context.clone();
-            move |event| {
-                let mut this = this.lock().unwrap();
-                this.interactions
-                    .pointer_moved(mouse_event_to_canvas(&event));
-                GraphWidget::update(&mut this, &context)
-            }
-        });
-        canvas
-            .add_event_listener_with_callback("mousemove", move_handler.as_ref().unchecked_ref())?;
-        move_handler.forget();
-
-        let up_handler = ScopedClosure::<dyn FnMut(MouseEvent) -> Result<(), JsValue>>::new({
-            let this = Arc::clone(&self.shared);
-            let context = context.clone();
-            move |event| {
-                let mut this = this.lock().unwrap();
-                this.interactions
-                    .pointer_released(mouse_event_to_canvas(&event));
-                GraphWidget::update(&mut this, &context)
-            }
-        });
-        canvas.add_event_listener_with_callback("mouseup", up_handler.as_ref().unchecked_ref())?;
-        up_handler.forget();
-
-        let leave_handler = ScopedClosure::<dyn FnMut() -> Result<(), JsValue>>::new({
-            let this = Arc::clone(&self.shared);
-            let context = context.clone();
-            move || {
-                let mut this = this.lock().unwrap();
-                this.interactions.pointer_left();
-                GraphWidget::update(&mut this, &context)
-            }
-        });
-        canvas.add_event_listener_with_callback(
-            "mouseleave",
-            leave_handler.as_ref().unchecked_ref(),
-        )?;
-        leave_handler.forget();
+        reactive::canvas_interactions(&canvas, &self.interactions)?;
 
         canvas_container.append_child(&canvas)?;
         element.append_child(&canvas_container)?;
+        reactive::element_size(&canvas_container, &self.canvas_size)?;
 
-        let resize_handler = ScopedClosure::<dyn FnMut() -> Result<(), JsValue>>::new({
-            let this = Arc::clone(&self.shared);
-            let canvas_container = canvas_container.clone();
-            move || {
-                let canvas_size = V2f {
-                    x: canvas_container.client_width() as f32,
-                    y: canvas_container.client_height() as f32,
-                };
-
-                let mut this = this.lock().unwrap();
-                if this.canvas_size == canvas_size {
-                    return Ok(());
+        reactive::frames(
+            map_ref! {
+                let _graph = self.graph.signal_ref(|_| ()),
+                let _canvas_size = self.canvas_size.signal(),
+                let _edit_mode = self.edit.option.signal().dedupe(),
+                let _edit_mode = self.edit.edge_vertex.signal().dedupe() => ()
+            },
+            &self.interactions,
+            {
+                let canvas = canvas.clone();
+                let graph = self.graph.clone();
+                let canvas_size = self.canvas_size.clone();
+                let interactions = self.interactions.clone();
+                let edit = self.edit.clone();
+                let consecutive_moves = self.consecutive_moves.clone();
+                let preset = self.preset;
+                move || {
+                    GraphWidget::update(
+                        &canvas,
+                        &graph,
+                        &canvas_size,
+                        &interactions,
+                        &edit,
+                        &consecutive_moves,
+                        preset,
+                    )
                 }
-                this.canvas_size = canvas_size;
+            },
+        );
 
-                if let Some(state) = &this.state {
-                    state.canvas.set_width(canvas_size.x as u32);
-                    state.canvas.set_height(canvas_size.y as u32);
-                }
-                GraphWidget::draw(&mut this)?;
-
-                Ok(())
-            }
-        });
-        let resize_observer = ResizeObserver::new(resize_handler.as_ref().unchecked_ref())?;
-        resize_observer.observe(&canvas_container);
-        resize_handler.forget();
-
-        let mut this = self.shared.lock().unwrap();
-        this.state = Some(HtmlState {
-            canvas,
-            edit_mode: mode_select,
-            _resize_observer: resize_observer,
+        report_edits_to_python(&self.graph, &context, |graph| {
+            GraphBackendMessage::SetGraph { graph }
         });
 
-        GraphWidget::draw(&mut this)?;
         context.send_message(&GraphBackendMessage::Initialized);
 
         Ok(())

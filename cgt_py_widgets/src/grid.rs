@@ -2,6 +2,7 @@ use crate::{
     SyncState,
     canvas::HtmlCanvas,
     reactive::{self, SelectOption, SelectOptionElement},
+    report_edits_to_python,
 };
 use cgt::{
     drawing::{Canvas, Color, Hits, Interactions},
@@ -10,10 +11,7 @@ use cgt::{
     short::partizan::{Player, games::fission},
 };
 use cgt_py_messages::{GridBackendMessage, GridFrontendMessage, GridPreset, GridPresetFlag, Tile};
-use futures_signals::{
-    map_ref,
-    signal::{Mutable, SignalExt},
-};
+use futures_signals::signal::{Mutable, SignalExt};
 use jupyter_rust_widget_frontend::{AnyWidgetModel, Context, WasmWidget};
 use wasm_bindgen::{
     JsCast, JsValue,
@@ -21,7 +19,7 @@ use wasm_bindgen::{
 };
 use web_sys::{
     CanvasRenderingContext2d, Document, Element, HtmlButtonElement, HtmlCanvasElement,
-    HtmlDivElement, HtmlElement, HtmlInputElement, HtmlLabelElement, MouseEvent,
+    HtmlDivElement, HtmlElement, HtmlInputElement, HtmlLabelElement,
 };
 
 #[derive(Clone, Copy)]
@@ -324,10 +322,8 @@ impl GridWidget {
                 ));
                 if !consecutive_moves.get()
                     && let Some(new_mode) = edit_option.get().mode.opposite_player()
-                    && let Some(new_option_idx) =
-                        SelectOption::find_index(|o| o.mode == new_mode, preset, EDIT_OPTIONS)
                     && let Some(new_option) =
-                        SelectOption::selected_value_idx(new_option_idx, preset, EDIT_OPTIONS)
+                        SelectOption::find(|o| o.mode == new_mode, preset, EDIT_OPTIONS)
                 {
                     edit_option.set(new_option);
                 }
@@ -473,44 +469,28 @@ impl WasmWidget for GridWidget {
         board.append_child(&canvas)?;
         element.append_child(&board).unwrap();
 
-        wasm_bindgen_futures::spawn_local(
-            map_ref! {
-                let _grid = self.grid.signal_ref(|_| ()),
-                let _pointer = self.interactions.signal_ref(Interactions::pointer).dedupe() => ()
+        reactive::frames(self.grid.signal_ref(|_| ()), &self.interactions, {
+            let canvas = canvas.clone();
+            let grid = self.grid.clone();
+            let interactions = self.interactions.clone();
+            let edit_option = self.edit_option.clone();
+            let consecutive_moves = self.consecutive_moves.clone();
+            let preset = self.preset;
+            move || {
+                GridWidget::update(
+                    &canvas,
+                    &grid,
+                    &interactions,
+                    &edit_option,
+                    &consecutive_moves,
+                    &preset,
+                )
             }
-            .for_each({
-                let canvas = canvas.clone();
-                let grid = self.grid.clone();
-                let interactions = self.interactions.clone();
-                let edit_option = self.edit_option.clone();
-                let consecutive_moves = self.consecutive_moves.clone();
-                let preset = self.preset;
-                move |()| {
-                    // Nothing can be done about a frame that fails to paint
-                    let _ = GridWidget::update(
-                        &canvas,
-                        &grid,
-                        &interactions,
-                        &edit_option,
-                        &consecutive_moves,
-                        &preset,
-                    );
+        });
 
-                    async {}
-                }
-            }),
-        );
-
-        wasm_bindgen_futures::spawn_local(self.grid.signal_cloned().for_each({
-            let context = context.clone();
-            move |grid| {
-                if grid.provenance.should_report_to_python() {
-                    context.send_message(&GridBackendMessage::SetGrid { grid: grid.state });
-                }
-
-                async {}
-            }
-        }));
+        report_edits_to_python(&self.grid, &context, |grid| GridBackendMessage::SetGrid {
+            grid,
+        });
 
         context.send_message(&GridBackendMessage::Initialized);
 

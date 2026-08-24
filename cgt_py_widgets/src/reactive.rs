@@ -1,9 +1,12 @@
 use cgt::{drawing::Interactions, numeric::v2f::V2f};
-use futures_signals::signal::{Mutable, Signal, SignalExt};
+use futures_signals::{
+    map_ref,
+    signal::{Mutable, Signal, SignalExt},
+};
 use wasm_bindgen::{JsCast as _, JsValue, prelude::ScopedClosure};
 use web_sys::{
-    Document, HtmlCanvasElement, HtmlElement, HtmlInputElement, HtmlOptionElement,
-    HtmlSelectElement, MouseEvent,
+    Document, Element, HtmlCanvasElement, HtmlElement, HtmlInputElement, HtmlOptionElement,
+    HtmlSelectElement, MouseEvent, ResizeObserver,
 };
 
 pub fn checkbox(input: &HtmlInputElement, output: &Mutable<bool>) -> Result<(), JsValue> {
@@ -19,6 +22,40 @@ pub fn checkbox(input: &HtmlInputElement, output: &Mutable<bool>) -> Result<(), 
         let checkbox = input.clone();
         move |checked| {
             let _ = checkbox.set_checked(checked);
+            async {}
+        }
+    }));
+
+    Ok(())
+}
+
+pub fn input_f32(
+    input: &HtmlInputElement,
+    output: &Mutable<f32>,
+    decimals: usize,
+) -> Result<(), JsValue> {
+    let on_html_input = ScopedClosure::<dyn FnMut()>::new({
+        let input = input.clone();
+        let output = output.clone();
+        move || {
+            let typed = input.value_as_number();
+            if typed.is_finite() {
+                output.set_neq(typed as f32);
+            }
+        }
+    });
+    input.add_event_listener_with_callback("input", on_html_input.as_ref().unchecked_ref())?;
+    on_html_input.forget();
+
+    wasm_bindgen_futures::spawn_local(output.signal().dedupe().for_each({
+        let input = input.clone();
+        move |value| {
+            #[allow(clippy::float_cmp)]
+            let shown = input.value_as_number() as f32 == value;
+            if !shown {
+                input.set_value(&format!("{:.*}", decimals, value));
+            }
+
             async {}
         }
     }));
@@ -107,6 +144,43 @@ pub fn canvas_interactions(
     leave_handler.forget();
 
     Ok(())
+}
+
+pub fn element_size(element: &Element, output: &Mutable<V2f>) -> Result<(), JsValue> {
+    let on_resize = ScopedClosure::<dyn FnMut()>::new({
+        let element = element.clone();
+        let output = output.clone();
+        move || {
+            output.set_neq(V2f {
+                x: element.client_width() as f32,
+                y: element.client_height() as f32,
+            });
+        }
+    });
+    let observer = ResizeObserver::new(on_resize.as_ref().unchecked_ref())?;
+    observer.observe(element);
+    on_resize.forget();
+
+    std::mem::forget(observer);
+
+    Ok(())
+}
+
+pub fn frames<S, F>(trigger: S, interactions: &Mutable<Interactions>, mut render: F)
+where
+    S: Signal<Item = ()> + 'static,
+    F: FnMut() -> Result<(), JsValue> + 'static,
+{
+    wasm_bindgen_futures::spawn_local(
+        map_ref! {
+            let _trigger = trigger,
+            let _pointer = interactions.signal_ref(Interactions::pointer).dedupe() => ()
+        }
+        .for_each(move |()| {
+            let _ = render();
+            async {}
+        }),
+    );
 }
 
 pub trait SelectOptionElement {
@@ -209,7 +283,7 @@ pub trait SelectOption: SelectOptionElement + Sized {
             .iter()
             .filter(|o| o.is_visible(preset))
             .nth(idx)
-            .map(|o| o.clone())
+            .cloned()
     }
 
     fn selected_value_idx(idx: usize, preset: &Self::Preset, options: &[Self]) -> Option<Self>
@@ -220,7 +294,22 @@ pub trait SelectOption: SelectOptionElement + Sized {
             .iter()
             .filter(|o| o.is_visible(preset))
             .nth(idx)
-            .map(|o| o.clone())
+            .cloned()
+    }
+
+    fn find(
+        mut find_value: impl FnMut(&Self) -> bool,
+        preset: &Self::Preset,
+        options: &[Self],
+    ) -> Option<Self>
+    where
+        Self: Clone,
+    {
+        options
+            .iter()
+            .filter(|o| o.is_visible(preset))
+            .find(|o| find_value(o))
+            .cloned()
     }
 
     fn find_index(
