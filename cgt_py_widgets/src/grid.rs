@@ -22,6 +22,8 @@ use web_sys::{
     HtmlDivElement, HtmlElement, HtmlInputElement, HtmlLabelElement,
 };
 
+mod domineering;
+
 #[derive(Clone, Copy)]
 enum Edge {
     Top,
@@ -41,6 +43,7 @@ enum EditMode {
     FlipCell,
     PlaceObject(Tile),
     FissionMove(Player),
+    DomineeringMove(Player),
 }
 
 impl EditMode {
@@ -49,6 +52,7 @@ impl EditMode {
             EditMode::FlipCell => None,
             EditMode::PlaceObject(_) => None,
             EditMode::FissionMove(player) => Some(EditMode::FissionMove(player.opposite())),
+            EditMode::DomineeringMove(player) => Some(EditMode::DomineeringMove(player.opposite())),
         }
     }
 }
@@ -60,7 +64,6 @@ const EDIT_OPTIONS: &[EditOption] = &[
         mode: EditMode::FlipCell,
         visible_presets: GridPresetFlag::Domineering,
     },
-    // TODO: Domineering moves that hover over two tiles, kinda tricky
     // Generic
     EditOption {
         text: "Clear Tile",
@@ -71,6 +74,17 @@ const EDIT_OPTIONS: &[EditOption] = &[
         text: "Fill Tile",
         mode: EditMode::PlaceObject(Tile::Taken),
         visible_presets: GridPresetFlag::all(),
+    },
+    // Domineering
+    EditOption {
+        text: "Left Move",
+        mode: EditMode::DomineeringMove(Player::Left),
+        visible_presets: GridPresetFlag::Domineering,
+    },
+    EditOption {
+        text: "Right Move",
+        mode: EditMode::DomineeringMove(Player::Right),
+        visible_presets: GridPresetFlag::Domineering,
     },
     // Fission
     EditOption {
@@ -244,13 +258,19 @@ fn checked_resize(value: u8, action: ResizeAction) -> Option<u8> {
     }
 }
 
+struct Frame {
+    tiles: Hits<(u8, u8)>,
+    domino: Option<[(u8, u8); 2]>,
+}
+
 impl GridWidget {
     /// Paint the grid and report what the mouse did to its tiles
     fn draw(
         canvas: &HtmlCanvasElement,
         grid: &VecGrid<Tile>,
         interactions: &mut Interactions,
-    ) -> Result<Hits<(u8, u8)>, JsValue> {
+        edit_mode: EditMode,
+    ) -> Result<Frame, JsValue> {
         let canvas_size = grid.canvas_size::<HtmlCanvas>().size();
         canvas.set_width(canvas_size.x as u32);
         canvas.set_height(canvas_size.y as u32);
@@ -266,12 +286,56 @@ impl GridWidget {
             .unwrap()
             .dyn_into::<CanvasRenderingContext2d>()?;
 
+        // Read before the canvas borrows the interactions away
+        let cursor = interactions.pointer().position;
+
+        let mut domino = None;
         let mut canvas = HtmlCanvas::new(context, interactions);
-        Ok(canvas.frame(|canvas| {
+        let tiles = canvas.frame(|canvas| {
             // The tiles do not cover the gaps between them, which the grid lines are drawn in
             canvas.rect(V2f::ZERO, canvas_size, Color::BLACK);
-            grid.draw(canvas, Tile::drawing)
-        }))
+            let tiles = grid.draw(canvas, Tile::drawing);
+
+            // Nothing is hovered during the measuring pass, so the domino is only found
+            // during the painting one. A highlight registers no area of its own, so
+            // previewing it cannot disturb hit testing
+            domino = match edit_mode {
+                EditMode::DomineeringMove(player) => {
+                    tiles.hovered.zip(cursor).and_then(|(hovered, cursor)| {
+                        domineering::hovered_domino(grid, player, hovered, cursor)
+                    })
+                }
+                EditMode::FlipCell | EditMode::PlaceObject(_) | EditMode::FissionMove(_) => None,
+            };
+
+            if let (Some(domino), EditMode::DomineeringMove(player)) = (domino, edit_mode) {
+                let color = match player {
+                    Player::Left => Color::BLUE,
+                    Player::Right => Color::RED,
+                };
+                for (x, y) in domino {
+                    canvas.highlight_tile(HtmlCanvas::tile_position(x, y), color);
+                }
+            }
+
+            tiles
+        });
+
+        Ok(Frame { tiles, domino })
+    }
+
+    fn pass_turn(
+        edit_option: &Mutable<EditOption>,
+        consecutive_moves: &Mutable<bool>,
+        preset: &GridPreset,
+    ) {
+        if !consecutive_moves.get()
+            && let Some(new_mode) = edit_option.get().mode.opposite_player()
+            && let Some(new_option) =
+                SelectOption::find(|o| o.mode == new_mode, preset, EDIT_OPTIONS)
+        {
+            edit_option.set(new_option);
+        }
     }
 
     fn apply(
@@ -279,9 +343,9 @@ impl GridWidget {
         edit_option: &Mutable<EditOption>,
         consecutive_moves: &Mutable<bool>,
         preset: &GridPreset,
-        hits: &Hits<(u8, u8)>,
+        frame: &Frame,
     ) {
-        let Some((x, y)) = hits.clicked else {
+        let Some((x, y)) = frame.tiles.clicked else {
             return;
         };
 
@@ -320,13 +384,23 @@ impl GridWidget {
                 grid.set(SyncState::edited(
                     fission.move_in(x, y, player).grid().map(|t| Tile::from(t)),
                 ));
-                if !consecutive_moves.get()
-                    && let Some(new_mode) = edit_option.get().mode.opposite_player()
-                    && let Some(new_option) =
-                        SelectOption::find(|o| o.mode == new_mode, preset, EDIT_OPTIONS)
+                GridWidget::pass_turn(edit_option, consecutive_moves, preset);
+            }
+
+            EditMode::DomineeringMove(_) => {
+                // Already chosen and checked while painting the preview
+                let Some(domino) = frame.domino else {
+                    return;
+                };
+
                 {
-                    edit_option.set(new_option);
+                    let mut grid = grid.lock_mut();
+                    for (x, y) in domino {
+                        grid.edit().set(x, y, Tile::Taken);
+                    }
                 }
+
+                GridWidget::pass_turn(edit_option, consecutive_moves, preset);
             }
         }
     }
@@ -339,8 +413,13 @@ impl GridWidget {
         consecutive_moves: &Mutable<bool>,
         preset: &GridPreset,
     ) -> Result<(), JsValue> {
-        let hits = GridWidget::draw(canvas, &grid.lock_ref().state, &mut interactions.lock_mut())?;
-        GridWidget::apply(grid, edit_option, consecutive_moves, preset, &hits);
+        let frame = GridWidget::draw(
+            canvas,
+            &grid.lock_ref().state,
+            &mut interactions.lock_mut(),
+            edit_option.get().mode,
+        )?;
+        GridWidget::apply(grid, edit_option, consecutive_moves, preset, &frame);
 
         Ok(())
     }
