@@ -147,42 +147,73 @@ pub enum GridFrontendMessage {
     SetGrid(VecGrid<Tile>),
 }
 
-#[derive(Clone, Copy)]
-pub enum GridPreset {
-    Domineering = 1,
-    Fission = 2,
-    Amazons = 3,
-}
+macro_rules! preset {
+    (
+        $(#[$flag_attr:meta])*
+        $flag_vis:vis struct $flag:ident;
 
-impl GridPreset {
-    pub const fn into_flag_bits(self) -> u32 {
-        1 << self as u32
-    }
-
-    pub const fn from_flag_bits(bits: u32) -> Option<GridPreset> {
-        match bits {
-            b if b == GridPreset::Domineering.into_flag_bits() => Some(GridPreset::Domineering),
-            b if b == GridPreset::Fission.into_flag_bits() => Some(GridPreset::Fission),
-            b if b == GridPreset::Amazons.into_flag_bits() => Some(GridPreset::Amazons),
-            _ => None,
+        $(#[$preset_attr:meta])*
+        $preset_vis:vis enum $preset:ident {$(
+            $(#[$variant_attr:meta])*
+            $variant:ident $(= $value:literal)?,
+        )*}) => {
+        $(#[$preset_attr])* $preset_vis enum $preset {
+            $($(#[$variant_attr])* $variant $(= $value)?,)*
         }
-    }
 
-    pub const fn into_flag(self) -> GridPresetFlag {
-        GridPresetFlag::from_bits_truncate(self.into_flag_bits())
-    }
+        impl $preset {
+            pub const fn into_flag_bits(self) -> u32 {
+                1 << self as u32
+            }
 
-    pub const fn intersects(self, flags: GridPresetFlag) -> bool {
-        self.into_flag().intersects(flags)
-    }
+            pub const fn from_flag_bits(bits: u32) -> Option<$preset> {
+                match bits {
+                    $(b if b == $preset::$variant.into_flag_bits() => Some($preset::$variant),)*
+                    _ => None,
+                }
+            }
+
+            pub const fn into_flag(self) -> $flag {
+                $flag::from_bits_truncate(self.into_flag_bits())
+            }
+
+            pub const fn intersects(self, flags: $flag) -> bool {
+                self.into_flag().intersects(flags)
+            }
+        }
+
+        // TODO: Do it ourselves since we are in the macro and only use const fn union()
+        bitflags::bitflags! {
+            $(#[$flag_attr])* $flag_vis struct $flag: u32 {
+                $(const $variant = $preset::$variant.into_flag_bits();)*
+            }
+        }
+
+        impl $flag {
+            pub const fn from_slice(flags: &[$flag]) -> $flag {
+                // const-hack
+                let mut res = $flag::empty();
+                let mut i = 0;
+                while i < flags.len() {
+                    res = res.union(flags[i]);
+                    i+= 1;
+                }
+                res
+            }
+        }
+    };
 }
 
-bitflags::bitflags! {
+preset! {
     #[derive(Clone, Copy)]
-    pub struct GridPresetFlag: u32 {
-        const DOMINEERING = GridPreset::Domineering.into_flag_bits();
-        const FISSION = GridPreset::Fission.into_flag_bits();
-        const AMAZONS = GridPreset::Amazons.into_flag_bits();
+    pub struct GridPresetFlag;
+
+    #[derive(Clone, Copy)]
+    pub enum GridPreset {
+        Domineering = 1,
+        Fission = 2,
+        Amazons = 3,
+        // TODO: Konane, SkiJumps, ToadsAndFrogs
     }
 }
 

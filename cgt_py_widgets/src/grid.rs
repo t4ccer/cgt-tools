@@ -68,50 +68,49 @@ const EDIT_OPTIONS: &[EditOption] = &[
     EditOption {
         text: "Flip Tile",
         mode: EditMode::FlipCell,
-        visible_presets: GridPresetFlag::DOMINEERING,
+        visible_presets: GridPresetFlag::Domineering,
     },
     // TODO: Domineering moves that hover over two tiles, kinda tricky
     // Generic
     EditOption {
         text: "Clear Tile",
         mode: EditMode::PlaceObject(Tile::Empty),
-        visible_presets: GridPresetFlag::DOMINEERING
-            .union(GridPresetFlag::FISSION)
-            .union(GridPresetFlag::AMAZONS),
+        visible_presets: GridPresetFlag::all(),
     },
     EditOption {
         text: "Fill Tile",
         mode: EditMode::PlaceObject(Tile::Taken),
-        visible_presets: GridPresetFlag::DOMINEERING
-            .union(GridPresetFlag::FISSION)
-            .union(GridPresetFlag::AMAZONS),
+        visible_presets: GridPresetFlag::all(),
     },
     // Fission
     EditOption {
         text: "Place Stone",
         mode: EditMode::PlaceObject(Tile::BlackStone),
-        visible_presets: GridPresetFlag::FISSION.union(GridPresetFlag::AMAZONS),
+        visible_presets: GridPresetFlag::from_slice(&[
+            GridPresetFlag::Fission,
+            GridPresetFlag::Amazons,
+        ]),
     },
     EditOption {
         text: "Left Move",
         mode: EditMode::FissionMove(Player::Left),
-        visible_presets: GridPresetFlag::FISSION,
+        visible_presets: GridPresetFlag::Fission,
     },
     EditOption {
         text: "Right Move",
         mode: EditMode::FissionMove(Player::Right),
-        visible_presets: GridPresetFlag::FISSION,
+        visible_presets: GridPresetFlag::Fission,
     },
     // Amazons
     EditOption {
         text: "Place Left Queen",
         mode: EditMode::PlaceObject(Tile::BlueStone),
-        visible_presets: GridPresetFlag::AMAZONS,
+        visible_presets: GridPresetFlag::Amazons,
     },
     EditOption {
         text: "Place Right Queen",
         mode: EditMode::PlaceObject(Tile::RedStone),
-        visible_presets: GridPresetFlag::AMAZONS,
+        visible_presets: GridPresetFlag::Amazons,
     },
     // TODO: Amazons moves
 ];
