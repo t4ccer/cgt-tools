@@ -228,7 +228,6 @@ dependencies = [
 name = "cgt_py_messages"
 version = "0.10.0"
 dependencies = [
- "bitflags",
  "cgt",
  "serde",
 ]

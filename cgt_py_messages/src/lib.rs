@@ -205,28 +205,34 @@ macro_rules! preset {
             }
 
             pub const fn into_flag(self) -> $flag {
-                $flag::from_bits_truncate(self.into_flag_bits())
+                $flag(self.into_flag_bits())
             }
 
             pub const fn intersects(self, flags: $flag) -> bool {
-                self.into_flag().intersects(flags)
+                (self.into_flag().0 & flags.0) != 0
             }
         }
 
-        // TODO: Do it ourselves since we are in the macro and only use const fn union()
-        bitflags::bitflags! {
-            $(#[$flag_attr])* $flag_vis struct $flag: u32 {
-                $(const $variant = $preset::$variant.into_flag_bits();)*
-            }
-        }
+        $(#[$flag_attr])* $flag_vis struct $flag(u32);
 
         impl $flag {
+            $(#[allow(non_upper_case_globals)]
+              pub const $variant: $flag = $flag($preset::$variant.into_flag_bits());)*
+
+            pub const fn empty() -> $flag {
+                $flag(0)
+            }
+
+            pub const fn all() -> $flag {
+                $flag(0 $(| $preset::$variant.into_flag_bits())*)
+            }
+
             pub const fn from_slice(flags: &[$flag]) -> $flag {
                 // const-hack
                 let mut res = $flag::empty();
                 let mut i = 0;
                 while i < flags.len() {
-                    res = res.union(flags[i]);
+                    res.0 |= flags[i].0;
                     i+= 1;
                 }
                 res

@@ -13,6 +13,5 @@ publish = false
 description = "Types shared between the `cgt` Python bindings and the Jupyter widget frontend"
 
 [dependencies]
-bitflags = "2.13.1"
 cgt = { path = "../.", features = ["serde"] }
 serde.workspace = true
