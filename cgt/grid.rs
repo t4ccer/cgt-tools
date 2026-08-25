@@ -42,6 +42,8 @@ pub enum ParseErrorReason {
     InvalidCharTile(char),
 }
 
+impl std::error::Error for ParseErrorReason {}
+
 impl std::fmt::Display for ParseErrorReason {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -64,7 +66,7 @@ impl std::fmt::Display for ParseErrorReason {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GridParseError<E> {
     /// Construction error (e.g. grid too large)
-    ConstructionError(E),
+    ConstructionError(E), // TODO: Input location
 
     /// Parsing error
     ParseError(ParseErrorReason), // TODO: Input location
@@ -75,10 +77,7 @@ where
     E: std::fmt::Display,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            GridParseError::ConstructionError(err) => write!(f, "construction error: {err}"),
-            GridParseError::ParseError(err) => write!(f, "parse error: {err}"),
-        }
+        write!(f, "grid parse error")
     }
 }
 
@@ -89,7 +88,7 @@ where
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             GridParseError::ConstructionError(err) => Some(err),
-            GridParseError::ParseError(_) => None,
+            GridParseError::ParseError(err) => Some(err),
         }
     }
 }

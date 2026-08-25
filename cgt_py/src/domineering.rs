@@ -1,5 +1,6 @@
 use crate::{grid::PyGrid, py_partizan_game};
 use cgt::{
+    display_error::DisplayError,
     grid::FiniteGrid as _,
     result::UnwrapInfallible,
     short::partizan::{
@@ -24,9 +25,7 @@ impl PyDomineering {
     #[new]
     pub fn new(position: &str) -> PyResult<PyDomineering> {
         let inner = Domineering::from_str(position).map_err(|err| {
-            PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                "Parse error: invalid Domineering grid: {err}"
-            ))
+            PyErr::new::<pyo3::exceptions::PyValueError, _>(err.display_error().to_string())
         })?;
         Ok(PyDomineering(inner))
     }

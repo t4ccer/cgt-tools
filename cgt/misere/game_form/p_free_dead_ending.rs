@@ -273,8 +273,8 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            PFreeDeadEndingConstructionError::Underlying(err) => {
-                write!(f, "could not construct the underlying form: {}", err)
+            PFreeDeadEndingConstructionError::Underlying(_) => {
+                write!(f, "could not construct the underlying form")
             }
         }
     }

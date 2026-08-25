@@ -1,6 +1,7 @@
 use crate::{grid::PyGrid, py_partizan_game};
-use cgt::short::partizan::{
-    games::amazons::Amazons, transposition_table::ParallelTranspositionTable,
+use cgt::{
+    display_error::DisplayError,
+    short::partizan::{games::amazons::Amazons, transposition_table::ParallelTranspositionTable},
 };
 use cgt_py_messages::{GridPreset, Tile};
 use pyo3::{PyErr, PyResult, pyclass, pymethods};
@@ -20,9 +21,7 @@ impl PyAmazons {
     #[new]
     pub fn new(position: &str) -> PyResult<PyAmazons> {
         let inner = Amazons::from_str(position).map_err(|err| {
-            PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                "Parse error: invalid Amazons grid: {err}"
-            ))
+            PyErr::new::<pyo3::exceptions::PyValueError, _>(err.display_error().to_string())
         })?;
         Ok(PyAmazons(inner))
     }

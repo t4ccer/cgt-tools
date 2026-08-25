@@ -46,7 +46,7 @@ impl PyBipartiteSnort {
             };
             if vert_u.index >= graph.size() || vert_v.index >= graph.size() {
                 return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                    "Invalid edge: ({}, {})",
+                    "invalid edge: ({}, {})",
                     vert_u.index,
                     vert_v.index - blue as usize,
                 )));

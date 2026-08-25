@@ -63,8 +63,8 @@ where
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ParseError::Dicotic(err) => write!(f, "parse error: {}", err),
-            ParseError::Integer(err) => write!(f, "parse error: {}", err),
+            ParseError::Dicotic(_) => write!(f, "dicotic error"),
+            ParseError::Integer(_) => write!(f, "integer error"),
             ParseError::MalformedInput => write!(f, "parse error: malformed input"),
         }
     }

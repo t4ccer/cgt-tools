@@ -77,14 +77,10 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             DeadEndingConstructionError::NotDeadEnding(g) => {
-                write!(
-                    f,
-                    "could not construct dead-ending game: `{}` is not dead-ending",
-                    g
-                )
+                write!(f, "form `{}` is not dead-ending", g)
             }
-            DeadEndingConstructionError::Underlying(err) => {
-                write!(f, "could not construct the underlying form: {}", err)
+            DeadEndingConstructionError::Underlying(_) => {
+                write!(f, "could not construct the underlying form")
             }
         }
     }

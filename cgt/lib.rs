@@ -10,6 +10,7 @@
 #![warn(missing_copy_implementations)]
 
 pub mod bit_vec;
+pub mod display_error;
 pub mod drawing;
 pub mod graph;
 pub mod grid;

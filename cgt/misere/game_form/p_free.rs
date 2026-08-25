@@ -165,10 +165,10 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             PFreeConstructionError::NotPFree(g) => {
-                write!(f, "could not construct P-free game: `{}` is not P-free", g)
+                write!(f, "form `{}` is not P-free", g)
             }
-            PFreeConstructionError::Underlying(err) => {
-                write!(f, "could not construct the underlying form: {}", err)
+            PFreeConstructionError::Underlying(_) => {
+                write!(f, "could not construct the underlying form")
             }
         }
     }
