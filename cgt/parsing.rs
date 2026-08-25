@@ -75,11 +75,19 @@ macro_rules! lexeme {
 }
 pub(crate) use lexeme;
 
-macro_rules! mk_unsigned_parser {
-    ($name:ident, $ty:ty) => {
-        /// Parse unsigned number
+macro_rules! mk_number_parser {
+    ($name:ident, $ty:ty $(, $minus:ident)?) => {
+        /// Parse number
         pub const fn $name(self) -> Option<(Parser<'s>, $ty)> {
             let mut bs = self.input.as_bytes();
+
+            $(let $minus = match bs {
+                [b'-', rest @ ..] => {
+                    bs = rest;
+                    true
+                }
+                _ => false,
+            };)?
 
             let mut parsed_anything = false;
             let mut acc: $ty = 0;
@@ -110,6 +118,10 @@ macro_rules! mk_unsigned_parser {
                         if !parsed_anything {
                             return None;
                         }
+
+                        $(if $minus {
+                            acc = -acc;
+                        })?
 
                         return Some((
                             Parser {
@@ -180,69 +192,13 @@ impl<'s> Parser<'s> {
         }
     }
 
-    /// Parse signed number
-    pub const fn parse_i64(self) -> Option<(Parser<'s>, i64)> {
-        let mut bs = self.input.as_bytes();
+    mk_number_parser!(parse_u8, u8);
+    mk_number_parser!(parse_u16, u16);
+    mk_number_parser!(parse_u32, u32);
+    mk_number_parser!(parse_u64, u64);
 
-        let minus = match bs {
-            [b'-', rest @ ..] => {
-                bs = rest;
-                true
-            }
-            _ => false,
-        };
-
-        let mut parsed_anything = false;
-        let mut acc: i64 = 0;
-
-        loop {
-            match bs {
-                [
-                    b @ (b'0' | b'1' | b'2' | b'3' | b'4' | b'5' | b'6' | b'7' | b'8' | b'9'),
-                    rest @ ..,
-                ] => {
-                    parsed_anything = true;
-                    match acc.checked_mul(10) {
-                        Some(a) => acc = a,
-                        None => {
-                            return None;
-                        }
-                    }
-                    match acc.checked_add((*b - b'0') as i64) {
-                        Some(a) => acc = a,
-                        None => {
-                            return None;
-                        }
-                    }
-
-                    bs = rest;
-                }
-                _ => {
-                    if !parsed_anything {
-                        return None;
-                    }
-
-                    if minus {
-                        acc = -acc;
-                    }
-
-                    return Some((
-                        Parser {
-                            // const-hack
-                            input: match core::str::from_utf8(bs) {
-                                Ok(input) => input,
-                                Err(_) => unreachable!(),
-                            },
-                        },
-                        acc,
-                    ));
-                }
-            }
-        }
-    }
-
-    mk_unsigned_parser!(parse_u8, u8);
-    mk_unsigned_parser!(parse_u16, u16);
-    mk_unsigned_parser!(parse_u32, u32);
-    mk_unsigned_parser!(parse_u64, u64);
+    mk_number_parser!(parse_i8, i8, minus);
+    mk_number_parser!(parse_i16, i16, minus);
+    mk_number_parser!(parse_i32, i32, minus);
+    mk_number_parser!(parse_i64, i64, minus);
 }

@@ -128,17 +128,16 @@ impl Nus {
         let p = p.trim_whitespace();
         let (p, up_multiple) = match lexeme!(p, Parser::parse_any_ascii_char) {
             Some((p, c)) if c == '^' || c == 'v' => {
-                // TODO: add parse_i32
-                let (p, up_multiple) = match lexeme!(p, Parser::parse_i64) {
+                let (p, up_multiple) = match lexeme!(p, Parser::parse_i32) {
                     Some((p, up_multiple)) => (p, up_multiple),
                     None => (p, 1),
                 };
                 (
                     p,
                     if c == 'v' {
-                        -(up_multiple as i32)
+                        -(up_multiple)
                     } else {
-                        up_multiple as i32
+                        up_multiple
                     },
                 )
             }

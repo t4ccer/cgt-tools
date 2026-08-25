@@ -450,13 +450,8 @@ pub trait GameFormContext {
             let p = p.trim_whitespace();
             Ok((p, self.new(left, right).map_err(ParseError::Dicotic)?))
         } else {
-            // TODO: Generalize number parsers
-            let (p, integer) = lexeme!(p, Parser::parse_i64).ok_or(ParseError::MalformedInput)?;
-            Ok((
-                p,
-                self.new_integer(integer as i32)
-                    .map_err(ParseError::Integer)?,
-            ))
+            let (p, integer) = lexeme!(p, Parser::parse_i32).ok_or(ParseError::MalformedInput)?;
+            Ok((p, self.new_integer(integer).map_err(ParseError::Integer)?))
         }
     }
 
