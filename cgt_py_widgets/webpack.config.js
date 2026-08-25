@@ -5,7 +5,7 @@ module.exports = {
   mode: "production",
   output: {
     filename: "bundle.js", // The single output file
-    path: path.resolve(__dirname, "dist"),
+    path: path.resolve(__dirname, "../cgt_py/widget"),
     clean: true,
     library: {
       name: "JupyterCGT",

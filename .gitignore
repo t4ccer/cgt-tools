@@ -9,5 +9,5 @@
 /tarpaulin-report.html
 snort*.png
 /cgt_py/cgt_py.pyi
+/cgt_py/widget/
 /cgt_py/docs/api/
-/website/

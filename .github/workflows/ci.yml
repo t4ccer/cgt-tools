@@ -1,0 +1,303 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  bundle:
+    name: Bundle, stubs and docs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install wasm-pack
+        uses: jetli/wasm-pack-action@v0.4.0
+
+      - name: Install webpack
+        run: npm install --global webpack webpack-cli
+
+      - name: Install Sphinx
+        run: pip install sphinx myst-parser furo
+
+      - name: Create virtualenv
+        run: python -m venv .venv
+
+      - name: Build widget bundle and type stubs
+        run: make stub
+
+      - name: Build docs
+        run: |
+          make docs DOCS_NAME=unstable
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            make docs DOCS_NAME="$GITHUB_REF_NAME"
+            make docs-latest DOCS_NAME="$GITHUB_REF_NAME"
+          fi
+
+      - name: Upload Python build inputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-inputs
+          path: |
+            cgt_py/widget/bundle.js
+            cgt_py/cgt_py.pyi
+
+      - name: Upload website
+        uses: actions/upload-artifact@v4
+        with:
+          name: website
+          path: target/website
+          include-hidden-files: true
+
+  rust:
+    name: Rust
+    needs: bundle
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Download Python build inputs
+        uses: actions/download-artifact@v4
+        with:
+          name: python-inputs
+          path: cgt_py
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Check formatting
+        run: cargo fmt --all --check -- --style-edition=2024
+
+      - name: Run clippy
+        run: cargo clippy --workspace --all-targets
+
+      - name: Run tests
+        run: cargo test --workspace
+
+  wheels-linux:
+    name: Wheels (${{ matrix.platform.name }})
+    needs: bundle
+    runs-on: ${{ matrix.platform.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - name: manylinux x86_64
+            runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - name: manylinux aarch64
+            runner: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Download Python build inputs
+        uses: actions/download-artifact@v4
+        with:
+          name: python-inputs
+          path: cgt_py
+
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          command: build
+          args: --release --out dist --find-interpreter
+          target: ${{ matrix.platform.target }}
+          manylinux: auto
+          working-directory: cgt_py
+          sccache: true
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.platform.target }}
+          path: cgt_py/dist
+
+  wheels-native:
+    name: Wheels (${{ matrix.platform.name }}, Python ${{ matrix.python-version }})
+    needs: bundle
+    runs-on: ${{ matrix.platform.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - name: Windows x86_64
+            runner: windows-latest
+            target: x86_64-pc-windows-msvc
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Download Python build inputs
+        uses: actions/download-artifact@v4
+        with:
+          name: python-inputs
+          path: cgt_py
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          command: build
+          args: --release --out dist --interpreter python
+          target: ${{ matrix.platform.target }}
+          working-directory: cgt_py
+          sccache: true
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.platform.target }}-py${{ matrix.python-version }}
+          path: cgt_py/dist
+
+  sdist:
+    name: Source distribution
+    needs: bundle
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Download Python build inputs
+        uses: actions/download-artifact@v4
+        with:
+          name: python-inputs
+          path: cgt_py
+
+      - name: Build source distribution
+        uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: --out dist
+          working-directory: cgt_py
+
+      - name: Upload source distribution
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-sdist
+          path: cgt_py/dist
+
+  tag:
+    name: Check tag matches manifests
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Compare tag against manifest versions
+        run: |
+          for manifest in Cargo.toml cgt_derive/Cargo.toml cgt_py/Cargo.toml; do
+            version="$(sed -n 's/^version = "\(.*\)"$/\1/p' "$manifest" | head -1)"
+            if [[ "v$version" != "$GITHUB_REF_NAME" ]]; then
+              echo "::error::$manifest is $version but the tag is $GITHUB_REF_NAME"
+              exit 1
+            fi
+          done
+
+  publish-docs:
+    name: Publish docs
+    needs: [bundle, rust]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Download website
+        uses: actions/download-artifact@v4
+        with:
+          name: website
+          path: site
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./site
+          publish_branch: gh-pages
+          keep_files: true
+
+  publish-crates:
+    name: Publish to crates.io
+    needs: [rust, tag]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    env:
+      CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Publish cgt_derive
+        run: cargo publish -p cgt_derive
+
+      - name: Publish cgt
+        run: cargo publish -p cgt
+
+  publish-pypi:
+    name: Publish to PyPI
+    needs: [rust, wheels-linux, wheels-native, sdist, tag]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+      - name: Download distributions
+        uses: actions/download-artifact@v4
+        with:
+          pattern: dist-*
+          merge-multiple: true
+          path: dist
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

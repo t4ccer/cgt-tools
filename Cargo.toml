@@ -14,9 +14,7 @@ exclude = ["vendor"]
 # `extension-module` is not enabled here so that the stub generator binary can link against
 # libpython. `maturin` turns it on when building the wheel
 pyo3 = { version = "0.29", features = ["multiple-pymethods"] }
-pyo3-stub-gen = { version = "0.23", default-features = false, features = [
-  "infer_signature",
-] }
+pyo3-stub-gen = { version = "0.23", default-features = false }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = { version = "1.0.150" }
 web-sys = { version = "0.3.103", features = [

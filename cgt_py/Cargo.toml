@@ -10,6 +10,7 @@ description = "Python bindings for Rust `cgt` package"
 homepage = "https://github.com/t4ccer/cgt-tools"
 keywords = ["cgt"]
 categories = ["mathematics", "science"]
+include = ["/src", "/widget/bundle.js", "/cgt_py.pyi", "/pyproject.toml"]
 
 [lib]
 name = "cgt_py"

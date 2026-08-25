@@ -14,20 +14,11 @@
       url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    hercules-ci-effects = {
-      url = "github:hercules-ci/hercules-ci-effects";
-      inputs.nixpkgs.follows = "nixpkgs";
-      inputs.flake-parts.follows = "flake-parts";
-    };
   };
   outputs = inputs @ {self, ...}:
-    inputs.flake-parts.lib.mkFlake {inherit inputs;} ({withSystem, ...}: let
-      version = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).package.version;
-    in {
+    inputs.flake-parts.lib.mkFlake {inherit inputs;} {
       imports = [
         inputs.pre-commit-hooks-nix.flakeModule
-        inputs.hercules-ci-effects.flakeModule
-        ./nix/github-pages.nix
       ];
 
       # `nix flake show --impure` hack
@@ -36,51 +27,8 @@
         then [builtins.currentSystem]
         else inputs.nixpkgs.lib.systems.flakeExposed;
 
-      herculesCI = herculesArgs: {
-        ciSystems = ["x86_64-linux"];
-        onPush.cargo = {
-          outputs.effects = withSystem "x86_64-linux" ({
-            hci-effects,
-            config,
-            pkgs,
-            ...
-          }: {
-            cargoPublish = let
-              cargoSetupHook = pkgs.runCommand "hercules-ci-cargo-setup-hook" {} ''
-                mkdir -p $out/nix-support
-                cp ${./nix/cargo-setup-hook.sh} $out/nix-support/setup-hook
-              '';
-
-              cargoPublish = pkgs.callPackage ./nix/cargo-publish.nix {
-                inherit (inputs.nixpkgs) lib;
-                inherit (pkgs) cargo stdenv;
-                inherit (hci-effects) mkEffect;
-                inherit cargoSetupHook;
-              };
-
-              shouldRun =
-                herculesArgs.config.repo.tag
-                != null
-                && (builtins.match "^v([0-9]+).([0-9]+).([0-9]+)$" herculesArgs.config.repo.tag) != null;
-            in
-              hci-effects.runIf shouldRun (cargoPublish {
-                src = ./.;
-              });
-          });
-        };
-      };
-
-      hercules-ci.github-releases.files = [
-        {
-          label = "cgt-tools-v${version}-x86_64-windows.zip";
-          path = "${self.outputs.packages.x86_64-linux.cgt-tools-x86_64-windows-bundle}";
-        }
-      ];
-
       perSystem = {
         config,
-        self',
-        inputs',
         pkgs,
         lib,
         system,
@@ -108,33 +56,6 @@
             });
           };
         };
-
-        hostPkgs = pkgs;
-
-        mkCgtTools = {pkgs}:
-          pkgs.rustPlatform.buildRustPackage {
-            name = "cgt-tools";
-
-            src = lib.cleanSourceWith {
-              src = ./.;
-              filter = name: type: let
-                baseName = baseNameOf (toString name);
-              in
-                !((!lib.cleanSourceFilter name type)
-                  || (baseName == "flake.lock")
-                  || (lib.hasSuffix ".nix" baseName)
-                  || (lib.hasSuffix ".md" baseName));
-            };
-            cargoLock.lockFile = ./Cargo.lock;
-
-            cargoBuildFlags = ["-p cgt_gui -p cgt_cli"];
-
-            buildInputs = [
-              pkgs.SDL2
-            ];
-
-            doCheck = false;
-          };
       in {
         _module.args.pkgs = import self.inputs.nixpkgs {
           inherit system;
@@ -165,27 +86,6 @@
           tools = {
             rustfmt = lib.mkForce rustToolchain;
             clippy = lib.mkForce rustToolchain;
-          };
-        };
-
-        packages = {
-          cgt-tools-x86_64-windows = mkCgtTools {
-            pkgs = pkgs.pkgsCross.mingwW64;
-          };
-
-          cgt-tools-x86_64-windows-bundle =
-            pkgs.runCommand "cgt-tools-v${version}-x86_64-windows.zip" {
-              nativeBuildInputs = [pkgs.zip];
-            } ''
-              cp --no-preserve=all -vLr ${self'.packages.cgt-tools-x86_64-windows}/bin/ ./cgt-tools-v${version}-x86_64-windows
-              cp --no-preserve=all ${./LICENSE} ./cgt-tools-v${version}-x86_64-windows/LICENSE
-              echo ${version} > ./cgt-tools-v${version}-x86_64-windows/VERSION
-              zip -r cgt-tools-v${version}-x86_64-windows.zip cgt-tools-v${version}-x86_64-windows
-              mv cgt-tools-v${version}-x86_64-windows.zip $out
-            '';
-
-          cgt-tools = mkCgtTools {
-            inherit pkgs;
           };
         };
 
@@ -234,5 +134,5 @@
         };
         formatter = pkgs.alejandra;
       };
-    });
+    };
 }

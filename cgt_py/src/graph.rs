@@ -364,7 +364,7 @@ impl RustWidget for GraphWidget {
     type FrontendMessage = GraphFrontendMessage;
 
     fn esm(&self) -> String {
-        let bundle = include_str!("../../cgt_py_widgets/dist/bundle.js");
+        let bundle = include_str!("../widget/bundle.js");
         let preset = format!("const preset = {};", self.preset.into_flag_bits());
         let epilogue = r#" async function render({model, el}) {
                                await JupyterCGT.render_graph(model, el, preset);
