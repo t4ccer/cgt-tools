@@ -49,6 +49,12 @@ pub struct Parser<'s> {
     // TODO: Track location since construction with new()
     /// Remaining unparsed input
     pub input: &'s str,
+
+    /// Line (starting with 0) of current parser position
+    pub line: u32,
+
+    /// Column (starting with 0) of current parser position
+    pub column: u32,
 }
 
 macro_rules! try_option {
@@ -78,11 +84,12 @@ pub(crate) use lexeme;
 macro_rules! mk_number_parser {
     ($name:ident, $ty:ty $(, $minus:ident)?) => {
         /// Parse number
-        pub const fn $name(self) -> Option<(Parser<'s>, $ty)> {
+        pub const fn $name(mut self) -> Option<(Parser<'s>, $ty)> {
             let mut bs = self.input.as_bytes();
 
             $(let $minus = match bs {
                 [b'-', rest @ ..] => {
+                    self.column += 1;
                     bs = rest;
                     true
                 }
@@ -98,6 +105,7 @@ macro_rules! mk_number_parser {
                         b @ (b'0' | b'1' | b'2' | b'3' | b'4' | b'5' | b'6' | b'7' | b'8' | b'9'),
                         rest @ ..,
                     ] => {
+                        self.column += 1;
                         parsed_anything = true;
                         match acc.checked_mul(10) {
                             Some(a) => acc = a,
@@ -130,6 +138,8 @@ macro_rules! mk_number_parser {
                                     Ok(input) => input,
                                     Err(_) => unreachable!(),
                                 },
+                                line: self.line,
+                                column: self.column,
                             },
                             acc,
                         ));
@@ -143,15 +153,27 @@ macro_rules! mk_number_parser {
 impl<'s> Parser<'s> {
     /// Create new parser marking the beginning of the input
     pub const fn new(input: &'s str) -> Parser<'s> {
-        Parser { input }
+        Parser {
+            input,
+            line: 0,
+            column: 0,
+        }
     }
 
     /// Remove whitespace from the beginning of the input
-    pub const fn trim_whitespace(self) -> Parser<'s> {
+    pub const fn trim_whitespace(mut self) -> Parser<'s> {
         let mut bs = self.input.as_bytes();
         loop {
             match bs {
-                [b'\t' | b'\n' | b'\r' | b' ', rest @ ..] => bs = rest,
+                [b'\t' | b'\r' | b' ', rest @ ..] => {
+                    self.column += 1;
+                    bs = rest
+                }
+                [b'\n', rest @ ..] => {
+                    self.column = 0;
+                    self.line += 1;
+                    bs = rest
+                }
                 _ => {
                     return Parser {
                         input: {
@@ -161,6 +183,8 @@ impl<'s> Parser<'s> {
                                 Err(_) => unreachable!(),
                             }
                         },
+                        line: self.line,
+                        column: self.column,
                     };
                 }
             }
@@ -170,6 +194,19 @@ impl<'s> Parser<'s> {
     /// Parse one ascii char if input is non-empty
     pub const fn parse_any_ascii_char(self) -> Option<(Parser<'s>, char)> {
         match self.input.as_bytes() {
+            [b'\n', rest @ ..] => Some((
+                Parser {
+                    // const-hack
+                    input: match core::str::from_utf8(rest) {
+                        Ok(input) => input,
+                        Err(_) => unreachable!(),
+                    },
+
+                    line: self.line + 1,
+                    column: 0,
+                },
+                '\n',
+            )),
             [b, rest @ ..] if b.is_ascii() => Some((
                 Parser {
                     // const-hack
@@ -177,6 +214,9 @@ impl<'s> Parser<'s> {
                         Ok(input) => input,
                         Err(_) => unreachable!(),
                     },
+
+                    line: self.line,
+                    column: self.column + 1,
                 },
                 *b as char,
             )),
