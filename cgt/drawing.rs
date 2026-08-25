@@ -4,7 +4,7 @@
 
 use std::fmt::Arguments;
 
-use crate::{graph::VertexIndex, numeric::v2f::V2f};
+use crate::{graph::VertexIndex, numeric::v2f::V2f, short::partizan::Player};
 
 pub mod svg;
 pub mod tikz;
@@ -64,6 +64,14 @@ impl Color {
             g: scale(self.g),
             b: scale(self.b),
             a: self.a,
+        }
+    }
+
+    /// Left is bLue, Right is Red
+    pub const fn of_player(player: Player) -> Color {
+        match player {
+            Player::Left => Color::BLUE,
+            Player::Right => Color::RED,
         }
     }
 }

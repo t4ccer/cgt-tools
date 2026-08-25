@@ -103,14 +103,6 @@ impl PendingMove {
     }
 }
 
-// TODO: Should be in some more general place like color module
-const fn player_color(player: Player) -> Color {
-    match player {
-        Player::Left => Color::BLUE,
-        Player::Right => Color::RED,
-    }
-}
-
 const EDIT_OPTIONS: &[EditOption] = &[
     // Domineering
     EditOption {
@@ -411,7 +403,7 @@ impl GridWidget {
             // A highlight registers no area of its own, so previewing the domino cannot
             // disturb hit testing
             if let (Some(domino), EditMode::DomineeringMove(player)) = (domino, edit_mode) {
-                let color = player_color(player);
+                let color = Color::of_player(player);
                 for (x, y) in domino {
                     canvas.highlight_tile(HtmlCanvas::tile_position(x, y), color);
                 }
@@ -419,13 +411,13 @@ impl GridWidget {
 
             match pending_move {
                 Some(PendingMove::Amazons(pending)) => {
-                    let color = player_color(pending.player);
+                    let color = Color::of_player(pending.player);
                     for (x, y) in [Some(pending.queen), pending.target].into_iter().flatten() {
                         canvas.highlight_tile(HtmlCanvas::tile_position(x, y), color);
                     }
                 }
                 Some(PendingMove::Konane(pending)) => {
-                    let color = player_color(pending.player);
+                    let color = Color::of_player(pending.player);
                     let landing = tiles.hovered.filter(|landing| {
                         konane::jumped(grid, pending.player, pending.stone, *landing).is_some()
                     });
