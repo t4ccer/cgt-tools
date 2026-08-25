@@ -868,7 +868,6 @@ fn parameter_row(
     label: &str,
     input_type: &str,
 ) -> Result<(HtmlLabelElement, HtmlInputElement), JsValue> {
-    // Wrapping the input in the label associates the two without needing a unique id
     let row = document
         .create_element("label")?
         .dyn_into::<HtmlLabelElement>()?;
@@ -1230,7 +1229,6 @@ impl WasmWidget for GraphWidget {
             self.edit.option.clone(),
         )?;
 
-        // Wrapping the dropdown in the label associates the two without needing a unique id
         let edge_options = document
             .create_element("label")?
             .dyn_into::<HtmlLabelElement>()?;

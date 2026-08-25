@@ -613,11 +613,11 @@ impl WasmWidget for GridWidget {
             .create_element("div")?
             .dyn_into::<HtmlDivElement>()?;
         controls.style().set_property("display", "flex")?;
-        controls.style().set_property("flex-direction", "column")?;
-        controls.style().set_property("gap", "4px")?;
+        controls.style().set_property("flex-direction", "row")?;
+        controls.style().set_property("align-items", "center")?;
+        controls.style().set_property("width", "fit-content")?;
+        controls.style().set_property("gap", "8px")?;
         controls.style().set_property("margin-bottom", "4px")?;
-
-        let mode_box = document.create_element("div")?;
 
         let mode_select = SelectOption::create_element_reactive(
             &document,
@@ -626,11 +626,13 @@ impl WasmWidget for GridWidget {
             EDIT_OPTIONS,
             self.edit_option.clone(),
         )?;
-        let alternating_box = document
-            .create_element("div")?
-            .dyn_into::<HtmlDivElement>()?;
 
-        // TODO: Auto-generate unique element id to link the label
+        let move_options = document
+            .create_element("label")?
+            .dyn_into::<HtmlLabelElement>()?;
+        move_options.style().set_property("align-items", "center")?;
+        move_options.style().set_property("gap", "4px")?;
+
         let alternating_moves_checkbox = document
             .create_element("input")?
             .dyn_into::<HtmlInputElement>()?;
@@ -638,29 +640,25 @@ impl WasmWidget for GridWidget {
         let alternating_moves = self.alternating_moves.clone();
         reactive::checkbox(&alternating_moves_checkbox, &alternating_moves)?;
 
-        let alternating_label = document
-            .create_element("label")?
-            .dyn_into::<HtmlLabelElement>()?;
-        alternating_label.set_text_content(Some("Alternating Moves"));
-        alternating_box.append_child(&alternating_label)?;
-        alternating_box.append_child(&alternating_moves_checkbox)?;
+        let move_options_text = document.create_element("span")?;
+        move_options_text.set_text_content(Some("Alternating Moves"));
+        move_options.append_child(&alternating_moves_checkbox)?;
+        move_options.append_child(&move_options_text)?;
 
         reactive::style_set_property(
-            HtmlElement::from(alternating_box.clone()),
+            HtmlElement::from(move_options.clone()),
             "display",
             self.edit_option.signal().map(|option| {
                 if option.mode.opposite_player().is_some() {
-                    "block"
+                    "flex"
                 } else {
                     "none"
                 }
             }),
         )?;
 
-        mode_box.append_child(&mode_select)?;
-        mode_box.append_child(&alternating_box)?;
-        controls.append_child(&mode_box)?;
-
+        controls.append_child(&mode_select)?;
+        controls.append_child(&move_options)?;
         element.append_child(&controls).unwrap();
 
         let canvas = document
