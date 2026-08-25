@@ -243,8 +243,6 @@ pub trait FiniteGrid: Grid + Sized {
     where
         C: Canvas,
     {
-        // TODO: get_tile_color should return shape to handle fissions etc.
-
         let mut hits = Hits::new();
 
         for y in 0..self.height() {
