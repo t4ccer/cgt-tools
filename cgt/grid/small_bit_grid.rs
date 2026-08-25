@@ -1,6 +1,6 @@
 //! Grid with up to 64 tiles holding a single bit of information.
 
-use crate::grid::{BitTile, CharTile, FiniteGrid, Grid};
+use crate::grid::{BitTile, CharTile, FiniteGrid, Grid, GridParseError};
 use std::{fmt::Display, marker::PhantomData, str::FromStr};
 
 /// Internal representation of a grid
@@ -39,10 +39,24 @@ where
     }
 }
 
+/// Grid has too many tiles to fit in the internal bit storage
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GridTooLarge(u32);
+
+impl std::fmt::Display for GridTooLarge {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "grid too large: {} > {}", self.0, GridBits::BITS)
+    }
+}
+
+impl std::error::Error for GridTooLarge {}
+
 impl<T> FiniteGrid for SmallBitGrid<T>
 where
     T: BitTile + Copy,
 {
+    type ConstructionError = GridTooLarge;
+
     fn width(&self) -> u8 {
         self.width
     }
@@ -51,10 +65,10 @@ where
         self.height
     }
 
-    fn filled(width: u8, height: u8, value: T) -> Option<Self> {
+    fn filled(width: u8, height: u8, value: T) -> Result<Self, Self::ConstructionError> {
         Self::check_dimensions(width, height)?;
 
-        Some(Self {
+        Ok(Self {
             width,
             height,
             grid: if value.tile_to_bool() {
@@ -90,11 +104,11 @@ where
     T: BitTile + Copy,
 {
     /// Check if dimensions are small enough to fit in the fixed-size bit representation.
-    const fn check_dimensions(width: u8, height: u8) -> Option<()> {
+    const fn check_dimensions(width: u8, height: u8) -> Result<(), GridTooLarge> {
         if (width as usize * height as usize) > 8 * std::mem::size_of::<GridBits>() {
-            return None;
+            return Err(GridTooLarge(width as u32 * height as u32));
         }
-        Some(())
+        Ok(())
     }
 
     /// Creates empty grid with given size.
@@ -109,10 +123,10 @@ where
     ///
     /// # Errors
     /// - Grid has more than 64 tiles
-    pub fn empty(width: u8, height: u8) -> Option<Self> {
+    pub fn empty(width: u8, height: u8) -> Result<Self, GridTooLarge> {
         Self::check_dimensions(width, height)?;
 
-        Some(Self {
+        Ok(Self {
             width,
             height,
             grid: 0,
@@ -138,9 +152,9 @@ where
     ///
     /// # Errors
     /// - Grid has more than 64 tiles
-    pub fn from_number(width: u8, height: u8, grid_id: GridBits) -> Option<Self> {
+    pub fn from_number(width: u8, height: u8, grid_id: GridBits) -> Result<Self, GridTooLarge> {
         Self::check_dimensions(width, height)?;
-        Some(Self {
+        Ok(Self {
             width,
             height,
             grid: grid_id,
@@ -164,7 +178,7 @@ where
     ///
     /// # Errors
     /// - Grid has more than 64 tiles
-    pub fn from_arr(width: u8, height: u8, grid: &[T]) -> Option<Self> {
+    pub fn from_arr(width: u8, height: u8, grid: &[T]) -> Result<Self, GridTooLarge> {
         Self::from_number(width, height, arr_to_bits(grid))
     }
 
@@ -216,10 +230,10 @@ impl<T> FromStr for SmallBitGrid<T>
 where
     T: BitTile + CharTile + Default + Copy,
 {
-    type Err = ();
+    type Err = GridParseError<<SmallBitGrid<T> as FiniteGrid>::ConstructionError>;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::parse(s).ok_or(())
+        Self::parse(s)
     }
 }
 
@@ -369,6 +383,62 @@ mod tests {
             "#..#|\
 	 ....|\
 	 ##..",
+        );
+    }
+
+    #[test]
+    fn parser_errors() {
+        use crate::grid::ParseErrorReason;
+
+        assert_eq!(
+            SmallBitGrid::<bool>::parse("...|.....|..."),
+            Err(GridParseError::ParseError(
+                ParseErrorReason::InvalidRowSize {
+                    row: 1,
+                    expected: 3,
+                    actual: 5
+                }
+            ))
+        );
+
+        assert_eq!(
+            SmallBitGrid::<bool>::parse("...|.|..."),
+            Err(GridParseError::ParseError(
+                ParseErrorReason::InvalidRowSize {
+                    row: 1,
+                    expected: 3,
+                    actual: 1
+                }
+            ))
+        );
+
+        assert_eq!(
+            SmallBitGrid::<bool>::parse("...|...|....."),
+            Err(GridParseError::ParseError(
+                ParseErrorReason::InvalidRowSize {
+                    row: 2,
+                    expected: 3,
+                    actual: 5
+                }
+            ))
+        );
+
+        assert_eq!(
+            SmallBitGrid::<bool>::parse("...|...|."),
+            Err(GridParseError::ParseError(
+                ParseErrorReason::InvalidRowSize {
+                    row: 2,
+                    expected: 3,
+                    actual: 1
+                }
+            ))
+        );
+
+        assert_eq!(
+            SmallBitGrid::<bool>::parse(
+                "...................................................................................................."
+            ),
+            Err(GridParseError::ConstructionError(GridTooLarge(100)))
         );
     }
 }

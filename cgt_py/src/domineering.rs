@@ -1,6 +1,7 @@
 use crate::{grid::PyGrid, py_partizan_game};
 use cgt::{
     grid::FiniteGrid as _,
+    result::UnwrapInfallible,
     short::partizan::{
         games::domineering::Domineering, transposition_table::ParallelTranspositionTable,
     },
@@ -19,12 +20,11 @@ pub struct PyDomineering(pub Domineering);
 impl PyDomineering {
     #[new]
     pub fn new(position: &str) -> PyResult<PyDomineering> {
-        let inner = Domineering::from_str(position).or(Err(PyErr::new::<
-            pyo3::exceptions::PyValueError,
-            _,
-        >(
-            "Parse error: invalid Domineering grid",
-        )))?;
+        let inner = Domineering::from_str(position).map_err(|err| {
+            PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "Parse error: invalid Domineering grid: {err}"
+            ))
+        })?;
         Ok(PyDomineering(inner))
     }
 
@@ -44,7 +44,7 @@ impl PyDomineering {
     pub fn grid(&self) -> PyGrid {
         PyGrid::from_preset_unchecked(
             GridPreset::Domineering,
-            self.0.grid().map(|tile| Tile::from(tile)).unwrap(),
+            self.0.grid().map(Tile::from).unwrap_infallible(),
         )
     }
 }

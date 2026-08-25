@@ -16,10 +16,11 @@ pub struct PyKonane(pub Konane);
 impl PyKonane {
     #[new]
     pub fn new(position: &str) -> PyResult<PyKonane> {
-        let inner =
-            Konane::from_str(position).or(Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                "Parse error: invalid Konane grid",
-            )))?;
+        let inner = Konane::from_str(position).map_err(|err| {
+            PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "Parse error: invalid Konane grid: {err}"
+            ))
+        })?;
         Ok(PyKonane(inner))
     }
 

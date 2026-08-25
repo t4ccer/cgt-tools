@@ -23,18 +23,91 @@ pub trait Grid {
     fn set(&mut self, x: u8, y: u8, value: Self::Item);
 }
 
+/// Grid parser failure
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ParseErrorReason {
+    /// Row has invalid size
+    InvalidRowSize {
+        /// Which row was invalid
+        row: u8,
+
+        /// Expected row length
+        expected: u8,
+
+        /// Actual row length
+        actual: u8,
+    },
+
+    /// Input character does not represent a tile
+    InvalidCharTile(char),
+}
+
+impl std::fmt::Display for ParseErrorReason {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ParseErrorReason::InvalidRowSize {
+                row,
+                expected,
+                actual,
+            } => {
+                write!(
+                    f,
+                    "row {row} has invalid size (expected: {expected}, got: {actual})"
+                )
+            }
+            ParseErrorReason::InvalidCharTile(c) => write!(f, "invalid tile character: `{c}`"),
+        }
+    }
+}
+
+/// Error that happened during parsing grid from string
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GridParseError<E> {
+    /// Construction error (e.g. grid too large)
+    ConstructionError(E),
+
+    /// Parsing error
+    ParseError(ParseErrorReason), // TODO: Input location
+}
+
+impl<E> std::fmt::Display for GridParseError<E>
+where
+    E: std::fmt::Display,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            GridParseError::ConstructionError(err) => write!(f, "construction error: {err}"),
+            GridParseError::ParseError(err) => write!(f, "parse error: {err}"),
+        }
+    }
+}
+
+impl<E> std::error::Error for GridParseError<E>
+where
+    E: std::error::Error + 'static,
+{
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            GridParseError::ConstructionError(err) => Some(err),
+            GridParseError::ParseError(_) => None,
+        }
+    }
+}
+
 /// Trait for finite grids.
 pub trait FiniteGrid: Grid + Sized {
+    /// Error when grid cannot be constructed with given dimensions
+    type ConstructionError: std::error::Error;
+
     /// Width of the grid.
     fn width(&self) -> u8;
 
     /// Height of the grid.
     fn height(&self) -> u8;
 
-    // TODO: Make these all Option an associated type error
-
     /// Create new gird filled with the same tile
-    fn filled(width: u8, height: u8, value: Self::Item) -> Option<Self>;
+    #[allow(clippy::missing_errors_doc)]
+    fn filled(width: u8, height: u8, value: Self::Item) -> Result<Self, Self::ConstructionError>;
 
     /// Create new zero-sized grid
     fn zero_size() -> Self;
@@ -57,21 +130,22 @@ pub trait FiniteGrid: Grid + Sized {
     }
 
     /// Map each tile, potentially changing the grid type
+    #[allow(clippy::missing_errors_doc)]
     fn try_map<R, E, G>(
         &self,
         mut f: impl FnMut(Self::Item) -> Result<R, E>,
-    ) -> Result<Option<G>, E>
+    ) -> Result<Result<G, G::ConstructionError>, E>
     where
         G: FiniteGrid<Item = R>,
     {
         if self.width() == 0 || self.height() == 0 {
-            return Ok(Some(G::zero_size()));
+            return Ok(Ok(G::zero_size()));
         }
 
         let initial = f(self.get(0, 0))?;
         let mut g = match G::filled(self.width(), self.height(), initial) {
-            Some(g) => g,
-            None => return Ok(None),
+            Ok(g) => g,
+            Err(err) => return Ok(Err(err)),
         };
 
         for y in 0..self.height() {
@@ -81,11 +155,12 @@ pub trait FiniteGrid: Grid + Sized {
             }
         }
 
-        Ok(Some(g))
+        Ok(Ok(g))
     }
 
     /// Map each tile, potentially changing the grid type
-    fn map<R, G>(&self, mut f: impl FnMut(Self::Item) -> R) -> Option<G>
+    #[allow(clippy::missing_errors_doc)]
+    fn map<R, G>(&self, mut f: impl FnMut(Self::Item) -> R) -> Result<G, G::ConstructionError>
     where
         G: FiniteGrid<Item = R>,
     {
@@ -94,43 +169,48 @@ pub trait FiniteGrid: Grid + Sized {
     }
 
     /// Parse grid from string following notation from [`Self::display`]
-    fn parse(input: &str) -> Option<Self>
+    #[allow(clippy::missing_errors_doc)]
+    fn parse(input: &str) -> Result<Self, GridParseError<Self::ConstructionError>>
     where
         Self::Item: CharTile + Default,
     {
         let row_separator = '|';
-        let width = input.split(row_separator).next()?.len() as u8;
+        let width = input
+            .split(row_separator)
+            .next()
+            .expect("`split` always returns the first element")
+            .chars()
+            .count() as u8;
         let height = input.chars().filter(|c| *c == row_separator).count() as u8 + 1;
 
-        let mut grid = Self::filled(width, height, Default::default())?;
-        let mut x = 0;
-        let mut y = 0;
+        let mut grid = Self::filled(width, height, Default::default())
+            .map_err(GridParseError::ConstructionError)?;
 
-        for chr in input.chars() {
-            if chr == row_separator {
-                if x == width {
-                    x = 0;
-                    y += 1;
-                    continue;
-                }
+        for (y, row) in input.split(row_separator).enumerate() {
+            let y = y as u8;
+
+            // Check the whole row upfront so the error can report its real length
+            let row_width = row.chars().count() as u8;
+            if row_width != width {
                 // Not a rectangle
-                return None;
+                return Err(GridParseError::ParseError(
+                    ParseErrorReason::InvalidRowSize {
+                        row: y,
+                        expected: width,
+                        actual: row_width,
+                    },
+                ));
             }
 
-            if x >= width {
-                return None;
+            for (x, chr) in row.chars().enumerate() {
+                let value = Self::Item::char_to_tile(chr).ok_or(GridParseError::ParseError(
+                    ParseErrorReason::InvalidCharTile(chr),
+                ))?;
+                grid.set(x as u8, y, value);
             }
-
-            let value = Self::Item::char_to_tile(chr)?;
-            grid.set(x, y, value);
-            x += 1;
         }
 
-        if x != width {
-            // Not a rectangle in the last row
-            return None;
-        }
-        Some(grid)
+        Ok(grid)
     }
 
     /// Minimum required canvas size to paint the whole grid

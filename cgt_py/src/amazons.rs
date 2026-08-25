@@ -16,12 +16,11 @@ pub struct PyAmazons(pub Amazons);
 impl PyAmazons {
     #[new]
     pub fn new(position: &str) -> PyResult<PyAmazons> {
-        let inner = Amazons::from_str(position).or(Err(PyErr::new::<
-            pyo3::exceptions::PyValueError,
-            _,
-        >(
-            "Parse error: invalid Amazons grid"
-        )))?;
+        let inner = Amazons::from_str(position).map_err(|err| {
+            PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "Parse error: invalid Amazons grid: {err}"
+            ))
+        })?;
         Ok(PyAmazons(inner))
     }
 

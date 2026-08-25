@@ -1,5 +1,6 @@
 use cgt::{
     grid::{CharTile, FiniteGrid, vec_grid::VecGrid},
+    result::UnwrapInfallible,
     short::partizan::games::{
         amazons::{self, Amazons},
         domineering,
@@ -185,7 +186,7 @@ fn default_grid(preset: GridPreset) -> VecGrid<Tile> {
         GridPreset::Amazons => (4, 4, Tile::Empty),
         GridPreset::Konane => (5, 5, Tile::Empty),
     };
-    FiniteGrid::filled(width, height, tile).unwrap()
+    FiniteGrid::filled(width, height, tile).unwrap_infallible()
 }
 
 fn grid_from_position(preset: GridPreset, position: &Bound<'_, PyAny>) -> PyResult<PyGrid> {

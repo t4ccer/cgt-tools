@@ -64,6 +64,8 @@ impl<T> FiniteGrid for VecGrid<T>
 where
     T: Copy,
 {
+    type ConstructionError = Infallible;
+
     fn width(&self) -> u8 {
         self.width
     }
@@ -72,8 +74,8 @@ where
         self.height
     }
 
-    fn filled(width: u8, height: u8, value: T) -> Option<Self> {
-        Some(Self {
+    fn filled(width: u8, height: u8, value: T) -> Result<Self, Infallible> {
+        Ok(Self {
             width,
             height,
             grid: vec![value; width as usize * height as usize],

@@ -16,12 +16,11 @@ pub struct PyFission(pub Fission);
 impl PyFission {
     #[new]
     pub fn new(position: &str) -> PyResult<PyFission> {
-        let inner = Fission::from_str(position).or(Err(PyErr::new::<
-            pyo3::exceptions::PyValueError,
-            _,
-        >(
-            "Parse error: invalid Fission grid"
-        )))?;
+        let inner = Fission::from_str(position).map_err(|err| {
+            PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "Parse error: invalid Fission grid: {err}"
+            ))
+        })?;
         Ok(PyFission(inner))
     }
 

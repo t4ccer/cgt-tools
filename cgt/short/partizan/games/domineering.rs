@@ -4,7 +4,7 @@
 extern crate alloc;
 use crate::{
     drawing::{self, BoundingBox, Canvas, Color, Draw},
-    grid::{self, FiniteGrid, Grid, decompositions, small_bit_grid::SmallBitGrid},
+    grid::{self, FiniteGrid, Grid, GridParseError, decompositions, small_bit_grid::SmallBitGrid},
     short::partizan::partizan_game::PartizanGame,
 };
 use cgt_derive::Tile;
@@ -51,10 +51,10 @@ impl<G> FromStr for Domineering<G>
 where
     G: Grid<Item = Tile> + FiniteGrid,
 {
-    type Err = ();
+    type Err = GridParseError<G::ConstructionError>;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self::new(G::parse(s).ok_or(())?))
+        Ok(Self::new(G::parse(s)?))
     }
 }
 

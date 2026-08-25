@@ -101,9 +101,7 @@ pub fn canvas_interactions(
                 .pointer_pressed(mouse_event_to_canvas(&event));
         }
     });
-    canvas
-        .add_event_listener_with_callback("mousedown", down_handler.as_ref().unchecked_ref())
-        .unwrap();
+    canvas.add_event_listener_with_callback("mousedown", down_handler.as_ref().unchecked_ref())?;
     down_handler.forget();
 
     let up_handler = ScopedClosure::<dyn FnMut(MouseEvent)>::new({
@@ -114,9 +112,7 @@ pub fn canvas_interactions(
                 .pointer_released(mouse_event_to_canvas(&event));
         }
     });
-    canvas
-        .add_event_listener_with_callback("mouseup", up_handler.as_ref().unchecked_ref())
-        .unwrap();
+    canvas.add_event_listener_with_callback("mouseup", up_handler.as_ref().unchecked_ref())?;
     up_handler.forget();
 
     let move_handler = ScopedClosure::<dyn FnMut(MouseEvent)>::new({
@@ -127,9 +123,7 @@ pub fn canvas_interactions(
                 .pointer_moved(mouse_event_to_canvas(&event));
         }
     });
-    canvas
-        .add_event_listener_with_callback("mousemove", move_handler.as_ref().unchecked_ref())
-        .unwrap();
+    canvas.add_event_listener_with_callback("mousemove", move_handler.as_ref().unchecked_ref())?;
     move_handler.forget();
 
     let leave_handler = ScopedClosure::<dyn FnMut()>::new({
@@ -139,8 +133,7 @@ pub fn canvas_interactions(
         }
     });
     canvas
-        .add_event_listener_with_callback("mouseleave", leave_handler.as_ref().unchecked_ref())
-        .unwrap();
+        .add_event_listener_with_callback("mouseleave", leave_handler.as_ref().unchecked_ref())?;
     leave_handler.forget();
 
     Ok(())

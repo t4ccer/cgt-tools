@@ -2,7 +2,7 @@
 
 use crate::{
     drawing::{self, BoundingBox, Canvas, Color, Draw},
-    grid::{FiniteGrid, Grid, vec_grid::VecGrid},
+    grid::{FiniteGrid, Grid, GridParseError, vec_grid::VecGrid},
     short::partizan::{Player, partizan_game::PartizanGame},
 };
 use cgt_derive::Tile;
@@ -361,9 +361,9 @@ impl<G> FromStr for Konane<G>
 where
     G: Grid<Item = Tile> + FiniteGrid,
 {
-    type Err = ();
+    type Err = GridParseError<G::ConstructionError>;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self::new(G::parse(s).ok_or(())?))
+        Ok(Self::new(G::parse(s)?))
     }
 }

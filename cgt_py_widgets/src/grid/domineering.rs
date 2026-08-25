@@ -63,7 +63,7 @@ pub fn domino_fits(grid: &VecGrid<Tile>, domino: [(u8, u8); 2]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cgt::grid::Grid;
+    use cgt::{grid::Grid, result::UnwrapInfallible};
 
     /// Tiles are 64px with a 2px line between them, so tile (x, y) starts at
     /// x * 64 + (x + 1) * 2 and its middle is 32px further in
@@ -72,7 +72,7 @@ mod tests {
     }
 
     fn empty(width: u8, height: u8) -> VecGrid<Tile> {
-        FiniteGrid::filled(width, height, Tile::Empty).unwrap()
+        FiniteGrid::filled(width, height, Tile::Empty).unwrap_infallible()
     }
 
     /// Cursor `offset` px from the middle of the tile, negative being up / left

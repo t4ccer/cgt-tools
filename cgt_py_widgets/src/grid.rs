@@ -8,6 +8,7 @@ use cgt::{
     drawing::{Area, Canvas, Color, Hits, Interaction, Interactions},
     grid::{FiniteGrid, Grid as _, vec_grid::VecGrid},
     numeric::v2f::V2f,
+    result::UnwrapInfallible,
     short::partizan::{Player, games::fission},
 };
 use cgt_py_messages::{GridBackendMessage, GridFrontendMessage, GridPreset, GridPresetFlag, Tile};
@@ -318,7 +319,8 @@ fn resize_edge(grid: &VecGrid<Tile>, edge: Edge, action: ResizeAction) -> Option
         (Edge::Right | Edge::Bottom, _) => (0, 0),
     };
 
-    let mut new_grid: VecGrid<Tile> = FiniteGrid::filled(new_width, new_height, Tile::Taken)?;
+    let mut new_grid: VecGrid<Tile> =
+        FiniteGrid::filled(new_width, new_height, Tile::Taken).unwrap_infallible();
     for y in 0..height {
         for x in 0..width {
             let new_x = i16::from(x) + offset_x;
@@ -758,7 +760,7 @@ impl WasmWidget for GridWidget {
 
         controls.append_child(&mode_select)?;
         controls.append_child(&move_options)?;
-        element.append_child(&controls).unwrap();
+        element.append_child(&controls)?;
 
         let canvas = document
             .create_element("canvas")?
@@ -782,7 +784,7 @@ impl WasmWidget for GridWidget {
         canvas.style().set_property("grid-row", "2")?;
         canvas.style().set_property("grid-column", "2")?;
         board.append_child(&canvas)?;
-        element.append_child(&board).unwrap();
+        element.append_child(&board)?;
 
         reactive::frames(
             map_ref! {
