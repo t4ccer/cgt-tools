@@ -50,14 +50,15 @@ impl<T> SyncState<T> {
         }
     }
 
-    fn take_from_python(&mut self, sequence: Sequence, new_state: T)
+    fn take_from_python(this: &Mutable<Self>, sequence: Sequence, new_state: T)
     where
         T: PartialEq,
     {
-        if self.is_worth_taking(sequence, &new_state) {
-            self.state = new_state;
-            self.provenance = Provenance::Python;
-            self.sequence = sequence
+        if this.lock_ref().is_worth_taking(sequence, &new_state) {
+            let mut this = this.lock_mut();
+            this.state = new_state;
+            this.provenance = Provenance::Python;
+            this.sequence = sequence
         }
     }
 

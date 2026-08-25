@@ -595,8 +595,7 @@ impl WasmWidget for GridWidget {
                 sequence,
                 grid: new_grid,
             } => {
-                let mut grid = self.grid.lock_mut();
-                grid.take_from_python(sequence, new_grid);
+                SyncState::take_from_python(&self.grid, sequence, new_grid);
 
                 Ok(())
             }

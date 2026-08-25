@@ -1198,8 +1198,7 @@ impl WasmWidget for GraphWidget {
                 sequence,
                 graph: new_graph,
             } => {
-                let mut graph = self.graph.lock_mut();
-                graph.take_from_python(sequence, new_graph);
+                SyncState::take_from_python(&self.graph, sequence, new_graph);
 
                 Ok(())
             }
