@@ -4,6 +4,7 @@ use cgt::{
         amazons::{self, Amazons},
         domineering,
         fission::{self, Fission},
+        konane::{self, Konane},
     },
 };
 use cgt_py_messages::{GridBackendMessage, GridFrontendMessage, GridPreset, Sequence, Tile};
@@ -13,7 +14,7 @@ use pyo3::{
     pyfunction, pymethods,
 };
 
-use crate::{amazons::PyAmazons, domineering::PyDomineering, fission::PyFission};
+use crate::{amazons::PyAmazons, domineering::PyDomineering, fission::PyFission, konane::PyKonane};
 
 #[pyclass]
 struct PyGrid {
@@ -44,6 +45,7 @@ impl PyGrid {
                 GridPreset::Domineering => self.domineering()?.into_py_any(py),
                 GridPreset::Fission => self.fission()?.into_py_any(py),
                 GridPreset::Amazons => self.amazons()?.into_py_any(py),
+                GridPreset::Konane => self.konane()?.into_py_any(py),
             },
             None => Err(PyValueError::new_err(
                 "This grid is not associated with any game",
@@ -72,6 +74,15 @@ impl PyGrid {
         Ok(PyAmazons(Amazons::new(
             self.grid
                 .try_map(|t| amazons::Tile::try_from(*t))
+                .map_err(|err| PyValueError::new_err(err.to_string()))?,
+        )))
+    }
+
+    #[getter]
+    pub fn konane(&self) -> PyResult<PyKonane> {
+        Ok(PyKonane(Konane::new(
+            self.grid
+                .try_map(|t| konane::Tile::try_from(*t))
                 .map_err(|err| PyValueError::new_err(err.to_string()))?,
         )))
     }
@@ -170,6 +181,16 @@ pub fn make_amazons_widget(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
     GridWidget {
         preset: GridPreset::Amazons,
         grid: FiniteGrid::filled(4, 4, Tile::Empty).unwrap(),
+        sequence: Sequence::INITIAL,
+    }
+    .into_widget(py, "cgt_py")
+}
+
+#[pyfunction(name = "KonaneWidget")]
+pub fn make_konane_widget(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
+    GridWidget {
+        preset: GridPreset::Konane,
+        grid: FiniteGrid::filled(5, 5, Tile::Empty).unwrap(),
         sequence: Sequence::INITIAL,
     }
     .into_widget(py, "cgt_py")

@@ -27,6 +27,7 @@ use web_sys::{
 
 mod amazons;
 mod domineering;
+mod konane;
 
 #[derive(Clone, Copy)]
 enum Edge {
@@ -49,6 +50,7 @@ enum EditMode {
     FissionMove(Player),
     DomineeringMove(Player),
     AmazonsMove(Player),
+    KonaneMove(Player),
 }
 
 impl EditMode {
@@ -59,6 +61,43 @@ impl EditMode {
             EditMode::FissionMove(player) => Some(EditMode::FissionMove(player.opposite())),
             EditMode::DomineeringMove(player) => Some(EditMode::DomineeringMove(player.opposite())),
             EditMode::AmazonsMove(player) => Some(EditMode::AmazonsMove(player.opposite())),
+            EditMode::KonaneMove(player) => Some(EditMode::KonaneMove(player.opposite())),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PendingMove {
+    Amazons(amazons::Move),
+    Konane(konane::Move),
+}
+
+impl PendingMove {
+    const fn mode(self) -> EditMode {
+        match self {
+            PendingMove::Amazons(pending) => EditMode::AmazonsMove(pending.player),
+            PendingMove::Konane(pending) => EditMode::KonaneMove(pending.player),
+        }
+    }
+
+    fn is_live(self, grid: &VecGrid<Tile>) -> bool {
+        match self {
+            PendingMove::Amazons(pending) => pending.is_live(grid),
+            PendingMove::Konane(pending) => pending.is_live(grid),
+        }
+    }
+
+    const fn amazons(self) -> Option<amazons::Move> {
+        match self {
+            PendingMove::Amazons(pending) => Some(pending),
+            PendingMove::Konane(_) => None,
+        }
+    }
+
+    const fn konane(self) -> Option<konane::Move> {
+        match self {
+            PendingMove::Konane(pending) => Some(pending),
+            PendingMove::Amazons(_) => None,
         }
     }
 }
@@ -137,6 +176,27 @@ const EDIT_OPTIONS: &[EditOption] = &[
         mode: EditMode::AmazonsMove(Player::Right),
         visible_presets: GridPresetFlag::Amazons,
     },
+    // Konane
+    EditOption {
+        text: "Place Left Stone",
+        mode: EditMode::PlaceObject(Tile::BlueStone),
+        visible_presets: GridPresetFlag::Konane,
+    },
+    EditOption {
+        text: "Place Right Stone",
+        mode: EditMode::PlaceObject(Tile::RedStone),
+        visible_presets: GridPresetFlag::Konane,
+    },
+    EditOption {
+        text: "Left Move",
+        mode: EditMode::KonaneMove(Player::Left),
+        visible_presets: GridPresetFlag::Konane,
+    },
+    EditOption {
+        text: "Right Move",
+        mode: EditMode::KonaneMove(Player::Right),
+        visible_presets: GridPresetFlag::Konane,
+    },
 ];
 
 struct GridWidget {
@@ -145,9 +205,8 @@ struct GridWidget {
     alternating_moves: Mutable<bool>,
     grid: Mutable<SyncState<VecGrid<Tile>>>,
 
-    /// Amazons move that has been started but not played yet, which takes three clicks to
-    /// put together
-    amazons_move: Mutable<Option<amazons::Move>>,
+    /// Move that has been started but not played yet, waiting on the clicks left to finish it
+    pending_move: Mutable<Option<PendingMove>>,
 
     /// What the pointer is doing, which every frame both reads and consumes
     interactions: Mutable<Interactions>,
@@ -165,7 +224,7 @@ impl GridWidget {
             ),
             alternating_moves: Mutable::new(true),
             grid: Mutable::new(SyncState::uninitialized(FiniteGrid::zero_size())),
-            amazons_move: Mutable::new(None),
+            pending_move: Mutable::new(None),
             interactions: Mutable::new(Interactions::new()),
         }
     }
@@ -307,7 +366,7 @@ impl GridWidget {
         grid: &VecGrid<Tile>,
         interactions: &mut Interactions,
         edit_mode: EditMode,
-        amazons_move: Option<amazons::Move>,
+        pending_move: Option<PendingMove>,
     ) -> Result<Frame, JsValue> {
         let canvas_size = grid.canvas_size::<HtmlCanvas>().size();
         canvas.set_width(canvas_size.x as u32);
@@ -332,7 +391,8 @@ impl GridWidget {
             EditMode::FlipCell
             | EditMode::PlaceObject(_)
             | EditMode::FissionMove(_)
-            | EditMode::AmazonsMove(_) => None,
+            | EditMode::AmazonsMove(_)
+            | EditMode::KonaneMove(_) => None,
         };
 
         let mut canvas = HtmlCanvas::new(context, interactions);
@@ -355,14 +415,23 @@ impl GridWidget {
                 }
             }
 
-            if let Some(amazons_move) = amazons_move {
-                let color = player_color(amazons_move.player);
-                for (x, y) in [Some(amazons_move.queen), amazons_move.target]
-                    .into_iter()
-                    .flatten()
-                {
-                    canvas.highlight_tile(HtmlCanvas::tile_position(x, y), color);
+            match pending_move {
+                Some(PendingMove::Amazons(pending)) => {
+                    let color = player_color(pending.player);
+                    for (x, y) in [Some(pending.queen), pending.target].into_iter().flatten() {
+                        canvas.highlight_tile(HtmlCanvas::tile_position(x, y), color);
+                    }
                 }
+                Some(PendingMove::Konane(pending)) => {
+                    let color = player_color(pending.player);
+                    let landing = tiles.hovered.filter(|landing| {
+                        konane::jumped(grid, pending.player, pending.stone, *landing).is_some()
+                    });
+                    for (x, y) in [Some(pending.stone), landing].into_iter().flatten() {
+                        canvas.highlight_tile(HtmlCanvas::tile_position(x, y), color);
+                    }
+                }
+                None => {}
             }
 
             Frame {
@@ -390,20 +459,22 @@ impl GridWidget {
     }
 
     fn abandon_stale_move(
-        amazons_move: &Mutable<Option<amazons::Move>>,
+        pending_move: &Mutable<Option<PendingMove>>,
         grid: &VecGrid<Tile>,
         mode: EditMode,
     ) {
-        amazons_move.set_neq(amazons_move.get().filter(|pending| {
-            mode == EditMode::AmazonsMove(pending.player) && pending.is_live(grid)
-        }));
+        pending_move.set_neq(
+            pending_move
+                .get()
+                .filter(|pending| pending.mode() == mode && pending.is_live(grid)),
+        );
     }
 
     fn apply(
         grid: &Mutable<SyncState<VecGrid<Tile>>>,
         edit_option: &Mutable<EditOption>,
         alternating_moves: &Mutable<bool>,
-        amazons_move: &Mutable<Option<amazons::Move>>,
+        pending_move: &Mutable<Option<PendingMove>>,
         preset: &GridPreset,
         frame: &Frame,
     ) {
@@ -471,15 +542,15 @@ impl GridWidget {
             EditMode::AmazonsMove(player) => {
                 let clicked = (x, y);
 
-                let Some(pending) = amazons_move.get() else {
+                let Some(pending) = pending_move.get().and_then(PendingMove::amazons) else {
                     // Nothing picked up yet, so the only click worth anything is one on a
                     // queen of one's own
                     if amazons::holds_queen(&grid.lock_ref().state, player, clicked) {
-                        amazons_move.set(Some(amazons::Move {
+                        pending_move.set(Some(PendingMove::Amazons(amazons::Move {
                             player,
                             queen: clicked,
                             target: None,
-                        }));
+                        })));
                     }
                     return;
                 };
@@ -487,16 +558,16 @@ impl GridWidget {
                 let Some(target) = pending.target else {
                     // Clicking the queen again puts it back down, calling the move off
                     if clicked == pending.queen {
-                        amazons_move.set(None);
+                        pending_move.set(None);
                         return;
                     }
 
                     // Where the queen is walking to
                     if amazons::can_reach(&grid.lock_ref().state, pending.queen, clicked) {
-                        amazons_move.set(Some(amazons::Move {
+                        pending_move.set(Some(PendingMove::Amazons(amazons::Move {
                             target: Some(clicked),
                             ..pending
-                        }));
+                        })));
                     }
                     return;
                 };
@@ -504,10 +575,10 @@ impl GridWidget {
                 // Clicking where the queen is headed takes back that step alone, leaving
                 // the queen picked up and waiting for somewhere else to go
                 if clicked == target {
-                    amazons_move.set(Some(amazons::Move {
+                    pending_move.set(Some(PendingMove::Amazons(amazons::Move {
                         target: None,
                         ..pending
-                    }));
+                    })));
                     return;
                 }
 
@@ -525,7 +596,35 @@ impl GridWidget {
                 };
 
                 set_edited(grid, played);
-                amazons_move.set(None);
+                pending_move.set(None);
+                GridWidget::pass_turn(edit_option, alternating_moves, preset);
+            }
+            EditMode::KonaneMove(player) => {
+                let clicked = (x, y);
+
+                let Some(pending) = pending_move.get().and_then(PendingMove::konane) else {
+                    if konane::holds_stone(&grid.lock_ref().state, player, clicked) {
+                        pending_move.set(Some(PendingMove::Konane(konane::Move {
+                            player,
+                            stone: clicked,
+                        })));
+                    }
+                    return;
+                };
+
+                if clicked == pending.stone {
+                    pending_move.set(None);
+                    return;
+                }
+
+                let Some(played) =
+                    konane::play(&grid.lock_ref().state, player, pending.stone, clicked)
+                else {
+                    return;
+                };
+
+                set_edited(grid, played);
+                pending_move.set(None);
                 GridWidget::pass_turn(edit_option, alternating_moves, preset);
             }
 
@@ -540,24 +639,24 @@ impl GridWidget {
         interactions: &Mutable<Interactions>,
         edit_option: &Mutable<EditOption>,
         alternating_moves: &Mutable<bool>,
-        amazons_move: &Mutable<Option<amazons::Move>>,
+        pending_move: &Mutable<Option<PendingMove>>,
         preset: &GridPreset,
     ) -> Result<(), JsValue> {
         let mode = edit_option.get().mode;
-        GridWidget::abandon_stale_move(amazons_move, &grid.lock_ref().state, mode);
+        GridWidget::abandon_stale_move(pending_move, &grid.lock_ref().state, mode);
 
         let frame = GridWidget::draw(
             canvas,
             &grid.lock_ref().state,
             &mut interactions.lock_mut(),
             mode,
-            amazons_move.get(),
+            pending_move.get(),
         )?;
         GridWidget::apply(
             grid,
             edit_option,
             alternating_moves,
-            amazons_move,
+            pending_move,
             preset,
             &frame,
         );
@@ -689,7 +788,7 @@ impl WasmWidget for GridWidget {
             map_ref! {
                 let _grid = self.grid.signal_ref(|_| ()),
                 let _edit_mode = self.edit_option.signal().dedupe(),
-                let _amazons_move = self.amazons_move.signal().dedupe() => ()
+                let _pending_move = self.pending_move.signal().dedupe() => ()
             },
             &self.interactions,
             {
@@ -698,7 +797,7 @@ impl WasmWidget for GridWidget {
                 let interactions = self.interactions.clone();
                 let edit_option = self.edit_option.clone();
                 let alternating_moves = self.alternating_moves.clone();
-                let amazons_move = self.amazons_move.clone();
+                let pending_move = self.pending_move.clone();
                 let preset = self.preset;
                 move || {
                     GridWidget::update(
@@ -707,7 +806,7 @@ impl WasmWidget for GridWidget {
                         &interactions,
                         &edit_option,
                         &alternating_moves,
-                        &amazons_move,
+                        &pending_move,
                         &preset,
                     )
                 }

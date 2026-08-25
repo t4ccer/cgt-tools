@@ -6,7 +6,9 @@ use cgt::{
     grid::vec_grid::VecGrid,
     impl_has,
     numeric::v2f::V2f,
-    short::partizan::games::{amazons, col, digraph_placement, domineering, fission, snort},
+    short::partizan::games::{
+        amazons, col, digraph_placement, domineering, fission, konane, snort,
+    },
 };
 
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone, Copy, PartialEq, Eq)]
@@ -136,6 +138,15 @@ impl_tile_map! {
     }
 }
 
+impl_tile_map! {
+    match konane::Tile {
+        Empty => Empty,
+        Left => BlueStone,
+        Right => RedStone,
+        Blocked => Taken,
+    }
+}
+
 #[derive(
     serde::Deserialize, serde::Serialize, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord,
 )]
@@ -250,7 +261,8 @@ preset! {
         Domineering = 1,
         Fission = 2,
         Amazons = 3,
-        // TODO: Konane, SkiJumps, ToadsAndFrogs
+        Konane = 4,
+        // TODO: SkiJumps, ToadsAndFrogs
     }
 }
 

@@ -13,6 +13,7 @@ pub mod dyadic_rational_number;
 pub mod fission;
 pub mod graph;
 pub mod grid;
+pub mod konane;
 pub mod snort;
 pub mod thermograph;
 
@@ -77,6 +78,7 @@ fn cgt_py(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(grid::make_domineering_widget, m)?)?;
     m.add_function(wrap_pyfunction!(grid::make_fission_widget, m)?)?;
     m.add_function(wrap_pyfunction!(grid::make_amazons_widget, m)?)?;
+    m.add_function(wrap_pyfunction!(grid::make_konane_widget, m)?)?;
 
     m.add_function(wrap_pyfunction!(graph::make_snort_widget, m)?)?;
     m.add_function(wrap_pyfunction!(graph::make_col_widget, m)?)?;
@@ -92,6 +94,7 @@ fn cgt_py(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<crate::fission::PyFission>()?;
     m.add_class::<crate::graph::PyGraph>()?;
     m.add_class::<crate::graph::PyVertexColors>()?;
+    m.add_class::<crate::konane::PyKonane>()?;
     m.add_class::<crate::snort::PySnort>()?;
     m.add_class::<crate::thermograph::PyThermograph>()?;
 
