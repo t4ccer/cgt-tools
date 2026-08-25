@@ -17,13 +17,26 @@ use pyo3::{
 use crate::{amazons::PyAmazons, domineering::PyDomineering, fission::PyFission, konane::PyKonane};
 
 #[pyclass]
-struct PyGrid {
+pub struct PyGrid {
     // If `Some` then grid grid has tiles that can be represented in this game
-    known_preset: Option<GridPreset>,
-    grid: VecGrid<Tile>,
+    pub known_preset: Option<GridPreset>,
+    pub grid: VecGrid<Tile>,
 }
 
 impl PyGrid {
+    pub fn from_preset_unchecked(preset: GridPreset, grid: VecGrid<Tile>) -> PyGrid {
+        PyGrid {
+            known_preset: Some(preset),
+            grid,
+        }
+    }
+
+    pub fn from_preset(preset: GridPreset, grid: VecGrid<Tile>) -> PyResult<PyGrid> {
+        let grid = Self::from_preset_unchecked(preset, grid);
+        grid.is_valid_for(preset)?;
+        Ok(grid)
+    }
+
     fn try_into_grid<T>(&self) -> PyResult<String>
     where
         T: Copy + CharTile + TryFrom<Tile>,
@@ -33,6 +46,15 @@ impl PyGrid {
             .try_map(|t| T::try_from(*t))
             .map(|grid| std::fmt::from_fn(|f| grid.display(f, '|')).to_string())
             .map_err(|err| PyValueError::new_err(err.to_string()))
+    }
+
+    fn is_valid_for(&self, preset: GridPreset) -> PyResult<()> {
+        match preset {
+            GridPreset::Domineering => self.domineering().map(drop),
+            GridPreset::Fission => self.fission().map(drop),
+            GridPreset::Amazons => self.amazons().map(drop),
+            GridPreset::Konane => self.konane().map(drop),
+        }
     }
 }
 
@@ -156,42 +178,80 @@ impl RustWidget for GridWidget {
     }
 }
 
-#[pyfunction(name = "DomineeringWidget")]
-pub fn make_domineering_widget(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
+fn default_grid(preset: GridPreset) -> VecGrid<Tile> {
+    let (width, height, tile) = match preset {
+        GridPreset::Domineering => (8, 8, Tile::Taken),
+        GridPreset::Fission => (4, 4, Tile::Empty),
+        GridPreset::Amazons => (4, 4, Tile::Empty),
+        GridPreset::Konane => (5, 5, Tile::Empty),
+    };
+    FiniteGrid::filled(width, height, tile).unwrap()
+}
+
+fn grid_from_position(preset: GridPreset, position: &Bound<'_, PyAny>) -> PyResult<PyGrid> {
+    if let Ok(grid) = position.cast::<PyGrid>() {
+        return PyGrid::from_preset(preset, grid.borrow().grid.clone());
+    }
+
+    let grid = match preset {
+        GridPreset::Domineering => position.cast::<PyDomineering>()?.borrow().grid(),
+        GridPreset::Fission => position.cast::<PyFission>()?.borrow().grid(),
+        GridPreset::Amazons => position.cast::<PyAmazons>()?.borrow().grid(),
+        GridPreset::Konane => position.cast::<PyKonane>()?.borrow().grid(),
+    };
+
+    Ok(grid)
+}
+
+fn make_grid_widget<'py>(
+    py: Python<'py>,
+    preset: GridPreset,
+    position: Option<&Bound<'_, PyAny>>,
+) -> PyResult<Bound<'py, PyAny>> {
+    let grid = match position {
+        None => default_grid(preset),
+        Some(position) => grid_from_position(preset, position)?.grid,
+    };
     GridWidget {
-        preset: GridPreset::Domineering,
-        grid: FiniteGrid::filled(8, 8, Tile::Taken).unwrap(),
+        preset,
+        grid,
         sequence: Sequence::INITIAL,
     }
     .into_widget(py, "cgt_py")
+}
+
+#[pyfunction(name = "DomineeringWidget")]
+#[pyo3(signature = (position = None))]
+pub fn make_domineering_widget<'py>(
+    py: Python<'py>,
+    position: Option<&Bound<'_, PyAny>>,
+) -> PyResult<Bound<'py, PyAny>> {
+    make_grid_widget(py, GridPreset::Domineering, position)
 }
 
 #[pyfunction(name = "FissionWidget")]
-pub fn make_fission_widget(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
-    GridWidget {
-        preset: GridPreset::Fission,
-        grid: FiniteGrid::filled(4, 4, Tile::Empty).unwrap(),
-        sequence: Sequence::INITIAL,
-    }
-    .into_widget(py, "cgt_py")
+#[pyo3(signature = (position = None))]
+pub fn make_fission_widget<'py>(
+    py: Python<'py>,
+    position: Option<&Bound<'_, PyAny>>,
+) -> PyResult<Bound<'py, PyAny>> {
+    make_grid_widget(py, GridPreset::Fission, position)
 }
 
 #[pyfunction(name = "AmazonsWidget")]
-pub fn make_amazons_widget(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
-    GridWidget {
-        preset: GridPreset::Amazons,
-        grid: FiniteGrid::filled(4, 4, Tile::Empty).unwrap(),
-        sequence: Sequence::INITIAL,
-    }
-    .into_widget(py, "cgt_py")
+#[pyo3(signature = (position = None))]
+pub fn make_amazons_widget<'py>(
+    py: Python<'py>,
+    position: Option<&Bound<'_, PyAny>>,
+) -> PyResult<Bound<'py, PyAny>> {
+    make_grid_widget(py, GridPreset::Amazons, position)
 }
 
 #[pyfunction(name = "KonaneWidget")]
-pub fn make_konane_widget(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
-    GridWidget {
-        preset: GridPreset::Konane,
-        grid: FiniteGrid::filled(5, 5, Tile::Empty).unwrap(),
-        sequence: Sequence::INITIAL,
-    }
-    .into_widget(py, "cgt_py")
+#[pyo3(signature = (position = None))]
+pub fn make_konane_widget<'py>(
+    py: Python<'py>,
+    position: Option<&Bound<'_, PyAny>>,
+) -> PyResult<Bound<'py, PyAny>> {
+    make_grid_widget(py, GridPreset::Konane, position)
 }

@@ -266,6 +266,18 @@ preset! {
     }
 }
 
+impl GridPreset {
+    /// Name of the python class holding a position of the preset's game
+    pub const fn game_name(self) -> &'static str {
+        match self {
+            GridPreset::Domineering => "Domineering",
+            GridPreset::Fission => "Fission",
+            GridPreset::Amazons => "Amazons",
+            GridPreset::Konane => "Konane",
+        }
+    }
+}
+
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone, Copy, PartialEq, Eq)]
 #[serde(tag = "type")]
 pub enum VertexColor {
@@ -392,17 +404,13 @@ pub struct Vertex {
 impl_has!(Vertex -> position -> V2f);
 impl_has!(Vertex -> color -> VertexColor);
 
-/// Graph behind every graph widget. It is always directed - games with undirected edges
-/// store each of them as a pair of opposite arcs, see [`GraphPreset::directed_edges`]
-pub type WidgetGraph = DirectedGraph<Vertex>;
-
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(tag = "type")]
 pub enum GraphBackendMessage {
     Initialized,
     SetGraph {
         sequence: Sequence,
-        graph: WidgetGraph,
+        graph: DirectedGraph<Vertex>,
     },
 }
 
@@ -411,7 +419,7 @@ pub enum GraphBackendMessage {
 pub enum GraphFrontendMessage {
     SetGraph {
         sequence: Sequence,
-        graph: WidgetGraph,
+        graph: DirectedGraph<Vertex>,
     },
 }
 
@@ -442,6 +450,16 @@ impl GraphPreset {
         match self {
             GraphPreset::Snort | GraphPreset::Col | GraphPreset::DigraphPlacement => false,
             GraphPreset::BipartiteSnort => true,
+        }
+    }
+
+    /// Name of the python class holding a position of the preset's game
+    pub const fn game_name(self) -> &'static str {
+        match self {
+            GraphPreset::Snort => "Snort",
+            GraphPreset::Col => "Col",
+            GraphPreset::DigraphPlacement => "DigraphPlacement",
+            GraphPreset::BipartiteSnort => "BipartiteSnort",
         }
     }
 }

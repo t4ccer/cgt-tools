@@ -15,7 +15,7 @@ use cgt::{
 };
 use cgt_py_messages::{
     GraphBackendMessage, GraphFrontendMessage, GraphPreset, Sequence, Vertex, VertexColor,
-    WidgetGraph, layout::arrange,
+    layout::arrange,
 };
 use jupyter_rust_widget_backend::{Response, RustWidget};
 use pyo3::{
@@ -74,7 +74,7 @@ pub struct PyGraph {
     #[pyo3(get)]
     pub directed: bool,
 
-    pub graph: WidgetGraph,
+    pub graph: DirectedGraph<Vertex>,
 }
 
 pub const SVG_CANVAS_SIZE: V2f = V2f { x: 400.0, y: 250.0 };
@@ -100,12 +100,18 @@ where
 
 impl PyGraph {
     /// Graph of a game whose position the widget of a given preset holds
-    pub fn from_preset(preset: GraphPreset, graph: WidgetGraph) -> PyGraph {
+    pub fn from_preset_unchecked(preset: GraphPreset, graph: DirectedGraph<Vertex>) -> PyGraph {
         PyGraph {
             known_preset: Some(preset),
             directed: preset.directed_edges(),
             graph,
         }
+    }
+
+    pub fn from_preset(preset: GraphPreset, graph: DirectedGraph<Vertex>) -> PyResult<PyGraph> {
+        let graph = Self::from_preset_unchecked(preset, graph);
+        graph.is_valid_for(preset)?;
+        Ok(graph)
     }
 
     fn try_into_graph<T>(&self) -> PyResult<DirectedGraph<T>>
@@ -118,14 +124,21 @@ impl PyGraph {
             .map_err(|err| PyValueError::new_err(err.to_string()))
     }
 
-    /// The same as [`PyGraph::try_into_graph`] but for games played on undirected graphs.
-    /// Vertices connected either way end up connected both ways
     fn try_into_undirected_graph<T>(&self) -> PyResult<UndirectedGraph<T>>
     where
         T: TryFrom<VertexColor> + Clone,
         T::Error: std::error::Error,
     {
         Ok(UndirectedGraph::from_directed(&self.try_into_graph::<T>()?))
+    }
+
+    fn is_valid_for(&self, preset: GraphPreset) -> PyResult<()> {
+        match preset {
+            GraphPreset::Snort => self.snort().map(drop),
+            GraphPreset::Col => self.col().map(drop),
+            GraphPreset::DigraphPlacement => self.digraph_placement().map(drop),
+            GraphPreset::BipartiteSnort => self.bipartite_snort().map(drop),
+        }
     }
 }
 
@@ -168,7 +181,7 @@ impl PyGraph {
             })
             .collect::<Vec<_>>();
 
-        let mut graph = WidgetGraph::empty(&vertices);
+        let mut graph = DirectedGraph::empty(&vertices);
         for (u, v) in edges {
             if u as usize >= vertices.len() || v as usize >= vertices.len() {
                 return Err(PyValueError::new_err(format!("Invalid edge: ({u}, {v})")));
@@ -328,7 +341,7 @@ impl PyGraph {
 
 struct GraphWidget {
     preset: GraphPreset,
-    graph: WidgetGraph,
+    graph: DirectedGraph<Vertex>,
     sequence: Sequence,
 }
 
@@ -381,35 +394,74 @@ impl RustWidget for GraphWidget {
     }
 
     fn value<'py>(&mut self) -> impl pyo3::IntoPyObject<'py> {
-        PyGraph::from_preset(self.preset, self.graph.clone())
+        PyGraph::from_preset_unchecked(self.preset, self.graph.clone())
     }
 }
 
-fn make_graph_widget(py: Python<'_>, preset: GraphPreset) -> PyResult<Bound<'_, PyAny>> {
+fn graph_from_position(preset: GraphPreset, position: &Bound<'_, PyAny>) -> PyResult<PyGraph> {
+    if let Ok(graph) = position.cast::<PyGraph>() {
+        return PyGraph::from_preset(preset, graph.borrow().graph.clone());
+    }
+
+    let graph = match preset {
+        GraphPreset::Snort => position.cast::<PySnort>()?.borrow().graph(),
+        GraphPreset::Col => position.cast::<PyCol>()?.borrow().graph(),
+        GraphPreset::DigraphPlacement => position.cast::<PyDigraphPlacement>()?.borrow().graph(),
+        GraphPreset::BipartiteSnort => position.cast::<PyBipartiteSnort>()?.borrow().graph(),
+    };
+
+    Ok(graph)
+}
+
+fn make_graph_widget<'py>(
+    py: Python<'py>,
+    preset: GraphPreset,
+    position: Option<&Bound<'_, PyAny>>,
+) -> PyResult<Bound<'py, PyAny>> {
+    let graph = match position {
+        None => DirectedGraph::empty(&[]),
+        Some(position) => graph_from_position(preset, position)?.graph,
+    };
     GraphWidget {
         preset,
-        graph: WidgetGraph::empty(&[]),
+        graph,
         sequence: Sequence::INITIAL,
     }
     .into_widget(py, "cgt_py")
 }
 
 #[pyfunction(name = "SnortWidget")]
-pub fn make_snort_widget(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
-    make_graph_widget(py, GraphPreset::Snort)
+#[pyo3(signature = (position = None))]
+pub fn make_snort_widget<'py>(
+    py: Python<'py>,
+    position: Option<&Bound<'_, PyAny>>,
+) -> PyResult<Bound<'py, PyAny>> {
+    make_graph_widget(py, GraphPreset::Snort, position)
 }
 
 #[pyfunction(name = "ColWidget")]
-pub fn make_col_widget(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
-    make_graph_widget(py, GraphPreset::Col)
+#[pyo3(signature = (position = None))]
+pub fn make_col_widget<'py>(
+    py: Python<'py>,
+    position: Option<&Bound<'_, PyAny>>,
+) -> PyResult<Bound<'py, PyAny>> {
+    make_graph_widget(py, GraphPreset::Col, position)
 }
 
 #[pyfunction(name = "DigraphPlacementWidget")]
-pub fn make_digraph_placement_widget(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
-    make_graph_widget(py, GraphPreset::DigraphPlacement)
+#[pyo3(signature = (position = None))]
+pub fn make_digraph_placement_widget<'py>(
+    py: Python<'py>,
+    position: Option<&Bound<'_, PyAny>>,
+) -> PyResult<Bound<'py, PyAny>> {
+    make_graph_widget(py, GraphPreset::DigraphPlacement, position)
 }
 
 #[pyfunction(name = "BipartiteSnortWidget")]
-pub fn make_bipartite_snort_widget(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
-    make_graph_widget(py, GraphPreset::BipartiteSnort)
+#[pyo3(signature = (position = None))]
+pub fn make_bipartite_snort_widget<'py>(
+    py: Python<'py>,
+    position: Option<&Bound<'_, PyAny>>,
+) -> PyResult<Bound<'py, PyAny>> {
+    make_graph_widget(py, GraphPreset::BipartiteSnort, position)
 }

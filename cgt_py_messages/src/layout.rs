@@ -8,6 +8,8 @@ use cgt::{
     numeric::v2f::V2f,
 };
 
+pub const DEFAULT_CANVAS_SIZE: V2f = V2f { x: 640.0, y: 400.0 };
+
 pub const MAX_SPRING_WORK: usize = 1 << 22;
 
 pub const SPRING_ITERATIONS: std::ops::RangeInclusive<usize> = 256..=4096;

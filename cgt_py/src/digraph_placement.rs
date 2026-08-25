@@ -61,12 +61,13 @@ impl PyDigraphPlacement {
     }
 
     #[getter]
-    fn graph(&self) -> PyGraph {
-        let graph = self.0.graph.map(|&color| cgt_py_messages::Vertex {
+    pub fn graph(&self) -> PyGraph {
+        let mut graph = self.0.graph.map(|&color| cgt_py_messages::Vertex {
             color: cgt_py_messages::VertexColor::from(color),
             position: V2f::ZERO,
         });
-        PyGraph::from_preset(GraphPreset::DigraphPlacement, graph)
+        crate::graph::layout_for_svg(&mut graph);
+        PyGraph::from_preset_unchecked(GraphPreset::DigraphPlacement, graph)
     }
 
     fn __repr__(&self) -> String {

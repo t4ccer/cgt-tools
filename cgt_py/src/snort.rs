@@ -64,12 +64,13 @@ impl PySnort {
     }
 
     #[getter]
-    fn graph(&self) -> PyGraph {
-        let graph = self.0.graph.as_directed().map(|v| cgt_py_messages::Vertex {
+    pub fn graph(&self) -> PyGraph {
+        let mut graph = self.0.graph.as_directed().map(|v| cgt_py_messages::Vertex {
             color: cgt_py_messages::VertexColor::from(v.color()),
             position: V2f::ZERO,
         });
-        PyGraph::from_preset(GraphPreset::Snort, graph)
+        crate::graph::layout_for_svg(&mut graph);
+        PyGraph::from_preset_unchecked(GraphPreset::Snort, graph)
     }
 
     fn __repr__(&self) -> String {

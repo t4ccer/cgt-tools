@@ -77,8 +77,8 @@ impl PyBipartiteSnort {
     }
 
     #[getter]
-    fn graph(&self) -> PyGraph {
-        let graph = self
+    pub fn graph(&self) -> PyGraph {
+        let mut graph = self
             .0
             .graph
             .as_directed()
@@ -86,7 +86,8 @@ impl PyBipartiteSnort {
                 color: cgt_py_messages::VertexColor::from(color),
                 position: V2f::ZERO,
             });
-        PyGraph::from_preset(GraphPreset::BipartiteSnort, graph)
+        crate::graph::layout_for_svg(&mut graph);
+        PyGraph::from_preset_unchecked(GraphPreset::BipartiteSnort, graph)
     }
 
     fn __repr__(&self) -> String {

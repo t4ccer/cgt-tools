@@ -26,8 +26,9 @@ use cgt::{
 };
 use cgt_py_messages::{
     GraphBackendMessage, GraphFrontendMessage, GraphPreset, GraphPresetFlag, Vertex, VertexColor,
-    WidgetGraph,
-    layout::{default_bounds, default_circle, default_spring, max_spring_iterations},
+    layout::{
+        DEFAULT_CANVAS_SIZE, default_bounds, default_circle, default_spring, max_spring_iterations,
+    },
 };
 use futures_signals::{
     map_ref,
@@ -211,7 +212,6 @@ const LAYOUT_OPTIONS: &[LayoutOption] = &[
     },
 ];
 
-const DEFAULT_CANVAS_SIZE: V2f = V2f { x: 640.0, y: 400.0 };
 const MIN_CANVAS_SIZE: V2f = V2f { x: 240.0, y: 160.0 };
 
 #[derive(Clone)]
@@ -251,7 +251,7 @@ struct GraphWidget {
     layout: LayoutInputs,
     /// Size of the canvas, which the user is free to resize
     canvas_size: Mutable<V2f>,
-    graph: Mutable<SyncState<WidgetGraph>>,
+    graph: Mutable<SyncState<DirectedGraph<Vertex>>>,
     interactions: Mutable<Interactions>,
 }
 
@@ -276,7 +276,7 @@ fn clamp_to_canvas(position: V2f, canvas_size: V2f) -> V2f {
     }
 }
 
-fn vertex_position(graph: &WidgetGraph, vertex: VertexIndex) -> V2f {
+fn vertex_position(graph: &DirectedGraph<Vertex>, vertex: VertexIndex) -> V2f {
     *graph.get_vertex(vertex).get_inner()
 }
 
@@ -362,7 +362,7 @@ impl GraphWidget {
     /// Paint the graph and report what the mouse did to it
     fn draw(
         canvas: &HtmlCanvasElement,
-        graph: &WidgetGraph,
+        graph: &DirectedGraph<Vertex>,
         canvas_size: V2f,
         interactions: &mut Interactions,
         edit_mode: EditMode,
@@ -413,7 +413,7 @@ impl GraphWidget {
     /// their centers, the same way that the edges of the graph itself do
     fn draw_new_edge(
         canvas: &mut HtmlCanvas<'_>,
-        graph: &WidgetGraph,
+        graph: &DirectedGraph<Vertex>,
         preset: GraphPreset,
         hits: &Hits<VertexIndex>,
     ) {
@@ -456,7 +456,7 @@ impl GraphWidget {
     }
 
     fn add_vertex_at(
-        graph: &mut WidgetGraph,
+        graph: &mut DirectedGraph<Vertex>,
         canvas_size: V2f,
         position: V2f,
         color: VertexColor,
@@ -468,7 +468,7 @@ impl GraphWidget {
     }
 
     fn move_dragged_vertex(
-        graph: &Mutable<SyncState<WidgetGraph>>,
+        graph: &Mutable<SyncState<DirectedGraph<Vertex>>>,
         canvas_size: V2f,
         edit_mode: EditMode,
         frame: &Frame,
@@ -505,7 +505,7 @@ impl GraphWidget {
     }
 
     fn apply(
-        graph: &Mutable<SyncState<WidgetGraph>>,
+        graph: &Mutable<SyncState<DirectedGraph<Vertex>>>,
         canvas_size: V2f,
         edit: &EditModeInputs,
         preset: GraphPreset,
@@ -566,7 +566,7 @@ impl GraphWidget {
 
     /// Whether an edge is allowed to join two vertices
     fn may_connect(
-        graph: &WidgetGraph,
+        graph: &DirectedGraph<Vertex>,
         preset: GraphPreset,
         from: VertexIndex,
         to: VertexIndex,
@@ -581,7 +581,7 @@ impl GraphWidget {
     }
 
     fn dropped_vertex_color(
-        graph: &WidgetGraph,
+        graph: &DirectedGraph<Vertex>,
         preset: GraphPreset,
         from: VertexIndex,
         edge_vertex: Option<VertexColor>,
@@ -600,7 +600,7 @@ impl GraphWidget {
     }
 
     fn may_recolor(
-        graph: &WidgetGraph,
+        graph: &DirectedGraph<Vertex>,
         preset: GraphPreset,
         vertex: VertexIndex,
         new_color: VertexColor,
@@ -619,7 +619,7 @@ impl GraphWidget {
     /// as a pair of opposite arcs, so for them the edge is dragged out in both directions
     /// at once
     fn connect(
-        graph: &mut WidgetGraph,
+        graph: &mut DirectedGraph<Vertex>,
         preset: GraphPreset,
         from: VertexIndex,
         to: VertexIndex,
@@ -634,7 +634,7 @@ impl GraphWidget {
     /// Repaint a vertex, which is nothing worth reporting if it already had that color and
     /// nothing the preset allows if the new color is one a neighbour is already in
     fn recolor_vertex(
-        graph: &Mutable<SyncState<WidgetGraph>>,
+        graph: &Mutable<SyncState<DirectedGraph<Vertex>>>,
         preset: GraphPreset,
         vertex: VertexIndex,
         new_color: VertexColor,
@@ -652,7 +652,7 @@ impl GraphWidget {
     }
 
     fn drop_edge(
-        graph: &Mutable<SyncState<WidgetGraph>>,
+        graph: &Mutable<SyncState<DirectedGraph<Vertex>>>,
         canvas_size: V2f,
         preset: GraphPreset,
         frame: &Frame,
@@ -711,7 +711,7 @@ impl GraphWidget {
     /// touched by hand are recomputed first, since the graph they were last filled in for
     /// is not the graph being laid out now
     fn apply_layout(
-        graph: &Mutable<SyncState<WidgetGraph>>,
+        graph: &Mutable<SyncState<DirectedGraph<Vertex>>>,
         canvas_size: V2f,
         inputs: &LayoutInputs,
     ) {
@@ -744,7 +744,7 @@ impl GraphWidget {
     }
 
     fn snort_move(
-        graph: &Mutable<SyncState<WidgetGraph>>,
+        graph: &Mutable<SyncState<DirectedGraph<Vertex>>>,
         edit: &EditModeInputs,
         preset: GraphPreset,
         frame: &Frame,
@@ -789,7 +789,7 @@ impl GraphWidget {
     }
 
     fn col_move(
-        graph: &Mutable<SyncState<WidgetGraph>>,
+        graph: &Mutable<SyncState<DirectedGraph<Vertex>>>,
         edit: &EditModeInputs,
         preset: GraphPreset,
         frame: &Frame,
@@ -833,7 +833,7 @@ impl GraphWidget {
     }
 
     fn bipartite_snort_move(
-        graph: &Mutable<SyncState<WidgetGraph>>,
+        graph: &Mutable<SyncState<DirectedGraph<Vertex>>>,
         edit: &EditModeInputs,
         preset: GraphPreset,
         frame: &Frame,
@@ -877,7 +877,7 @@ impl GraphWidget {
     }
 
     fn digraph_placement_move(
-        graph: &Mutable<SyncState<WidgetGraph>>,
+        graph: &Mutable<SyncState<DirectedGraph<Vertex>>>,
         edit: &EditModeInputs,
         preset: GraphPreset,
         frame: &Frame,
@@ -926,7 +926,7 @@ impl GraphWidget {
 
     fn update(
         canvas: &HtmlCanvasElement,
-        graph: &Mutable<SyncState<WidgetGraph>>,
+        graph: &Mutable<SyncState<DirectedGraph<Vertex>>>,
         canvas_size: &Mutable<V2f>,
         interactions: &Mutable<Interactions>,
         edit: &EditModeInputs,
@@ -1066,7 +1066,7 @@ fn layout_controls(
     document: &Document,
     preset: GraphPreset,
     inputs: &LayoutInputs,
-    graph: &Mutable<SyncState<WidgetGraph>>,
+    graph: &Mutable<SyncState<DirectedGraph<Vertex>>>,
     canvas_size: &Mutable<V2f>,
 ) -> Result<HtmlElement, JsValue> {
     let root = document.create_element("div")?.dyn_into::<HtmlElement>()?;

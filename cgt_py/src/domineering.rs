@@ -1,7 +1,11 @@
-use crate::py_partizan_game;
-use cgt::short::partizan::{
-    games::domineering::Domineering, transposition_table::ParallelTranspositionTable,
+use crate::{grid::PyGrid, py_partizan_game};
+use cgt::{
+    grid::FiniteGrid as _,
+    short::partizan::{
+        games::domineering::Domineering, transposition_table::ParallelTranspositionTable,
+    },
 };
+use cgt_py_messages::{GridPreset, Tile};
 use pyo3::{PyErr, PyResult, pyclass, pymethods};
 use std::{str::FromStr, sync::LazyLock};
 
@@ -9,7 +13,7 @@ static TRANSPOSITION_TABLE: LazyLock<ParallelTranspositionTable<Domineering>> =
     LazyLock::new(ParallelTranspositionTable::new);
 
 #[pyclass(name = "Domineering")]
-pub struct PyDomineering(Domineering);
+pub struct PyDomineering(pub Domineering);
 
 #[pymethods]
 impl PyDomineering {
@@ -34,6 +38,14 @@ impl PyDomineering {
         let mut canvas = svg::Canvas::new(bounding_box);
         self.0.draw(&mut canvas);
         canvas.to_svg()
+    }
+
+    #[getter]
+    pub fn grid(&self) -> PyGrid {
+        PyGrid::from_preset_unchecked(
+            GridPreset::Domineering,
+            self.0.grid().map(|tile| Tile::from(tile)).unwrap(),
+        )
     }
 }
 

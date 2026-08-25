@@ -1,10 +1,11 @@
 //! Finite grids
 
-use std::{collections::VecDeque, fmt::Write};
+use std::{collections::VecDeque, convert::Infallible, fmt::Write};
 
 use crate::{
     drawing::{self, BoundingBox, Canvas, Hits},
     numeric::v2f::V2f,
+    result::UnwrapInfallible,
 };
 
 pub mod small_bit_grid;
@@ -30,6 +31,8 @@ pub trait FiniteGrid: Grid + Sized {
     /// Height of the grid.
     fn height(&self) -> u8;
 
+    // TODO: Make these all Option an associated type error
+
     /// Create new gird filled with the same tile
     fn filled(width: u8, height: u8, value: Self::Item) -> Option<Self>;
 
@@ -51,6 +54,43 @@ pub trait FiniteGrid: Grid + Sized {
             }
         }
         Ok(())
+    }
+
+    /// Map each tile, potentially changing the grid type
+    fn try_map<R, E, G>(
+        &self,
+        mut f: impl FnMut(Self::Item) -> Result<R, E>,
+    ) -> Result<Option<G>, E>
+    where
+        G: FiniteGrid<Item = R>,
+    {
+        if self.width() == 0 || self.height() == 0 {
+            return Ok(Some(G::zero_size()));
+        }
+
+        let initial = f(self.get(0, 0))?;
+        let mut g = match G::filled(self.width(), self.height(), initial) {
+            Some(g) => g,
+            None => return Ok(None),
+        };
+
+        for y in 0..self.height() {
+            for x in 0..self.width() {
+                let tile = f(self.get(x, y))?;
+                g.set(x, y, tile);
+            }
+        }
+
+        Ok(Some(g))
+    }
+
+    /// Map each tile, potentially changing the grid type
+    fn map<R, G>(&self, mut f: impl FnMut(Self::Item) -> R) -> Option<G>
+    where
+        G: FiniteGrid<Item = R>,
+    {
+        self.try_map(|tile| Ok::<R, Infallible>(f(tile)))
+            .unwrap_infallible()
     }
 
     /// Parse grid from string following notation from [`Self::display`]

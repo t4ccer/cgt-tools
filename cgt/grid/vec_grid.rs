@@ -13,6 +13,8 @@ pub struct VecGrid<T> {
 }
 
 impl<T> VecGrid<T> {
+    // TODO: Unify these with the FiniteGrid methods
+
     /// Transform grid tiles
     pub fn map<U>(&self, mut f: impl FnMut(&T) -> U) -> VecGrid<U> {
         match self.try_map::<U, Infallible>(|t| Ok(f(t))) {
