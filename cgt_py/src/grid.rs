@@ -14,10 +14,12 @@ use pyo3::{
     Bound, IntoPyObjectExt, Py, PyAny, PyResult, Python, exceptions::PyValueError, pyclass,
     pyfunction, pymethods,
 };
+use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pyfunction, gen_stub_pymethods};
 
 use crate::{amazons::PyAmazons, domineering::PyDomineering, fission::PyFission, konane::PyKonane};
 
-#[pyclass]
+#[gen_stub_pyclass]
+#[pyclass(name = "Grid")]
 pub struct PyGrid {
     // If `Some` then grid grid has tiles that can be represented in this game
     pub known_preset: Option<GridPreset>,
@@ -59,6 +61,7 @@ impl PyGrid {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyGrid {
     #[getter]
@@ -221,6 +224,7 @@ fn make_grid_widget<'py>(
     .into_widget(py, "cgt_py")
 }
 
+#[gen_stub_pyfunction]
 #[pyfunction(name = "DomineeringWidget")]
 #[pyo3(signature = (position = None))]
 pub fn make_domineering_widget<'py>(
@@ -230,6 +234,7 @@ pub fn make_domineering_widget<'py>(
     make_grid_widget(py, GridPreset::Domineering, position)
 }
 
+#[gen_stub_pyfunction]
 #[pyfunction(name = "FissionWidget")]
 #[pyo3(signature = (position = None))]
 pub fn make_fission_widget<'py>(
@@ -239,6 +244,7 @@ pub fn make_fission_widget<'py>(
     make_grid_widget(py, GridPreset::Fission, position)
 }
 
+#[gen_stub_pyfunction]
 #[pyfunction(name = "AmazonsWidget")]
 #[pyo3(signature = (position = None))]
 pub fn make_amazons_widget<'py>(
@@ -248,6 +254,7 @@ pub fn make_amazons_widget<'py>(
     make_grid_widget(py, GridPreset::Amazons, position)
 }
 
+#[gen_stub_pyfunction]
 #[pyfunction(name = "KonaneWidget")]
 #[pyo3(signature = (position = None))]
 pub fn make_konane_widget<'py>(

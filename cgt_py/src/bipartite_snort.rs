@@ -9,12 +9,14 @@ use cgt::{
 };
 use cgt_py_messages::GraphPreset;
 use pyo3::{PyErr, PyResult, pyclass, pymethods};
+use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 use std::sync::LazyLock;
 
 static TRANSPOSITION_TABLE: LazyLock<
     ParallelTranspositionTable<BipartiteSnort<VertexColor, UndirectedGraph<VertexColor>>>,
 > = LazyLock::new(ParallelTranspositionTable::new);
 
+#[gen_stub_pyclass]
 #[pyclass(name = "BipartiteSnort")]
 pub struct PyBipartiteSnort(pub BipartiteSnort<VertexColor, UndirectedGraph<VertexColor>>);
 
@@ -28,6 +30,7 @@ impl PyBipartiteSnort {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyBipartiteSnort {
     #[new]

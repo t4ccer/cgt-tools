@@ -12,6 +12,7 @@ use cgt_py_messages::GraphPreset;
 use pyo3::{
     Bound, PyAny, PyResult, exceptions::PyTypeError, pyclass, pymethods, types::PyAnyMethods,
 };
+use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 use std::sync::LazyLock;
 
 #[derive(Debug, Clone, Copy)]
@@ -27,9 +28,11 @@ static TRANSPOSITION_TABLE: LazyLock<
     ParallelTranspositionTable<Col<VertexColor, UndirectedGraph<VertexColor>>>,
 > = LazyLock::new(ParallelTranspositionTable::new);
 
+#[gen_stub_pyclass]
 #[pyclass(name = "Col")]
 pub struct PyCol(pub Col<VertexColor, UndirectedGraph<VertexColor>>);
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyCol {
     #[new]

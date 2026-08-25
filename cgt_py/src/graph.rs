@@ -22,6 +22,7 @@ use pyo3::{
     Bound, IntoPyObjectExt, Py, PyAny, PyResult, Python, exceptions::PyValueError, pyclass,
     pyfunction, pymethods,
 };
+use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pyfunction, gen_stub_pymethods};
 
 use crate::{
     bipartite_snort::PyBipartiteSnort, col::PyCol, digraph_placement::PyDigraphPlacement,
@@ -29,6 +30,7 @@ use crate::{
 };
 
 #[derive(Debug)]
+#[gen_stub_pyclass]
 #[pyclass(name = "VertexColors")]
 pub struct PyVertexColors {
     #[pyo3(get)]
@@ -55,6 +57,7 @@ impl PyVertexColors {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyVertexColors {
     fn __repr__(&self) -> String {
@@ -65,6 +68,7 @@ impl PyVertexColors {
     }
 }
 
+#[gen_stub_pyclass]
 #[pyclass(name = "Graph")]
 pub struct PyGraph {
     pub known_preset: Option<GraphPreset>,
@@ -142,6 +146,7 @@ impl PyGraph {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyGraph {
     #[new]
@@ -430,6 +435,7 @@ fn make_graph_widget<'py>(
     .into_widget(py, "cgt_py")
 }
 
+#[gen_stub_pyfunction]
 #[pyfunction(name = "SnortWidget")]
 #[pyo3(signature = (position = None))]
 pub fn make_snort_widget<'py>(
@@ -439,6 +445,7 @@ pub fn make_snort_widget<'py>(
     make_graph_widget(py, GraphPreset::Snort, position)
 }
 
+#[gen_stub_pyfunction]
 #[pyfunction(name = "ColWidget")]
 #[pyo3(signature = (position = None))]
 pub fn make_col_widget<'py>(
@@ -448,6 +455,7 @@ pub fn make_col_widget<'py>(
     make_graph_widget(py, GraphPreset::Col, position)
 }
 
+#[gen_stub_pyfunction]
 #[pyfunction(name = "DigraphPlacementWidget")]
 #[pyo3(signature = (position = None))]
 pub fn make_digraph_placement_widget<'py>(
@@ -457,6 +465,7 @@ pub fn make_digraph_placement_widget<'py>(
     make_graph_widget(py, GraphPreset::DigraphPlacement, position)
 }
 
+#[gen_stub_pyfunction]
 #[pyfunction(name = "BipartiteSnortWidget")]
 #[pyo3(signature = (position = None))]
 pub fn make_bipartite_snort_widget<'py>(

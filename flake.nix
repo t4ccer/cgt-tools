@@ -198,7 +198,15 @@
           hardeningDisable = ["fortify"];
 
           nativeBuildInputs = [
-            (pythonToolchain.withPackages (ps: with ps; [pip jupyter anywidget]))
+            (pythonToolchain.withPackages (ps:
+              with ps; [
+                pip
+                jupyter
+                anywidget
+                sphinx
+                myst-parser
+                furo
+              ]))
             pkgs.maturin
 
             pkgs.cargo-expand

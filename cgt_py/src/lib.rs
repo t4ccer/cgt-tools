@@ -19,6 +19,7 @@ pub mod thermograph;
 
 macro_rules! py_partizan_game {
     ($pystruct:ident) => {
+        #[gen_stub_pymethods]
         #[pymethods]
         impl $pystruct {
             #[getter]
@@ -94,6 +95,7 @@ fn cgt_py(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<crate::dyadic_rational_number::PyDyadicRationalNumber>()?;
     m.add_class::<crate::fission::PyFission>()?;
     m.add_class::<crate::graph::PyGraph>()?;
+    m.add_class::<crate::grid::PyGrid>()?;
     m.add_class::<crate::graph::PyVertexColors>()?;
     m.add_class::<crate::konane::PyKonane>()?;
     m.add_class::<crate::snort::PySnort>()?;
@@ -101,3 +103,5 @@ fn cgt_py(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     Ok(())
 }
+
+pyo3_stub_gen::define_stub_info_gatherer!(stub_info);

@@ -15,3 +15,9 @@ classifiers = [
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
+module-name = "cgt_py"
+
+[tool.pyo3-stub-gen.doc-gen]
+output-dir = "docs/api"
+# `docs/index.rst` is the hand-written root of the Sphinx tree instead
+generate-index = false

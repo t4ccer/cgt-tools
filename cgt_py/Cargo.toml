@@ -13,10 +13,15 @@ categories = ["mathematics", "science"]
 
 [lib]
 name = "cgt_py"
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "cgt_py_stub_gen"
+path = "src/bin/stub_gen.rs"
 
 [dependencies]
 pyo3 = { workspace = true }
+pyo3-stub-gen = { workspace = true }
 cgt = { path = "../.", features = ["serde"] }
 cgt_py_messages = { path = "../cgt_py_messages" }
 jupyter_rust_widget_backend = { path = "../jupyter_rust_widget_backend" }

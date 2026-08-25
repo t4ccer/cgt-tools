@@ -8,14 +8,17 @@ use cgt::{
 };
 use cgt_py_messages::{GridPreset, Tile};
 use pyo3::{PyErr, PyResult, pyclass, pymethods};
+use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 use std::{str::FromStr, sync::LazyLock};
 
 static TRANSPOSITION_TABLE: LazyLock<ParallelTranspositionTable<Domineering>> =
     LazyLock::new(ParallelTranspositionTable::new);
 
+#[gen_stub_pyclass]
 #[pyclass(name = "Domineering")]
 pub struct PyDomineering(pub Domineering);
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyDomineering {
     #[new]

@@ -1,14 +1,17 @@
 use cgt::numeric::dyadic_rational_number::DyadicRationalNumber;
 use pyo3::{prelude::*, pyclass::CompareOp};
+use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 use std::{
     ops::{Add, Neg, Sub},
     str::FromStr,
 };
 
+#[gen_stub_pyclass]
 #[pyclass(from_py_object, name = "DyadicRationalNumber")]
 #[derive(Clone)]
 pub struct PyDyadicRationalNumber(pub DyadicRationalNumber);
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyDyadicRationalNumber {
     #[new]
