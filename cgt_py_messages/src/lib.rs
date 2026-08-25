@@ -7,7 +7,7 @@ use cgt::{
     impl_has,
     numeric::v2f::V2f,
     short::partizan::games::{
-        amazons, col, digraph_placement, domineering, fission, konane, snort,
+        amazons, bipartite_snort, col, digraph_placement, domineering, fission, konane, snort,
     },
 };
 
@@ -348,6 +348,13 @@ impl_vertex_map! {
 }
 
 impl_vertex_map! {
+    match bipartite_snort::VertexColor {
+        TintLeft => Blue,
+        TintRight => Red,
+    }
+}
+
+impl_vertex_map! {
     match digraph_placement::VertexColor {
         Left => Blue,
         Right => Red,
@@ -417,7 +424,7 @@ preset! {
         Snort = 1,
         Col = 2,
         DigraphPlacement = 3,
-        // TODO: BipartiteSnort
+        BipartiteSnort = 4,
     }
 }
 
@@ -426,8 +433,15 @@ impl GraphPreset {
     /// graphs are stored as a pair of opposite arcs, so connecting two vertices adds both
     pub const fn directed_edges(self) -> bool {
         match self {
-            GraphPreset::Snort | GraphPreset::Col => false,
+            GraphPreset::Snort | GraphPreset::Col | GraphPreset::BipartiteSnort => false,
             GraphPreset::DigraphPlacement => true,
+        }
+    }
+
+    pub const fn bipartite(self) -> bool {
+        match self {
+            GraphPreset::Snort | GraphPreset::Col | GraphPreset::DigraphPlacement => false,
+            GraphPreset::BipartiteSnort => true,
         }
     }
 }

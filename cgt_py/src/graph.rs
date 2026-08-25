@@ -7,6 +7,7 @@ use cgt::{
     has::Has,
     numeric::v2f::V2f,
     short::partizan::games::{
+        bipartite_snort::{self, BipartiteSnort},
         col::{self, Col},
         digraph_placement::{self, DigraphPlacement},
         snort::{self, Snort},
@@ -22,7 +23,10 @@ use pyo3::{
     pyfunction, pymethods,
 };
 
-use crate::{col::PyCol, digraph_placement::PyDigraphPlacement, snort::PySnort};
+use crate::{
+    bipartite_snort::PyBipartiteSnort, col::PyCol, digraph_placement::PyDigraphPlacement,
+    snort::PySnort,
+};
 
 #[derive(Debug)]
 #[pyclass(name = "VertexColors")]
@@ -250,6 +254,7 @@ impl PyGraph {
                 GraphPreset::Snort => self.snort()?.into_py_any(py),
                 GraphPreset::Col => self.col()?.into_py_any(py),
                 GraphPreset::DigraphPlacement => self.digraph_placement()?.into_py_any(py),
+                GraphPreset::BipartiteSnort => self.bipartite_snort()?.into_py_any(py),
             },
             None => Err(PyValueError::new_err(
                 "This graph is not associated with any game",
@@ -270,6 +275,47 @@ impl PyGraph {
         Ok(PyCol(Col::new(
             self.try_into_undirected_graph::<col::VertexColor>()?,
         )))
+    }
+
+    #[getter]
+    pub fn bipartite_snort(&self) -> PyResult<PyBipartiteSnort> {
+        let colored = self.try_into_undirected_graph::<bipartite_snort::VertexColor>()?;
+
+        let mut order = Vec::with_capacity(colored.size());
+        for partition in [
+            bipartite_snort::VertexColor::TintLeft,
+            bipartite_snort::VertexColor::TintRight,
+        ] {
+            order.extend(
+                colored
+                    .vertex_indices()
+                    .filter(|&v| *colored.get_vertex(v) == partition),
+            );
+        }
+
+        let vertices = order
+            .iter()
+            .map(|&v| *colored.get_vertex(v))
+            .collect::<Vec<_>>();
+        let mut graph = UndirectedGraph::empty(&vertices);
+        for (u, &old_u) in order.iter().enumerate() {
+            for (v, &old_v) in order.iter().enumerate().skip(u + 1) {
+                if !colored.are_adjacent(old_u, old_v) {
+                    continue;
+                }
+
+                if vertices[u] == vertices[v] {
+                    return Err(PyValueError::new_err(format!(
+                        "Graph is not bipartite: vertices {} and {} have the same color",
+                        old_u.index, old_v.index,
+                    )));
+                }
+
+                graph.connect(VertexIndex { index: u }, VertexIndex { index: v }, true);
+            }
+        }
+
+        Ok(PyBipartiteSnort(BipartiteSnort::new(graph)))
     }
 
     #[getter]
@@ -361,4 +407,9 @@ pub fn make_col_widget(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
 #[pyfunction(name = "DigraphPlacementWidget")]
 pub fn make_digraph_placement_widget(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
     make_graph_widget(py, GraphPreset::DigraphPlacement)
+}
+
+#[pyfunction(name = "BipartiteSnortWidget")]
+pub fn make_bipartite_snort_widget(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
+    make_graph_widget(py, GraphPreset::BipartiteSnort)
 }

@@ -1,20 +1,22 @@
-use crate::py_partizan_game;
+use crate::{graph::PyGraph, py_partizan_game};
 use cgt::{
     graph::{Graph, VertexIndex, adjacency_matrix::undirected::UndirectedGraph},
+    numeric::v2f::V2f,
     short::partizan::{
         games::bipartite_snort::{BipartiteSnort, VertexColor},
         transposition_table::ParallelTranspositionTable,
     },
 };
+use cgt_py_messages::GraphPreset;
 use pyo3::{PyErr, PyResult, pyclass, pymethods};
 use std::sync::LazyLock;
 
 static TRANSPOSITION_TABLE: LazyLock<
-    ParallelTranspositionTable<BipartiteSnort<UndirectedGraph<VertexColor>>>,
+    ParallelTranspositionTable<BipartiteSnort<VertexColor, UndirectedGraph<VertexColor>>>,
 > = LazyLock::new(ParallelTranspositionTable::new);
 
 #[pyclass(name = "BipartiteSnort")]
-pub struct PyBipartiteSnort(pub BipartiteSnort<UndirectedGraph<VertexColor>>);
+pub struct PyBipartiteSnort(pub BipartiteSnort<VertexColor, UndirectedGraph<VertexColor>>);
 
 impl PyBipartiteSnort {
     fn edges_iter(&self) -> impl Iterator<Item = (u32, u32)> {
@@ -72,6 +74,19 @@ impl PyBipartiteSnort {
     #[getter]
     fn edges(&self) -> Vec<(u32, u32)> {
         self.edges_iter().collect::<Vec<_>>()
+    }
+
+    #[getter]
+    fn graph(&self) -> PyGraph {
+        let graph = self
+            .0
+            .graph
+            .as_directed()
+            .map(|&color| cgt_py_messages::Vertex {
+                color: cgt_py_messages::VertexColor::from(color),
+                position: V2f::ZERO,
+            });
+        PyGraph::from_preset(GraphPreset::BipartiteSnort, graph)
     }
 
     fn __repr__(&self) -> String {

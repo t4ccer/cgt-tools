@@ -17,6 +17,7 @@ use cgt::{
     short::partizan::{
         Player,
         games::{
+            bipartite_snort::{self, BipartiteSnort},
             col::{self, Col},
             digraph_placement::{self, DigraphPlacement},
             snort::{self, Snort},
@@ -100,6 +101,7 @@ const PLAYER_VERTEX: GraphPresetFlag = GraphPresetFlag::from_slice(&[
     GraphPresetFlag::Snort,
     GraphPresetFlag::Col,
     GraphPresetFlag::DigraphPlacement,
+    GraphPresetFlag::BipartiteSnort,
 ]);
 
 const GREEN_VERTEX: GraphPresetFlag = GraphPresetFlag::from_slice(&[]);
@@ -108,6 +110,7 @@ const PLAYABLE: GraphPresetFlag = GraphPresetFlag::from_slice(&[
     GraphPresetFlag::Snort,
     GraphPresetFlag::Col,
     GraphPresetFlag::DigraphPlacement,
+    GraphPresetFlag::BipartiteSnort,
 ]);
 
 const EDIT_OPTIONS: &[EditOption] = &[
@@ -314,6 +317,27 @@ fn col_move_in<const COLOR: u8>(
 }
 
 #[derive(Clone, Copy)]
+struct BipartiteSnortVertex {
+    color: bipartite_snort::VertexColor,
+    position: V2f,
+}
+
+impl_has!(BipartiteSnortVertex -> color -> bipartite_snort::VertexColor);
+
+type BipartiteSnortPosition =
+    BipartiteSnort<BipartiteSnortVertex, UndirectedGraph<BipartiteSnortVertex>>;
+
+fn bipartite_snort_move_in<const COLOR: u8>(
+    position: &BipartiteSnortPosition,
+    vertex: VertexIndex,
+) -> Option<BipartiteSnortPosition> {
+    position
+        .available_moves_for::<COLOR>()
+        .any(|legal| legal == vertex)
+        .then(|| position.move_in_vertex::<COLOR>(vertex))
+}
+
+#[derive(Clone, Copy)]
 struct DigraphPlacementVertex {
     color: digraph_placement::VertexColor,
     position: V2f,
@@ -413,12 +437,14 @@ impl GraphWidget {
             None => to_position,
         };
 
-        // Show whether dropping the edge here would add or remove it
-        let would_remove = target.is_some_and(|target| graph.are_adjacent(from, target));
-        let color = if would_remove {
-            Color::RED
-        } else {
-            Color::BLUE
+        // Show whether dropping the edge here would add it, remove it, or do nothing.
+        // Dropping on empty canvas always lands, so only an existing vertex can refuse
+        let color = match target {
+            Some(target) if graph.are_adjacent(from, target) => Color::RED,
+            Some(target) if !GraphWidget::may_connect(graph, preset, from, target) => {
+                Color::DARK_GRAY
+            }
+            Some(_) | None => Color::BLUE,
         };
 
         // Arrow head so that it is clear which way around the edge is about to go
@@ -501,7 +527,7 @@ impl GraphWidget {
 
             EditMode::AddColorVertex(new_color) => {
                 if let Some(vertex) = frame.vertices.clicked {
-                    GraphWidget::recolor_vertex(graph, vertex, new_color);
+                    GraphWidget::recolor_vertex(graph, preset, vertex, new_color);
                 }
             }
 
@@ -531,8 +557,62 @@ impl GraphWidget {
                 GraphPreset::DigraphPlacement => {
                     GraphWidget::digraph_placement_move(graph, edit, preset, frame, player)
                 }
+                GraphPreset::BipartiteSnort => {
+                    GraphWidget::bipartite_snort_move(graph, edit, preset, frame, player);
+                }
             },
         }
+    }
+
+    /// Whether an edge is allowed to join two vertices
+    fn may_connect(
+        graph: &WidgetGraph,
+        preset: GraphPreset,
+        from: VertexIndex,
+        to: VertexIndex,
+    ) -> bool {
+        if !preset.bipartite() {
+            return true;
+        }
+
+        let from: &VertexColor = graph.get_vertex(from).get_inner();
+        let to: &VertexColor = graph.get_vertex(to).get_inner();
+        from != to
+    }
+
+    fn dropped_vertex_color(
+        graph: &WidgetGraph,
+        preset: GraphPreset,
+        from: VertexIndex,
+        edge_vertex: Option<VertexColor>,
+    ) -> Option<VertexColor> {
+        let chosen = edge_vertex?;
+        if !preset.bipartite() {
+            return Some(chosen);
+        }
+
+        let from: &VertexColor = graph.get_vertex(from).get_inner();
+        match from {
+            VertexColor::Blue => Some(VertexColor::Red),
+            VertexColor::Red => Some(VertexColor::Blue),
+            VertexColor::White | VertexColor::Green => None,
+        }
+    }
+
+    fn may_recolor(
+        graph: &WidgetGraph,
+        preset: GraphPreset,
+        vertex: VertexIndex,
+        new_color: VertexColor,
+    ) -> bool {
+        if !preset.bipartite() {
+            return true;
+        }
+
+        graph.adjacent_to(vertex).all(|adjacent| {
+            let color: &VertexColor = graph.get_vertex(adjacent).get_inner();
+            adjacent == vertex || *color != new_color
+        })
     }
 
     /// Connect or disconnect two vertices. Games played on undirected graphs store an edge
@@ -551,13 +631,19 @@ impl GraphWidget {
         }
     }
 
-    /// Repaint a vertex, which is nothing worth reporting if it already had that color
+    /// Repaint a vertex, which is nothing worth reporting if it already had that color and
+    /// nothing the preset allows if the new color is one a neighbour is already in
     fn recolor_vertex(
         graph: &Mutable<SyncState<WidgetGraph>>,
+        preset: GraphPreset,
         vertex: VertexIndex,
         new_color: VertexColor,
     ) {
         let mut graph = graph.lock_mut();
+        if !GraphWidget::may_recolor(&graph.state, preset, vertex, new_color) {
+            return;
+        }
+
         let color: &VertexColor = graph.state.get_vertex(vertex).get_inner();
         if *color != new_color {
             let color: &mut VertexColor = graph.edit().get_vertex_mut(vertex).get_inner_mut();
@@ -577,7 +663,7 @@ impl GraphWidget {
         // create nothing paints nothing
         if let Some(vertex) = frame.vertices.clicked {
             if let Some(new_color) = edge_vertex {
-                GraphWidget::recolor_vertex(graph, vertex, new_color);
+                GraphWidget::recolor_vertex(graph, preset, vertex, new_color);
             }
 
             return;
@@ -591,14 +677,25 @@ impl GraphWidget {
             Some(target) if target == from => {}
             Some(target) => {
                 let mut state = graph.lock_mut();
+                let adjacent = state.state.are_adjacent(from, target);
+
+                if !adjacent && !GraphWidget::may_connect(&state.state, preset, from, target) {
+                    return;
+                }
+
                 let graph = state.edit();
-                let adjacent = graph.are_adjacent(from, target);
                 GraphWidget::connect(graph, preset, from, target, !adjacent);
             }
             // Dropped on empty canvas, so the edge only lands somewhere if the dropdown
             // is set to leave a vertex behind
             None => {
-                let Some(color) = edge_vertex else {
+                let color = GraphWidget::dropped_vertex_color(
+                    &graph.lock_ref().state,
+                    preset,
+                    from,
+                    edge_vertex,
+                );
+                let Some(color) = color else {
                     return;
                 };
 
@@ -719,6 +816,50 @@ impl GraphWidget {
             Player::Right => {
                 col_move_in::<{ col::VertexColor::TintRight as u8 }>(&position, clicked)
             }
+        };
+
+        let Some(new_position) = new_position else {
+            return;
+        };
+
+        set_edited(
+            graph,
+            new_position.graph.as_directed().map(|vertex| Vertex {
+                position: vertex.position,
+                color: VertexColor::from(vertex.color),
+            }),
+        );
+        edit.pass_turn(preset);
+    }
+
+    fn bipartite_snort_move(
+        graph: &Mutable<SyncState<WidgetGraph>>,
+        edit: &EditModeInputs,
+        preset: GraphPreset,
+        frame: &Frame,
+        player: Player,
+    ) {
+        let Some(clicked) = frame.vertices.clicked else {
+            return;
+        };
+
+        let Ok(snort_graph) = graph.lock_ref().state.try_map(|vertex| {
+            bipartite_snort::VertexColor::try_from(vertex.color).map(|color| BipartiteSnortVertex {
+                color,
+                position: vertex.position,
+            })
+        }) else {
+            return;
+        };
+
+        let position = BipartiteSnort::new(UndirectedGraph::from_directed(&snort_graph));
+        let new_position = match player {
+            Player::Left => bipartite_snort_move_in::<
+                { bipartite_snort::VertexColor::TintLeft as u8 },
+            >(&position, clicked),
+            Player::Right => bipartite_snort_move_in::<
+                { bipartite_snort::VertexColor::TintRight as u8 },
+            >(&position, clicked),
         };
 
         let Some(new_position) = new_position else {

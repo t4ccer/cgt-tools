@@ -83,6 +83,7 @@ fn cgt_py(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(graph::make_snort_widget, m)?)?;
     m.add_function(wrap_pyfunction!(graph::make_col_widget, m)?)?;
     m.add_function(wrap_pyfunction!(graph::make_digraph_placement_widget, m)?)?;
+    m.add_function(wrap_pyfunction!(graph::make_bipartite_snort_widget, m)?)?;
 
     m.add_class::<crate::amazons::PyAmazons>()?;
     m.add_class::<crate::bipartite_snort::PyBipartiteSnort>()?;

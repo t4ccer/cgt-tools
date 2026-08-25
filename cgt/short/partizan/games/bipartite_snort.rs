@@ -3,6 +3,7 @@
 use crate::{
     drawing::{BoundingBox, Canvas, Color, Draw},
     graph::{Graph, VertexIndex, bipartite::BipartiteGraph},
+    has::Has,
     numeric::v2f::V2f,
     short::partizan::{canonical_form::CanonicalForm, partizan_game::PartizanGame},
 };
@@ -38,35 +39,34 @@ impl VertexColor {
 /// Position of a [snort](self) game
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct BipartiteSnort<G> {
+pub struct BipartiteSnort<V, G> {
     /// Graph of the game
     pub graph: G,
+    _v: PhantomData<V>,
 }
 
-impl<G> BipartiteSnort<G>
+impl<V, G> BipartiteSnort<V, G>
 where
-    G: Graph<VertexColor>,
+    V: Has<VertexColor> + Clone,
+    G: Graph<V> + Clone,
 {
     /// Create new Snort position from graph
     pub const fn new(graph: G) -> Self {
-        Self { graph }
+        Self {
+            graph,
+            _v: PhantomData,
+        }
     }
-}
 
-impl<G> BipartiteSnort<G>
-where
-    G: Graph<VertexColor> + Clone,
-{
     /// Iterator over vertices where given player can move
     pub fn available_moves_for<const COLOR: u8>(&self) -> impl Iterator<Item = VertexIndex> + '_ {
         // const ADT generics are unstable, so here we go
         let own_tint_color: VertexColor = const { VertexColor::try_from_raw(COLOR).unwrap() };
         self.graph
             .vertex_indices()
-            .map(|v_idx| self.graph.get_vertex(v_idx))
-            .enumerate()
-            .filter(move |(_, vertex_color)| **vertex_color == own_tint_color)
-            .map(|(index, _)| VertexIndex { index })
+            .map(|v_idx| (v_idx, self.graph.get_vertex(v_idx)))
+            .filter(move |(_, vertex)| *(*vertex).get_inner() == own_tint_color)
+            .map(|(index, _)| index)
     }
 
     /// Return position after player move in a given vertex. Note that it does not check
@@ -87,7 +87,8 @@ where
 
             // No loops in snort graphs
             if adjacent_vertex_idx != move_vertex_idx {
-                let adjacent_vertex_color = position.graph.get_vertex_mut(adjacent_vertex_idx);
+                let adjacent_vertex = position.graph.get_vertex_mut(adjacent_vertex_idx);
+                let adjacent_vertex_color = adjacent_vertex.get_inner_mut();
 
                 // Tint adjacent vertex
                 if *adjacent_vertex_color == own_tint_color {
@@ -117,7 +118,7 @@ where
 
     /// BFS search to get the decompisitons, should be used only as a helper for [`Self::decompositions`]
     fn bfs(&self, visited_vertices: &mut [bool], initial_subgraph_vertex: VertexIndex) -> Self {
-        let mut vertices_to_take: Vec<VertexColor> = Vec::new();
+        let mut vertices_to_take: Vec<V> = Vec::new();
         let mut vertex_indices_to_take: Vec<VertexIndex> = Vec::new();
 
         let mut connected_visit_queue: VecDeque<VertexIndex> = VecDeque::new();
@@ -125,7 +126,7 @@ where
         visited_vertices[initial_subgraph_vertex.index] = true;
 
         while let Some(connected_vertex_idx) = connected_visit_queue.pop_front() {
-            vertices_to_take.push(*self.graph.get_vertex(connected_vertex_idx));
+            vertices_to_take.push(self.graph.get_vertex(connected_vertex_idx).clone());
             vertex_indices_to_take.push(connected_vertex_idx);
 
             for adjacent_to_connected_idx in self.graph.adjacent_to(connected_vertex_idx) {
@@ -149,7 +150,10 @@ where
             }
         }
 
-        Self { graph: new_graph }
+        Self {
+            graph: new_graph,
+            _v: PhantomData,
+        }
     }
 
     /// Render to a [graphviz](https://graphviz.org/) format, that can be later rendered to an
@@ -160,7 +164,7 @@ where
         write!(buf, "graph G {{").unwrap();
 
         for (vertex_relative_idx, vertex_idx) in self.graph.vertex_indices().enumerate() {
-            let vertex_color = self.graph.get_vertex(vertex_idx);
+            let vertex_color: &VertexColor = self.graph.get_vertex(vertex_idx).get_inner();
             let color = match vertex_color {
                 VertexColor::TintLeft => "blue",
                 VertexColor::TintRight => "red",
@@ -190,9 +194,18 @@ where
 const NODE_DISTANCE: f32 = 3.0;
 const PARTITION_DISTANCE: f32 = 7.0;
 
-impl<G> Draw for BipartiteSnort<G>
+fn vertex_color<V, G>(graph: &G, vertex: VertexIndex) -> VertexColor
 where
-    G: Graph<VertexColor> + Clone,
+    V: Has<VertexColor>,
+    G: Graph<V>,
+{
+    *graph.get_vertex(vertex).get_inner()
+}
+
+impl<V, G> Draw for BipartiteSnort<V, G>
+where
+    V: Has<VertexColor>,
+    G: Graph<V> + Clone,
 {
     fn draw<C>(&self, canvas: &mut C)
     where
@@ -206,7 +219,7 @@ where
         for (off, vertex_index) in self
             .graph
             .vertex_indices()
-            .filter(|idx| *self.graph.get_vertex(*idx) == VertexColor::TintLeft)
+            .filter(|idx| vertex_color(&self.graph, *idx) == VertexColor::TintLeft)
             .enumerate()
         {
             positions[vertex_index.index] = V2f {
@@ -219,7 +232,7 @@ where
         for (off, vertex_index) in self
             .graph
             .vertex_indices()
-            .filter(|idx| *self.graph.get_vertex(*idx) == VertexColor::TintRight)
+            .filter(|idx| vertex_color(&self.graph, *idx) == VertexColor::TintRight)
             .enumerate()
         {
             positions[vertex_index.index] = V2f {
@@ -242,7 +255,7 @@ where
 
         for vertex_idx in self.graph.vertex_indices() {
             let position = positions[vertex_idx.index];
-            let color = match self.graph.get_vertex(vertex_idx) {
+            let color = match vertex_color(&self.graph, vertex_idx) {
                 VertexColor::TintLeft => Color::BLUE,
                 VertexColor::TintRight => Color::RED,
             };
@@ -257,12 +270,12 @@ where
         let blue = self
             .graph
             .vertex_indices()
-            .filter(|idx| *self.graph.get_vertex(*idx) == VertexColor::TintLeft)
+            .filter(|idx| vertex_color(&self.graph, *idx) == VertexColor::TintLeft)
             .count();
         let red = self
             .graph
             .vertex_indices()
-            .filter(|idx| *self.graph.get_vertex(*idx) == VertexColor::TintRight)
+            .filter(|idx| vertex_color(&self.graph, *idx) == VertexColor::TintRight)
             .count();
         let higher = blue.max(red);
 
@@ -277,7 +290,7 @@ where
     }
 }
 
-impl<G> PartizanGame for BipartiteSnort<G>
+impl<G> PartizanGame for BipartiteSnort<VertexColor, G>
 where
     G: Graph<VertexColor> + Clone + Hash + Eq + Send + Sync,
 {
@@ -381,9 +394,9 @@ impl<G, F> BipartiteSnortIterator<G, F> {
 impl<G, F> Iterator for BipartiteSnortIterator<G, F>
 where
     F: FnMut(),
-    G: Graph<VertexColor>,
+    G: Graph<VertexColor> + Clone,
 {
-    type Item = (BipartiteGraph, BipartiteSnort<G>);
+    type Item = (BipartiteGraph, BipartiteSnort<VertexColor, G>);
 
     fn next(&mut self) -> Option<Self::Item> {
         while self.current_mask < self.max_combinations() {
