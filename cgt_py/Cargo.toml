@@ -24,5 +24,5 @@ path = "src/bin/stub_gen.rs"
 pyo3 = { workspace = true }
 pyo3-stub-gen = { workspace = true }
 cgt = { path = "../.", features = ["serde"] }
+serde_json.workspace = true
 cgt_py_messages = { path = "../cgt_py_messages" }
-jupyter_rust_widget_backend = { path = "../jupyter_rust_widget_backend" }

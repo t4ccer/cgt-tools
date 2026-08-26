@@ -1,10 +1,10 @@
 #![allow(non_local_definitions)] // These come from pyo3 marcos
 
+use crate::widget::inject_traitlet_widget;
 use cgt::{
     drawing::{Draw, MeasuringCanvas, svg},
     numeric::v2f::V2f,
 };
-use jupyter_rust_widget_backend::inject_rust_widget;
 use pyo3::prelude::*;
 
 pub mod amazons;
@@ -21,6 +21,7 @@ pub mod konane;
 pub mod parsing;
 pub mod snort;
 pub mod thermograph;
+pub mod widget;
 
 pub const SVG_MAX_CANVAS_SIZE: V2f = V2f { x: 420.0, y: 350.0 };
 
@@ -94,7 +95,9 @@ pub(crate) use py_partizan_game;
 
 #[pymodule]
 fn cgt_py(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
-    inject_rust_widget(py, m)?;
+    inject_traitlet_widget(py, m)?;
+    grid::inject_grid_widget(py, m)?;
+    graph::inject_graph_widget(py, m)?;
     m.add_function(wrap_pyfunction!(grid::make_domineering_widget, m)?)?;
     m.add_function(wrap_pyfunction!(grid::make_fission_widget, m)?)?;
     m.add_function(wrap_pyfunction!(grid::make_amazons_widget, m)?)?;

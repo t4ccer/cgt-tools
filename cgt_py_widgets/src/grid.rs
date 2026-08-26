@@ -1,8 +1,7 @@
+use crate::widget::{AnyWidgetModel, bind_traitlet};
 use crate::{
-    SyncState,
     canvas::HtmlCanvas,
     reactive::{self, SelectOption, SelectOptionElement},
-    report_edits_to_python, set_edited,
 };
 use cgt::{
     drawing::{Area, Canvas, Color, Hits, Interaction, Interactions, Shade},
@@ -11,12 +10,12 @@ use cgt::{
     result::UnwrapInfallible,
     short::partizan::{Player, games::fission},
 };
-use cgt_py_messages::{GridBackendMessage, GridFrontendMessage, GridPreset, GridPresetFlag, Tile};
+use cgt_py_messages::{GRID_TRAITLET, GridPreset, GridPresetFlag, Tile};
 use futures_signals::{
     map_ref,
     signal::{Mutable, SignalExt},
 };
-use jupyter_rust_widget_frontend::{AnyWidgetModel, Context, WasmWidget};
+use std::sync::Arc;
 use wasm_bindgen::{
     JsCast, JsValue,
     prelude::{ScopedClosure, wasm_bindgen},
@@ -196,7 +195,7 @@ struct GridWidget {
     preset: GridPreset,
     edit_option: Mutable<EditOption>,
     alternating_moves: Mutable<bool>,
-    grid: Mutable<SyncState<VecGrid<Tile>>>,
+    grid: Mutable<VecGrid<Tile>>,
 
     /// Move that has been started but not played yet, waiting on the clicks left to finish it
     pending_move: Mutable<Option<PendingMove>>,
@@ -216,14 +215,14 @@ impl GridWidget {
                     .unwrap(),
             ),
             alternating_moves: Mutable::new(true),
-            grid: Mutable::new(SyncState::uninitialized(FiniteGrid::zero_size())),
+            grid: Mutable::new(FiniteGrid::zero_size()),
             pending_move: Mutable::new(None),
             interactions: Mutable::new(Interactions::new()),
         }
     }
 
     fn edge_buttons(
-        grid: Mutable<SyncState<VecGrid<Tile>>>,
+        grid: Mutable<VecGrid<Tile>>,
         document: &Document,
         edge: Edge,
     ) -> Result<HtmlDivElement, JsValue> {
@@ -276,10 +275,10 @@ impl GridWidget {
             let handler = ScopedClosure::<dyn FnMut() -> Result<(), JsValue>>::new({
                 let grid = grid.clone();
                 move || {
-                    let Some(new_grid) = resize_edge(&grid.lock_ref().state, edge, grow) else {
+                    let Some(new_grid) = resize_edge(&grid.lock_ref(), edge, grow) else {
                         return Ok(());
                     };
-                    set_edited(&grid, new_grid);
+                    grid.set_neq(new_grid);
 
                     Ok(())
                 }
@@ -465,7 +464,7 @@ impl GridWidget {
     }
 
     fn apply(
-        grid: &Mutable<SyncState<VecGrid<Tile>>>,
+        grid: &Mutable<VecGrid<Tile>>,
         edit_option: &Mutable<EditOption>,
         alternating_moves: &Mutable<bool>,
         pending_move: &Mutable<Option<PendingMove>>,
@@ -483,7 +482,7 @@ impl GridWidget {
             {
                 let mut grid = grid.lock_mut();
                 for (x, y) in domino {
-                    grid.edit().set(x, y, Tile::Taken);
+                    grid.set(x, y, Tile::Taken);
                 }
             }
 
@@ -498,26 +497,23 @@ impl GridWidget {
         match mode {
             EditMode::FlipCell => {
                 let mut grid = grid.lock_mut();
-                let flipped = match grid.state.get(x, y) {
+                let flipped = match grid.get(x, y) {
                     Tile::Empty => Tile::Taken,
                     Tile::Taken => Tile::Empty,
                     Tile::BlueStone | Tile::RedStone | Tile::BlackStone => return,
                 };
-                grid.edit().set(x, y, flipped);
+                grid.set(x, y, flipped);
             }
             EditMode::PlaceObject(tile) => {
                 // Placing what is already there is not an edit, and reporting it would
                 // have python run its update callbacks over an unchanged grid
                 let mut grid = grid.lock_mut();
-                if grid.state.get(x, y) != tile {
-                    grid.edit().set(x, y, tile);
+                if grid.get(x, y) != tile {
+                    grid.set(x, y, tile);
                 }
             }
             EditMode::FissionMove(player) => {
-                let Ok(fission_grid) = grid
-                    .lock_ref()
-                    .state
-                    .try_map(|t| fission::Tile::try_from(*t))
+                let Ok(fission_grid) = grid.lock_ref().try_map(|t| fission::Tile::try_from(*t))
                 else {
                     return;
                 };
@@ -527,10 +523,7 @@ impl GridWidget {
                     return;
                 }
 
-                set_edited(
-                    grid,
-                    fission.move_in(x, y, player).grid().map(|t| Tile::from(t)),
-                );
+                grid.set_neq(fission.move_in(x, y, player).grid().map(|t| Tile::from(t)));
                 GridWidget::pass_turn(edit_option, alternating_moves, preset);
             }
             EditMode::AmazonsMove(player) => {
@@ -539,7 +532,7 @@ impl GridWidget {
                 let Some(pending) = pending_move.get().and_then(PendingMove::amazons) else {
                     // Nothing picked up yet, so the only click worth anything is one on a
                     // queen of one's own
-                    if amazons::holds_queen(&grid.lock_ref().state, player, clicked) {
+                    if amazons::holds_queen(&grid.lock_ref(), player, clicked) {
                         pending_move.set(Some(PendingMove::Amazons(amazons::Move {
                             player,
                             queen: clicked,
@@ -557,7 +550,7 @@ impl GridWidget {
                     }
 
                     // Where the queen is walking to
-                    if amazons::can_reach(&grid.lock_ref().state, pending.queen, clicked) {
+                    if amazons::can_reach(&grid.lock_ref(), pending.queen, clicked) {
                         pending_move.set(Some(PendingMove::Amazons(amazons::Move {
                             target: Some(clicked),
                             ..pending
@@ -579,17 +572,13 @@ impl GridWidget {
                 // Anything else is the stone being thrown, which plays the move. The tile
                 // the queen is leaving counts: it is empty by the time the stone flies, so
                 // it can be thrown across and landed on like any other
-                let Some(played) = amazons::play(
-                    &grid.lock_ref().state,
-                    player,
-                    pending.queen,
-                    target,
-                    clicked,
-                ) else {
+                let Some(played) =
+                    amazons::play(&grid.lock_ref(), player, pending.queen, target, clicked)
+                else {
                     return;
                 };
 
-                set_edited(grid, played);
+                grid.set_neq(played);
                 pending_move.set(None);
                 GridWidget::pass_turn(edit_option, alternating_moves, preset);
             }
@@ -597,7 +586,7 @@ impl GridWidget {
                 let clicked = (x, y);
 
                 let Some(pending) = pending_move.get().and_then(PendingMove::konane) else {
-                    if konane::holds_stone(&grid.lock_ref().state, player, clicked) {
+                    if konane::holds_stone(&grid.lock_ref(), player, clicked) {
                         pending_move.set(Some(PendingMove::Konane(konane::Move {
                             player,
                             stone: clicked,
@@ -611,13 +600,12 @@ impl GridWidget {
                     return;
                 }
 
-                let Some(played) =
-                    konane::play(&grid.lock_ref().state, player, pending.stone, clicked)
+                let Some(played) = konane::play(&grid.lock_ref(), player, pending.stone, clicked)
                 else {
                     return;
                 };
 
-                set_edited(grid, played);
+                grid.set_neq(played);
                 pending_move.set(None);
                 GridWidget::pass_turn(edit_option, alternating_moves, preset);
             }
@@ -629,7 +617,7 @@ impl GridWidget {
 
     fn update(
         canvas: &HtmlCanvasElement,
-        grid: &Mutable<SyncState<VecGrid<Tile>>>,
+        grid: &Mutable<VecGrid<Tile>>,
         interactions: &Mutable<Interactions>,
         edit_option: &Mutable<EditOption>,
         alternating_moves: &Mutable<bool>,
@@ -637,11 +625,11 @@ impl GridWidget {
         preset: &GridPreset,
     ) -> Result<(), JsValue> {
         let mode = edit_option.get().mode;
-        GridWidget::abandon_stale_move(pending_move, &grid.lock_ref().state, mode);
+        GridWidget::abandon_stale_move(pending_move, &grid.lock_ref(), mode);
 
         let frame = GridWidget::draw(
             canvas,
-            &grid.lock_ref().state,
+            &grid.lock_ref(),
             &mut interactions.lock_mut(),
             mode,
             pending_move.get(),
@@ -678,28 +666,8 @@ impl SelectOptionElement for EditOption {
     }
 }
 
-impl WasmWidget for GridWidget {
-    type BackendMessage = GridBackendMessage;
-    type FrontendMessage = GridFrontendMessage;
-
-    fn handle_message(&mut self, message: Self::FrontendMessage) -> Result<(), JsValue> {
-        match message {
-            GridFrontendMessage::SetGrid {
-                sequence,
-                grid: new_grid,
-            } => {
-                SyncState::take_from_python(&self.grid, sequence, new_grid);
-
-                Ok(())
-            }
-        }
-    }
-
-    fn mount(
-        &mut self,
-        context: Context<GridBackendMessage>,
-        element: Element,
-    ) -> Result<(), JsValue> {
+impl GridWidget {
+    fn mount(&mut self, model: &Arc<AnyWidgetModel>, element: Element) -> Result<(), JsValue> {
         let document = web_sys::window().unwrap().document().unwrap();
 
         let controls = document
@@ -807,11 +775,7 @@ impl WasmWidget for GridWidget {
             },
         );
 
-        report_edits_to_python(&self.grid, &context, |sequence, grid| {
-            GridBackendMessage::SetGrid { sequence, grid }
-        });
-
-        context.send_message(&GridBackendMessage::Initialized);
+        bind_traitlet(model, GRID_TRAITLET, &self.grid);
 
         Ok(())
     }
@@ -824,6 +788,6 @@ pub fn render_grid_widget_impl(
     raw_preset: u32,
 ) -> Result<(), JsValue> {
     let preset = GridPreset::from_flag_bits(raw_preset).unwrap();
-    let widget = GridWidget::new(preset);
-    widget.render(model, el)
+    let mut widget = GridWidget::new(preset);
+    widget.mount(&Arc::new(model), el)
 }

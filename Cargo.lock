@@ -220,9 +220,9 @@ version = "0.10.0"
 dependencies = [
  "cgt",
  "cgt_py_messages",
- "jupyter_rust_widget_backend",
  "pyo3",
  "pyo3-stub-gen",
+ "serde_json",
 ]
 
 [[package]]
@@ -240,7 +240,6 @@ dependencies = [
  "cgt",
  "cgt_py_messages",
  "futures-signals",
- "jupyter_rust_widget_frontend",
  "serde",
  "serde_json",
  "wasm-bindgen",
@@ -755,25 +754,6 @@ dependencies = [
  "cfg-if",
  "futures-util",
  "wasm-bindgen",
-]
-
-[[package]]
-name = "jupyter_rust_widget_backend"
-version = "0.10.0"
-dependencies = [
- "pyo3",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "jupyter_rust_widget_frontend"
-version = "0.10.0"
-dependencies = [
- "serde",
- "serde_json",
- "wasm-bindgen",
- "web-sys",
 ]
 
 [[package]]

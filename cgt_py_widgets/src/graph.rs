@@ -1,8 +1,7 @@
+use crate::widget::{AnyWidgetModel, bind_traitlet};
 use crate::{
-    SyncState,
     canvas::HtmlCanvas,
     reactive::{self, SelectOption, SelectOptionElement},
-    report_edits_to_python, set_edited,
 };
 use cgt::{
     drawing::{Area, Canvas, Color, Hits, Interaction, Interactions, Shade},
@@ -25,16 +24,16 @@ use cgt::{
     },
 };
 use cgt_py_messages::{
-    GraphBackendMessage, GraphFrontendMessage, GraphPreset, GraphPresetFlag, Vertex, VertexColor,
+    GRAPH_TRAITLET, GraphPreset, GraphPresetFlag, Vertex, VertexColor,
     layout::{
         DEFAULT_CANVAS_SIZE, default_bounds, default_circle, default_spring, max_spring_iterations,
     },
 };
 use futures_signals::{
     map_ref,
-    signal::{Mutable, SignalExt},
+    signal::{Mutable, MutableLockMut, MutableLockRef, SignalExt},
 };
-use jupyter_rust_widget_frontend::{AnyWidgetModel, Context, WasmWidget};
+use std::sync::Arc;
 use wasm_bindgen::{
     JsCast, JsValue,
     prelude::{ScopedClosure, wasm_bindgen},
@@ -245,13 +244,64 @@ impl EditModeInputs {
     }
 }
 
+/// The graph in two copies: the one that is drawn, which a drag moves on every frame it
+/// passes through, and the one python is told about, which only a finished edit changes
+#[derive(Clone)]
+struct GraphState {
+    displayed: Mutable<DirectedGraph<Vertex>>,
+    synced: Mutable<DirectedGraph<Vertex>>,
+}
+
+impl GraphState {
+    fn new() -> GraphState {
+        GraphState {
+            displayed: Mutable::new(Graph::empty(&[])),
+            synced: Mutable::new(Graph::empty(&[])),
+        }
+    }
+
+    fn lock_ref(&self) -> MutableLockRef<'_, DirectedGraph<Vertex>> {
+        self.displayed.lock_ref()
+    }
+
+    /// Change what is drawn without telling python, for an edit that is not over yet
+    fn draw(&self) -> MutableLockMut<'_, DirectedGraph<Vertex>> {
+        self.displayed.lock_mut()
+    }
+
+    /// Hand what is drawn over, once the edit that arrived at it is finished. Doing nothing
+    /// when the two already agree is what keeps an edit from being reported twice
+    fn commit(&self) {
+        self.synced.set_neq(self.displayed.get_cloned());
+    }
+
+    /// Replace what is drawn with a finished edit and hand it straight over
+    fn set(&self, graph: DirectedGraph<Vertex>) {
+        self.displayed.set_neq(graph.clone());
+        self.synced.set_neq(graph);
+    }
+
+    /// Draw whatever python last sent down. Only ever writes what is drawn, so an edit made
+    /// here cannot come back around and be reported to python as if it were the user's
+    fn follow_synced(&self) {
+        wasm_bindgen_futures::spawn_local(self.synced.signal_cloned().for_each({
+            let displayed = self.displayed.clone();
+            move |graph| {
+                displayed.set_neq(graph);
+
+                async {}
+            }
+        }));
+    }
+}
+
 struct GraphWidget {
     preset: GraphPreset,
     edit: EditModeInputs,
     layout: LayoutInputs,
     /// Size of the canvas, which the user is free to resize
     canvas_size: Mutable<V2f>,
-    graph: Mutable<SyncState<DirectedGraph<Vertex>>>,
+    graph: GraphState,
     interactions: Mutable<Interactions>,
 }
 
@@ -262,7 +312,7 @@ impl GraphWidget {
             edit: EditModeInputs::new(preset),
             layout: LayoutInputs::new(preset),
             canvas_size: Mutable::new(DEFAULT_CANVAS_SIZE),
-            graph: Mutable::new(SyncState::uninitialized(Graph::empty(&[]))),
+            graph: GraphState::new(),
             interactions: Mutable::new(Interactions::new()),
         }
     }
@@ -468,7 +518,7 @@ impl GraphWidget {
     }
 
     fn move_dragged_vertex(
-        graph: &Mutable<SyncState<DirectedGraph<Vertex>>>,
+        graph: &GraphState,
         canvas_size: V2f,
         edit_mode: EditMode,
         frame: &Frame,
@@ -482,30 +532,26 @@ impl GraphWidget {
         };
 
         let new_position = clamp_to_canvas(drag.position(), canvas_size);
-        let mut graph = graph.lock_mut();
-        let moved = vertex_position(&graph.state, vertex) != new_position;
+        let moved = vertex_position(&graph.lock_ref(), vertex) != new_position;
 
-        // Every frame that the pointer holds a vertex down for drags it again, so a vertex
-        // that is already where the pointer left it must not be written to: that would
-        // report a change, which would paint the frame that reports the drag once more,
-        // and so on forever
-        if drag.dropped {
-            // A drag that took the vertex nowhere is not worth reporting to python
-            if moved || graph.is_in_progress() {
-                let position: &mut V2f = graph.edit().get_vertex_mut(vertex).get_inner_mut();
-                *position = new_position;
-            }
-        } else if moved {
-            let position: &mut V2f = graph
-                .edit_in_progress()
-                .get_vertex_mut(vertex)
-                .get_inner_mut();
+        // Every frame that the pointer holds a vertex down drags it again, so a vertex that
+        // is already where the pointer left it must not be written to: that would paint a
+        // frame, which would report the drag once more, and so on forever
+        if moved {
+            let mut drawn = graph.draw();
+            let position: &mut V2f = drawn.get_vertex_mut(vertex).get_inner_mut();
             *position = new_position;
+        }
+
+        // Python hears about a drag once it is over rather than on every frame it passes
+        // through, and hears nothing at all if the vertex ended up where it started
+        if drag.dropped {
+            graph.commit();
         }
     }
 
     fn apply(
-        graph: &Mutable<SyncState<DirectedGraph<Vertex>>>,
+        graph: &GraphState,
         canvas_size: V2f,
         edit: &EditModeInputs,
         preset: GraphPreset,
@@ -517,8 +563,8 @@ impl GraphWidget {
         if let Some(position) = frame.background.clicked
             && let Some(color) = edit_mode.new_vertex_color(edit.edge_vertex.get().color)
         {
-            let mut state = graph.lock_mut();
-            GraphWidget::add_vertex_at(state.edit(), canvas_size, position, color);
+            GraphWidget::add_vertex_at(&mut graph.draw(), canvas_size, position, color);
+            graph.commit();
             return;
         }
 
@@ -533,7 +579,8 @@ impl GraphWidget {
 
             EditMode::RemoveVertex => {
                 if let Some(vertex) = frame.vertices.clicked {
-                    graph.lock_mut().edit().remove_vertex(vertex);
+                    graph.draw().remove_vertex(vertex);
+                    graph.commit();
                 }
             }
 
@@ -634,25 +681,31 @@ impl GraphWidget {
     /// Repaint a vertex, which is nothing worth reporting if it already had that color and
     /// nothing the preset allows if the new color is one a neighbour is already in
     fn recolor_vertex(
-        graph: &Mutable<SyncState<DirectedGraph<Vertex>>>,
+        graph: &GraphState,
         preset: GraphPreset,
         vertex: VertexIndex,
         new_color: VertexColor,
     ) {
-        let mut graph = graph.lock_mut();
-        if !GraphWidget::may_recolor(&graph.state, preset, vertex, new_color) {
-            return;
-        }
+        {
+            let mut drawn = graph.draw();
+            if !GraphWidget::may_recolor(&drawn, preset, vertex, new_color) {
+                return;
+            }
 
-        let color: &VertexColor = graph.state.get_vertex(vertex).get_inner();
-        if *color != new_color {
-            let color: &mut VertexColor = graph.edit().get_vertex_mut(vertex).get_inner_mut();
+            let color: &VertexColor = drawn.get_vertex(vertex).get_inner();
+            if *color == new_color {
+                return;
+            }
+
+            let color: &mut VertexColor = drawn.get_vertex_mut(vertex).get_inner_mut();
             *color = new_color;
         }
+
+        graph.commit();
     }
 
     fn drop_edge(
-        graph: &Mutable<SyncState<DirectedGraph<Vertex>>>,
+        graph: &GraphState,
         canvas_size: V2f,
         preset: GraphPreset,
         frame: &Frame,
@@ -676,33 +729,36 @@ impl GraphWidget {
         match frame.vertices.hovered {
             Some(target) if target == from => {}
             Some(target) => {
-                let mut state = graph.lock_mut();
-                let adjacent = state.state.are_adjacent(from, target);
+                {
+                    let mut drawn = graph.draw();
+                    let adjacent = drawn.are_adjacent(from, target);
 
-                if !adjacent && !GraphWidget::may_connect(&state.state, preset, from, target) {
-                    return;
+                    if !adjacent && !GraphWidget::may_connect(&drawn, preset, from, target) {
+                        return;
+                    }
+
+                    GraphWidget::connect(&mut drawn, preset, from, target, !adjacent);
                 }
 
-                let graph = state.edit();
-                GraphWidget::connect(graph, preset, from, target, !adjacent);
+                graph.commit();
             }
             // Dropped on empty canvas, so the edge only lands somewhere if the dropdown
             // is set to leave a vertex behind
             None => {
-                let color = GraphWidget::dropped_vertex_color(
-                    &graph.lock_ref().state,
-                    preset,
-                    from,
-                    edge_vertex,
-                );
+                let color =
+                    GraphWidget::dropped_vertex_color(&graph.lock_ref(), preset, from, edge_vertex);
                 let Some(color) = color else {
                     return;
                 };
 
-                let mut state = graph.lock_mut();
-                let graph = state.edit();
-                let target = GraphWidget::add_vertex_at(graph, canvas_size, drag.cursor, color);
-                GraphWidget::connect(graph, preset, from, target, true);
+                {
+                    let mut drawn = graph.draw();
+                    let target =
+                        GraphWidget::add_vertex_at(&mut drawn, canvas_size, drag.cursor, color);
+                    GraphWidget::connect(&mut drawn, preset, from, target, true);
+                }
+
+                graph.commit();
             }
         }
     }
@@ -710,41 +766,42 @@ impl GraphWidget {
     /// Rearrange the whole graph with the chosen algorithm. Parameters that were never
     /// touched by hand are recomputed first, since the graph they were last filled in for
     /// is not the graph being laid out now
-    fn apply_layout(
-        graph: &Mutable<SyncState<DirectedGraph<Vertex>>>,
-        canvas_size: V2f,
-        inputs: &LayoutInputs,
-    ) {
-        let vertices = graph.lock_ref().state.size();
+    fn apply_layout(graph: &GraphState, canvas_size: V2f, inputs: &LayoutInputs) {
+        let vertices = graph.lock_ref().size();
 
         if !inputs.customized.get() {
             inputs.show_defaults(vertices, canvas_size);
         }
 
-        let mut state = graph.lock_mut();
-        let graph = state.edit();
+        {
+            let mut drawn = graph.draw();
 
-        match inputs.algorithm.get().algorithm {
-            LayoutAlgorithm::Circle => inputs.circle().layout(graph),
-            LayoutAlgorithm::SpringEmbedder => inputs.spring(vertices, canvas_size).layout(graph),
+            match inputs.algorithm.get().algorithm {
+                LayoutAlgorithm::Circle => inputs.circle().layout(&mut *drawn),
+                LayoutAlgorithm::SpringEmbedder => {
+                    inputs.spring(vertices, canvas_size).layout(&mut *drawn);
+                }
+            }
+
+            // Parameters of one's own choosing are left to put vertices wherever they put
+            // them, but a layout that diverged has to be caught: a position that is not a
+            // number would not even survive being sent back to python
+            for vertex in drawn.vertex_indices() {
+                let position: &mut V2f = drawn.get_vertex_mut(vertex).get_inner_mut();
+                if !position.x.is_finite() {
+                    position.x = canvas_size.x * 0.5;
+                }
+                if !position.y.is_finite() {
+                    position.y = canvas_size.y * 0.5;
+                }
+            }
         }
 
-        // Parameters of one's own choosing are left to put vertices wherever they put
-        // them, but a layout that diverged has to be caught: a position that is not a
-        // number would not even survive being sent back to python
-        for vertex in graph.vertex_indices() {
-            let position: &mut V2f = graph.get_vertex_mut(vertex).get_inner_mut();
-            if !position.x.is_finite() {
-                position.x = canvas_size.x * 0.5;
-            }
-            if !position.y.is_finite() {
-                position.y = canvas_size.y * 0.5;
-            }
-        }
+        graph.commit();
     }
 
     fn snort_move(
-        graph: &Mutable<SyncState<DirectedGraph<Vertex>>>,
+        graph: &GraphState,
         edit: &EditModeInputs,
         preset: GraphPreset,
         frame: &Frame,
@@ -754,7 +811,7 @@ impl GraphWidget {
             return;
         };
 
-        let Ok(snort_graph) = graph.lock_ref().state.try_map(|vertex| {
+        let Ok(snort_graph) = graph.lock_ref().try_map(|vertex| {
             snort::VertexColor::try_from(vertex.color).map(|color| SnortVertex {
                 kind: snort::VertexKind::Single(color),
                 position: vertex.position,
@@ -778,18 +835,15 @@ impl GraphWidget {
             return;
         };
 
-        set_edited(
-            graph,
-            new_position.graph.as_directed().map(|vertex| Vertex {
-                position: vertex.position,
-                color: VertexColor::from(vertex.kind.color()),
-            }),
-        );
+        graph.set(new_position.graph.as_directed().map(|vertex| Vertex {
+            position: vertex.position,
+            color: VertexColor::from(vertex.kind.color()),
+        }));
         edit.pass_turn(preset);
     }
 
     fn col_move(
-        graph: &Mutable<SyncState<DirectedGraph<Vertex>>>,
+        graph: &GraphState,
         edit: &EditModeInputs,
         preset: GraphPreset,
         frame: &Frame,
@@ -799,7 +853,7 @@ impl GraphWidget {
             return;
         };
 
-        let Ok(col_graph) = graph.lock_ref().state.try_map(|vertex| {
+        let Ok(col_graph) = graph.lock_ref().try_map(|vertex| {
             col::VertexColor::try_from(vertex.color).map(|color| ColVertex {
                 color,
                 position: vertex.position,
@@ -822,18 +876,15 @@ impl GraphWidget {
             return;
         };
 
-        set_edited(
-            graph,
-            new_position.graph.as_directed().map(|vertex| Vertex {
-                position: vertex.position,
-                color: VertexColor::from(vertex.color),
-            }),
-        );
+        graph.set(new_position.graph.as_directed().map(|vertex| Vertex {
+            position: vertex.position,
+            color: VertexColor::from(vertex.color),
+        }));
         edit.pass_turn(preset);
     }
 
     fn bipartite_snort_move(
-        graph: &Mutable<SyncState<DirectedGraph<Vertex>>>,
+        graph: &GraphState,
         edit: &EditModeInputs,
         preset: GraphPreset,
         frame: &Frame,
@@ -843,7 +894,7 @@ impl GraphWidget {
             return;
         };
 
-        let Ok(snort_graph) = graph.lock_ref().state.try_map(|vertex| {
+        let Ok(snort_graph) = graph.lock_ref().try_map(|vertex| {
             bipartite_snort::VertexColor::try_from(vertex.color).map(|color| BipartiteSnortVertex {
                 color,
                 position: vertex.position,
@@ -866,18 +917,15 @@ impl GraphWidget {
             return;
         };
 
-        set_edited(
-            graph,
-            new_position.graph.as_directed().map(|vertex| Vertex {
-                position: vertex.position,
-                color: VertexColor::from(vertex.color),
-            }),
-        );
+        graph.set(new_position.graph.as_directed().map(|vertex| Vertex {
+            position: vertex.position,
+            color: VertexColor::from(vertex.color),
+        }));
         edit.pass_turn(preset);
     }
 
     fn digraph_placement_move(
-        graph: &Mutable<SyncState<DirectedGraph<Vertex>>>,
+        graph: &GraphState,
         edit: &EditModeInputs,
         preset: GraphPreset,
         frame: &Frame,
@@ -887,7 +935,7 @@ impl GraphWidget {
             return;
         };
 
-        let Ok(placement_graph) = graph.lock_ref().state.try_map(|vertex| {
+        let Ok(placement_graph) = graph.lock_ref().try_map(|vertex| {
             digraph_placement::VertexColor::try_from(vertex.color).map(|color| {
                 DigraphPlacementVertex {
                     color,
@@ -914,19 +962,16 @@ impl GraphWidget {
             return;
         };
 
-        set_edited(
-            graph,
-            new_position.graph.map(|vertex| Vertex {
-                position: vertex.position,
-                color: VertexColor::from(vertex.color),
-            }),
-        );
+        graph.set(new_position.graph.map(|vertex| Vertex {
+            position: vertex.position,
+            color: VertexColor::from(vertex.color),
+        }));
         edit.pass_turn(preset);
     }
 
     fn update(
         canvas: &HtmlCanvasElement,
-        graph: &Mutable<SyncState<DirectedGraph<Vertex>>>,
+        graph: &GraphState,
         canvas_size: &Mutable<V2f>,
         interactions: &Mutable<Interactions>,
         edit: &EditModeInputs,
@@ -934,7 +979,7 @@ impl GraphWidget {
     ) -> Result<(), JsValue> {
         let frame = GraphWidget::draw(
             canvas,
-            &graph.lock_ref().state,
+            &graph.lock_ref(),
             canvas_size.get(),
             &mut interactions.lock_mut(),
             edit.option.get().mode,
@@ -1066,7 +1111,7 @@ fn layout_controls(
     document: &Document,
     preset: GraphPreset,
     inputs: &LayoutInputs,
-    graph: &Mutable<SyncState<DirectedGraph<Vertex>>>,
+    graph: &GraphState,
     canvas_size: &Mutable<V2f>,
 ) -> Result<HtmlElement, JsValue> {
     let root = document.create_element("div")?.dyn_into::<HtmlElement>()?;
@@ -1191,7 +1236,7 @@ fn layout_controls(
         let canvas_size = canvas_size.clone();
         move || {
             inputs.customized.set_neq(false);
-            inputs.show_defaults(graph.lock_ref().state.size(), canvas_size.get());
+            inputs.show_defaults(graph.lock_ref().size(), canvas_size.get());
         }
     });
     reset.add_event_listener_with_callback("click", reset_handler.as_ref().unchecked_ref())?;
@@ -1213,7 +1258,7 @@ fn layout_controls(
         let canvas_size = canvas_size.clone();
         move || {
             if !inputs.customized.get() {
-                inputs.show_defaults(graph.lock_ref().state.size(), canvas_size.get());
+                inputs.show_defaults(graph.lock_ref().size(), canvas_size.get());
             }
         }
     });
@@ -1328,28 +1373,8 @@ impl LayoutInputs {
     }
 }
 
-impl WasmWidget for GraphWidget {
-    type BackendMessage = GraphBackendMessage;
-    type FrontendMessage = GraphFrontendMessage;
-
-    fn handle_message(&mut self, message: Self::FrontendMessage) -> Result<(), JsValue> {
-        match message {
-            GraphFrontendMessage::SetGraph {
-                sequence,
-                graph: new_graph,
-            } => {
-                SyncState::take_from_python(&self.graph, sequence, new_graph);
-
-                Ok(())
-            }
-        }
-    }
-
-    fn mount(
-        &mut self,
-        context: Context<GraphBackendMessage>,
-        element: Element,
-    ) -> Result<(), JsValue> {
+impl GraphWidget {
+    fn mount(&mut self, model: &Arc<AnyWidgetModel>, element: Element) -> Result<(), JsValue> {
         let document = web_sys::window().unwrap().document().unwrap();
 
         let controls = document
@@ -1469,7 +1494,7 @@ impl WasmWidget for GraphWidget {
 
         reactive::frames(
             map_ref! {
-                let _graph = self.graph.signal_ref(|_| ()),
+                let _graph = self.graph.displayed.signal_ref(|_| ()),
                 let _canvas_size = self.canvas_size.signal(),
                 let _edit_mode = self.edit.option.signal().dedupe(),
                 let _edit_mode = self.edit.edge_vertex.signal().dedupe() => ()
@@ -1488,11 +1513,8 @@ impl WasmWidget for GraphWidget {
             },
         );
 
-        report_edits_to_python(&self.graph, &context, |sequence, graph| {
-            GraphBackendMessage::SetGraph { sequence, graph }
-        });
-
-        context.send_message(&GraphBackendMessage::Initialized);
+        bind_traitlet(model, GRAPH_TRAITLET, &self.graph.synced);
+        self.graph.follow_synced();
 
         Ok(())
     }
@@ -1505,6 +1527,6 @@ pub fn render_graph_widget_impl(
     raw_preset: u32,
 ) -> Result<(), JsValue> {
     let preset = GraphPreset::from_flag_bits(raw_preset).unwrap();
-    let widget = GraphWidget::new(preset);
-    widget.render(model, el)
+    let mut widget = GraphWidget::new(preset);
+    widget.mount(&Arc::new(model), el)
 }

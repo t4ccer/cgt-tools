@@ -9,18 +9,18 @@ use cgt::{
         konane::{self, Konane},
     },
 };
-use cgt_py_messages::{GridBackendMessage, GridFrontendMessage, GridPreset, Sequence, Tile};
-use jupyter_rust_widget_backend::{Response, RustWidget};
+use cgt_py_messages::{GridPreset, Tile};
 use pyo3::{
-    Bound, IntoPyObjectExt, Py, PyAny, PyResult, Python, exceptions::PyValueError, pyclass,
-    pyfunction, pymethods,
+    Bound, IntoPyObjectExt, Py, PyAny, PyResult, Python, exceptions::PyValueError, prelude::*,
+    pyclass, pyfunction, pymethods, types::PyDict,
 };
 use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pyfunction, gen_stub_pymethods};
 
 use crate::{amazons::PyAmazons, domineering::PyDomineering, fission::PyFission, konane::PyKonane};
 
 #[gen_stub_pyclass]
-#[pyclass(name = "Grid")]
+#[pyclass(name = "Grid", eq)]
+#[derive(PartialEq)]
 pub struct PyGrid {
     // If `Some` then grid grid has tiles that can be represented in this game
     pub known_preset: Option<GridPreset>,
@@ -113,74 +113,60 @@ impl PyGrid {
                 .map_err(|err| PyValueError::new_err(err.display_error().to_string()))?,
         )))
     }
-}
 
-struct GridWidget {
-    preset: GridPreset,
-    grid: VecGrid<Tile>,
+    #[staticmethod]
+    pub fn decode_from_traitlet(preset_bits: u32, raw_grid: &str) -> PyResult<PyGrid> {
+        let preset = GridPreset::from_flag_bits(preset_bits)
+            .ok_or_else(|| PyValueError::new_err(format!("unknown grid preset: {preset_bits}")))?;
+        let grid = serde_json::from_str::<VecGrid<Tile>>(raw_grid)
+            .map_err(|err| PyValueError::new_err(err.to_string()))?;
 
-    /// Which version of the grid is held. A frontend that has fallen behind can send one
-    /// from before an edit made in another, and that must not be taken
-    sequence: Sequence,
-}
+        Ok(PyGrid::from_preset_unchecked(preset, grid))
+    }
 
-impl GridWidget {
-    fn set_grid_message(&self) -> GridFrontendMessage {
-        GridFrontendMessage::SetGrid {
-            sequence: self.sequence,
-            grid: self.grid.clone(),
-        }
+    pub fn encode_to_traitlet(&self) -> String {
+        serde_json::to_string(&self.grid).unwrap()
     }
 }
 
-impl RustWidget for GridWidget {
-    type BackendMessage = GridBackendMessage;
-    type FrontendMessage = GridFrontendMessage;
+fn grid_esm(preset: GridPreset) -> String {
+    let bundle = include_str!("../widget/bundle.js");
+    let preset = format!("const preset = {};", preset.into_flag_bits());
+    let epilogue = r#" async function render({model, el}) {
+                           await JupyterCGT.render_grid(model, el, preset);
+                       }
+                       export default { render }"#;
+    let mut esm = String::with_capacity(bundle.len() + preset.len() + epilogue.len());
+    esm.push_str(bundle);
+    esm.push_str(&preset);
+    esm.push_str(epilogue);
+    esm
+}
 
-    fn esm(&self) -> String {
-        let bundle = include_str!("../widget/bundle.js");
-        let preset = format!("const preset = {};", self.preset.into_flag_bits());
-        let epilogue = r#" async function render({model, el}) {
-                               await JupyterCGT.render_grid(model, el, preset);
-                           }
-                           export default { render }"#;
-        let mut esm = String::with_capacity(bundle.len() + preset.len() + epilogue.len());
-        esm.push_str(bundle);
-        esm.push_str(&preset);
-        esm.push_str(epilogue);
-        esm
-    }
+pub fn inject_grid_widget(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
+    let ctx = PyDict::new(py);
+    ctx.set_item("TraitletWidget", m.getattr("TraitletWidget")?)?;
+    ctx.set_item("traitlets", py.import("traitlets")?)?;
+    ctx.set_item("Grid", py.get_type::<PyGrid>())?;
+    ctx.set_item("StateTraitlet", m.getattr("StateTraitlet")?)?;
 
-    fn handle_message(&mut self, event: Self::BackendMessage) -> Response<Self::FrontendMessage> {
-        match event {
-            GridBackendMessage::Initialized => Response {
-                message: Some(self.set_grid_message()),
-                run_on_update: false,
-            },
-            GridBackendMessage::SetGrid { sequence, grid } => {
-                // Anything numbered at or below what is already held describes a grid this
-                // side has moved on from, and running the update callbacks over it would
-                // report a move that has since been played over
-                let taken = sequence > self.sequence;
-                if taken {
-                    self.sequence = sequence;
-                    self.grid = grid;
-                }
+    let py_code = cr#"
+class GridWidget(TraitletWidget):
+    grid = StateTraitlet().tag(
+        sync=True,
+        to_json=lambda grid, widget: grid.encode_to_traitlet(),
+        from_json=lambda raw_grid, widget: Grid.decode_from_traitlet(widget._preset, raw_grid),
+    )
 
-                Response {
-                    message: Some(self.set_grid_message()),
-                    run_on_update: taken,
-                }
-            }
-        }
-    }
+    def __init__(self, esm, preset, grid):
+        self._preset = preset
+        TraitletWidget.__init__(self, esm, grid=grid)
+"#;
 
-    fn value<'py>(&mut self) -> impl pyo3::IntoPyObject<'py> {
-        PyGrid {
-            known_preset: Some(self.preset),
-            grid: self.grid.clone(),
-        }
-    }
+    py.run(py_code, Some(&ctx), None)?;
+    m.add("GridWidget", ctx.get_item("GridWidget")?.unwrap())?;
+
+    Ok(())
 }
 
 fn default_grid(preset: GridPreset) -> VecGrid<Tile> {
@@ -217,12 +203,12 @@ fn make_grid_widget<'py>(
         None => default_grid(preset),
         Some(position) => grid_from_position(preset, position)?.grid,
     };
-    GridWidget {
-        preset,
-        grid,
-        sequence: Sequence::INITIAL,
-    }
-    .into_widget(py, "cgt_py")
+
+    py.import("cgt_py")?.getattr("GridWidget")?.call1((
+        grid_esm(preset),
+        preset.into_flag_bits(),
+        PyGrid::from_preset_unchecked(preset, grid),
+    ))
 }
 
 #[gen_stub_pyfunction]

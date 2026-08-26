@@ -14,14 +14,10 @@ use cgt::{
         snort::{self, Snort},
     },
 };
-use cgt_py_messages::{
-    GraphBackendMessage, GraphFrontendMessage, GraphPreset, Sequence, Vertex, VertexColor,
-    layout::arrange,
-};
-use jupyter_rust_widget_backend::{Response, RustWidget};
+use cgt_py_messages::{GraphPreset, Vertex, VertexColor, layout::arrange};
 use pyo3::{
-    Bound, IntoPyObjectExt, Py, PyAny, PyResult, Python, exceptions::PyValueError, pyclass,
-    pyfunction, pymethods,
+    Bound, IntoPyObjectExt, Py, PyAny, PyResult, Python, exceptions::PyValueError, prelude::*,
+    pyclass, pyfunction, pymethods, types::PyDict,
 };
 use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pyfunction, gen_stub_pymethods};
 
@@ -70,7 +66,8 @@ impl PyVertexColors {
 }
 
 #[gen_stub_pyclass]
-#[pyclass(name = "Graph")]
+#[pyclass(name = "Graph", eq)]
+#[derive(PartialEq)]
 pub struct PyGraph {
     pub known_preset: Option<GraphPreset>,
 
@@ -340,65 +337,60 @@ impl PyGraph {
             self.try_into_graph::<digraph_placement::VertexColor>()?,
         )))
     }
-}
 
-struct GraphWidget {
-    preset: GraphPreset,
-    graph: DirectedGraph<Vertex>,
-    sequence: Sequence,
-}
+    #[staticmethod]
+    pub fn decode_from_traitlet(preset_bits: u32, raw_graph: &str) -> PyResult<PyGraph> {
+        let preset = GraphPreset::from_flag_bits(preset_bits)
+            .ok_or_else(|| PyValueError::new_err(format!("unknown graph preset: {preset_bits}")))?;
+        let graph = serde_json::from_str::<DirectedGraph<Vertex>>(raw_graph)
+            .map_err(|err| PyValueError::new_err(err.to_string()))?;
 
-impl GraphWidget {
-    fn set_graph_message(&self) -> GraphFrontendMessage {
-        GraphFrontendMessage::SetGraph {
-            sequence: self.sequence,
-            graph: self.graph.clone(),
-        }
+        Ok(PyGraph::from_preset_unchecked(preset, graph))
+    }
+
+    pub fn encode_to_traitlet(&self) -> String {
+        serde_json::to_string(&self.graph).unwrap()
     }
 }
 
-impl RustWidget for GraphWidget {
-    type BackendMessage = GraphBackendMessage;
-    type FrontendMessage = GraphFrontendMessage;
+fn graph_esm(preset: GraphPreset) -> String {
+    let bundle = include_str!("../widget/bundle.js");
+    let preset = format!("const preset = {};", preset.into_flag_bits());
+    let epilogue = r#" async function render({model, el}) {
+                           await JupyterCGT.render_graph(model, el, preset);
+                       }
+                       export default { render }"#;
+    let mut esm = String::with_capacity(bundle.len() + preset.len() + epilogue.len());
+    esm.push_str(bundle);
+    esm.push_str(&preset);
+    esm.push_str(epilogue);
+    esm
+}
 
-    fn esm(&self) -> String {
-        let bundle = include_str!("../widget/bundle.js");
-        let preset = format!("const preset = {};", self.preset.into_flag_bits());
-        let epilogue = r#" async function render({model, el}) {
-                               await JupyterCGT.render_graph(model, el, preset);
-                           }
-                           export default { render }"#;
-        let mut esm = String::with_capacity(bundle.len() + preset.len() + epilogue.len());
-        esm.push_str(bundle);
-        esm.push_str(&preset);
-        esm.push_str(epilogue);
-        esm
-    }
+pub fn inject_graph_widget(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
+    let ctx = PyDict::new(py);
+    ctx.set_item("TraitletWidget", m.getattr("TraitletWidget")?)?;
+    ctx.set_item("traitlets", py.import("traitlets")?)?;
+    ctx.set_item("Graph", py.get_type::<PyGraph>())?;
+    ctx.set_item("StateTraitlet", m.getattr("StateTraitlet")?)?;
 
-    fn handle_message(&mut self, event: Self::BackendMessage) -> Response<Self::FrontendMessage> {
-        match event {
-            GraphBackendMessage::Initialized => Response {
-                message: Some(self.set_graph_message()),
-                run_on_update: false,
-            },
-            GraphBackendMessage::SetGraph { sequence, graph } => {
-                let taken = sequence > self.sequence;
-                if taken {
-                    self.sequence = sequence;
-                    self.graph = graph;
-                }
+    let py_code = cr#"
+class GraphWidget(TraitletWidget):
+    graph = StateTraitlet().tag(
+        sync=True,
+        to_json=lambda graph, widget: graph.encode_to_traitlet(),
+        from_json=lambda raw_graph, widget: Graph.decode_from_traitlet(widget._preset, raw_graph),
+    )
 
-                Response {
-                    message: Some(self.set_graph_message()),
-                    run_on_update: taken,
-                }
-            }
-        }
-    }
+    def __init__(self, esm, preset, graph):
+        self._preset = preset
+        TraitletWidget.__init__(self, esm, graph=graph)
+"#;
 
-    fn value<'py>(&mut self) -> impl pyo3::IntoPyObject<'py> {
-        PyGraph::from_preset_unchecked(self.preset, self.graph.clone())
-    }
+    py.run(py_code, Some(&ctx), None)?;
+    m.add("GraphWidget", ctx.get_item("GraphWidget")?.unwrap())?;
+
+    Ok(())
 }
 
 fn graph_from_position(preset: GraphPreset, position: &Bound<'_, PyAny>) -> PyResult<PyGraph> {
@@ -425,12 +417,12 @@ fn make_graph_widget<'py>(
         None => DirectedGraph::empty(&[]),
         Some(position) => graph_from_position(preset, position)?.graph,
     };
-    GraphWidget {
-        preset,
-        graph,
-        sequence: Sequence::INITIAL,
-    }
-    .into_widget(py, "cgt_py")
+
+    py.import("cgt_py")?.getattr("GraphWidget")?.call1((
+        graph_esm(preset),
+        preset.into_flag_bits(),
+        PyGraph::from_preset_unchecked(preset, graph),
+    ))
 }
 
 #[gen_stub_pyfunction]
