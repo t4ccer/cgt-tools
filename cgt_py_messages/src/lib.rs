@@ -376,10 +376,10 @@ impl_vertex_map! {
 impl VertexColor {
     pub const fn color(self) -> Color {
         match self {
-            VertexColor::White => Color::from_hex(0xf5f5f5ff),
+            VertexColor::White => Color::WHITE,
             VertexColor::Blue => Color::BLUE,
             VertexColor::Red => Color::RED,
-            VertexColor::Green => Color::from_hex(0xa6e22eff),
+            VertexColor::Green => Color::GREEN,
         }
     }
 }

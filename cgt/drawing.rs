@@ -36,8 +36,14 @@ impl Color {
     #[allow(clippy::unreadable_literal)]
     pub const DARK_GRAY: Color = Color::from_hex(0x444444ff);
 
+    #[allow(clippy::unreadable_literal)]
+    pub const WHITE: Color = Color::from_hex(0xf5f5f5ff);
+
+    #[allow(clippy::unreadable_literal)]
+    pub const GREEN: Color = Color::from_hex(0xa6e22eff);
+
     #[must_use]
-    pub const fn from_hex(hex: u32) -> Color {
+    const fn from_hex(hex: u32) -> Color {
         Color {
             r: ((hex >> 24) & 0xff) as u8,
             g: ((hex >> 16) & 0xff) as u8,
