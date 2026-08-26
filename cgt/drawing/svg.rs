@@ -1,15 +1,15 @@
 //! Canvas that can draw to SVG
 
 use crate::{
-    drawing::{BoundingBox, Color, TextAlignment},
+    drawing::{BoundingBox, Color, Rgba, Shade, TextAlignment, Theme},
     numeric::v2f::V2f,
 };
 use core::fmt::Write;
 use std::{fmt::Display, marker::PhantomData, mem::ManuallyDrop};
 
-struct Rgba(Color);
+struct Css(Rgba);
 
-impl Display for Rgba {
+impl Display for Css {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -120,6 +120,7 @@ impl Tag<'_, '_, Content> {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Canvas {
     buffer: String,
+    theme: Theme,
 }
 
 impl Canvas {
@@ -135,7 +136,14 @@ impl Canvas {
                 viewport.size().x,
                 viewport.size().y,
             ),
+            theme: Theme::Light,
         }
+    }
+
+    #[must_use]
+    pub const fn with_theme(mut self, theme: Theme) -> Self {
+        self.theme = theme;
+        self
     }
 
     pub fn to_svg(mut self) -> String {
@@ -168,13 +176,14 @@ impl Canvas {
 }
 
 impl crate::drawing::Canvas for Canvas {
-    fn rect(&mut self, position: V2f, size: V2f, color: Color) {
+    fn rect(&mut self, position: V2f, size: V2f, color: Color, shade: Shade) {
+        let color = Css(self.theme.shaded(color, shade));
         let mut rect = self.self_closing_tag("rect");
         rect.attribute("x", position.x);
         rect.attribute("y", position.y);
         rect.attribute("width", size.x);
         rect.attribute("height", size.y);
-        rect.attribute("fill", Rgba(color));
+        rect.attribute("fill", color);
     }
 
     fn circle(
@@ -182,26 +191,30 @@ impl crate::drawing::Canvas for Canvas {
         position: V2f,
         radius: f32,
         fill_color: Color,
+        fill_shade: Shade,
         stroke_width: f32,
         stroke_color: Color,
     ) {
+        let fill_color = Css(self.theme.shaded(fill_color, fill_shade));
+        let stroke_color = Css(self.theme.color(stroke_color));
         let mut circle = self.self_closing_tag("circle");
         circle.attribute("cx", position.x);
         circle.attribute("cy", position.y);
         circle.attribute("r", radius);
-        circle.attribute("fill", Rgba(fill_color));
+        circle.attribute("fill", fill_color);
         circle.attribute("stroke-width", stroke_width);
-        circle.attribute("stroke", Rgba(stroke_color));
+        circle.attribute("stroke", stroke_color);
     }
 
     fn line(&mut self, start: V2f, end: V2f, weight: f32, color: Color) {
+        let color = Css(self.theme.color(color));
         let mut line = self.self_closing_tag("line");
         line.attribute("x1", start.x);
         line.attribute("y1", start.y);
         line.attribute("x2", end.x);
         line.attribute("y2", end.y);
         line.attribute("stroke-width", weight);
-        line.attribute("stroke", Rgba(color));
+        line.attribute("stroke", color);
     }
 
     fn text(
@@ -211,6 +224,7 @@ impl crate::drawing::Canvas for Canvas {
         alignment: super::TextAlignment,
         color: Color,
     ) {
+        let color = Css(self.theme.color(color));
         let mut text = self.tag("text");
         text.attribute("x", position.x);
         text.attribute("y", position.y);
@@ -224,7 +238,7 @@ impl crate::drawing::Canvas for Canvas {
         );
         text.attribute("dominant-baseline", "central");
         text.attribute("font-size", "13px");
-        text.attribute("fill", Rgba(color));
+        text.attribute("fill", color);
 
         let mut text = text.finish_attributes();
         text.content(&content);
@@ -233,13 +247,14 @@ impl crate::drawing::Canvas for Canvas {
     fn large_char(&mut self, letter: char, position: V2f, color: Color) {
         let tile_size = Self::tile_size();
 
+        let color = Css(self.theme.color(color));
         let mut text = self.tag("text");
         text.attribute("x", tile_size.x.mul_add(0.5, position.x));
         text.attribute("y", tile_size.y.mul_add(0.5, position.y));
         text.attribute("text-anchor", "middle");
         text.attribute("dominant-baseline", "central");
         text.attribute("font-size", "52px");
-        text.attribute("fill", Rgba(color));
+        text.attribute("fill", color);
 
         let mut text = text.finish_attributes();
         let mut buf = [0u8; 4];

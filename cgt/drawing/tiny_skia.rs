@@ -3,7 +3,7 @@
 // TODO: Remove unwraps
 
 use crate::{
-    drawing::{BoundingBox, Color},
+    drawing::{BoundingBox, Color, Rgba, Shade, Theme},
     numeric::v2f::V2f,
 };
 use tiny_skia;
@@ -12,6 +12,7 @@ use tiny_skia;
 pub struct Canvas {
     offset: V2f,
     pixmap: tiny_skia::Pixmap,
+    theme: Theme,
 }
 
 impl Canvas {
@@ -21,7 +22,14 @@ impl Canvas {
         Canvas {
             offset,
             pixmap: tiny_skia::Pixmap::new(size.x as u32, size.y as u32).unwrap(),
+            theme: Theme::Light,
         }
+    }
+
+    #[must_use]
+    pub const fn with_theme(mut self, theme: Theme) -> Canvas {
+        self.theme = theme;
+        self
     }
 
     pub fn to_png(&self) -> Vec<u8> {
@@ -30,11 +38,11 @@ impl Canvas {
 }
 
 impl super::Canvas for Canvas {
-    fn rect(&mut self, position: V2f, size: V2f, color: Color) {
+    fn rect(&mut self, position: V2f, size: V2f, color: Color, shade: Shade) {
         let position = self.offset + position;
         self.pixmap.fill_rect(
             tiny_skia::Rect::from_xywh(position.x, position.y, size.x, size.y).unwrap(),
-            &paint_solid_color(color),
+            &paint_solid_color(self.theme.shaded(color, shade)),
             tiny_skia::Transform::identity(),
             None,
         );
@@ -45,6 +53,7 @@ impl super::Canvas for Canvas {
         position: V2f,
         radius: f32,
         fill_color: Color,
+        fill_shade: Shade,
         stroke_width: f32,
         stroke_color: Color,
     ) {
@@ -56,7 +65,7 @@ impl super::Canvas for Canvas {
                     .unwrap();
             self.pixmap.fill_path(
                 &path,
-                &paint_solid_color(stroke_color),
+                &paint_solid_color(self.theme.color(stroke_color)),
                 tiny_skia::FillRule::Winding,
                 tiny_skia::Transform::identity(),
                 None,
@@ -67,7 +76,7 @@ impl super::Canvas for Canvas {
             let path = tiny_skia::PathBuilder::from_circle(position.x, position.y, radius).unwrap();
             self.pixmap.fill_path(
                 &path,
-                &paint_solid_color(fill_color),
+                &paint_solid_color(self.theme.shaded(fill_color, fill_shade)),
                 tiny_skia::FillRule::Winding,
                 tiny_skia::Transform::identity(),
                 None,
@@ -86,7 +95,7 @@ impl super::Canvas for Canvas {
         let path = path.finish().unwrap();
         self.pixmap.stroke_path(
             &path,
-            &paint_solid_color(color),
+            &paint_solid_color(self.theme.color(color)),
             &tiny_skia::Stroke {
                 width: weight,
                 miter_limit: 4.0,
@@ -126,7 +135,7 @@ impl super::Canvas for Canvas {
     }
 }
 
-fn paint_solid_color(color: Color) -> tiny_skia::Paint<'static> {
+fn paint_solid_color(color: Rgba) -> tiny_skia::Paint<'static> {
     tiny_skia::Paint {
         shader: tiny_skia::Shader::SolidColor(tiny_skia::Color::from(color)),
         blend_mode: tiny_skia::BlendMode::SourceOver,

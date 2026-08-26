@@ -187,14 +187,14 @@ where
     {
         self.grid.draw(canvas, |tile| match tile {
             Tile::Empty => drawing::Tile::Square {
-                color: Color::LIGHT_GRAY,
+                color: Color::Surface,
             },
             Tile::Stone => drawing::Tile::Circle {
-                tile_color: Color::LIGHT_GRAY,
-                circle_color: Color::DARK_GRAY,
+                tile_color: Color::Surface,
+                circle_color: Color::Secondary,
             },
             Tile::Blocked => drawing::Tile::Square {
-                color: Color::DARK_GRAY,
+                color: Color::Secondary,
             },
         });
     }

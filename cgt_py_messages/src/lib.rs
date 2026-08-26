@@ -25,22 +25,22 @@ impl Tile {
     pub const fn drawing(self) -> drawing::Tile {
         match self {
             Tile::Empty => drawing::Tile::Square {
-                color: Color::LIGHT_GRAY,
+                color: Color::Surface,
             },
             Tile::Taken => drawing::Tile::Square {
-                color: Color::DARK_GRAY,
+                color: Color::Secondary,
             },
             Tile::BlueStone => drawing::Tile::Circle {
-                tile_color: Color::LIGHT_GRAY,
-                circle_color: Color::BLUE,
+                tile_color: Color::Surface,
+                circle_color: Color::Blue,
             },
             Tile::RedStone => drawing::Tile::Circle {
-                tile_color: Color::LIGHT_GRAY,
-                circle_color: Color::RED,
+                tile_color: Color::Surface,
+                circle_color: Color::Red,
             },
             Tile::BlackStone => drawing::Tile::Circle {
-                tile_color: Color::LIGHT_GRAY,
-                circle_color: Color::DARK_GRAY,
+                tile_color: Color::Surface,
+                circle_color: Color::Secondary,
             },
         }
     }
@@ -376,10 +376,10 @@ impl_vertex_map! {
 impl VertexColor {
     pub const fn color(self) -> Color {
         match self {
-            VertexColor::White => Color::WHITE,
-            VertexColor::Blue => Color::BLUE,
-            VertexColor::Red => Color::RED,
-            VertexColor::Green => Color::GREEN,
+            VertexColor::White => Color::Background,
+            VertexColor::Blue => Color::Blue,
+            VertexColor::Red => Color::Red,
+            VertexColor::Green => Color::Green,
         }
     }
 }

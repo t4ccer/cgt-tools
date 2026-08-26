@@ -574,7 +574,7 @@ impl Thermograph {
                     y: y_top_above_x_axis,
                 },
             C::thin_line_weight(),
-            Color::LIGHT_GRAY,
+            Color::Surface,
         );
 
         if left_x >= 0.0 && right_x <= 0.0 {
@@ -591,7 +591,7 @@ impl Thermograph {
                         y: padding.mul_add(2.0, y_top_above_x_axis) + mast_height,
                     },
                 C::thin_line_weight(),
-                Color::LIGHT_GRAY,
+                Color::Surface,
             );
         }
 
@@ -633,11 +633,16 @@ impl Thermograph {
                         this_point,
                         format_args!("({this_x_r}, {this_y_r})"),
                         alignment,
-                        Color::BLACK,
+                        Color::Primary,
                     );
                 }
 
-                canvas.line(prev_point, this_point, C::thick_line_weight(), Color::BLACK);
+                canvas.line(
+                    prev_point,
+                    this_point,
+                    C::thick_line_weight(),
+                    Color::Primary,
+                );
 
                 prev_x = this_x;
                 prev_y = this_y;
@@ -661,7 +666,7 @@ impl Thermograph {
                     y: y_top_above_x_axis - 1.0 + padding - mast_y,
                 },
             C::thick_line_weight(),
-            Color::BLACK,
+            Color::Primary,
         );
         canvas.line(
             scale
@@ -675,7 +680,7 @@ impl Thermograph {
                     y: y_top_above_x_axis - 1.0 + padding - mast_y,
                 },
             C::thick_line_weight(),
-            Color::BLACK,
+            Color::Primary,
         );
         canvas.line(
             scale
@@ -689,7 +694,7 @@ impl Thermograph {
                     y: y_top_above_x_axis - 1.0 + padding - mast_y,
                 },
             C::thick_line_weight(),
-            Color::BLACK,
+            Color::Primary,
         );
     }
 

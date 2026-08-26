@@ -248,7 +248,7 @@ where
                     positions[this_vertex_idx.index],
                     positions[adjacent_vertex_idx.index],
                     C::thin_line_weight(),
-                    Color::BLACK,
+                    Color::Primary,
                 );
             }
         }
@@ -256,8 +256,8 @@ where
         for vertex_idx in self.graph.vertex_indices() {
             let position = positions[vertex_idx.index];
             let color = match vertex_color(&self.graph, vertex_idx) {
-                VertexColor::TintLeft => Color::BLUE,
-                VertexColor::TintRight => Color::RED,
+                VertexColor::TintLeft => Color::Blue,
+                VertexColor::TintRight => Color::Red,
             };
             canvas.vertex(position, color, vertex_idx);
         }

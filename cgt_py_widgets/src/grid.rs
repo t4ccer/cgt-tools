@@ -5,7 +5,7 @@ use crate::{
     report_edits_to_python, set_edited,
 };
 use cgt::{
-    drawing::{Area, Canvas, Color, Hits, Interaction, Interactions},
+    drawing::{Area, Canvas, Color, Hits, Interaction, Interactions, Shade},
     grid::{FiniteGrid, Grid as _, vec_grid::VecGrid},
     numeric::v2f::V2f,
     result::UnwrapInfallible,
@@ -397,7 +397,7 @@ impl GridWidget {
                 position: V2f::ZERO,
                 size: canvas_size,
             });
-            canvas.rect(V2f::ZERO, canvas_size, Color::BLACK);
+            canvas.rect(V2f::ZERO, canvas_size, Color::Primary, Shade::Plain);
             let tiles = grid.draw(canvas, Tile::drawing);
 
             // A highlight registers no area of its own, so previewing the domino cannot

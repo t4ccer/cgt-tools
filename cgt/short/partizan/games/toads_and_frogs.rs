@@ -96,16 +96,16 @@ impl Draw for ToadsAndFrogs {
     {
         self.grid().draw(canvas, |tile| match tile {
             Tile::Empty => drawing::Tile::Square {
-                color: Color::LIGHT_GRAY,
+                color: Color::Surface,
             },
             Tile::Toad => drawing::Tile::Char {
-                tile_color: Color::LIGHT_GRAY,
-                text_color: Color::BLUE,
+                tile_color: Color::Surface,
+                text_color: Color::Blue,
                 letter: 'T',
             },
             Tile::Frog => drawing::Tile::Char {
-                tile_color: Color::LIGHT_GRAY,
-                text_color: Color::RED,
+                tile_color: Color::Surface,
+                text_color: Color::Red,
                 letter: 'F',
             },
         });

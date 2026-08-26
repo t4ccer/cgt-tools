@@ -174,14 +174,14 @@ pub trait Graph<V>: Sized {
                             edge_start_pos,
                             edge_end_pos,
                             C::thin_line_weight(),
-                            Color::BLACK,
+                            Color::Primary,
                         );
                     } else {
                         canvas.arrow(
                             edge_start_pos,
                             edge_end_pos,
                             C::thin_line_weight(),
-                            Color::BLACK,
+                            Color::Primary,
                         );
                     }
                 }

@@ -12,39 +12,20 @@ pub mod tikz;
 #[cfg(feature = "tiny_skia")]
 pub mod tiny_skia;
 
+/// Concrete color that a [`Color`] is painted with. Only canvases build these, by resolving
+/// a [`Color`] through their [`Theme`]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Color {
+pub struct Rgba {
     pub r: u8,
     pub g: u8,
     pub b: u8,
     pub a: u8,
 }
 
-impl Color {
-    #[allow(clippy::unreadable_literal)]
-    pub const BLUE: Color = Color::from_hex(0x4e4afbff);
-
-    #[allow(clippy::unreadable_literal)]
-    pub const RED: Color = Color::from_hex(0xf92672ff);
-
-    #[allow(clippy::unreadable_literal)]
-    pub const BLACK: Color = Color::from_hex(0x000000ff);
-
-    #[allow(clippy::unreadable_literal)]
-    pub const LIGHT_GRAY: Color = Color::from_hex(0xccccccff);
-
-    #[allow(clippy::unreadable_literal)]
-    pub const DARK_GRAY: Color = Color::from_hex(0x444444ff);
-
-    #[allow(clippy::unreadable_literal)]
-    pub const WHITE: Color = Color::from_hex(0xf5f5f5ff);
-
-    #[allow(clippy::unreadable_literal)]
-    pub const GREEN: Color = Color::from_hex(0xa6e22eff);
-
+impl Rgba {
     #[must_use]
-    const fn from_hex(hex: u32) -> Color {
-        Color {
+    const fn from_hex(hex: u32) -> Rgba {
+        Rgba {
             r: ((hex >> 24) & 0xff) as u8,
             g: ((hex >> 16) & 0xff) as u8,
             b: ((hex >> 8) & 0xff) as u8,
@@ -53,39 +34,140 @@ impl Color {
     }
 
     #[must_use]
-    pub const fn faded(self, alpha: u8) -> Color {
-        Color {
+    pub const fn faded(self, alpha: u8) -> Rgba {
+        Rgba {
             a: ((self.a as f32) * (alpha as f32 / 255.0)) as u8,
             ..self
         }
     }
 
-    /// Scale each color channel, leaving the alpha alone. Used to darken things that the
-    /// pointer is doing something to
+    /// Move each color channel `amount` of the way towards `target`, leaving the alpha
+    /// alone
     #[must_use]
-    pub fn scaled(self, factor: f32) -> Color {
-        let scale = |channel: u8| (channel as f32 * factor).round() as u8;
-        Color {
-            r: scale(self.r),
-            g: scale(self.g),
-            b: scale(self.b),
+    fn blended(self, target: Rgba, amount: f32) -> Rgba {
+        let blend = |from: u8, to: u8| {
+            (f32::from(to) - f32::from(from))
+                .mul_add(amount, f32::from(from))
+                .round() as u8
+        };
+        Rgba {
+            r: blend(self.r, target.r),
+            g: blend(self.g, target.g),
+            b: blend(self.b, target.b),
             a: self.a,
-        }
-    }
-
-    /// Left is bLue, Right is Red
-    pub const fn of_player(player: Player) -> Color {
-        match player {
-            Player::Left => Color::BLUE,
-            Player::Right => Color::RED,
         }
     }
 }
 
 #[cfg(feature = "tiny_skia")]
-impl From<Color> for ::tiny_skia::Color {
-    fn from(color: Color) -> ::tiny_skia::Color {
+impl From<Rgba> for ::tiny_skia::Color {
+    fn from(color: Rgba) -> ::tiny_skia::Color {
         ::tiny_skia::Color::from_rgba8(color.r, color.g, color.b, color.a)
+    }
+}
+
+/// Color of something that is about to be painted. What it looks like depends on the
+/// [`Theme`] the canvas resolves it with, so that the same drawing works on a light and on a
+/// dark background
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Color {
+    /// Text, lines, and outlines
+    Primary,
+
+    /// Text and fills that should draw less attention than [`Color::Primary`]
+    Secondary,
+
+    /// Fills and faint lines that sit just off the [`Color::Background`]
+    Surface,
+
+    /// Whatever nothing has been painted on
+    Background,
+
+    Blue,
+
+    Red,
+
+    Green,
+}
+
+impl Color {
+    /// Left is bLue, Right is Red
+    pub const fn of_player(player: Player) -> Color {
+        match player {
+            Player::Left => Color::Blue,
+            Player::Right => Color::Red,
+        }
+    }
+}
+
+/// How far towards [`Color::Primary`] something is painted, to show what the pointer is
+/// doing to it
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Shade {
+    Plain,
+    Hovered,
+    Pressed,
+}
+
+impl Shade {
+    const fn amount(self) -> f32 {
+        match self {
+            Shade::Plain => 0.0,
+            Shade::Hovered => 0.1,
+            Shade::Pressed => 0.3,
+        }
+    }
+}
+
+/// Which end of the gray ramp the canvas background sits at
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+pub enum Theme {
+    #[default]
+    Light,
+    Dark,
+}
+
+impl Theme {
+    #[allow(clippy::unreadable_literal)]
+    const BLUE: Rgba = Rgba::from_hex(0x4e4afbff);
+
+    #[allow(clippy::unreadable_literal)]
+    const RED: Rgba = Rgba::from_hex(0xf92672ff);
+
+    #[allow(clippy::unreadable_literal)]
+    const GREEN: Rgba = Rgba::from_hex(0xa6e22eff);
+
+    #[allow(clippy::unreadable_literal)]
+    const BLACK: Rgba = Rgba::from_hex(0x000000ff);
+
+    #[allow(clippy::unreadable_literal)]
+    const DARK_GRAY: Rgba = Rgba::from_hex(0x444444ff);
+
+    #[allow(clippy::unreadable_literal)]
+    const LIGHT_GRAY: Rgba = Rgba::from_hex(0xccccccff);
+
+    #[allow(clippy::unreadable_literal)]
+    const WHITE: Rgba = Rgba::from_hex(0xf5f5f5ff);
+
+    /// Concrete color that `color` is painted with, before the pointer shades it
+    #[must_use]
+    pub const fn color(self, color: Color) -> Rgba {
+        match (self, color) {
+            (_, Color::Blue) => Theme::BLUE,
+            (_, Color::Red) => Theme::RED,
+            (_, Color::Green) => Theme::GREEN,
+            (Theme::Light, Color::Primary) | (Theme::Dark, Color::Background) => Theme::BLACK,
+            (Theme::Light, Color::Secondary) | (Theme::Dark, Color::Surface) => Theme::DARK_GRAY,
+            (Theme::Light, Color::Surface) | (Theme::Dark, Color::Secondary) => Theme::LIGHT_GRAY,
+            (Theme::Light, Color::Background) | (Theme::Dark, Color::Primary) => Theme::WHITE,
+        }
+    }
+
+    /// Concrete color that `color` is painted with once the pointer has shaded it
+    #[must_use]
+    pub fn shaded(self, color: Color, shade: Shade) -> Rgba {
+        self.color(color)
+            .blended(self.color(Color::Primary), shade.amount())
     }
 }
 
@@ -224,15 +306,15 @@ impl Interaction {
         drag: None,
     };
 
-    /// Shade a color to show what the pointer is doing to the thing painted with it
+    /// Shading that shows what the pointer is doing to the thing painted with it
     #[must_use]
-    pub fn shade(self, color: Color) -> Color {
+    pub const fn shade(self) -> Shade {
         if self.pressed {
-            color.scaled(0.7)
+            Shade::Pressed
         } else if self.hovered {
-            color.scaled(0.9)
+            Shade::Hovered
         } else {
-            color
+            Shade::Plain
         }
     }
 }
@@ -475,13 +557,14 @@ impl Interactions {
 
 /// Anything that can be used for drawing
 pub trait Canvas {
-    fn rect(&mut self, position: V2f, size: V2f, color: Color);
+    fn rect(&mut self, position: V2f, size: V2f, color: Color, shade: Shade);
 
     fn circle(
         &mut self,
         position: V2f,
         radius: f32,
         fill_color: Color,
+        fill_shade: Shade,
         stroke_width: f32,
         stroke_color: Color,
     );
@@ -530,19 +613,20 @@ pub trait Canvas {
 
         match tile {
             Tile::Square { color } => {
-                self.rect(position, tile_size, interaction.shade(color));
+                self.rect(position, tile_size, color, interaction.shade());
             }
             Tile::Circle {
                 tile_color,
                 circle_color,
             } => {
-                self.rect(position, tile_size, interaction.shade(tile_color));
+                self.rect(position, tile_size, tile_color, interaction.shade());
                 self.circle(
                     position + tile_size * 0.5,
                     tile_size.x * 0.4,
-                    interaction.shade(circle_color),
+                    circle_color,
+                    interaction.shade(),
                     Self::thin_line_weight(),
-                    Color::BLACK,
+                    Color::Primary,
                 );
             }
             Tile::Char {
@@ -550,7 +634,7 @@ pub trait Canvas {
                 text_color,
                 letter,
             } => {
-                self.rect(position, tile_size, interaction.shade(tile_color));
+                self.rect(position, tile_size, tile_color, interaction.shade());
                 self.large_char(letter, position, text_color);
             }
         }
@@ -630,7 +714,7 @@ pub trait Canvas {
                 line_start,
                 line_end,
                 Self::thick_line_weight(),
-                Color::BLACK,
+                Color::Primary,
             );
         }
 
@@ -656,7 +740,7 @@ pub trait Canvas {
                 line_start,
                 line_end,
                 Self::thick_line_weight(),
-                Color::BLACK,
+                Color::Primary,
             );
         }
     }
@@ -667,9 +751,10 @@ pub trait Canvas {
         self.circle(
             position,
             radius,
-            interaction.shade(color),
+            color,
+            interaction.shade(),
             Self::thin_line_weight(),
-            Color::BLACK,
+            Color::Primary,
         );
         interaction
     }

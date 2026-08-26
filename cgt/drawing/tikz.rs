@@ -1,13 +1,13 @@
 //! Canvas that can draw to SVG
 
 use crate::{
-    drawing::{Color, TextAlignment},
+    drawing::{Color, Rgba, Shade, TextAlignment, Theme},
     numeric::v2f::V2f,
 };
 use core::fmt::Write;
 use std::fmt::Display;
 
-struct Rgb(Color);
+struct Rgb(Rgba);
 
 impl Display for Rgb {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -30,13 +30,21 @@ impl Display for Point {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Canvas {
     buffer: String,
+    theme: Theme,
 }
 
 impl Canvas {
     pub const fn new() -> Self {
         Self {
             buffer: String::new(),
+            theme: Theme::Light,
         }
+    }
+
+    #[must_use]
+    pub const fn with_theme(mut self, theme: Theme) -> Self {
+        self.theme = theme;
+        self
     }
 
     pub fn to_tikz(&self) -> &str {
@@ -45,11 +53,11 @@ impl Canvas {
 }
 
 impl crate::drawing::Canvas for Canvas {
-    fn rect(&mut self, position: V2f, size: V2f, color: Color) {
+    fn rect(&mut self, position: V2f, size: V2f, color: Color, shade: Shade) {
         write!(
             self.buffer,
             "\\draw [fill = {color}] {start} rectangle {end};",
-            color = Rgb(color),
+            color = Rgb(self.theme.shaded(color, shade)),
             start = Point(position),
             end = Point(position + size),
         )
@@ -61,15 +69,16 @@ impl crate::drawing::Canvas for Canvas {
         position: V2f,
         radius: f32,
         fill_color: Color,
+        fill_shade: Shade,
         stroke_width: f32,
         stroke_color: Color,
     ) {
         write!(
             self.buffer,
             "\\draw [fill = {fill_color}, line width = {stroke_width}cm, draw = {draw_color}] {position} circle ({radius}cm);",
-            fill_color = Rgb(fill_color),
+            fill_color = Rgb(self.theme.shaded(fill_color, fill_shade)),
             position = Point(position),
-            draw_color = Rgb(stroke_color),
+            draw_color = Rgb(self.theme.color(stroke_color)),
         )
         .unwrap();
     }
@@ -78,7 +87,7 @@ impl crate::drawing::Canvas for Canvas {
         write!(
             self.buffer,
             "\\draw [line width = {weight}cm, draw={color}] {start} -- {end};",
-            color = Rgb(color),
+            color = Rgb(self.theme.color(color)),
             start = Point(start),
             end = Point(end),
         )
@@ -100,7 +109,7 @@ impl crate::drawing::Canvas for Canvas {
         write!(
             self.buffer,
             "\\node [draw={color}, align={align}, text={color}] at {position} {{{content}}};",
-            color = Rgb(color),
+            color = Rgb(self.theme.color(color)),
             position = Point(position),
         )
         .unwrap();

@@ -56,10 +56,10 @@ where
     {
         self.grid.draw(canvas, |tile| match tile {
             Tile::Empty => drawing::Tile::Square {
-                color: Color::LIGHT_GRAY,
+                color: Color::Surface,
             },
-            Tile::Blue => drawing::Tile::Square { color: Color::BLUE },
-            Tile::Red => drawing::Tile::Square { color: Color::RED },
+            Tile::Blue => drawing::Tile::Square { color: Color::Blue },
+            Tile::Red => drawing::Tile::Square { color: Color::Red },
         });
     }
 

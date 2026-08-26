@@ -268,26 +268,26 @@ where
     {
         self.grid.draw(canvas, |tile| match tile {
             Tile::Empty => drawing::Tile::Square {
-                color: Color::LIGHT_GRAY,
+                color: Color::Surface,
             },
             Tile::LeftJumper => drawing::Tile::Char {
-                tile_color: Color::LIGHT_GRAY,
-                text_color: Color::BLUE,
+                tile_color: Color::Surface,
+                text_color: Color::Blue,
                 letter: 'L',
             },
             Tile::LeftSlipper => drawing::Tile::Char {
-                tile_color: Color::LIGHT_GRAY,
-                text_color: Color::BLUE,
+                tile_color: Color::Surface,
+                text_color: Color::Blue,
                 letter: 'l',
             },
             Tile::RightJumper => drawing::Tile::Char {
-                tile_color: Color::LIGHT_GRAY,
-                text_color: Color::RED,
+                tile_color: Color::Surface,
+                text_color: Color::Red,
                 letter: 'R',
             },
             Tile::RightSlipper => drawing::Tile::Char {
-                tile_color: Color::LIGHT_GRAY,
-                text_color: Color::RED,
+                tile_color: Color::Surface,
+                text_color: Color::Red,
                 letter: 'r',
             },
         });

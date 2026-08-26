@@ -5,7 +5,7 @@ use crate::{
     report_edits_to_python, set_edited,
 };
 use cgt::{
-    drawing::{Area, Canvas, Color, Hits, Interaction, Interactions},
+    drawing::{Area, Canvas, Color, Hits, Interaction, Interactions, Shade},
     graph::{
         Graph, VertexIndex,
         adjacency_matrix::{directed::DirectedGraph, undirected::UndirectedGraph},
@@ -389,7 +389,7 @@ impl GraphWidget {
                 position: V2f::ZERO,
                 size: canvas_size,
             });
-            canvas.rect(V2f::ZERO, canvas_size, Color::LIGHT_GRAY);
+            canvas.rect(V2f::ZERO, canvas_size, Color::Surface, Shade::Plain);
 
             let vertices = graph.draw(canvas, |canvas, vertex| {
                 let position: V2f = *graph.get_vertex(vertex).get_inner();
@@ -440,11 +440,11 @@ impl GraphWidget {
         // Show whether dropping the edge here would add it, remove it, or do nothing.
         // Dropping on empty canvas always lands, so only an existing vertex can refuse
         let color = match target {
-            Some(target) if graph.are_adjacent(from, target) => Color::RED,
+            Some(target) if graph.are_adjacent(from, target) => Color::Red,
             Some(target) if !GraphWidget::may_connect(graph, preset, from, target) => {
-                Color::DARK_GRAY
+                Color::Secondary
             }
-            Some(_) | None => Color::BLUE,
+            Some(_) | None => Color::Blue,
         };
 
         // Arrow head so that it is clear which way around the edge is about to go

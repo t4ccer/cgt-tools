@@ -188,9 +188,9 @@ where
         let interaction = canvas.vertex(
             vertex_position,
             if vertex.tower.is_some() {
-                Color::DARK_GRAY
+                Color::Secondary
             } else {
-                Color::LIGHT_GRAY
+                Color::Surface
             },
             idx,
         );
@@ -201,9 +201,9 @@ where
                 y: C::vertex_radius(),
             };
         let text_color = if vertex.is_unique {
-            Color::BLACK
+            Color::Primary
         } else {
-            Color::RED
+            Color::Red
         };
 
         if vertex.tower.is_some() {
@@ -363,9 +363,9 @@ where
         let interaction = canvas.vertex(
             vertex_position,
             if vertex.is_original {
-                Color::DARK_GRAY
+                Color::Secondary
             } else {
-                Color::LIGHT_GRAY
+                Color::Surface
             },
             idx,
         );
@@ -376,9 +376,9 @@ where
                 y: C::vertex_radius(),
             };
         let text_color = if vertex.is_colliding {
-            Color::RED
+            Color::Red
         } else {
-            Color::BLACK
+            Color::Primary
         };
 
         canvas.text(

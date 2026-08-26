@@ -2,7 +2,7 @@
 //! whatever is painted on it
 
 use cgt::{
-    drawing::{Area, Canvas, Color, Interaction, Interactions, TextAlignment},
+    drawing::{Area, Canvas, Color, Interaction, Interactions, Rgba, Shade, TextAlignment, Theme},
     numeric::v2f::V2f,
 };
 use core::f64;
@@ -13,9 +13,10 @@ use web_sys::CanvasRenderingContext2d;
 pub(crate) struct HtmlCanvas<'a> {
     context: CanvasRenderingContext2d,
     interactions: &'a mut Interactions,
+    theme: Theme,
 }
 
-fn css(color: Color) -> String {
+fn css(color: Rgba) -> String {
     format!(
         "rgba({},{},{},{})",
         color.r,
@@ -33,6 +34,7 @@ impl<'a> HtmlCanvas<'a> {
         HtmlCanvas {
             context,
             interactions,
+            theme: Theme::Light,
         }
     }
 
@@ -61,7 +63,8 @@ impl<'a> HtmlCanvas<'a> {
         self.context.set_font(font);
         self.context.set_text_align(align);
         self.context.set_text_baseline("middle");
-        self.context.set_fill_style_str(&css(color));
+        self.context
+            .set_fill_style_str(&css(self.theme.color(color)));
         // Fails only if the text cannot be laid out, in which case there is nothing to draw
         let _ = self
             .context
@@ -70,12 +73,13 @@ impl<'a> HtmlCanvas<'a> {
 }
 
 impl Canvas for HtmlCanvas<'_> {
-    fn rect(&mut self, position: V2f, size: V2f, color: Color) {
+    fn rect(&mut self, position: V2f, size: V2f, color: Color, shade: Shade) {
         if self.is_measuring() {
             return;
         }
 
-        self.context.set_fill_style_str(&css(color));
+        self.context
+            .set_fill_style_str(&css(self.theme.shaded(color, shade)));
         self.context.fill_rect(
             position.x as f64,
             position.y as f64,
@@ -89,6 +93,7 @@ impl Canvas for HtmlCanvas<'_> {
         position: V2f,
         radius: f32,
         fill_color: Color,
+        fill_shade: Shade,
         stroke_width: f32,
         stroke_color: Color,
     ) {
@@ -105,10 +110,12 @@ impl Canvas for HtmlCanvas<'_> {
             0.0,
             2.0 * f64::consts::PI,
         );
-        self.context.set_fill_style_str(&css(fill_color));
+        self.context
+            .set_fill_style_str(&css(self.theme.shaded(fill_color, fill_shade)));
         self.context.fill();
         self.context.set_line_width(stroke_width as f64);
-        self.context.set_stroke_style_str(&css(stroke_color));
+        self.context
+            .set_stroke_style_str(&css(self.theme.color(stroke_color)));
         self.context.stroke();
     }
 
@@ -121,7 +128,8 @@ impl Canvas for HtmlCanvas<'_> {
         self.context.move_to(start.x as f64, start.y as f64);
         self.context.line_to(end.x as f64, end.y as f64);
         self.context.set_line_width(weight as f64);
-        self.context.set_stroke_style_str(&css(color));
+        self.context
+            .set_stroke_style_str(&css(self.theme.color(color)));
         self.context.stroke();
     }
 

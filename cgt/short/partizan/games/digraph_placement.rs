@@ -106,8 +106,8 @@ where
             canvas.vertex(
                 position,
                 match color {
-                    VertexColor::Left => drawing::Color::BLUE,
-                    VertexColor::Right => drawing::Color::RED,
+                    VertexColor::Left => drawing::Color::Blue,
+                    VertexColor::Right => drawing::Color::Red,
                 },
                 vertex_index,
             )

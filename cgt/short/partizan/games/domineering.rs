@@ -225,10 +225,10 @@ where
     {
         self.grid.draw(canvas, |tile| match tile {
             Tile::Empty => drawing::Tile::Square {
-                color: Color::LIGHT_GRAY,
+                color: Color::Surface,
             },
             Tile::Taken => drawing::Tile::Square {
-                color: Color::DARK_GRAY,
+                color: Color::Secondary,
             },
         });
     }
