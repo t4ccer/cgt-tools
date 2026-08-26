@@ -6,15 +6,19 @@ use std::fmt::Arguments;
 
 use crate::{graph::VertexIndex, numeric::v2f::V2f, short::partizan::Player};
 
-pub mod svg;
-pub mod tikz;
-
-#[cfg(feature = "tiny_skia")]
-pub mod tiny_skia;
-
 mod measuring;
+mod svg;
+mod tikz;
 
 pub use measuring::MeasuringCanvas;
+pub use svg::SvgCanvas;
+pub use tikz::TikzCanvas;
+
+#[cfg(feature = "tiny_skia")]
+mod tiny_skia;
+
+#[cfg(feature = "tiny_skia")]
+pub use tiny_skia::TinySkiaCanvas;
 
 /// Concrete color that a [`Color`] is painted with. Only canvases build these, by resolving
 /// a [`Color`] through their [`Theme`]

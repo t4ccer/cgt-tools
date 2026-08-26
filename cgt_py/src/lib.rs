@@ -2,7 +2,7 @@
 
 use crate::widget::inject_traitlet_widget;
 use cgt::{
-    drawing::{Draw, MeasuringCanvas, svg},
+    drawing::{Draw, MeasuringCanvas, SvgCanvas},
     numeric::v2f::V2f,
 };
 use pyo3::prelude::*;
@@ -30,9 +30,8 @@ pub fn draw_svg<D>(game: &D) -> String
 where
     D: Draw,
 {
-    let bounding_box = MeasuringCanvas::<svg::Canvas>::measure(game, Some(SVG_MAX_CANVAS_SIZE));
-    let mut canvas =
-        svg::Canvas::new(bounding_box).with_max_canvas_size(crate::SVG_MAX_CANVAS_SIZE);
+    let bounding_box = MeasuringCanvas::<SvgCanvas>::measure(game, Some(SVG_MAX_CANVAS_SIZE));
+    let mut canvas = SvgCanvas::new(bounding_box).with_max_canvas_size(crate::SVG_MAX_CANVAS_SIZE);
     game.draw(&mut canvas);
     canvas.to_svg()
 }

@@ -1,6 +1,6 @@
 use cgt::{
     display_error::DisplayError,
-    drawing::{Canvas, MeasuringCanvas, svg},
+    drawing::{Canvas, MeasuringCanvas, SvgCanvas},
     graph::{
         Graph, VertexIndex,
         adjacency_matrix::{directed::DirectedGraph, undirected::UndirectedGraph},
@@ -86,7 +86,7 @@ where
     G: Graph<V>,
     V: Has<V2f>,
 {
-    arrange::<svg::Canvas, _, _>(graph, SVG_CANVAS_SIZE);
+    arrange::<SvgCanvas, _, _>(graph, SVG_CANVAS_SIZE);
 }
 
 fn draw_colored_graph<C>(graph: &DirectedGraph<Vertex>, canvas: &mut C)
@@ -251,10 +251,10 @@ impl PyGraph {
         let mut positioned_graph = self.graph.clone();
         layout_for_svg(&mut positioned_graph);
 
-        let mut measuring = MeasuringCanvas::<svg::Canvas>::new(Some(crate::SVG_MAX_CANVAS_SIZE));
+        let mut measuring = MeasuringCanvas::<SvgCanvas>::new(Some(crate::SVG_MAX_CANVAS_SIZE));
         draw_colored_graph(&positioned_graph, &mut measuring);
 
-        let mut canvas = svg::Canvas::new(measuring.bounding_box())
+        let mut canvas = SvgCanvas::new(measuring.bounding_box())
             .with_max_canvas_size(crate::SVG_MAX_CANVAS_SIZE);
         draw_colored_graph(&positioned_graph, &mut canvas);
         canvas.to_svg()

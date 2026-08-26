@@ -159,7 +159,7 @@ impl Tag<'_, '_, Content> {
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
-pub struct Canvas {
+pub struct SvgCanvas {
     buffer: String,
 
     /// Theme to paint with, or [`None`] to leave the choice to whoever looks at the image
@@ -168,7 +168,7 @@ pub struct Canvas {
     max_canvas_size: Option<V2f>,
 }
 
-impl Canvas {
+impl SvgCanvas {
     /// Both palettes are written into every image, and a `<style>` element inside an inline
     /// SVG applies to the whole page it is embedded in, so the rules have to be scoped to
     /// the images this canvas produces. Every one of them defines the same properties, so
@@ -181,7 +181,7 @@ impl Canvas {
             buffer: format!(
                 "<svg xmlns=\"http://www.w3.org/2000/svg\" class=\"{}\" \
                  viewBox=\"{} {} {} {}\" width=\"{}\" height=\"{}\">",
-                Canvas::CLASS,
+                SvgCanvas::CLASS,
                 viewport.top_left.x,
                 viewport.top_left.y,
                 size.x,
@@ -226,7 +226,7 @@ impl Canvas {
     /// Define every color of both themes, so that the image follows the color scheme of
     /// whoever looks at it
     fn palette(&mut self) {
-        write!(self.buffer, "<style>svg.{}{{", Canvas::CLASS).unwrap();
+        write!(self.buffer, "<style>svg.{}{{", SvgCanvas::CLASS).unwrap();
         for color in Color::ALL {
             write!(
                 self.buffer,
@@ -240,7 +240,7 @@ impl Canvas {
         write!(
             self.buffer,
             "}}@media (prefers-color-scheme: dark){{svg.{}{{",
-            Canvas::CLASS
+            SvgCanvas::CLASS
         )
         .unwrap();
         for color in Color::ALL {
@@ -276,7 +276,7 @@ impl Canvas {
     }
 }
 
-impl crate::drawing::Canvas for Canvas {
+impl crate::drawing::Canvas for SvgCanvas {
     fn rect(&mut self, position: V2f, size: V2f, color: Color, shade: Shade) {
         let color = self.paint(color, shade);
         let mut rect = self.self_closing_tag("rect");

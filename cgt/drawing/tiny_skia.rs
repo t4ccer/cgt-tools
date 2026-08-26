@@ -9,18 +9,18 @@ use crate::{
 use tiny_skia;
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Canvas {
+pub struct TinySkiaCanvas {
     offset: V2f,
     pixmap: tiny_skia::Pixmap,
     theme: Theme,
     max_canvas_size: Option<V2f>,
 }
 
-impl Canvas {
-    pub fn new(viewport: BoundingBox) -> Canvas {
+impl TinySkiaCanvas {
+    pub fn new(viewport: BoundingBox) -> TinySkiaCanvas {
         let size = viewport.size();
         let offset = -viewport.top_left;
-        Canvas {
+        TinySkiaCanvas {
             offset,
             pixmap: tiny_skia::Pixmap::new(size.x as u32, size.y as u32).unwrap(),
             theme: Theme::Light,
@@ -29,14 +29,14 @@ impl Canvas {
     }
 
     #[must_use]
-    pub const fn with_theme(mut self, theme: Theme) -> Canvas {
+    pub const fn with_theme(mut self, theme: Theme) -> TinySkiaCanvas {
         self.theme = theme;
         self
     }
 
     /// Set the canvas size
     #[must_use]
-    pub const fn with_max_canvas_size(mut self, max_canvas_size: V2f) -> Canvas {
+    pub const fn with_max_canvas_size(mut self, max_canvas_size: V2f) -> TinySkiaCanvas {
         self.max_canvas_size = Some(max_canvas_size);
         self
     }
@@ -46,7 +46,7 @@ impl Canvas {
     }
 }
 
-impl super::Canvas for Canvas {
+impl super::Canvas for TinySkiaCanvas {
     fn rect(&mut self, position: V2f, size: V2f, color: Color, shade: Shade) {
         let position = self.offset + position;
         self.pixmap.fill_rect(

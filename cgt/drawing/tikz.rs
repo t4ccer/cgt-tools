@@ -28,12 +28,12 @@ impl Display for Point {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Canvas {
+pub struct TikzCanvas {
     buffer: String,
     theme: Theme,
 }
 
-impl Canvas {
+impl TikzCanvas {
     pub const fn new() -> Self {
         Self {
             buffer: String::new(),
@@ -52,7 +52,7 @@ impl Canvas {
     }
 }
 
-impl crate::drawing::Canvas for Canvas {
+impl crate::drawing::Canvas for TikzCanvas {
     fn rect(&mut self, position: V2f, size: V2f, color: Color, shade: Shade) {
         write!(
             self.buffer,

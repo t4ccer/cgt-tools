@@ -1,5 +1,5 @@
 use cgt::{
-    drawing::{Draw, tikz},
+    drawing::{Draw, TikzCanvas},
     graph::{adjacency_matrix::undirected::UndirectedGraph, bipartite::BipartiteGraph},
     latex::LatexMathEscape,
     short::partizan::{
@@ -75,7 +75,7 @@ pub fn run(args: Args) -> anyhow::Result<()> {
 
                 let temperature = canonical_form.temperature();
 
-                let mut canvas = tikz::Canvas::new();
+                let mut canvas = TikzCanvas::new();
                 snort.draw(&mut canvas);
                 writeln!(
                     out,
@@ -108,7 +108,7 @@ pub fn run(args: Args) -> anyhow::Result<()> {
     writeln!(out, "  \\midrule \\endhead%")?;
     for (canonical_form, (graph, snort)) in &seen_reduced {
         let canonical_form: &CanonicalForm = canonical_form;
-        let mut canvas = tikz::Canvas::new();
+        let mut canvas = TikzCanvas::new();
         snort.draw(&mut canvas);
         writeln!(
             out,
@@ -132,7 +132,7 @@ pub fn run(args: Args) -> anyhow::Result<()> {
         let cf: &CanonicalForm = cf;
 
         if *cf == -cf {
-            let mut canvas = tikz::Canvas::new();
+            let mut canvas = TikzCanvas::new();
             snort.draw(&mut canvas);
             writeln!(
                 out,
@@ -172,7 +172,7 @@ pub fn run(args: Args) -> anyhow::Result<()> {
             continue;
         }
 
-        let mut canvas1 = tikz::Canvas::new();
+        let mut canvas1 = TikzCanvas::new();
         snort1.draw(&mut canvas1);
 
         for (cf2, (graph2, snort2)) in &seen_cf {
@@ -192,16 +192,16 @@ pub fn run(args: Args) -> anyhow::Result<()> {
                 continue;
             }
 
-            let mut canvas2 = tikz::Canvas::new();
+            let mut canvas2 = TikzCanvas::new();
             snort2.draw(&mut canvas2);
 
-            let mut canvas = tikz::Canvas::new();
+            let mut canvas = TikzCanvas::new();
             snort.draw(&mut canvas);
 
             let write = |out: &mut BufWriter<File>,
                          graph: &BipartiteGraph,
                          cf: &CanonicalForm,
-                         canvas: &tikz::Canvas| {
+                         canvas: &TikzCanvas| {
                 if args.sum_images {
                     write!(
                         out,
