@@ -22,6 +22,46 @@ impl Display for Css {
     }
 }
 
+/// Custom property that [`Canvas::palette`] defines for `color` in both themes
+const fn variable(color: Color) -> &'static str {
+    match color {
+        Color::Primary => "--cgt-primary",
+        Color::Secondary => "--cgt-secondary",
+        Color::Surface => "--cgt-surface",
+        Color::Background => "--cgt-background",
+        Color::Blue => "--cgt-blue",
+        Color::Red => "--cgt-red",
+        Color::Green => "--cgt-green",
+    }
+}
+
+/// What a [`Color`] is painted with: the concrete color of the canvas theme, or the custom
+/// property that follows whichever theme the viewer is using
+#[derive(Clone, Copy)]
+enum Paint {
+    Fixed(Rgba),
+    Themed { color: Color, shade: Shade },
+}
+
+impl Display for Paint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match *self {
+            Paint::Fixed(color) => write!(f, "{}", Css(color)),
+            Paint::Themed {
+                color,
+                shade: Shade::Plain,
+            } => write!(f, "var({})", variable(color)),
+            Paint::Themed { color, shade } => write!(
+                f,
+                "color-mix(in srgb, var({}) {}%, var({}))",
+                variable(color),
+                shade.amount().mul_add(-100.0, 100.0),
+                variable(Color::Primary),
+            ),
+        }
+    }
+}
+
 struct SelfClosing;
 struct Open;
 struct Content;
@@ -120,15 +160,25 @@ impl Tag<'_, '_, Content> {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Canvas {
     buffer: String,
-    theme: Theme,
+
+    /// Theme to paint with, or [`None`] to leave the choice to whoever looks at the image
+    theme: Option<Theme>,
 }
 
 impl Canvas {
+    /// Both palettes are written into every image, and a `<style>` element inside an inline
+    /// SVG applies to the whole page it is embedded in, so the rules have to be scoped to
+    /// the images this canvas produces. Every one of them defines the same properties, so
+    /// they can all share the one class
+    const CLASS: &'static str = "cgt-canvas";
+
     pub fn new(viewport: BoundingBox) -> Self {
         let size = viewport.size();
         Self {
             buffer: format!(
-                "<svg viewBox=\"{} {} {} {}\" width=\"{}\" height=\"{}\">",
+                "<svg xmlns=\"http://www.w3.org/2000/svg\" class=\"{}\" \
+                 viewBox=\"{} {} {} {}\" width=\"{}\" height=\"{}\">",
+                Canvas::CLASS,
                 viewport.top_left.x,
                 viewport.top_left.y,
                 size.x,
@@ -136,19 +186,59 @@ impl Canvas {
                 viewport.size().x,
                 viewport.size().y,
             ),
-            theme: Theme::Light,
+            theme: None,
         }
     }
 
+    /// Paint with `theme` instead of following the color scheme of whoever looks at the
+    /// image
     #[must_use]
     pub const fn with_theme(mut self, theme: Theme) -> Self {
-        self.theme = theme;
+        self.theme = Some(theme);
         self
     }
 
     pub fn to_svg(mut self) -> String {
+        if self.theme.is_none() {
+            self.palette();
+        }
         self.buffer.push_str("</svg>");
         self.buffer
+    }
+
+    fn paint(&self, color: Color, shade: Shade) -> Paint {
+        self.theme.map_or(Paint::Themed { color, shade }, |theme| {
+            Paint::Fixed(theme.shaded(color, shade))
+        })
+    }
+
+    /// Define every color of both themes, so that the image follows the color scheme of
+    /// whoever looks at it
+    fn palette(&mut self) {
+        write!(self.buffer, "<style>svg.{}{{", Canvas::CLASS).unwrap();
+        for color in Color::ALL {
+            write!(
+                self.buffer,
+                "{}:{};",
+                variable(color),
+                Css(Theme::Light.color(color))
+            )
+            .unwrap();
+        }
+
+        write!(
+            self.buffer,
+            "}}@media (prefers-color-scheme: dark){{svg.{}{{",
+            Canvas::CLASS
+        )
+        .unwrap();
+        for color in Color::ALL {
+            let dark = Theme::Dark.color(color);
+            if dark != Theme::Light.color(color) {
+                write!(self.buffer, "{}:{};", variable(color), Css(dark)).unwrap();
+            }
+        }
+        self.buffer.push_str("}}</style>");
     }
 
     fn self_closing_tag<'buf, 'tag>(
@@ -177,13 +267,13 @@ impl Canvas {
 
 impl crate::drawing::Canvas for Canvas {
     fn rect(&mut self, position: V2f, size: V2f, color: Color, shade: Shade) {
-        let color = Css(self.theme.shaded(color, shade));
+        let color = self.paint(color, shade);
         let mut rect = self.self_closing_tag("rect");
         rect.attribute("x", position.x);
         rect.attribute("y", position.y);
         rect.attribute("width", size.x);
         rect.attribute("height", size.y);
-        rect.attribute("fill", color);
+        rect.attribute("style", format_args!("fill:{}", color));
     }
 
     fn circle(
@@ -195,26 +285,28 @@ impl crate::drawing::Canvas for Canvas {
         stroke_width: f32,
         stroke_color: Color,
     ) {
-        let fill_color = Css(self.theme.shaded(fill_color, fill_shade));
-        let stroke_color = Css(self.theme.color(stroke_color));
+        let fill_color = self.paint(fill_color, fill_shade);
+        let stroke_color = self.paint(stroke_color, Shade::Plain);
         let mut circle = self.self_closing_tag("circle");
         circle.attribute("cx", position.x);
         circle.attribute("cy", position.y);
         circle.attribute("r", radius);
-        circle.attribute("fill", fill_color);
         circle.attribute("stroke-width", stroke_width);
-        circle.attribute("stroke", stroke_color);
+        circle.attribute(
+            "style",
+            format_args!("fill:{};stroke:{}", fill_color, stroke_color),
+        );
     }
 
     fn line(&mut self, start: V2f, end: V2f, weight: f32, color: Color) {
-        let color = Css(self.theme.color(color));
+        let color = self.paint(color, Shade::Plain);
         let mut line = self.self_closing_tag("line");
         line.attribute("x1", start.x);
         line.attribute("y1", start.y);
         line.attribute("x2", end.x);
         line.attribute("y2", end.y);
         line.attribute("stroke-width", weight);
-        line.attribute("stroke", color);
+        line.attribute("style", format_args!("stroke:{}", color));
     }
 
     fn text(
@@ -224,7 +316,7 @@ impl crate::drawing::Canvas for Canvas {
         alignment: super::TextAlignment,
         color: Color,
     ) {
-        let color = Css(self.theme.color(color));
+        let color = self.paint(color, Shade::Plain);
         let mut text = self.tag("text");
         text.attribute("x", position.x);
         text.attribute("y", position.y);
@@ -238,7 +330,7 @@ impl crate::drawing::Canvas for Canvas {
         );
         text.attribute("dominant-baseline", "central");
         text.attribute("font-size", "13px");
-        text.attribute("fill", color);
+        text.attribute("style", format_args!("fill:{}", color));
 
         let mut text = text.finish_attributes();
         text.content(&content);
@@ -247,14 +339,14 @@ impl crate::drawing::Canvas for Canvas {
     fn large_char(&mut self, letter: char, position: V2f, color: Color) {
         let tile_size = Self::tile_size();
 
-        let color = Css(self.theme.color(color));
+        let color = self.paint(color, Shade::Plain);
         let mut text = self.tag("text");
         text.attribute("x", tile_size.x.mul_add(0.5, position.x));
         text.attribute("y", tile_size.y.mul_add(0.5, position.y));
         text.attribute("text-anchor", "middle");
         text.attribute("dominant-baseline", "central");
         text.attribute("font-size", "52px");
-        text.attribute("fill", color);
+        text.attribute("style", format_args!("fill:{}", color));
 
         let mut text = text.finish_attributes();
         let mut buf = [0u8; 4];

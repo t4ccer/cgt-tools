@@ -91,6 +91,18 @@ pub enum Color {
 }
 
 impl Color {
+    /// Every color, for canvases that emit a whole palette rather than resolving one color
+    /// at a time
+    pub const ALL: [Color; 7] = [
+        Color::Primary,
+        Color::Secondary,
+        Color::Surface,
+        Color::Background,
+        Color::Blue,
+        Color::Red,
+        Color::Green,
+    ];
+
     /// Left is bLue, Right is Red
     pub const fn of_player(player: Player) -> Color {
         match player {
@@ -110,7 +122,9 @@ pub enum Shade {
 }
 
 impl Shade {
-    const fn amount(self) -> f32 {
+    /// How much of the way towards [`Color::Primary`] the shade moves a color
+    #[must_use]
+    pub const fn amount(self) -> f32 {
         match self {
             Shade::Plain => 0.0,
             Shade::Hovered => 0.1,

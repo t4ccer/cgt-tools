@@ -730,7 +730,6 @@ impl Draw for Thermograph {
     where
         C: Canvas,
     {
-        // FIXME: We should be mindful about dark mode for svg renderer
         self.draw_scaled(canvas, 64.0);
     }
 
