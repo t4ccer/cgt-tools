@@ -290,7 +290,9 @@ impl crate::drawing::Canvas for Canvas {
         let mut circle = self.self_closing_tag("circle");
         circle.attribute("cx", position.x);
         circle.attribute("cy", position.y);
-        circle.attribute("r", radius);
+        // A stroke straddles the path it is drawn on, so the path has to come in by half of
+        // it for the circle to stay within `radius` of its center
+        circle.attribute("r", f32::max(stroke_width.mul_add(-0.5, radius), 0.0));
         circle.attribute("stroke-width", stroke_width);
         circle.attribute(
             "style",

@@ -106,7 +106,9 @@ impl Canvas for HtmlCanvas<'_> {
         let _ = self.context.arc(
             position.x as f64,
             position.y as f64,
-            radius as f64,
+            // A stroke straddles the path it is drawn on, so the path has to come in by
+            // half of it for the circle to stay within `radius` of its center
+            f32::max(stroke_width.mul_add(-0.5, radius), 0.0) as f64,
             0.0,
             2.0 * f64::consts::PI,
         );
