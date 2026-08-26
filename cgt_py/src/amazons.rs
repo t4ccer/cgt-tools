@@ -29,11 +29,7 @@ impl PyAmazons {
     }
 
     fn _repr_svg_(&self) -> String {
-        use cgt::drawing::{Draw, svg};
-        let bounding_box = self.0.required_canvas::<svg::Canvas>();
-        let mut canvas = svg::Canvas::new(bounding_box);
-        self.0.draw(&mut canvas);
-        canvas.to_svg()
+        crate::draw_svg(&self.0)
     }
 
     #[getter]

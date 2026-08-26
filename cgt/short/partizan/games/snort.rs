@@ -3,7 +3,7 @@
 //! vertices in their own color.
 
 use crate::{
-    drawing::{BoundingBox, Canvas, Color, Draw},
+    drawing::{Canvas, Color, Draw},
     graph::{Graph, VertexIndex},
     has::Has,
     numeric::{dyadic_rational_number::DyadicRationalNumber, nimber::Nimber, v2f::V2f},
@@ -385,13 +385,6 @@ where
                 vertex_index,
             )
         });
-    }
-
-    fn required_canvas<C>(&self) -> BoundingBox
-    where
-        C: Canvas,
-    {
-        self.graph.required_canvas::<C>()
     }
 }
 

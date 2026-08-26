@@ -6,7 +6,7 @@
 //! in the same way.
 
 use crate::{
-    drawing::{self, BoundingBox, Canvas, Color, Draw},
+    drawing::{self, Canvas, Color, Draw},
     grid::{CharTile, FiniteGrid, Grid, vec_grid::VecGrid},
     short::partizan::partizan_game::PartizanGame,
 };
@@ -109,13 +109,6 @@ impl Draw for ToadsAndFrogs {
                 letter: 'F',
             },
         });
-    }
-
-    fn required_canvas<C>(&self) -> BoundingBox
-    where
-        C: Canvas,
-    {
-        self.grid().canvas_size::<C>()
     }
 }
 

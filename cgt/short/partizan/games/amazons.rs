@@ -1,7 +1,7 @@
 //! Amazons game
 
 use crate::{
-    drawing::{self, BoundingBox, Canvas, Color, Draw},
+    drawing::{self, Canvas, Color, Draw},
     grid::{FiniteGrid, Grid, GridParseError, decompositions, move_top_left, vec_grid::VecGrid},
     short::partizan::{Player, partizan_game::PartizanGame},
 };
@@ -190,13 +190,6 @@ where
                 circle_color: Color::Red,
             },
         });
-    }
-
-    fn required_canvas<C>(&self) -> BoundingBox
-    where
-        C: Canvas,
-    {
-        self.grid().canvas_size::<C>()
     }
 }
 

@@ -1,7 +1,7 @@
 //! Konane
 
 use crate::{
-    drawing::{self, BoundingBox, Canvas, Color, Draw},
+    drawing::{self, Canvas, Color, Draw},
     grid::{FiniteGrid, Grid, GridParseError, vec_grid::VecGrid},
     short::partizan::{Player, partizan_game::PartizanGame},
 };
@@ -93,13 +93,6 @@ where
                 color: Color::Secondary,
             },
         });
-    }
-
-    fn required_canvas<C>(&self) -> BoundingBox
-    where
-        C: Canvas,
-    {
-        self.grid().canvas_size::<C>()
     }
 }
 

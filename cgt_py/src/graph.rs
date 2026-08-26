@@ -1,6 +1,6 @@
 use cgt::{
     display_error::DisplayError,
-    drawing::{Draw, svg},
+    drawing::{Canvas, MeasuringCanvas, svg},
     graph::{
         Graph, VertexIndex,
         adjacency_matrix::{directed::DirectedGraph, undirected::UndirectedGraph},
@@ -92,15 +92,15 @@ where
     arrange::<svg::Canvas, _, _>(graph, SVG_CANVAS_SIZE);
 }
 
-/// Draw a game onto a fresh svg canvas cut to fit it
-pub fn draw_svg<D>(game: &D) -> String
+fn draw_colored_graph<C>(graph: &DirectedGraph<Vertex>, canvas: &mut C)
 where
-    D: Draw,
+    C: Canvas,
 {
-    let bounding_box = game.required_canvas::<svg::Canvas>();
-    let mut canvas = svg::Canvas::new(bounding_box);
-    game.draw(&mut canvas);
-    canvas.to_svg()
+    graph.draw(canvas, |canvas, vertex| {
+        let position: V2f = *graph.get_vertex(vertex).get_inner();
+        let color: VertexColor = *graph.get_vertex(vertex).get_inner();
+        canvas.vertex(position, color.color(), vertex)
+    });
 }
 
 impl PyGraph {
@@ -251,18 +251,14 @@ impl PyGraph {
     }
 
     fn _repr_svg_(&self) -> String {
-        use cgt::drawing::{Canvas, svg};
-
         let mut positioned_graph = self.graph.clone();
         layout_for_svg(&mut positioned_graph);
 
-        let bounding_box = Graph::required_canvas::<svg::Canvas>(&positioned_graph);
-        let mut canvas = svg::Canvas::new(bounding_box);
-        positioned_graph.draw(&mut canvas, |canvas, vertex| {
-            let position: V2f = *positioned_graph.get_vertex(vertex).get_inner();
-            let color: VertexColor = *positioned_graph.get_vertex(vertex).get_inner();
-            canvas.vertex(position, color.color(), vertex)
-        });
+        let mut measuring = MeasuringCanvas::<svg::Canvas>::new();
+        draw_colored_graph(&positioned_graph, &mut measuring);
+
+        let mut canvas = svg::Canvas::new(measuring.bounding_box());
+        draw_colored_graph(&positioned_graph, &mut canvas);
         canvas.to_svg()
     }
 

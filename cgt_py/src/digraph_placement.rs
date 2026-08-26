@@ -90,7 +90,7 @@ impl PyDigraphPlacement {
             position: V2f::ZERO,
         });
         crate::graph::layout_for_svg(&mut graph);
-        crate::graph::draw_svg(&DigraphPlacement::new(graph))
+        crate::draw_svg(&DigraphPlacement::new(graph))
     }
 }
 

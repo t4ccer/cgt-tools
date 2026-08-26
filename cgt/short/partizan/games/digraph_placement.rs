@@ -5,7 +5,7 @@
 use std::{hash::Hash, marker::PhantomData};
 
 use crate::{
-    drawing::{self, BoundingBox, Canvas, Draw},
+    drawing::{self, Canvas, Draw},
     graph::{Graph, VertexIndex},
     has::Has,
     numeric::v2f::V2f,
@@ -112,13 +112,6 @@ where
                 vertex_index,
             )
         });
-    }
-
-    fn required_canvas<C>(&self) -> BoundingBox
-    where
-        C: Canvas,
-    {
-        self.graph.required_canvas::<C>()
     }
 }
 

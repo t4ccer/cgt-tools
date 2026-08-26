@@ -3,7 +3,7 @@
 use std::collections::VecDeque;
 
 use crate::{
-    drawing::{BoundingBox, Canvas, Color, Hits, Interaction},
+    drawing::{Canvas, Color, Hits, Interaction},
     has::Has,
     numeric::v2f::V2f,
 };
@@ -193,46 +193,6 @@ pub trait Graph<V>: Sized {
             hits.record(this_vertex_idx, draw_vertex(canvas, this_vertex_idx));
         }
         hits
-    }
-
-    /// Get required canvas size to fit whole graph
-    fn required_canvas<C>(&self) -> BoundingBox
-    where
-        V: Has<V2f>,
-        C: Canvas,
-    {
-        if self.size() == 0 {
-            return BoundingBox {
-                top_left: V2f::ZERO,
-                bottom_right: V2f::ZERO,
-            };
-        }
-
-        let r = C::vertex_radius();
-        self.vertex_indices()
-            .map(|idx| *self.get_vertex(idx).get_inner())
-            .fold(
-                BoundingBox {
-                    top_left: V2f {
-                        x: f32::INFINITY,
-                        y: f32::INFINITY,
-                    },
-                    bottom_right: V2f {
-                        x: f32::NEG_INFINITY,
-                        y: f32::NEG_INFINITY,
-                    },
-                },
-                |bounding_box, v: V2f| BoundingBox {
-                    top_left: V2f {
-                        x: f32::min(bounding_box.top_left.x, v.x - r),
-                        y: f32::min(bounding_box.top_left.y, v.y - r),
-                    },
-                    bottom_right: V2f {
-                        x: f32::max(bounding_box.bottom_right.x, v.x + r),
-                        y: f32::max(bounding_box.bottom_right.y, v.y + r),
-                    },
-                },
-            )
     }
 
     /// Iterator over vertices

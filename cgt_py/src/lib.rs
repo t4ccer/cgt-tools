@@ -1,5 +1,6 @@
 #![allow(non_local_definitions)] // These come from pyo3 marcos
 
+use cgt::drawing::{Draw, MeasuringCanvas, svg};
 use jupyter_rust_widget_backend::inject_rust_widget;
 use pyo3::prelude::*;
 
@@ -17,6 +18,17 @@ pub mod konane;
 pub mod parsing;
 pub mod snort;
 pub mod thermograph;
+
+/// Draw a game onto a fresh svg canvas cut to fit it
+pub fn draw_svg<D>(game: &D) -> String
+where
+    D: Draw,
+{
+    let bounding_box = MeasuringCanvas::<svg::Canvas>::measure(game);
+    let mut canvas = svg::Canvas::new(bounding_box);
+    game.draw(&mut canvas);
+    canvas.to_svg()
+}
 
 macro_rules! py_partizan_game {
     ($pystruct:ident) => {

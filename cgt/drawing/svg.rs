@@ -331,7 +331,7 @@ impl crate::drawing::Canvas for Canvas {
             },
         );
         text.attribute("dominant-baseline", "central");
-        text.attribute("font-size", "13px");
+        text.attribute("font-size", format_args!("{}px", Self::text_size()));
         text.attribute("style", format_args!("fill:{}", color));
 
         let mut text = text.finish_attributes();
@@ -358,6 +358,10 @@ impl crate::drawing::Canvas for Canvas {
 
     fn tile_size() -> V2f {
         V2f { x: 64.0, y: 64.0 }
+    }
+
+    fn text_size() -> f32 {
+        13.0
     }
 
     fn thick_line_weight() -> f32 {

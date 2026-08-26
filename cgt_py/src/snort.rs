@@ -93,7 +93,7 @@ impl PySnort {
             position: V2f::ZERO,
         });
         crate::graph::layout_for_svg(&mut graph);
-        crate::graph::draw_svg(&Snort::new(graph))
+        crate::draw_svg(&Snort::new(graph))
     }
 }
 

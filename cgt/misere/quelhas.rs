@@ -3,7 +3,7 @@
 #![allow(missing_docs)]
 
 use crate::{
-    drawing::{self, BoundingBox, Canvas, Color, Draw},
+    drawing::{self, Canvas, Color, Draw},
     grid::{FiniteGrid, Grid},
     short::partizan::Player,
 };
@@ -61,12 +61,5 @@ where
             Tile::Blue => drawing::Tile::Square { color: Color::Blue },
             Tile::Red => drawing::Tile::Square { color: Color::Red },
         });
-    }
-
-    fn required_canvas<C>(&self) -> BoundingBox
-    where
-        C: Canvas,
-    {
-        self.grid().canvas_size::<C>()
     }
 }

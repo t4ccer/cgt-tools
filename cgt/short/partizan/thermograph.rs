@@ -2,7 +2,7 @@
 
 use crate::{
     display,
-    drawing::{BoundingBox, Canvas, Color, Draw, TextAlignment},
+    drawing::{Canvas, Color, Draw, TextAlignment},
     numeric::{dyadic_rational_number::DyadicRationalNumber, rational::Rational, v2f::V2f},
     short::partizan::{Player, canonical_form::CanonicalForm, trajectory::Trajectory},
 };
@@ -697,32 +697,6 @@ impl Thermograph {
             Color::Primary,
         );
     }
-
-    /// Measure thermograph with scale (length of one thermograph unit)
-    pub fn required_canvas_scaled<C>(&self, scale: f32) -> BoundingBox
-    where
-        C: Canvas,
-    {
-        let padding: f32 = 0.5;
-        let mast_height: f32 = 0.5;
-
-        let left_x = self.left_wall.value_at(Rational::from(-1));
-        let right_x = self.right_wall.value_at(Rational::from(-1));
-        let y_top_above_x_axis = self.y_top_above_x_axis();
-
-        BoundingBox {
-            top_left: scale
-                * V2f {
-                    x: -left_x.as_f32().unwrap(),
-                    y: -1.0,
-                },
-            bottom_right: scale
-                * V2f {
-                    x: padding.mul_add(2.0, -right_x.as_f32().unwrap()),
-                    y: padding.mul_add(2.0, y_top_above_x_axis) + mast_height,
-                },
-        }
-    }
 }
 
 impl Draw for Thermograph {
@@ -731,14 +705,6 @@ impl Draw for Thermograph {
         C: Canvas,
     {
         self.draw_scaled(canvas, 64.0);
-    }
-
-    fn required_canvas<C>(&self) -> BoundingBox
-    where
-        C: Canvas,
-    {
-        // FIXME: Account for text size when computing bounding boxes
-        self.required_canvas_scaled::<C>(64.0)
     }
 }
 

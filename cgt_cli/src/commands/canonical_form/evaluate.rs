@@ -1,7 +1,7 @@
 use crate::io::FilePathOr;
 use anyhow::{Context, Result};
 use cgt::{
-    drawing::{Draw, svg, tiny_skia},
+    drawing::{Draw, MeasuringCanvas, svg, tiny_skia},
     short::partizan::canonical_form::CanonicalForm,
 };
 use clap::Parser;
@@ -39,7 +39,7 @@ pub fn run(args: Args) -> Result<()> {
                 .context(format!("Could not create file '{}'", svg_fp))?,
         );
 
-        let canvas_size = thermograph.required_canvas::<svg::Canvas>();
+        let canvas_size = MeasuringCanvas::<svg::Canvas>::measure(&thermograph);
         let mut canvas = svg::Canvas::new(canvas_size);
         thermograph.draw(&mut canvas);
         let svg = canvas.to_svg();
@@ -53,7 +53,7 @@ pub fn run(args: Args) -> Result<()> {
                 .create()
                 .context(format!("Could not create file '{}'", png_fp))?,
         );
-        let canvas_size = thermograph.required_canvas::<tiny_skia::Canvas>();
+        let canvas_size = MeasuringCanvas::<tiny_skia::Canvas>::measure(&thermograph);
         let mut canvas = tiny_skia::Canvas::new(canvas_size);
         thermograph.draw(&mut canvas);
         let png_bytes = canvas.to_png();

@@ -12,6 +12,10 @@ pub mod tikz;
 #[cfg(feature = "tiny_skia")]
 pub mod tiny_skia;
 
+mod measuring;
+
+pub use measuring::MeasuringCanvas;
+
 /// Concrete color that a [`Color`] is painted with. Only canvases build these, by resolving
 /// a [`Color`] through their [`Theme`]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -775,6 +779,9 @@ pub trait Canvas {
 
     fn tile_size() -> V2f;
 
+    /// Height of the font that [`Canvas::text`] is written in
+    fn text_size() -> f32;
+
     fn vertex_radius() -> f32;
 
     fn thick_line_weight() -> f32;
@@ -811,11 +818,6 @@ impl BoundingBox {
 pub trait Draw {
     /// Paint position on existing canvas
     fn draw<C>(&self, canvas: &mut C)
-    where
-        C: Canvas;
-
-    /// Minimum required canvas size to paint the whole position
-    fn required_canvas<C>(&self) -> BoundingBox
     where
         C: Canvas;
 }

@@ -126,6 +126,10 @@ impl super::Canvas for Canvas {
         V2f { x: 64.0, y: 64.0 }
     }
 
+    fn text_size() -> f32 {
+        13.0
+    }
+
     fn thick_line_weight() -> f32 {
         2.0
     }

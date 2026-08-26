@@ -10,7 +10,7 @@
 //! a slipper that cannot jump anymore.
 
 use crate::{
-    drawing::{self, BoundingBox, Canvas, Color, Draw},
+    drawing::{self, Canvas, Color, Draw},
     grid::{FiniteGrid, Grid, GridParseError, vec_grid::VecGrid},
     short::partizan::{canonical_form::CanonicalForm, partizan_game::PartizanGame},
 };
@@ -291,13 +291,6 @@ where
                 letter: 'r',
             },
         });
-    }
-
-    fn required_canvas<C>(&self) -> BoundingBox
-    where
-        C: Canvas,
-    {
-        self.grid().canvas_size::<C>()
     }
 }
 

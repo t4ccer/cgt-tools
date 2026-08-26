@@ -132,6 +132,12 @@ impl crate::drawing::Canvas for Canvas {
         V2f { x: 1.0, y: 1.0 }
     }
 
+    /// LaTeX picks the font, so this is only the 10pt of a standard document expressed in
+    /// the centimetres that every other tikz length is in
+    fn text_size() -> f32 {
+        0.35
+    }
+
     fn thick_line_weight() -> f32 {
         0.05
     }

@@ -1,7 +1,7 @@
 //! Snort but on tinted, bipartite graph
 
 use crate::{
-    drawing::{BoundingBox, Canvas, Color, Draw},
+    drawing::{Canvas, Color, Draw},
     graph::{Graph, VertexIndex, bipartite::BipartiteGraph},
     has::Has,
     numeric::v2f::V2f,
@@ -211,8 +211,6 @@ where
     where
         C: Canvas,
     {
-        // FIXME: The bounding box is slightly off
-
         // NOTE: This probably could be computed on the fly
         let mut positions = vec![V2f::ZERO; self.graph.size()];
 
@@ -260,32 +258,6 @@ where
                 VertexColor::TintRight => Color::Red,
             };
             canvas.vertex(position, color, vertex_idx);
-        }
-    }
-
-    fn required_canvas<C>(&self) -> BoundingBox
-    where
-        C: Canvas,
-    {
-        let blue = self
-            .graph
-            .vertex_indices()
-            .filter(|idx| vertex_color(&self.graph, *idx) == VertexColor::TintLeft)
-            .count();
-        let red = self
-            .graph
-            .vertex_indices()
-            .filter(|idx| vertex_color(&self.graph, *idx) == VertexColor::TintRight)
-            .count();
-        let higher = blue.max(red);
-
-        BoundingBox {
-            top_left: V2f::ZERO,
-            bottom_right: V2f {
-                x: (PARTITION_DISTANCE + 4.0) * C::vertex_radius(),
-                y: (C::vertex_radius() * (2.0 + NODE_DISTANCE))
-                    .mul_add(higher as f32, -(C::vertex_radius() * NODE_DISTANCE)),
-            },
         }
     }
 }
