@@ -178,6 +178,16 @@ impl Canvas for HtmlCanvas<'_> {
         13.0
     }
 
+    /// The element is resized by whatever the widget is laid out in, so a drawing gets
+    /// however much room it happens to have this frame
+    fn max_canvas_size(&self) -> Option<V2f> {
+        let element = self.context.canvas()?;
+        Some(V2f {
+            x: element.width() as f32,
+            y: element.height() as f32,
+        })
+    }
+
     fn thick_line_weight() -> f32 {
         2.0
     }

@@ -39,8 +39,8 @@ pub fn run(args: Args) -> Result<()> {
                 .context(format!("Could not create file '{}'", svg_fp))?,
         );
 
-        let canvas_size = MeasuringCanvas::<svg::Canvas>::measure(&thermograph);
-        let mut canvas = svg::Canvas::new(canvas_size);
+        let canvas_size = MeasuringCanvas::<svg::Canvas>::measure(&thermograph, Some(crate::MAX_CANVAS_SIZE));
+        let mut canvas = svg::Canvas::new(canvas_size).with_max_canvas_size(crate::MAX_CANVAS_SIZE);
         thermograph.draw(&mut canvas);
         let svg = canvas.to_svg();
         w.write_all(svg.as_bytes())
@@ -53,8 +53,9 @@ pub fn run(args: Args) -> Result<()> {
                 .create()
                 .context(format!("Could not create file '{}'", png_fp))?,
         );
-        let canvas_size = MeasuringCanvas::<tiny_skia::Canvas>::measure(&thermograph);
-        let mut canvas = tiny_skia::Canvas::new(canvas_size);
+        let canvas_size = MeasuringCanvas::<tiny_skia::Canvas>::measure(&thermograph, Some(crate::MAX_CANVAS_SIZE));
+        let mut canvas =
+            tiny_skia::Canvas::new(canvas_size).with_max_canvas_size(crate::MAX_CANVAS_SIZE);
         thermograph.draw(&mut canvas);
         let png_bytes = canvas.to_png();
         w.write_all(&png_bytes)

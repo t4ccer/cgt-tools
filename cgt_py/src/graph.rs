@@ -254,10 +254,11 @@ impl PyGraph {
         let mut positioned_graph = self.graph.clone();
         layout_for_svg(&mut positioned_graph);
 
-        let mut measuring = MeasuringCanvas::<svg::Canvas>::new();
+        let mut measuring = MeasuringCanvas::<svg::Canvas>::new(Some(crate::SVG_MAX_CANVAS_SIZE));
         draw_colored_graph(&positioned_graph, &mut measuring);
 
-        let mut canvas = svg::Canvas::new(measuring.bounding_box());
+        let mut canvas = svg::Canvas::new(measuring.bounding_box())
+            .with_max_canvas_size(crate::SVG_MAX_CANVAS_SIZE);
         draw_colored_graph(&positioned_graph, &mut canvas);
         canvas.to_svg()
     }

@@ -157,12 +157,14 @@ impl Tag<'_, '_, Content> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct Canvas {
     buffer: String,
 
     /// Theme to paint with, or [`None`] to leave the choice to whoever looks at the image
     theme: Option<Theme>,
+
+    max_canvas_size: Option<V2f>,
 }
 
 impl Canvas {
@@ -187,6 +189,7 @@ impl Canvas {
                 viewport.size().y,
             ),
             theme: None,
+            max_canvas_size: None,
         }
     }
 
@@ -195,6 +198,13 @@ impl Canvas {
     #[must_use]
     pub const fn with_theme(mut self, theme: Theme) -> Self {
         self.theme = Some(theme);
+        self
+    }
+
+    /// Set the canvas size
+    #[must_use]
+    pub const fn with_max_canvas_size(mut self, max_canvas_size: V2f) -> Self {
+        self.max_canvas_size = Some(max_canvas_size);
         self
     }
 
@@ -362,6 +372,10 @@ impl crate::drawing::Canvas for Canvas {
 
     fn text_size() -> f32 {
         13.0
+    }
+
+    fn max_canvas_size(&self) -> Option<V2f> {
+        self.max_canvas_size
     }
 
     fn thick_line_weight() -> f32 {

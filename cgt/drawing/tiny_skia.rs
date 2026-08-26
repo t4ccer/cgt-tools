@@ -13,6 +13,7 @@ pub struct Canvas {
     offset: V2f,
     pixmap: tiny_skia::Pixmap,
     theme: Theme,
+    max_canvas_size: Option<V2f>,
 }
 
 impl Canvas {
@@ -23,12 +24,20 @@ impl Canvas {
             offset,
             pixmap: tiny_skia::Pixmap::new(size.x as u32, size.y as u32).unwrap(),
             theme: Theme::Light,
+            max_canvas_size: None,
         }
     }
 
     #[must_use]
     pub const fn with_theme(mut self, theme: Theme) -> Canvas {
         self.theme = theme;
+        self
+    }
+
+    /// Set the canvas size
+    #[must_use]
+    pub const fn with_max_canvas_size(mut self, max_canvas_size: V2f) -> Canvas {
+        self.max_canvas_size = Some(max_canvas_size);
         self
     }
 
@@ -128,6 +137,10 @@ impl super::Canvas for Canvas {
 
     fn text_size() -> f32 {
         13.0
+    }
+
+    fn max_canvas_size(&self) -> Option<V2f> {
+        self.max_canvas_size
     }
 
     fn thick_line_weight() -> f32 {

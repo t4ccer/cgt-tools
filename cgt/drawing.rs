@@ -593,7 +593,7 @@ pub trait Canvas {
     fn arrow(&mut self, start: V2f, end: V2f, weight: f32, color: Color) {
         self.line(start, end, weight, color);
 
-        let size = Self::vertex_radius() * 0.3;
+        let size = Self::arrow_head_size();
         let direction = V2f::direction(start, end);
 
         // Both barbs sit behind the tip, offset to either side of the line
@@ -782,7 +782,18 @@ pub trait Canvas {
     /// Height of the font that [`Canvas::text`] is written in
     fn text_size() -> f32;
 
+    /// Room that a drawing should try to fit in, or [`None`] for canvases that grow to
+    /// whatever is painted on them. Drawings that can be laid out at more than one size
+    /// pick theirs to fit this
+    fn max_canvas_size(&self) -> Option<V2f>;
+
     fn vertex_radius() -> f32;
+
+    /// How far back from its tip an arrow head reaches. Independent of whatever a drawing
+    /// scales its own coordinates by, so that heads stay the same size on every image
+    fn arrow_head_size() -> f32 {
+        Self::vertex_radius() * 0.3
+    }
 
     fn thick_line_weight() -> f32;
 

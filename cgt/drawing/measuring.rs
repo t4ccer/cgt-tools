@@ -26,6 +26,8 @@ pub struct MeasuringCanvas<C> {
     /// until then
     bounding_box: Option<BoundingBox>,
 
+    max_canvas_size: Option<V2f>,
+
     /// `fn() -> C` rather than `C`, so that measuring for a canvas neither owns one nor
     /// inherits what it can be sent across
     canvas: PhantomData<fn() -> C>,
@@ -36,9 +38,10 @@ where
     C: Canvas,
 {
     #[must_use]
-    pub const fn new() -> MeasuringCanvas<C> {
+    pub const fn new(max_canvas_size: Option<V2f>) -> MeasuringCanvas<C> {
         MeasuringCanvas {
             bounding_box: None,
+            max_canvas_size,
             canvas: PhantomData,
         }
     }
@@ -52,13 +55,13 @@ where
         })
     }
 
-    /// Room that `drawing` needs on a `C`
+    /// Room that `drawing` needs on a `C` that has `max_canvas_size` to give it
     #[must_use]
-    pub fn measure<D>(drawing: &D) -> BoundingBox
+    pub fn measure<D>(drawing: &D, max_canvas_size: Option<V2f>) -> BoundingBox
     where
         D: Draw,
     {
-        let mut canvas = MeasuringCanvas::<C>::new();
+        let mut canvas = MeasuringCanvas::<C>::new(max_canvas_size);
         drawing.draw(&mut canvas);
         canvas.bounding_box()
     }
@@ -164,8 +167,16 @@ where
         C::text_size()
     }
 
+    fn max_canvas_size(&self) -> Option<V2f> {
+        self.max_canvas_size
+    }
+
     fn vertex_radius() -> f32 {
         C::vertex_radius()
+    }
+
+    fn arrow_head_size() -> f32 {
+        C::arrow_head_size()
     }
 
     fn thick_line_weight() -> f32 {

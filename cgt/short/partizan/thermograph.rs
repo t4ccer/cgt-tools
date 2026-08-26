@@ -542,13 +542,68 @@ impl Thermograph {
         y_top_above_x_axis_l.max(y_top_above_x_axis_r)
     }
 
+    /// How much of every axis the thermograph covers, in thermograph units
+    fn extent(&self) -> V2f {
+        let left_x = self
+            .left_wall
+            .value_at(Rational::from(-1))
+            .as_f32()
+            .unwrap();
+        let right_x = self
+            .right_wall
+            .value_at(Rational::from(-1))
+            .as_f32()
+            .unwrap();
+
+        V2f {
+            x: left_x - right_x,
+            y: self.y_top_above_x_axis() + 1.0,
+        }
+    }
+
+    /// Canvas length of one thermograph unit that keeps `self` inside
+    /// [`Canvas::max_canvas_size`].
+    ///
+    /// A thermograph is as big as its temperature, so a hot one drawn at a fixed scale runs
+    /// to thousands of pixels. Only ever scales down: one that already fits is left at the
+    /// natural scale of the canvas
+    pub fn scale_for<C>(&self, canvas: &C) -> f32
+    where
+        C: Canvas,
+    {
+        let natural = Thermograph::natural_scale::<C>();
+        let Some(budget) = canvas.max_canvas_size() else {
+            return natural;
+        };
+
+        // The ornaments are the same size whatever the scale, so the trajectories only get
+        // what is left of the budget once they are paid for. An axis overhangs both ends,
+        // and the mast stem stands above the top one
+        let ornaments = Thermograph::ornaments::<C>();
+        let extent = self.extent();
+        let plot = V2f {
+            x: 2.0f32.mul_add(-ornaments.axis_overhang, budget.x),
+            y: 2.0f32.mul_add(-ornaments.axis_overhang, budget.y) - ornaments.mast_stem,
+        };
+
+        f32::min(
+            natural,
+            f32::max(f32::min(plot.x / extent.x, plot.y / extent.y), 0.0),
+        )
+    }
+
     /// Draw thermograph with scale (length of one thermograph unit)
     pub fn draw_scaled<C>(&self, canvas: &mut C, scale: f32)
     where
         C: Canvas,
     {
-        let padding: f32 = 0.5;
-        let mast_height: f32 = 0.5;
+        let ornaments = Thermograph::ornaments::<C>();
+
+        // Values grow to the left and temperatures upwards, both against the canvas axes
+        let point = |value: f32, temperature: f32| V2f {
+            x: -scale * value,
+            y: -scale * temperature,
+        };
 
         let left_x = self
             .left_wall
@@ -562,42 +617,49 @@ impl Thermograph {
             .unwrap();
         let y_top_above_x_axis = self.y_top_above_x_axis();
 
+        let mast_x = self.left_wall.mast_x_intercept().as_f32().unwrap();
+        let mast_base = point(mast_x, y_top_above_x_axis);
+        let mast_tip = V2f {
+            y: mast_base.y - ornaments.mast_stem,
+            ..mast_base
+        };
+
+        let leftmost = point(left_x, 0.0);
+        let rightmost = point(right_x, 0.0);
         canvas.line(
-            scale
-                * V2f {
-                    x: -left_x,
-                    y: y_top_above_x_axis,
-                },
-            scale
-                * V2f {
-                    x: padding.mul_add(2.0, -right_x),
-                    y: y_top_above_x_axis,
-                },
+            V2f {
+                x: leftmost.x - ornaments.axis_overhang,
+                ..leftmost
+            },
+            V2f {
+                x: rightmost.x + ornaments.axis_overhang,
+                ..rightmost
+            },
             C::thin_line_weight(),
             Color::Surface,
         );
 
         if left_x >= 0.0 && right_x <= 0.0 {
-            let y_axis_position_x = padding;
+            let axis_x = point(0.0, 0.0).x;
             canvas.line(
-                scale
-                    * V2f {
-                        x: y_axis_position_x,
-                        y: -1.0,
-                    },
-                scale
-                    * V2f {
-                        x: y_axis_position_x,
-                        y: padding.mul_add(2.0, y_top_above_x_axis) + mast_height,
-                    },
+                V2f {
+                    x: axis_x,
+                    y: mast_tip.y - ornaments.axis_overhang,
+                },
+                V2f {
+                    x: axis_x,
+                    y: point(0.0, -1.0).y + ornaments.axis_overhang,
+                },
                 C::thin_line_weight(),
                 Color::Surface,
             );
         }
 
         let mut draw_trajectory = |trajectory: &Trajectory, side: Player| {
-            let mut prev_x = -trajectory.mast_x_intercept().as_f32().unwrap();
-            let mut prev_y = y_top_above_x_axis;
+            let mut prev_point = point(
+                trajectory.mast_x_intercept().as_f32().unwrap(),
+                y_top_above_x_axis,
+            );
 
             // TODO: Inject points for y=0 if do not exist
             for (point_idx, this_y_r) in trajectory
@@ -608,20 +670,7 @@ impl Thermograph {
                 .enumerate()
             {
                 let this_x_r = trajectory.value_at(this_y_r);
-
-                let this_x = -this_x_r.as_f32().unwrap();
-                let this_y = this_y_r.as_f32().unwrap();
-
-                let prev_point = scale
-                    * V2f {
-                        x: prev_x + padding,
-                        y: y_top_above_x_axis - 1.0 + padding + mast_height - prev_y,
-                    };
-                let this_point = scale
-                    * V2f {
-                        x: this_x + padding,
-                        y: y_top_above_x_axis - 1.0 + padding + mast_height - this_y,
-                    };
+                let this_point = point(this_x_r.as_f32().unwrap(), this_y_r.as_f32().unwrap());
 
                 // TODO: Better heuristic if top-most point should be on the left or right
                 if point_idx > 0 || matches!(side, Player::Right) {
@@ -644,58 +693,47 @@ impl Thermograph {
                     Color::Primary,
                 );
 
-                prev_x = this_x;
-                prev_y = this_y;
+                prev_point = this_point;
             }
         };
 
         draw_trajectory(&self.left_wall, Player::Left);
         draw_trajectory(&self.right_wall, Player::Right);
 
-        let mast_x = -self.left_wall.mast_x_intercept().as_f32().unwrap();
-        let mast_y = y_top_above_x_axis;
-        canvas.line(
-            scale
-                * V2f {
-                    x: mast_x + padding,
-                    y: y_top_above_x_axis - 1.0 + padding + mast_height - mast_y,
-                },
-            scale
-                * V2f {
-                    x: mast_x + padding,
-                    y: y_top_above_x_axis - 1.0 + padding - mast_y,
-                },
-            C::thick_line_weight(),
-            Color::Primary,
-        );
-        canvas.line(
-            scale
-                * V2f {
-                    x: mast_x + padding + 0.2,
-                    y: y_top_above_x_axis - 1.0 + padding - mast_y + 0.2,
-                },
-            scale
-                * V2f {
-                    x: mast_x + padding,
-                    y: y_top_above_x_axis - 1.0 + padding - mast_y,
-                },
-            C::thick_line_weight(),
-            Color::Primary,
-        );
-        canvas.line(
-            scale
-                * V2f {
-                    x: mast_x + padding - 0.2,
-                    y: y_top_above_x_axis - 1.0 + padding - mast_y + 0.2,
-                },
-            scale
-                * V2f {
-                    x: mast_x + padding,
-                    y: y_top_above_x_axis - 1.0 + padding - mast_y,
-                },
-            C::thick_line_weight(),
-            Color::Primary,
-        );
+        canvas.arrow(mast_base, mast_tip, C::thick_line_weight(), Color::Primary);
+    }
+}
+
+/// Lengths of the parts of a thermograph that mean the same thing at every scale, and so
+/// are measured in canvas units rather than thermograph ones
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+struct Ornaments {
+    /// How far the axes reach past the trajectories they carry
+    axis_overhang: f32,
+
+    /// Length of the mast between the topmost point and the arrow head
+    mast_stem: f32,
+}
+
+impl Thermograph {
+    /// Canvas length of one thermograph unit, before anything is scaled down to fit. Borrows
+    /// the tile size for want of anything better to call the length a canvas works in, which
+    /// is what keeps a tikz thermograph in centimetres rather than in pixels
+    fn natural_scale<C>() -> f32
+    where
+        C: Canvas,
+    {
+        C::tile_size().x
+    }
+
+    fn ornaments<C>() -> Ornaments
+    where
+        C: Canvas,
+    {
+        Ornaments {
+            axis_overhang: Thermograph::natural_scale::<C>() * 0.5,
+            mast_stem: Thermograph::natural_scale::<C>() * 0.5,
+        }
     }
 }
 
@@ -704,7 +742,7 @@ impl Draw for Thermograph {
     where
         C: Canvas,
     {
-        self.draw_scaled(canvas, 64.0);
+        self.draw_scaled(canvas, self.scale_for(canvas));
     }
 }
 

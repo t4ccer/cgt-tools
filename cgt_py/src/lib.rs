@@ -1,6 +1,9 @@
 #![allow(non_local_definitions)] // These come from pyo3 marcos
 
-use cgt::drawing::{Draw, MeasuringCanvas, svg};
+use cgt::{
+    drawing::{Draw, MeasuringCanvas, svg},
+    numeric::v2f::V2f,
+};
 use jupyter_rust_widget_backend::inject_rust_widget;
 use pyo3::prelude::*;
 
@@ -19,13 +22,16 @@ pub mod parsing;
 pub mod snort;
 pub mod thermograph;
 
+pub const SVG_MAX_CANVAS_SIZE: V2f = V2f { x: 420.0, y: 350.0 };
+
 /// Draw a game onto a fresh svg canvas cut to fit it
 pub fn draw_svg<D>(game: &D) -> String
 where
     D: Draw,
 {
-    let bounding_box = MeasuringCanvas::<svg::Canvas>::measure(game);
-    let mut canvas = svg::Canvas::new(bounding_box);
+    let bounding_box = MeasuringCanvas::<svg::Canvas>::measure(game, Some(SVG_MAX_CANVAS_SIZE));
+    let mut canvas =
+        svg::Canvas::new(bounding_box).with_max_canvas_size(crate::SVG_MAX_CANVAS_SIZE);
     game.draw(&mut canvas);
     canvas.to_svg()
 }

@@ -138,6 +138,11 @@ impl crate::drawing::Canvas for Canvas {
         0.35
     }
 
+    /// A tikz picture is sized by whatever LaTeX lays it out next to, not here
+    fn max_canvas_size(&self) -> Option<V2f> {
+        None
+    }
+
     fn thick_line_weight() -> f32 {
         0.05
     }
