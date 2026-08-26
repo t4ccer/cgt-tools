@@ -2,7 +2,7 @@
 
 use crate::{
     numeric::rational::Rational,
-    parsing::{Parser, impl_from_str_via_parser, lexeme, try_option},
+    parsing::{ParseError, Parser, impl_from_str_via_parser, lexeme, try_parse},
 };
 use auto_ops::impl_op_ex;
 use std::{
@@ -155,17 +155,24 @@ impl DyadicRationalNumber {
     }
 
     /// Parse dyadic number
-    pub(crate) const fn parse(p: Parser<'_>) -> Option<(Parser<'_>, DyadicRationalNumber)> {
-        let (p, numerator) = try_option!(lexeme!(p, Parser::parse_i64));
+    ///
+    /// # Errors
+    /// - Input is not a dyadic rational number
+    pub(crate) const fn parse(
+        p: Parser<'_>,
+    ) -> Result<(Parser<'_>, DyadicRationalNumber), ParseError> {
+        let start = p.trim_whitespace();
+        let (p, numerator) = try_parse!(lexeme!(p, Parser::parse_i64));
         match p.parse_any_ascii_char() {
-            Some((p, '/')) => {
+            Ok((p, '/')) => {
                 let p = p.trim_whitespace();
-                let (p, denominator) = try_option!(lexeme!(p, Parser::parse_u32));
-                let dyadic =
-                    try_option!(DyadicRationalNumber::new_fraction(numerator, denominator));
-                Some((p, dyadic))
+                let (p, denominator) = try_parse!(lexeme!(p, Parser::parse_u32));
+                match DyadicRationalNumber::new_fraction(numerator, denominator) {
+                    Some(dyadic) => Ok((p, dyadic)),
+                    None => Err(start.invalid_value("denominator is not a non-zero power of two")),
+                }
             }
-            _ => Some((p, DyadicRationalNumber::new_integer(numerator))),
+            _ => Ok((p, DyadicRationalNumber::new_integer(numerator))),
         }
     }
 

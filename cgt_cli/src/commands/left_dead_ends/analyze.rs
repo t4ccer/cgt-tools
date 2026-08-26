@@ -2,7 +2,7 @@ use crate::io::FilePathOr;
 use anyhow::{Context, Result};
 use cgt::{
     misere::left_dead_end::{LeftDeadEndContext, interned::Interner},
-    parsing::Parser,
+    parsing::{ParseError, Parser},
 };
 use rayon::iter::{ParallelBridge, ParallelIterator};
 use std::{
@@ -83,7 +83,7 @@ pub fn run(args: Args) -> Result<()> {
                 let p = p.parse_ascii_char('+')?;
                 let p = p.trim_whitespace();
                 let (_, c) = interner.parse(p)?;
-                Some((a, b, c, summed))
+                Ok::<_, ParseError>((a, b, c, summed))
             };
             let (a, b, c, g) =
                 parse().with_context(|| format!("Could not parse input line: `{}`", line))?;

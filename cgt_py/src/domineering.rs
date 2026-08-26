@@ -1,6 +1,5 @@
 use crate::{grid::PyGrid, py_partizan_game};
 use cgt::{
-    display_error::DisplayError,
     grid::FiniteGrid as _,
     result::UnwrapInfallible,
     short::partizan::{
@@ -8,7 +7,7 @@ use cgt::{
     },
 };
 use cgt_py_messages::{GridPreset, Tile};
-use pyo3::{PyErr, PyResult, pyclass, pymethods};
+use pyo3::{PyResult, pyclass, pymethods};
 use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 use std::{str::FromStr, sync::LazyLock};
 
@@ -24,9 +23,8 @@ pub struct PyDomineering(pub Domineering);
 impl PyDomineering {
     #[new]
     pub fn new(position: &str) -> PyResult<PyDomineering> {
-        let inner = Domineering::from_str(position).map_err(|err| {
-            PyErr::new::<pyo3::exceptions::PyValueError, _>(err.display_error().to_string())
-        })?;
+        let inner = Domineering::from_str(position)
+            .map_err(|err| crate::parsing::parse_error(&err, position))?;
         Ok(PyDomineering(inner))
     }
 

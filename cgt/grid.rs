@@ -5,6 +5,7 @@ use std::{collections::VecDeque, convert::Infallible, fmt::Write};
 use crate::{
     drawing::{self, BoundingBox, Canvas, Hits},
     numeric::v2f::V2f,
+    parsing::{InputLocation, InputSpan, ParseError, SyntaxError},
     result::UnwrapInfallible,
 };
 
@@ -66,10 +67,10 @@ impl std::fmt::Display for ParseErrorReason {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GridParseError<E> {
     /// Construction error (e.g. grid too large)
-    ConstructionError(E), // TODO: Input location
+    ConstructionError(E),
 
     /// Parsing error
-    ParseError(ParseErrorReason), // TODO: Input location
+    ParseError(ParseError<ParseErrorReason>),
 }
 
 impl<E> std::fmt::Display for GridParseError<E>
@@ -78,6 +79,15 @@ where
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "grid parse error")
+    }
+}
+
+impl<E> SyntaxError for GridParseError<E> {
+    fn span(&self) -> Option<InputSpan> {
+        match self {
+            GridParseError::ConstructionError(_) => None,
+            GridParseError::ParseError(err) => err.span(),
+        }
     }
 }
 
@@ -185,6 +195,7 @@ pub trait FiniteGrid: Grid + Sized {
         let mut grid = Self::filled(width, height, Default::default())
             .map_err(GridParseError::ConstructionError)?;
 
+        let mut row_start = 0;
         for (y, row) in input.split(row_separator).enumerate() {
             let y = y as u8;
 
@@ -192,21 +203,41 @@ pub trait FiniteGrid: Grid + Sized {
             let row_width = row.chars().count() as u8;
             if row_width != width {
                 // Not a rectangle
-                return Err(GridParseError::ParseError(
-                    ParseErrorReason::InvalidRowSize {
+                return Err(GridParseError::ParseError(ParseError {
+                    reason: ParseErrorReason::InvalidRowSize {
                         row: y,
                         expected: width,
                         actual: row_width,
                     },
-                ));
+                    span: InputSpan::new(
+                        InputLocation {
+                            line: 0,
+                            column: row_start,
+                        },
+                        u32::from(row_width),
+                    ),
+                }));
             }
 
             for (x, chr) in row.chars().enumerate() {
+                let x = x as u32;
                 let value = Self::Item::char_to_tile(chr).ok_or(GridParseError::ParseError(
-                    ParseErrorReason::InvalidCharTile(chr),
+                    ParseError {
+                        reason: ParseErrorReason::InvalidCharTile(chr),
+                        span: InputSpan::new(
+                            InputLocation {
+                                line: 0,
+                                column: row_start + x,
+                            },
+                            1,
+                        ),
+                    },
                 ))?;
                 grid.set(x as u8, y, value);
             }
+
+            // Skip over the row and the separator that follows it
+            row_start += u32::from(row_width) + 1;
         }
 
         Ok(grid)

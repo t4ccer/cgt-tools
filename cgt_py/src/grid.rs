@@ -1,4 +1,5 @@
 use cgt::{
+    display_error::DisplayError,
     grid::{CharTile, FiniteGrid, vec_grid::VecGrid},
     result::UnwrapInfallible,
     short::partizan::games::{
@@ -48,7 +49,7 @@ impl PyGrid {
         self.grid
             .try_map(|t| T::try_from(*t))
             .map(|grid| std::fmt::from_fn(|f| grid.display(f, '|')).to_string())
-            .map_err(|err| PyValueError::new_err(err.to_string()))
+            .map_err(|err| PyValueError::new_err(err.display_error().to_string()))
     }
 
     fn is_valid_for(&self, preset: GridPreset) -> PyResult<()> {
@@ -91,7 +92,7 @@ impl PyGrid {
         Ok(PyFission(Fission::new(
             self.grid
                 .try_map(|t| fission::Tile::try_from(*t))
-                .map_err(|err| PyValueError::new_err(err.to_string()))?,
+                .map_err(|err| PyValueError::new_err(err.display_error().to_string()))?,
         )))
     }
 
@@ -100,7 +101,7 @@ impl PyGrid {
         Ok(PyAmazons(Amazons::new(
             self.grid
                 .try_map(|t| amazons::Tile::try_from(*t))
-                .map_err(|err| PyValueError::new_err(err.to_string()))?,
+                .map_err(|err| PyValueError::new_err(err.display_error().to_string()))?,
         )))
     }
 
@@ -109,7 +110,7 @@ impl PyGrid {
         Ok(PyKonane(Konane::new(
             self.grid
                 .try_map(|t| konane::Tile::try_from(*t))
-                .map_err(|err| PyValueError::new_err(err.to_string()))?,
+                .map_err(|err| PyValueError::new_err(err.display_error().to_string()))?,
         )))
     }
 }

@@ -2,7 +2,7 @@
 
 use crate::{
     numeric::{dyadic_rational_number::DyadicRationalNumber, nimber::Nimber},
-    parsing::{Parser, impl_from_str_via_parser, lexeme},
+    parsing::{Expected, ParseError, Parser, impl_from_str_via_parser, lexeme},
     short::partizan::canonical_form::Hash,
 };
 use auto_ops::impl_op_ex;
@@ -111,26 +111,35 @@ impl Nus {
     /// Parse nus from string, using notation without pluses between number, up, and star components
     ///
     /// Pattern: `\d*([v^]\d*)?(\*\d*)`
-    pub const fn parse(p: Parser<'_>) -> Option<(Parser<'_>, Nus)> {
+    ///
+    /// # Errors
+    /// - Input is not a number-up-star
+    pub const fn parse(p: Parser<'_>) -> Result<(Parser<'_>, Nus), ParseError> {
+        let start = p.trim_whitespace();
+
         // This flag is set if we explicitly parse a number, rather than set it to zero if
         // it is omitted. It makes expressions like `*` a valid input, however it also makes
         // empty input parse to a zero game, which is undesired. We handle that case explicitly.
         let parsed_number: bool;
 
-        let (p, number) = if let Some((p, number)) = lexeme!(p, DyadicRationalNumber::parse) {
-            parsed_number = true;
-            (p, number)
-        } else {
-            parsed_number = false;
-            (p, DyadicRationalNumber::new_integer(0))
+        let (p, number) = match lexeme!(p, DyadicRationalNumber::parse) {
+            Ok((p, number)) => {
+                parsed_number = true;
+                (p, number)
+            }
+            Err(err) if !err.is_recoverable() => return Err(err),
+            Err(_) => {
+                parsed_number = false;
+                (p, DyadicRationalNumber::new_integer(0))
+            }
         };
 
         let p = p.trim_whitespace();
         let (p, up_multiple) = match lexeme!(p, Parser::parse_any_ascii_char) {
-            Some((p, c)) if c == '^' || c == 'v' => {
+            Ok((p, c)) if c == '^' || c == 'v' => {
                 let (p, up_multiple) = match lexeme!(p, Parser::parse_i32) {
-                    Some((p, up_multiple)) => (p, up_multiple),
-                    None => (p, 1),
+                    Ok((p, up_multiple)) => (p, up_multiple),
+                    Err(_) => (p, 1),
                 };
                 (
                     p,
@@ -145,17 +154,17 @@ impl Nus {
         };
 
         let (p, star_multiple) = match lexeme!(p, Parser::parse_any_ascii_char) {
-            Some((p, '*')) => match lexeme!(p, Parser::parse_u32) {
-                Some((p, star_multiple)) => (p, star_multiple),
-                None => (p, 1),
+            Ok((p, '*')) => match lexeme!(p, Parser::parse_u32) {
+                Ok((p, star_multiple)) => (p, star_multiple),
+                Err(_) => (p, 1),
             },
             _ => (p, 0),
         };
 
         if number.eq_integer(0) && up_multiple == 0 && star_multiple == 0 && !parsed_number {
-            None
+            Err(start.expected(Expected::Description("a number, up, or star")))
         } else {
-            Some((
+            Ok((
                 p,
                 Self {
                     number,
@@ -502,6 +511,7 @@ impl FusedIterator for RightMovesIter {}
 mod tests {
     use super::*;
     use crate::{
+        display_error::DisplayError,
         short::partizan::{
             Player,
             canonical_form::{CanonicalForm, Moves},
@@ -527,7 +537,7 @@ mod tests {
         ($inp: expr) => {
             let res = Nus::from_str($inp);
             if let Err(err) = res {
-                panic!("Parse should succeed, error: {}", err);
+                panic!("Parse should succeed, error: {}", err.display_error());
             }
         };
     }

@@ -1,10 +1,9 @@
 use crate::{grid::PyGrid, py_partizan_game};
-use cgt::{
-    display_error::DisplayError,
-    short::partizan::{games::fission::Fission, transposition_table::ParallelTranspositionTable},
+use cgt::short::partizan::{
+    games::fission::Fission, transposition_table::ParallelTranspositionTable,
 };
 use cgt_py_messages::{GridPreset, Tile};
-use pyo3::{PyErr, PyResult, pyclass, pymethods};
+use pyo3::{PyResult, pyclass, pymethods};
 use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 use std::{str::FromStr, sync::LazyLock};
 
@@ -20,9 +19,8 @@ pub struct PyFission(pub Fission);
 impl PyFission {
     #[new]
     pub fn new(position: &str) -> PyResult<PyFission> {
-        let inner = Fission::from_str(position).map_err(|err| {
-            PyErr::new::<pyo3::exceptions::PyValueError, _>(err.display_error().to_string())
-        })?;
+        let inner = Fission::from_str(position)
+            .map_err(|err| crate::parsing::parse_error(&err, position))?;
         Ok(PyFission(inner))
     }
 

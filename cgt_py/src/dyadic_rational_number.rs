@@ -31,12 +31,7 @@ impl PyDyadicRationalNumber {
             }
         } else if let Ok(string) = numerator.extract::<&str>() {
             DyadicRationalNumber::from_str(string)
-                .map_err(|err| {
-                    PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                        "Could not parse DyadicRationalNumber: {}",
-                        err
-                    ))
-                })
+                .map_err(|err| crate::parsing::parse_error(&err, string))
                 .map(PyDyadicRationalNumber)
         } else {
             Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(

@@ -2,7 +2,7 @@
 
 use crate::{
     graph::{Graph, VertexIndex},
-    parsing::{Parser, impl_from_str_via_parser},
+    parsing::{ParseError, Parser, impl_from_str_via_parser},
 };
 use std::fmt::Display;
 
@@ -21,13 +21,13 @@ impl Display for BipartiteGraph {
 }
 
 impl BipartiteGraph {
-    fn parse(p: Parser<'_>) -> Option<(Parser<'_>, BipartiteGraph)> {
+    fn parse(p: Parser<'_>) -> Result<(Parser<'_>, BipartiteGraph), ParseError> {
         let (p, blue) = p.parse_u32()?;
         let p = p.parse_ascii_char('b')?;
         let (p, red) = p.parse_u32()?;
         let p = p.parse_ascii_char('r')?;
         let (p, mask) = p.parse_u64()?;
-        Some((p, BipartiteGraph { blue, red, mask }))
+        Ok((p, BipartiteGraph { blue, red, mask }))
     }
 
     /// Convert to anything that implements [`Graph`]

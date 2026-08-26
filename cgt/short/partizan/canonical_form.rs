@@ -3,7 +3,7 @@
 use crate::{
     display,
     numeric::{dyadic_rational_number::DyadicRationalNumber, nimber::Nimber, rational::Rational},
-    parsing::{Parser, impl_from_str_via_parser, lexeme, try_option},
+    parsing::{Expected, ParseError, Parser, impl_from_str_via_parser, lexeme},
     short::partizan::{Player, thermograph::Thermograph},
     total::{TotalWrapper, impl_total_wrapper},
 };
@@ -402,37 +402,42 @@ impl Moves {
     /// `{a,b,...|c,d,...}`
     ///
     /// ` ^^^^^^^`
-    fn parse_list(mut p: Parser<'_>) -> Option<(Parser<'_>, Vec<CanonicalForm>)> {
+    fn parse_list(mut p: Parser<'_>) -> Result<(Parser<'_>, Vec<CanonicalForm>), ParseError> {
         let mut acc = Vec::new();
         loop {
             match lexeme!(p, CanonicalForm::parse) {
-                Some((cf_p, cf)) => {
+                Ok((cf_p, cf)) => {
                     acc.push(cf);
                     p = cf_p;
                     p = p.trim_whitespace();
                     match p.parse_ascii_char(',') {
-                        Some(pp) => {
+                        Ok(pp) => {
                             p = pp.trim_whitespace();
                         }
-                        None => return Some((p, acc)),
+                        Err(_) => return Ok((p, acc)),
                     }
                 }
-                None => return Some((p, acc)),
+                Err(err) if err.is_recoverable() => return Ok((p, acc)),
+                Err(err) => return Err(err),
             }
         }
     }
 
-    fn parse(p: Parser<'_>) -> Option<(Parser<'_>, Moves)> {
-        let p = try_option!(p.parse_ascii_char('{'));
-        let (p, left) = try_option!(Moves::parse_list(p));
-        let p = try_option!(p.parse_ascii_char('|'));
-        let (p, right) = try_option!(Moves::parse_list(p));
-        let p = try_option!(p.parse_ascii_char('}'));
+    fn parse(p: Parser<'_>) -> Result<(Parser<'_>, Moves), ParseError> {
+        let p = p.parse_ascii_char('{')?;
+        let (p, left) = Moves::parse_list(p)?;
+        let p = p
+            .parse_ascii_char('|')
+            .map_err(|err| err.expecting(Expected::Description("a game value or `|`")))?;
+        let (p, right) = Moves::parse_list(p)?;
+        let p = p
+            .parse_ascii_char('}')
+            .map_err(|err| err.expecting(Expected::Description("a game value or `}`")))?;
         let moves = Self {
             left: TotalWrapper::from_inner_vec(left),
             right: TotalWrapper::from_inner_vec(right),
         };
-        Some((p, moves))
+        Ok((p, moves))
     }
 }
 
@@ -1040,19 +1045,29 @@ impl CanonicalForm {
 
     /// Parse game using `{a,b,...|c,d,...}` notation
     #[allow(clippy::missing_errors_doc)]
-    fn parse(p: Parser<'_>) -> Option<(Parser<'_>, CanonicalForm)> {
+    fn parse(p: Parser<'_>) -> Result<(Parser<'_>, CanonicalForm), ParseError> {
         match lexeme!(p, Nus::parse) {
-            Some((p, nus)) => Some((p, CanonicalForm::new_nus(nus))),
-            None => {
-                let (p, Moves { left, right }) = try_option!(lexeme!(p, Moves::parse));
-                Some((
+            Ok((p, nus)) => Ok((p, CanonicalForm::new_nus(nus))),
+            Err(nus_error) if !nus_error.is_recoverable() => Err(nus_error),
+            Err(nus_error) => match lexeme!(p, Moves::parse) {
+                Ok((p, Moves { left, right })) => Ok((
                     p,
                     CanonicalForm::new_from_moves(
                         TotalWrapper::into_inner_vec(left),
                         TotalWrapper::into_inner_vec(right),
                     ),
-                ))
-            }
+                )),
+                Err(moves_error)
+                    if moves_error
+                        .span
+                        .start
+                        .is_further_than(&nus_error.span.start) =>
+                {
+                    Err(moves_error)
+                }
+                // Neither alternative got anywhere, so report what both of them wanted to see
+                Err(_) => Err(nus_error.expecting(Expected::Description("a game value"))),
+            },
         }
     }
 }

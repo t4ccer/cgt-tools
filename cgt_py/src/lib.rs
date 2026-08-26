@@ -14,6 +14,7 @@ pub mod fission;
 pub mod graph;
 pub mod grid;
 pub mod konane;
+pub mod parsing;
 pub mod snort;
 pub mod thermograph;
 

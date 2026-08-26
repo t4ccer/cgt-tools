@@ -5,7 +5,7 @@
 //! This code is heavily based on <https://github.com/alfiemd/gemau> by Alfie Davies
 
 use crate::{
-    parsing::{Parser, impl_from_str_via_parser, lexeme, try_option},
+    parsing::{Expected, ParseError, Parser, impl_from_str_via_parser, lexeme},
     total::impl_total_wrapper,
 };
 use auto_ops::impl_op_ex;
@@ -279,40 +279,46 @@ pub trait LeftDeadEndContext {
             })
     }
 
-    fn parse<'p>(&self, parser: Parser<'p>) -> Option<(Parser<'p>, Self::LeftDeadEnd)> {
+    #[allow(clippy::missing_errors_doc)]
+    fn parse<'p>(&self, parser: Parser<'p>) -> Result<(Parser<'p>, Self::LeftDeadEnd), ParseError> {
         let parser = parser.trim_whitespace();
-        if let Some(parser) = parser.parse_ascii_char('{') {
+        if let Ok(parser) = parser.parse_ascii_char('{') {
             let parser = parser.trim_whitespace();
 
             let mut options = Vec::new();
             let mut loop_parser = parser;
-            while let Some((parser, option)) = lexeme!(loop_parser, |p| self.parse(p)) {
+            while let Ok((parser, option)) = lexeme!(loop_parser, |p| self.parse(p)) {
                 loop_parser = parser;
                 options.push(option);
 
                 match loop_parser.parse_ascii_char(',') {
-                    Some(parser) => {
+                    Ok(parser) => {
                         loop_parser = parser.trim_whitespace();
                     }
-                    None => break,
+                    Err(_) => break,
                 }
             }
             let parser = loop_parser.trim_whitespace();
-            let parser = try_option!(parser.parse_ascii_char('}'));
+            let parser = parser
+                .parse_ascii_char('}')
+                .map_err(|err| err.expecting(Expected::Description("a game or `}`")))?;
             let parser = parser.trim_whitespace();
-            Some((parser, self.new_moves(options)))
+            Ok((parser, self.new_moves(options)))
         } else {
-            let (parser, integer) = try_option!(lexeme!(parser, Parser::parse_u32));
-            Some((parser, self.new_integer(integer)))
+            let (parser, integer) = lexeme!(parser, Parser::parse_u32)
+                .map_err(|err| err.expecting(Expected::Description("`{` or a number")))?;
+            Ok((parser, self.new_integer(integer)))
         }
     }
 
-    fn new_from_string(&self, input: &str) -> Option<Self::LeftDeadEnd> {
+    #[allow(clippy::missing_errors_doc)]
+    fn new_from_string(&self, input: &str) -> Result<Self::LeftDeadEnd, ParseError> {
         use crate::parsing::Parser;
 
         let p = Parser::new(input);
-        let (_, parsed) = self.parse(p)?;
-        Some(parsed)
+        let (p, parsed) = self.parse(p)?;
+        p.expect_end_of_input()?;
+        Ok(parsed)
     }
 
     /// Write game representation
@@ -417,7 +423,8 @@ where
         Context::EMPTY.next_day(day)
     }
 
-    fn parse(parser: Parser<'_>) -> Option<(Parser<'_>, Self)> {
+    #[allow(clippy::missing_errors_doc)]
+    fn parse(parser: Parser<'_>) -> Result<(Parser<'_>, Self), ParseError> {
         Context::EMPTY.parse(parser)
     }
 }

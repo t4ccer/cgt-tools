@@ -1,6 +1,6 @@
 //! Infinite rational number.
 
-use crate::parsing::{Parser, impl_from_str_via_parser, lexeme, try_option};
+use crate::parsing::{ParseError, Parser, impl_from_str_via_parser, lexeme, try_parse};
 use auto_ops::impl_op_ex;
 use num_rational::Rational64;
 use std::{
@@ -51,17 +51,18 @@ impl Rational {
     }
 
     // TODO: Handle infinities
-    const fn parse(p: Parser<'_>) -> Option<(Parser<'_>, Rational)> {
-        let (p, numerator) = try_option!(lexeme!(p, Parser::parse_i64));
+    const fn parse(p: Parser<'_>) -> Result<(Parser<'_>, Rational), ParseError> {
+        let start = p.trim_whitespace();
+        let (p, numerator) = try_parse!(lexeme!(p, Parser::parse_i64));
         match p.parse_ascii_char('/') {
-            Some(p) => {
-                let (p, denominator) = try_option!(lexeme!(p, Parser::parse_u32));
+            Ok(p) => {
+                let (p, denominator) = try_parse!(lexeme!(p, Parser::parse_u32));
                 match Rational::new_fraction(numerator, denominator) {
-                    None => None,
-                    Some(rational) => Some((p, rational)),
+                    None => Err(start.invalid_value("denominator is zero")),
+                    Some(rational) => Ok((p, rational)),
                 }
             }
-            _ => Some((p, Rational::new_integer(numerator))),
+            _ => Ok((p, Rational::new_integer(numerator))),
         }
     }
 

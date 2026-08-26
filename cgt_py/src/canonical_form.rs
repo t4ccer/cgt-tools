@@ -22,11 +22,7 @@ impl PyCanonicalForm {
         } else if let Ok(string) = value.extract::<&str>() {
             match CanonicalForm::from_str(string) {
                 Ok(cf) => return Ok(Self(cf)),
-                Err(_) => {
-                    return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                        "Could not parse CanonicalForm. Invalid input format.",
-                    ));
-                }
+                Err(err) => return Err(crate::parsing::parse_error(&err, string)),
             }
         } else if let Ok(canonical_form) = value.extract::<PyCanonicalForm>() {
             return Ok(canonical_form);

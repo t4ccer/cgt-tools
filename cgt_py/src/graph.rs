@@ -1,4 +1,5 @@
 use cgt::{
+    display_error::DisplayError,
     drawing::{Draw, svg},
     graph::{
         Graph, VertexIndex,
@@ -125,7 +126,7 @@ impl PyGraph {
     {
         self.graph
             .try_map(|&v| T::try_from(v.color))
-            .map_err(|err| PyValueError::new_err(err.to_string()))
+            .map_err(|err| PyValueError::new_err(err.display_error().to_string()))
     }
 
     fn try_into_undirected_graph<T>(&self) -> PyResult<UndirectedGraph<T>>

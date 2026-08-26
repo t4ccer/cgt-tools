@@ -393,50 +393,65 @@ mod tests {
 
     #[test]
     fn parser_errors() {
-        use crate::grid::ParseErrorReason;
+        use crate::{
+            grid::ParseErrorReason,
+            parsing::{InputLocation, InputSpan, ParseError},
+        };
 
         assert_eq!(
             SmallBitGrid::<bool>::parse("...|.....|..."),
-            Err(GridParseError::ParseError(
-                ParseErrorReason::InvalidRowSize {
+            Err(GridParseError::ParseError(ParseError {
+                reason: ParseErrorReason::InvalidRowSize {
                     row: 1,
                     expected: 3,
                     actual: 5
-                }
-            ))
+                },
+                span: InputSpan::new(InputLocation { line: 0, column: 4 }, 5),
+            }))
         );
 
         assert_eq!(
             SmallBitGrid::<bool>::parse("...|.|..."),
-            Err(GridParseError::ParseError(
-                ParseErrorReason::InvalidRowSize {
+            Err(GridParseError::ParseError(ParseError {
+                reason: ParseErrorReason::InvalidRowSize {
                     row: 1,
                     expected: 3,
                     actual: 1
-                }
-            ))
+                },
+                span: InputSpan::new(InputLocation { line: 0, column: 4 }, 1),
+            }))
         );
 
         assert_eq!(
             SmallBitGrid::<bool>::parse("...|...|....."),
-            Err(GridParseError::ParseError(
-                ParseErrorReason::InvalidRowSize {
+            Err(GridParseError::ParseError(ParseError {
+                reason: ParseErrorReason::InvalidRowSize {
                     row: 2,
                     expected: 3,
                     actual: 5
-                }
-            ))
+                },
+                span: InputSpan::new(InputLocation { line: 0, column: 8 }, 5),
+            }))
         );
 
         assert_eq!(
             SmallBitGrid::<bool>::parse("...|...|."),
-            Err(GridParseError::ParseError(
-                ParseErrorReason::InvalidRowSize {
+            Err(GridParseError::ParseError(ParseError {
+                reason: ParseErrorReason::InvalidRowSize {
                     row: 2,
                     expected: 3,
                     actual: 1
-                }
-            ))
+                },
+                span: InputSpan::new(InputLocation { line: 0, column: 8 }, 1),
+            }))
+        );
+
+        assert_eq!(
+            SmallBitGrid::<bool>::parse("...|.x.|..."),
+            Err(GridParseError::ParseError(ParseError {
+                reason: ParseErrorReason::InvalidCharTile('x'),
+                span: InputSpan::new(InputLocation { line: 0, column: 5 }, 1),
+            }))
         );
 
         assert_eq!(

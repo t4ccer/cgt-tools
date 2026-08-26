@@ -1,6 +1,6 @@
 use crate::{
     misere::game_form::Outcome,
-    parsing::{Parser, lexeme},
+    parsing::{Expected, InputSpan, Parser, SyntaxError, lexeme},
     short::partizan::Player,
 };
 use std::{cmp::Ordering, convert::Infallible, error::Error};
@@ -53,7 +53,7 @@ pub enum ParseError<Dicotic, Integer> {
     Integer(Integer),
 
     /// Malformed input
-    MalformedInput,
+    MalformedInput(crate::parsing::ParseError),
 }
 
 impl<Dicotic, Integer> std::fmt::Display for ParseError<Dicotic, Integer>
@@ -65,7 +65,16 @@ where
         match self {
             ParseError::Dicotic(_) => write!(f, "dicotic error"),
             ParseError::Integer(_) => write!(f, "integer error"),
-            ParseError::MalformedInput => write!(f, "parse error: malformed input"),
+            ParseError::MalformedInput(_) => write!(f, "parse error: malformed input"),
+        }
+    }
+}
+
+impl<Dicotic, Integer> SyntaxError for ParseError<Dicotic, Integer> {
+    fn span(&self) -> Option<InputSpan> {
+        match self {
+            ParseError::Dicotic(_) | ParseError::Integer(_) => None,
+            ParseError::MalformedInput(err) => err.span(),
         }
     }
 }
@@ -79,7 +88,7 @@ where
         match self {
             ParseError::Dicotic(err) => Some(err),
             ParseError::Integer(err) => Some(err),
-            ParseError::MalformedInput => None,
+            ParseError::MalformedInput(err) => Some(err),
         }
     }
 }
@@ -422,13 +431,13 @@ pub trait GameFormContext {
                     p = cf_p;
                     p = p.trim_whitespace();
                     match p.parse_ascii_char(',') {
-                        Some(pp) => {
+                        Ok(pp) => {
                             p = pp.trim_whitespace();
                         }
-                        None => return Ok((p, acc)),
+                        Err(_) => return Ok((p, acc)),
                     }
                 }
-                Err(ParseError::MalformedInput) => return Ok((p, acc)),
+                Err(ParseError::MalformedInput(_)) => return Ok((p, acc)),
                 Err(err) => return Err(err),
             }
         }
@@ -442,15 +451,25 @@ pub trait GameFormContext {
         ParseError<Self::DicoticConstructionError, Self::IntegerConstructionError>,
     > {
         let p = p.trim_whitespace();
-        if let Some(p) = p.parse_ascii_char('{') {
+        if let Ok(p) = p.parse_ascii_char('{') {
             let (p, left) = self.parse_list(p)?;
-            let p = p.parse_ascii_char('|').ok_or(ParseError::MalformedInput)?;
+            let p = p.parse_ascii_char('|').map_err(|err| {
+                ParseError::MalformedInput(
+                    err.expecting(Expected::Description("a game form or `|`")),
+                )
+            })?;
             let (p, right) = self.parse_list(p)?;
-            let p = p.parse_ascii_char('}').ok_or(ParseError::MalformedInput)?;
+            let p = p.parse_ascii_char('}').map_err(|err| {
+                ParseError::MalformedInput(
+                    err.expecting(Expected::Description("a game form or `}`")),
+                )
+            })?;
             let p = p.trim_whitespace();
             Ok((p, self.new(left, right).map_err(ParseError::Dicotic)?))
         } else {
-            let (p, integer) = lexeme!(p, Parser::parse_i32).ok_or(ParseError::MalformedInput)?;
+            let (p, integer) = lexeme!(p, Parser::parse_i32).map_err(|err| {
+                ParseError::MalformedInput(err.expecting(Expected::Description("`{` or a number")))
+            })?;
             Ok((p, self.new_integer(integer).map_err(ParseError::Integer)?))
         }
     }
