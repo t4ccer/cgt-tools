@@ -32,6 +32,7 @@ const fn variable(color: Color) -> &'static str {
         Color::Blue => "--cgt-blue",
         Color::Red => "--cgt-red",
         Color::Green => "--cgt-green",
+        Color::White => "--cgt-white",
     }
 }
 

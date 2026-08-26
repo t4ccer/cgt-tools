@@ -92,12 +92,14 @@ pub enum Color {
     Red,
 
     Green,
+
+    White,
 }
 
 impl Color {
     /// Every color, for canvases that emit a whole palette rather than resolving one color
     /// at a time
-    pub const ALL: [Color; 7] = [
+    pub const ALL: [Color; 8] = [
         Color::Primary,
         Color::Secondary,
         Color::Surface,
@@ -105,6 +107,7 @@ impl Color {
         Color::Blue,
         Color::Red,
         Color::Green,
+        Color::White,
     ];
 
     /// Left is bLue, Right is Red
@@ -169,11 +172,13 @@ impl Theme {
 
     /// Concrete color that `color` is painted with, before the pointer shades it
     #[must_use]
+    #[allow(clippy::match_same_arms)]
     pub const fn color(self, color: Color) -> Rgba {
         match (self, color) {
             (_, Color::Blue) => Theme::BLUE,
             (_, Color::Red) => Theme::RED,
             (_, Color::Green) => Theme::GREEN,
+            (_, Color::White) => Theme::WHITE,
             (Theme::Light, Color::Primary) | (Theme::Dark, Color::Background) => Theme::BLACK,
             (Theme::Light, Color::Secondary) | (Theme::Dark, Color::Surface) => Theme::DARK_GRAY,
             (Theme::Light, Color::Surface) | (Theme::Dark, Color::Secondary) => Theme::LIGHT_GRAY,

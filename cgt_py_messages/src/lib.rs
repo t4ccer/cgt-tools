@@ -376,7 +376,7 @@ impl_vertex_map! {
 impl VertexColor {
     pub const fn color(self) -> Color {
         match self {
-            VertexColor::White => Color::Background,
+            VertexColor::White => Color::White,
             VertexColor::Blue => Color::Blue,
             VertexColor::Red => Color::Red,
             VertexColor::Green => Color::Green,

@@ -229,7 +229,7 @@ where
             canvas.vertex(
                 position,
                 match color {
-                    VertexColor::Empty => Color::Surface,
+                    VertexColor::Empty => Color::White,
                     VertexColor::TintLeft => Color::Blue,
                     VertexColor::TintRight => Color::Red,
                 },
