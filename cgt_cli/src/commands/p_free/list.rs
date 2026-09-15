@@ -2,7 +2,7 @@ use crate::io::FilePathOr;
 use anyhow::Result;
 use cgt::{
     misere::game_form::{
-        DeadEndingFormContext, GameFormContext, PFreeDeadEndingContext, PFreeDeadEndingFormContext,
+        DeadEndingFormContext, GameFormContext, PFreeBlockingContext, PFreeBlockingFormContext,
         PFreeFormContext, StandardFormContext,
     },
     poset::AntichainIterator,
@@ -29,7 +29,7 @@ fn compute_relations<C, Form>(
     bar: &ProgressBar,
 ) -> (Vec<bool>, Vec<bool>)
 where
-    C: PFreeDeadEndingContext + Send + Sync,
+    C: PFreeBlockingContext + Send + Sync,
     C::IntegerConstructionError: Void,
     C::Form: Send + Sync,
     Form: Borrow<C::Form> + Send + Sync,
@@ -56,8 +56,8 @@ where
         }
         let j = i + 1 + (idx - start);
 
-        let i_le_j = context.ge_mod_p_free_dead_ending(forms[i].borrow(), forms[j].borrow());
-        let j_le_i = context.ge_mod_p_free_dead_ending(forms[j].borrow(), forms[i].borrow());
+        let i_le_j = context.ge_mod_p_free_blocking(forms[i].borrow(), forms[j].borrow());
+        let j_le_i = context.ge_mod_p_free_blocking(forms[j].borrow(), forms[i].borrow());
 
         // SAFETY: Each thread gets scheduled with a unique pair of indices that are in bounds
         unsafe {
@@ -77,7 +77,7 @@ where
 
 fn precompute_ge_relations<C, Form>(context: &C, forms: &[Form]) -> Vec<bool>
 where
-    C: PFreeDeadEndingContext + Send + Sync,
+    C: PFreeBlockingContext + Send + Sync,
     C::IntegerConstructionError: Void,
     C::Form: Send + Sync,
     Form: Borrow<C::Form> + Send + Sync,
@@ -101,8 +101,8 @@ where
         }
         let j = i + 1 + (idx - start);
 
-        let i_ge_j = context.ge_mod_p_free_dead_ending(forms[i].borrow(), forms[j].borrow());
-        let j_ge_i = context.ge_mod_p_free_dead_ending(forms[j].borrow(), forms[i].borrow());
+        let i_ge_j = context.ge_mod_p_free_blocking(forms[i].borrow(), forms[j].borrow());
+        let j_ge_i = context.ge_mod_p_free_blocking(forms[j].borrow(), forms[i].borrow());
 
         // SAFETY: Each thread gets scheduled with a unique pair of indices that are in bounds
         unsafe {
@@ -120,7 +120,7 @@ fn compute_partitioned_antichains<C>(
     bar: &ProgressBar,
 ) -> Vec<Vec<C::Form>>
 where
-    C: PFreeDeadEndingContext + Send + Sync,
+    C: PFreeBlockingContext + Send + Sync,
     C::IntegerConstructionError: Void,
     C::Form: Send + Sync,
 {
@@ -268,7 +268,7 @@ fn parallel<T>(
 #[must_use]
 fn next_day<C>(context: &C, previous_day: &[C::Form]) -> Vec<C::Form>
 where
-    C: PFreeDeadEndingContext + Send + Sync,
+    C: PFreeBlockingContext + Send + Sync,
     C::IntegerConstructionError: Void,
     C::Form: Send + Sync,
 {
@@ -347,7 +347,7 @@ where
 
 fn deduplicate_equal<C>(context: &C, games: &mut Vec<C::Form>, bar: &ProgressBar)
 where
-    C: PFreeDeadEndingContext + Send + Sync,
+    C: PFreeBlockingContext + Send + Sync,
     C::IntegerConstructionError: Void,
     C::Form: Send + Sync,
 {
@@ -359,7 +359,7 @@ where
         let g = &games[idx];
         if let Some(h) = games[0..idx]
             .iter()
-            .find(|h| context.eq_mod_p_free_dead_ending(g, h))
+            .find(|h| context.eq_mod_p_free_blocking(g, h))
         {
             // SAFETY: Each thread gets scheduled a unique index that is in bounds
             unsafe {
@@ -385,7 +385,7 @@ fn generate_hasse<C, W>(
     bar: &ProgressBar,
 ) -> io::Result<()>
 where
-    C: PFreeDeadEndingContext + Send + Sync,
+    C: PFreeBlockingContext + Send + Sync,
     C::IntegerConstructionError: Void,
     C::Form: Send + Sync,
     W: io::Write,
@@ -472,7 +472,7 @@ pub fn run(args: Args) -> Result<()> {
         eprintln!("Warning: Not generating any output");
     }
 
-    let context = PFreeDeadEndingFormContext::new(PFreeFormContext::new(
+    let context = PFreeBlockingFormContext::new(PFreeFormContext::new(
         DeadEndingFormContext::new(StandardFormContext),
     ));
 

@@ -2,7 +2,7 @@
 
 use crate::{
     misere::game_form::{
-        ConstructionError, DeadEndingContext, GameFormContext, Outcome, PFreeContext,
+        BlockingContext, ConstructionError, GameFormContext, Outcome, PFreeContext,
     },
     result::{UnwrapInfallible, Void},
     short::partizan::Player,
@@ -10,18 +10,46 @@ use crate::{
 };
 use std::{collections::HashMap, error::Error, fmt, sync::RwLock};
 
-pub trait PFreeDeadEndingContext: DeadEndingContext + PFreeContext
+/// Comparison of P-free blocking forms
+///
+/// Dead-ending forms are blocking so the same maintenance and proviso checks decide the order
+/// modulo pf(E) when the inner context is dead-ending and modulo pf(B) when it is blocking
+pub trait PFreeBlockingContext: BlockingContext + PFreeContext
 where
     Self::IntegerConstructionError: Void,
 {
-    fn ge_mod_p_free_dead_ending(&self, g: &Self::Form, h: &Self::Form) -> bool;
+    fn ge_mod_p_free_blocking(&self, g: &Self::Form, h: &Self::Form) -> bool;
 
-    fn eq_mod_p_free_dead_ending(&self, g: &Self::Form, h: &Self::Form) -> bool {
-        self.ge_mod_p_free_dead_ending(g, h) && self.ge_mod_p_free_dead_ending(h, g)
+    fn satisfy_maintenance(&self, g: &Self::Form, h: &Self::Form) -> bool {
+        let a = self.moves(g, Player::Right).all(|gr| {
+            self.moves(gr, Player::Left)
+                .any(|grl| self.ge_mod_p_free_blocking(grl, h))
+                || self
+                    .moves(h, Player::Right)
+                    .any(|hr| self.ge_mod_p_free_blocking(gr, hr))
+        });
+        let b = self.moves(h, Player::Left).all(|hl| {
+            self.moves(hl, Player::Right)
+                .any(|hlr| self.ge_mod_p_free_blocking(g, hlr))
+                || self
+                    .moves(g, Player::Left)
+                    .any(|gl| self.ge_mod_p_free_blocking(gl, hl))
+        });
+
+        a && b
     }
 
-    fn incomp_mod_p_free_dead_ending(&self, g: &Self::Form, h: &Self::Form) -> bool {
-        !self.ge_mod_p_free_dead_ending(g, h) && !self.ge_mod_p_free_dead_ending(h, g)
+    fn satisfy_proviso(&self, g: &Self::Form, h: &Self::Form) -> bool {
+        (!self.is_end(g, Player::Right) || self.outcome(h) != Outcome::L)
+            && (!self.is_end(h, Player::Left) || self.outcome(g) != Outcome::R)
+    }
+
+    fn eq_mod_p_free_blocking(&self, g: &Self::Form, h: &Self::Form) -> bool {
+        self.ge_mod_p_free_blocking(g, h) && self.ge_mod_p_free_blocking(h, g)
+    }
+
+    fn incomp_mod_p_free_blocking(&self, g: &Self::Form, h: &Self::Form) -> bool {
+        !self.ge_mod_p_free_blocking(g, h) && !self.ge_mod_p_free_blocking(h, g)
     }
 
     fn bypass_reversible_moves_l(&self, g: &Self::Form) -> Vec<Self::Form> {
@@ -42,7 +70,7 @@ where
                 Some(g) => g.clone(),
             };
             for g_lr in self.moves(&g_l, Player::Right) {
-                if self.ge_mod_p_free_dead_ending(g, g_lr) {
+                if self.ge_mod_p_free_blocking(g, g_lr) {
                     let mut end_reversible = true;
                     for g_lrl in self.moves(g_lr, Player::Left) {
                         end_reversible = false;
@@ -87,7 +115,7 @@ where
             };
 
             for g_rl in self.moves(&g_r, Player::Left) {
-                if self.ge_mod_p_free_dead_ending(g_rl, g) {
+                if self.ge_mod_p_free_blocking(g_rl, g) {
                     let mut end_reversible = true;
                     for g_rlr in self.moves(g_rl, Player::Right) {
                         end_reversible = false;
@@ -122,8 +150,8 @@ where
                 let move_j = &moves[j];
 
                 let remove_i = match player {
-                    Player::Left => self.ge_mod_p_free_dead_ending(move_j, move_i),
-                    Player::Right => self.ge_mod_p_free_dead_ending(move_i, move_j),
+                    Player::Left => self.ge_mod_p_free_blocking(move_j, move_i),
+                    Player::Right => self.ge_mod_p_free_blocking(move_i, move_j),
                 };
 
                 if remove_i {
@@ -132,8 +160,8 @@ where
                 }
 
                 let remove_j = match player {
-                    Player::Left => self.ge_mod_p_free_dead_ending(move_i, move_j),
-                    Player::Right => self.ge_mod_p_free_dead_ending(move_j, move_i),
+                    Player::Left => self.ge_mod_p_free_blocking(move_i, move_j),
+                    Player::Right => self.ge_mod_p_free_blocking(move_j, move_i),
                 };
 
                 if remove_j {
@@ -186,7 +214,7 @@ where
             }
             Err(err) => {
                 unreachable!(
-                    "Reduction of `{}` is `{}` which is not pf(E)",
+                    "Reduction of `{}` is `{}` which is not P-free blocking",
                     self.display(game),
                     self.base_context().display(&err.recover())
                 )
@@ -202,16 +230,16 @@ enum SeenZero {
 }
 
 #[derive(Debug)]
-pub struct PFreeDeadEndingFormContext<C>
+pub struct PFreeBlockingFormContext<C>
 where
     C: GameFormContext,
 {
-    not_ge_zero: RwLock<HashMap<TotalWrapper<PFreeDeadEndingForm<C::Form>>, SeenZero>>,
-    not_zero_ge: RwLock<HashMap<TotalWrapper<PFreeDeadEndingForm<C::Form>>, SeenZero>>,
+    not_ge_zero: RwLock<HashMap<TotalWrapper<PFreeBlockingForm<C::Form>>, SeenZero>>,
+    not_zero_ge: RwLock<HashMap<TotalWrapper<PFreeBlockingForm<C::Form>>, SeenZero>>,
     context: C,
 }
 
-impl<C> PFreeDeadEndingFormContext<C>
+impl<C> PFreeBlockingFormContext<C>
 where
     C: GameFormContext,
 {
@@ -226,16 +254,16 @@ where
 
 #[derive(Debug, Clone)]
 #[repr(transparent)]
-pub struct PFreeDeadEndingForm<G> {
+pub struct PFreeBlockingForm<G> {
     underlying: G,
 }
 
-impl<G> PFreeDeadEndingForm<G> {
-    pub(crate) const fn new_unchecked(underlying: G) -> PFreeDeadEndingForm<G> {
-        PFreeDeadEndingForm { underlying }
+impl<G> PFreeBlockingForm<G> {
+    pub(crate) const fn new_unchecked(underlying: G) -> PFreeBlockingForm<G> {
+        PFreeBlockingForm { underlying }
     }
 
-    pub(crate) const fn new_ref_unchecked(underlying: &G) -> &PFreeDeadEndingForm<G> {
+    pub(crate) const fn new_ref_unchecked(underlying: &G) -> &PFreeBlockingForm<G> {
         // SAFETY: We are #[repr(transparent)] so reference cast is safe
         unsafe { &*(::std::ptr::from_ref(underlying).cast::<Self>()) }
     }
@@ -249,7 +277,7 @@ impl<G> PFreeDeadEndingForm<G> {
     }
 }
 
-impl<G> TotalWrappable for PFreeDeadEndingForm<G>
+impl<G> TotalWrappable for PFreeBlockingForm<G>
 where
     G: TotalWrappable,
 {
@@ -263,72 +291,71 @@ where
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum PFreeDeadEndingConstructionError<E> {
+pub enum PFreeBlockingConstructionError<E> {
     Underlying(E),
 }
 
-impl<E> std::fmt::Display for PFreeDeadEndingConstructionError<E>
+impl<E> std::fmt::Display for PFreeBlockingConstructionError<E>
 where
     E: std::fmt::Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            PFreeDeadEndingConstructionError::Underlying(_) => {
+            PFreeBlockingConstructionError::Underlying(_) => {
                 write!(f, "could not construct the underlying form")
             }
         }
     }
 }
 
-impl<E> Error for PFreeDeadEndingConstructionError<E>
+impl<E> Error for PFreeBlockingConstructionError<E>
 where
     E: std::fmt::Debug + Error + 'static,
 {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            PFreeDeadEndingConstructionError::Underlying(err) => Some(err),
+            PFreeBlockingConstructionError::Underlying(err) => Some(err),
         }
     }
 }
 
-impl<E, G> ConstructionError<G> for PFreeDeadEndingConstructionError<E>
+impl<E, G> ConstructionError<G> for PFreeBlockingConstructionError<E>
 where
     E: ConstructionError<G>,
 {
     fn recover(self) -> G {
         match self {
-            PFreeDeadEndingConstructionError::Underlying(err) => err.recover(),
+            PFreeBlockingConstructionError::Underlying(err) => err.recover(),
         }
     }
 }
 
-impl<E> Void for PFreeDeadEndingConstructionError<E>
+impl<E> Void for PFreeBlockingConstructionError<E>
 where
     E: Void,
 {
     fn absurd<T>(self) -> T {
         match self {
-            PFreeDeadEndingConstructionError::Underlying(err) => err.absurd(),
+            PFreeBlockingConstructionError::Underlying(err) => err.absurd(),
         }
     }
 }
 
-impl<C> GameFormContext for PFreeDeadEndingFormContext<C>
+impl<C> GameFormContext for PFreeBlockingFormContext<C>
 where
     C: GameFormContext,
 {
-    type Form = PFreeDeadEndingForm<C::Form>;
+    type Form = PFreeBlockingForm<C::Form>;
 
     type BaseForm = C::BaseForm;
 
-    type DicoticConstructionError = PFreeDeadEndingConstructionError<C::DicoticConstructionError>;
+    type DicoticConstructionError = PFreeBlockingConstructionError<C::DicoticConstructionError>;
 
-    type IntegerConstructionError = PFreeDeadEndingConstructionError<C::IntegerConstructionError>;
+    type IntegerConstructionError = PFreeBlockingConstructionError<C::IntegerConstructionError>;
 
-    type ConjugateConstructionError =
-        PFreeDeadEndingConstructionError<C::ConjugateConstructionError>;
+    type ConjugateConstructionError = PFreeBlockingConstructionError<C::ConjugateConstructionError>;
 
-    type SumConstructionError = PFreeDeadEndingConstructionError<C::SumConstructionError>;
+    type SumConstructionError = PFreeBlockingConstructionError<C::SumConstructionError>;
 
     fn new(
         &self,
@@ -340,8 +367,8 @@ where
                 left.into_iter().map(|g| g.underlying),
                 right.into_iter().map(|g| g.underlying),
             )
-            .map(PFreeDeadEndingForm::new_unchecked)
-            .map_err(PFreeDeadEndingConstructionError::Underlying)
+            .map(PFreeBlockingForm::new_unchecked)
+            .map_err(PFreeBlockingConstructionError::Underlying)
     }
 
     fn moves<'a>(
@@ -351,7 +378,7 @@ where
     ) -> impl Iterator<Item = &'a Self::Form> {
         self.context
             .moves(&game.underlying, player)
-            .map(PFreeDeadEndingForm::new_ref_unchecked)
+            .map(PFreeBlockingForm::new_ref_unchecked)
     }
 
     fn total_cmp(&self, lhs: &Self::Form, rhs: &Self::Form) -> std::cmp::Ordering {
@@ -362,12 +389,27 @@ where
         self.context.total_eq(&lhs.underlying, &rhs.underlying)
     }
 
-    fn is_dead_ending(&self, _: &Self::Form) -> bool {
-        true
+    fn is_p_free(&self, game: &Self::Form) -> bool {
+        self.context.is_p_free(&game.underlying)
     }
 
-    fn is_p_free(&self, _: &Self::Form) -> bool {
-        true
+    fn is_dead_ending(&self, game: &Self::Form) -> bool {
+        self.context.is_dead_ending(&game.underlying)
+    }
+
+    fn is_blocking(&self, game: &Self::Form) -> bool {
+        self.context.is_blocking(&game.underlying)
+    }
+
+    fn sum(
+        &self,
+        g: &Self::Form,
+        h: &Self::Form,
+    ) -> Result<Self::Form, Self::SumConstructionError> {
+        self.context
+            .sum(&g.underlying, &h.underlying)
+            .map(PFreeBlockingForm::new_unchecked)
+            .map_err(PFreeBlockingConstructionError::Underlying)
     }
 
     fn base(&self, game: Self::Form) -> Self::BaseForm {
@@ -379,51 +421,22 @@ where
     }
 }
 
-impl<C> PFreeContext for PFreeDeadEndingFormContext<C>
+impl<C> PFreeContext for PFreeBlockingFormContext<C>
 where
     C: PFreeContext,
     C::IntegerConstructionError: Void,
 {
 }
 
-impl<C> DeadEndingContext for PFreeDeadEndingFormContext<C>
+impl<C> BlockingContext for PFreeBlockingFormContext<C> where C: BlockingContext {}
+
+impl<C> PFreeBlockingContext for PFreeBlockingFormContext<C>
 where
-    C: DeadEndingContext + PFreeContext,
+    C: BlockingContext + PFreeContext,
     C::IntegerConstructionError: Void,
     C::Form: TotalWrappable,
 {
-    fn satisfy_maintenance(&self, g: &Self::Form, h: &Self::Form) -> bool {
-        let a = self.moves(g, Player::Right).all(|gr| {
-            self.moves(gr, Player::Left)
-                .any(|grl| self.ge_mod_p_free_dead_ending(grl, h))
-                || self
-                    .moves(h, Player::Right)
-                    .any(|hr| self.ge_mod_p_free_dead_ending(gr, hr))
-        });
-        let b = self.moves(h, Player::Left).all(|hl| {
-            self.moves(hl, Player::Right)
-                .any(|hlr| self.ge_mod_p_free_dead_ending(g, hlr))
-                || self
-                    .moves(g, Player::Left)
-                    .any(|gl| self.ge_mod_p_free_dead_ending(gl, hl))
-        });
-
-        a && b
-    }
-
-    fn satisfy_proviso(&self, g: &Self::Form, h: &Self::Form) -> bool {
-        (!self.is_end(g, Player::Right) || self.outcome(h) != Outcome::L)
-            && (!self.is_end(h, Player::Left) || self.outcome(g) != Outcome::R)
-    }
-}
-
-impl<C> PFreeDeadEndingContext for PFreeDeadEndingFormContext<C>
-where
-    C: DeadEndingContext + PFreeContext,
-    C::IntegerConstructionError: Void,
-    C::Form: TotalWrappable,
-{
-    fn ge_mod_p_free_dead_ending(&self, g: &Self::Form, h: &Self::Form) -> bool {
+    fn ge_mod_p_free_blocking(&self, g: &Self::Form, h: &Self::Form) -> bool {
         // Relation on integers does not follow from maintenance/proviso so it is hardcoded
         if let Some(g) = self.to_integer(g)
             && let Some(h) = self.to_integer(h)
@@ -432,14 +445,14 @@ where
             return g <= h;
         }
 
-        if self.ge_mod_dead_ending(g, h) {
+        if self.satisfy_proviso(g, h) && self.satisfy_maintenance(g, h) {
             return true;
         }
 
         let plug_end = |g,
                         h,
                         seen_zero: &RwLock<
-            HashMap<TotalWrapper<PFreeDeadEndingForm<C::Form>>, SeenZero>,
+            HashMap<TotalWrapper<PFreeBlockingForm<C::Form>>, SeenZero>,
         >| {
             self.to_integer(g).and_then(|g| match g.cmp(&0) {
                 // G = -n = {-1 | -(n - 1)}
@@ -458,8 +471,8 @@ where
                     let not_zero_ge = seen_zero.read().unwrap();
                     match not_zero_ge.get(TotalWrapper::from_ref(h)) {
                         // First time we see `h` compared against G = 0
-                        // If we are here that means that first call to `self.ge_mod_dead_ending(0, h)`
-                        // returned false so we try again with `self.ge_mod_dead_ending({-1|1}, h)`
+                        // If we are here that means that maintenance/proviso check of `0 >= h`
+                        // failed so we try again with `{-1|1} >= h`
                         None => {
                             drop(not_zero_ge);
                             seen_zero
@@ -475,7 +488,7 @@ where
                             )
                         }
                         // If we are here that means that we are in the process of checking
-                        // `self.ge_mod_dead_ending({-1|1}, h)` holds since we got `self.ge_mod_dead_ending(0, h) = false`
+                        // `{-1|1} >= h` holds since we got `0 >= h = false`
                         // already, so we break the recursion and note that in the HashMap to not take
                         // the write lock again for that game
                         Some(SeenZero::Once) => {
@@ -502,11 +515,11 @@ where
 
         // No need to plug both cause then they are both integers and handled by the case above
         if let Some(g) = plug_end(g, h, &self.not_ge_zero) {
-            return self.ge_mod_p_free_dead_ending(&g, h);
+            return self.ge_mod_p_free_blocking(&g, h);
         }
 
         if let Some(h) = plug_end(h, g, &self.not_zero_ge) {
-            return self.ge_mod_p_free_dead_ending(g, &h);
+            return self.ge_mod_p_free_blocking(g, &h);
         }
 
         false
@@ -517,15 +530,15 @@ where
 mod tests {
     use crate::{
         misere::game_form::{
-            DeadEndingFormContext, GameFormContext, PFreeDeadEndingContext,
-            PFreeDeadEndingFormContext, PFreeFormContext, StandardFormContext,
+            BlockingFormContext, DeadEndingFormContext, GameFormContext, PFreeBlockingContext,
+            PFreeBlockingFormContext, PFreeFormContext, StandardFormContext,
         },
         total::TotalWrappable,
     };
 
     #[test]
     fn relations() {
-        let context = PFreeDeadEndingFormContext::new(PFreeFormContext::new(
+        let context = PFreeBlockingFormContext::new(PFreeFormContext::new(
             DeadEndingFormContext::new(StandardFormContext),
         ));
 
@@ -551,73 +564,73 @@ mod tests {
             };
         }
 
-        macro_rules! assert_eq_mod_p_free_dead_ending {
+        macro_rules! assert_eq_mod_p_free_blocking {
             ($lhs:expr, $rhs:expr) => {
                 assert_rel!(
                     $lhs,
                     $rhs,
-                    eq_mod_p_free_dead_ending,
+                    eq_mod_p_free_blocking,
                     "Game forms are not = (mod pf(E))\n  left: {}\n right: {}"
                 );
             };
         }
 
-        macro_rules! assert_ge_mod_p_free_dead_ending {
+        macro_rules! assert_ge_mod_p_free_blocking {
             ($lhs:expr, $rhs:expr) => {
                 assert_rel!(
                     $lhs,
                     $rhs,
-                    ge_mod_p_free_dead_ending,
+                    ge_mod_p_free_blocking,
                     "Game forms are not >= (mod pf(E))\n  left: {}\n right: {}"
                 );
             };
         }
 
-        assert_eq_mod_p_free_dead_ending!("1", "{0|1}");
+        assert_eq_mod_p_free_blocking!("1", "{0|1}");
 
-        assert_eq_mod_p_free_dead_ending!("1", "{0,{-2|2}|1}");
-        assert_eq_mod_p_free_dead_ending!("2", "{1,{-2|2}|1}");
-        assert_eq_mod_p_free_dead_ending!("2", "{2,{-2|2}|1}");
-        assert_eq_mod_p_free_dead_ending!("2", "{3,{-2|2}|1}");
+        assert_eq_mod_p_free_blocking!("1", "{0,{-2|2}|1}");
+        assert_eq_mod_p_free_blocking!("2", "{1,{-2|2}|1}");
+        assert_eq_mod_p_free_blocking!("2", "{2,{-2|2}|1}");
+        assert_eq_mod_p_free_blocking!("2", "{3,{-2|2}|1}");
 
-        assert_eq_mod_p_free_dead_ending!("1", "{0,{-3|3}|1}");
-        assert_eq_mod_p_free_dead_ending!("2", "{1,{-3|3}|1}");
-        assert_eq_mod_p_free_dead_ending!("3", "{2,{-3|3}|1}");
-        assert_eq_mod_p_free_dead_ending!("3", "{3,{-3|3}|1}");
-        assert_eq_mod_p_free_dead_ending!("3", "{4,{-3|3}|1}");
+        assert_eq_mod_p_free_blocking!("1", "{0,{-3|3}|1}");
+        assert_eq_mod_p_free_blocking!("2", "{1,{-3|3}|1}");
+        assert_eq_mod_p_free_blocking!("3", "{2,{-3|3}|1}");
+        assert_eq_mod_p_free_blocking!("3", "{3,{-3|3}|1}");
+        assert_eq_mod_p_free_blocking!("3", "{4,{-3|3}|1}");
 
-        assert_eq_mod_p_free_dead_ending!("3", "{{-3|3}|1}");
-        assert_eq_mod_p_free_dead_ending!("3", "{{-3|3}|2}");
-        assert_eq_mod_p_free_dead_ending!("3", "{{-3|3}|3}");
-        assert_eq_mod_p_free_dead_ending!("3", "{{-3|3}|4}");
+        assert_eq_mod_p_free_blocking!("3", "{{-3|3}|1}");
+        assert_eq_mod_p_free_blocking!("3", "{{-3|3}|2}");
+        assert_eq_mod_p_free_blocking!("3", "{{-3|3}|3}");
+        assert_eq_mod_p_free_blocking!("3", "{{-3|3}|4}");
 
-        assert_ge_mod_p_free_dead_ending!("3", "{{-3|3}|5}");
+        assert_ge_mod_p_free_blocking!("3", "{{-3|3}|5}");
 
-        assert_eq_mod_p_free_dead_ending!("{{-3|3},{-4|4}|1}", "3");
+        assert_eq_mod_p_free_blocking!("{{-3|3},{-4|4}|1}", "3");
 
-        assert_ge_mod_p_free_dead_ending!("0", "1");
+        assert_ge_mod_p_free_blocking!("0", "1");
 
-        assert_eq_mod_p_free_dead_ending!("{1|3}", "2");
+        assert_eq_mod_p_free_blocking!("{1|3}", "2");
 
-        assert_ge_mod_p_free_dead_ending!("{-2|1}", "{-2|2}");
+        assert_ge_mod_p_free_blocking!("{-2|1}", "{-2|2}");
 
-        assert_eq_mod_p_free_dead_ending!("5", "{4|1,{-1|3}}");
-        assert_ge_mod_p_free_dead_ending!("-1", "5");
-        assert_ge_mod_p_free_dead_ending!("-1", "{4|1,{-1|3}}");
-        assert_ge_mod_p_free_dead_ending!("{-1|0}", "5");
-        assert_ge_mod_p_free_dead_ending!("{-1|0}", "{4|1,{-1|3}}");
+        assert_eq_mod_p_free_blocking!("5", "{4|1,{-1|3}}");
+        assert_ge_mod_p_free_blocking!("-1", "5");
+        assert_ge_mod_p_free_blocking!("-1", "{4|1,{-1|3}}");
+        assert_ge_mod_p_free_blocking!("{-1|0}", "5");
+        assert_ge_mod_p_free_blocking!("{-1|0}", "{4|1,{-1|3}}");
 
-        assert_eq_mod_p_free_dead_ending!("5", "{4|{0|3}}");
-        assert_ge_mod_p_free_dead_ending!("0", "{4|{0|3}}");
+        assert_eq_mod_p_free_blocking!("5", "{4|{0|3}}");
+        assert_ge_mod_p_free_blocking!("0", "{4|{0|3}}");
 
-        assert_eq_mod_p_free_dead_ending!("{0, {-2|2}|1}", "{0|1}");
-        assert_eq_mod_p_free_dead_ending!("{0, {-2|2}|2}", "{0|2}");
-        assert_eq_mod_p_free_dead_ending!("{0, {-2|2}, {-3|3}|2}", "{0|2}");
+        assert_eq_mod_p_free_blocking!("{0, {-2|2}|1}", "{0|1}");
+        assert_eq_mod_p_free_blocking!("{0, {-2|2}|2}", "{0|2}");
+        assert_eq_mod_p_free_blocking!("{0, {-2|2}, {-3|3}|2}", "{0|2}");
     }
 
     #[test]
     fn reductions() {
-        let context = PFreeDeadEndingFormContext::new(PFreeFormContext::new(
+        let context = PFreeBlockingFormContext::new(PFreeFormContext::new(
             DeadEndingFormContext::new(StandardFormContext),
         ));
 
@@ -626,7 +639,7 @@ mod tests {
                 let g = context.from_str($lhs).unwrap();
                 let h = context.from_str($rhs).unwrap();
                 assert!(
-                    context.eq_mod_p_free_dead_ending(&g, &h),
+                    context.eq_mod_p_free_blocking(&g, &h),
                     "SANITY CHECK: Games are not equal mod pf(E)\n  left: {}\n right: {}",
                     context.display(&g),
                     context.display(&h)
@@ -635,7 +648,7 @@ mod tests {
                 let gg = context.reduced(&g);
 
                 assert!(
-                    context.eq_mod_p_free_dead_ending(&g, &h),
+                    context.eq_mod_p_free_blocking(&g, &h),
                     "SANITY CHECK: Original and reduced are not equal mod pf(E)\n  left: {}\n right: {}",
                     context.display(&g),
                     context.display(&gg)
@@ -695,5 +708,21 @@ mod tests {
         assert_identical!("{1,{-2|2},{-3|3}|1}", "2");
 
         assert_identical!("{-1|{0|3}}", "0");
+    }
+
+    #[test]
+    fn blocking_relations() {
+        let context = PFreeBlockingFormContext::new(PFreeFormContext::new(
+            BlockingFormContext::new(StandardFormContext),
+        ));
+
+        let g = context.from_str("{|{0|}}").unwrap();
+        assert!(!context.is_dead_ending(&g));
+        assert!(context.eq_mod_p_free_blocking(&g, &g));
+
+        let one = context.from_str("1").unwrap();
+        let h = context.from_str("{0|1}").unwrap();
+        assert!(context.eq_mod_p_free_blocking(&one, &h));
+        assert!(context.total_eq(&context.reduced(&h), &one));
     }
 }

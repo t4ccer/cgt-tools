@@ -1,19 +1,21 @@
 #![allow(missing_docs)]
 
+mod blocking;
 mod context;
 mod dead_ending;
 mod p_free;
-mod p_free_dead_ending;
+mod p_free_blocking;
 mod standard;
 
+pub use blocking::{BlockingConstructionError, BlockingContext, BlockingForm, BlockingFormContext};
 pub use context::{ConstructionError, GameFormContext, ParseError};
 pub use dead_ending::{
     DeadEndingConstructionError, DeadEndingContext, DeadEndingForm, DeadEndingFormContext,
 };
 pub use p_free::{PFreeConstructionError, PFreeContext, PFreeForm, PFreeFormContext};
-pub use p_free_dead_ending::{
-    PFreeDeadEndingConstructionError, PFreeDeadEndingContext, PFreeDeadEndingForm,
-    PFreeDeadEndingFormContext,
+pub use p_free_blocking::{
+    PFreeBlockingConstructionError, PFreeBlockingContext, PFreeBlockingForm,
+    PFreeBlockingFormContext,
 };
 pub use standard::{StandardForm, StandardFormContext};
 

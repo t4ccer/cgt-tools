@@ -2,7 +2,8 @@
 
 use crate::{
     misere::game_form::{
-        ConstructionError, GameFormContext, Outcome, StandardForm, StandardFormContext,
+        BlockingContext, ConstructionError, GameFormContext, Outcome, StandardForm,
+        StandardFormContext,
     },
     short::partizan::Player,
     total::TotalWrappable,
@@ -159,7 +160,15 @@ where
             .map(DeadEndingForm::new_ref_unchecked)
     }
 
+    fn is_p_free(&self, game: &Self::Form) -> bool {
+        self.context.is_p_free(&game.underlying)
+    }
+
     fn is_dead_ending(&self, _game: &Self::Form) -> bool {
+        true
+    }
+
+    fn is_blocking(&self, _game: &Self::Form) -> bool {
         true
     }
 
@@ -269,6 +278,8 @@ pub trait DeadEndingContext: GameFormContext {
 }
 
 impl<C> DeadEndingContext for DeadEndingFormContext<C> where C: GameFormContext {}
+
+impl<C> BlockingContext for DeadEndingFormContext<C> where C: GameFormContext {}
 
 impl std::fmt::Display for DeadEndingForm<StandardForm> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

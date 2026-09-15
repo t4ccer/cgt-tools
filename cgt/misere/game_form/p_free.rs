@@ -2,8 +2,9 @@
 
 use crate::{
     misere::game_form::{
-        ConstructionError, DeadEndingContext, DeadEndingForm, DeadEndingFormContext,
-        GameFormContext, Outcome, StandardForm, StandardFormContext,
+        BlockingContext, BlockingForm, BlockingFormContext, ConstructionError, DeadEndingContext,
+        DeadEndingForm, DeadEndingFormContext, GameFormContext, Outcome, StandardForm,
+        StandardFormContext,
     },
     result::{UnwrapInfallible, Void},
     short::partizan::Player,
@@ -249,6 +250,14 @@ where
         true
     }
 
+    fn is_dead_ending(&self, game: &Self::Form) -> bool {
+        self.context.is_dead_ending(&game.underlying)
+    }
+
+    fn is_blocking(&self, game: &Self::Form) -> bool {
+        self.context.is_blocking(&game.underlying)
+    }
+
     fn total_cmp(&self, lhs: &Self::Form, rhs: &Self::Form) -> std::cmp::Ordering {
         self.context.total_cmp(&lhs.underlying, &rhs.underlying)
     }
@@ -292,6 +301,11 @@ impl<C> DeadEndingContext for PFreeFormContext<C> where
 {
 }
 
+impl<C> BlockingContext for PFreeFormContext<C> where
+    C: BlockingContext<IntegerConstructionError = Infallible>
+{
+}
+
 impl std::fmt::Display for PFreeForm<StandardForm> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", StandardFormContext.display(&self.underlying))
@@ -304,6 +318,16 @@ impl std::fmt::Display for PFreeForm<DeadEndingForm<StandardForm>> {
             f,
             "{}",
             DeadEndingFormContext::new(StandardFormContext).display(&self.underlying)
+        )
+    }
+}
+
+impl std::fmt::Display for PFreeForm<BlockingForm<StandardForm>> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            BlockingFormContext::new(StandardFormContext).display(&self.underlying)
         )
     }
 }

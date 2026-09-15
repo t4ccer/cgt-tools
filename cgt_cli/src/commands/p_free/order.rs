@@ -1,7 +1,8 @@
 use cgt::misere::game_form::{
-    ConstructionError, DeadEndingContext, DeadEndingFormContext, GameFormContext, Outcome,
-    PFreeFormContext, StandardFormContext,
+    BlockingFormContext, ConstructionError, DeadEndingFormContext, GameFormContext, Outcome,
+    PFreeBlockingContext, PFreeBlockingFormContext, PFreeFormContext, StandardFormContext,
 };
+use cgt::result::Void;
 use clap::ValueEnum;
 use quickcheck::Gen;
 use std::error::Error;
@@ -346,29 +347,49 @@ where
     }
 }
 
-#[allow(clippy::needless_pass_by_value, clippy::unnecessary_wraps)]
+fn run_in<C>(context: &C, args: &Args, universe: &str) -> anyhow::Result<()>
+where
+    C: PFreeBlockingContext,
+    C::IntegerConstructionError: Void + Sync + Send + Error + 'static,
+    C::DicoticConstructionError: Sync + Send + Error + 'static,
+{
+    let args = RichArgs::new(context, args)?;
+    eprintln!("--------------------");
+    eprintln!(
+        "{} >= {} (mod {}) => {}",
+        context.display(&args.lhs),
+        context.display(&args.rhs),
+        universe,
+        context.ge_mod_p_free_blocking(&args.lhs, &args.rhs)
+    );
+    eprintln!(
+        "{} <= {} (mod {}) => {}",
+        context.display(&args.lhs),
+        context.display(&args.rhs),
+        universe,
+        context.ge_mod_p_free_blocking(&args.rhs, &args.lhs)
+    );
+    eprintln!("--------------------");
+    show_results(context, &args);
+    Ok(())
+}
+
+#[allow(clippy::needless_pass_by_value)]
 pub fn run(args: Args) -> anyhow::Result<()> {
     match args.variant {
-        Variant::DeadEnding => {
-            let context = PFreeFormContext::new(DeadEndingFormContext::new(StandardFormContext));
-            let args = RichArgs::new(&context, &args)?;
-            eprintln!("--------------------");
-            eprintln!(
-                "{} >= {} (mod pf(E)) => {}",
-                context.display(&args.lhs),
-                context.display(&args.rhs),
-                context.ge_mod_dead_ending(&args.lhs, &args.rhs)
-            );
-            eprintln!(
-                "{} <= {} (mod pf(E)) => {}",
-                context.display(&args.lhs),
-                context.display(&args.rhs),
-                context.ge_mod_dead_ending(&args.rhs, &args.lhs)
-            );
-            eprintln!("--------------------");
-            show_results(&context, &args);
-        }
-        Variant::Blocking => todo!(),
+        Variant::DeadEnding => run_in(
+            &PFreeBlockingFormContext::new(PFreeFormContext::new(DeadEndingFormContext::new(
+                StandardFormContext,
+            ))),
+            &args,
+            "pf(E)",
+        ),
+        Variant::Blocking => run_in(
+            &PFreeBlockingFormContext::new(PFreeFormContext::new(BlockingFormContext::new(
+                StandardFormContext,
+            ))),
+            &args,
+            "pf(B)",
+        ),
     }
-    Ok(())
 }
