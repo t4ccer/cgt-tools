@@ -42,58 +42,6 @@ impl Trajectory {
         }
     }
 
-    /// Create a new trajectory with given slopes and critical points. Returns [None] if input
-    /// violates the invariants.
-    pub fn new(
-        mast: Rational,
-        critical_points: Vec<Rational>,
-        slopes: Vec<Rational>,
-    ) -> Option<Self> {
-        // Input validation
-        if slopes.len() != critical_points.len() + 1 {
-            // Slopes must have length one greater than criticalPoints
-            return None;
-        }
-
-        if (0..(critical_points.len() - 1)).any(|i| {
-            let prev = critical_points[i];
-            let next = critical_points[i + 1];
-            prev <= next
-        }) {
-            // The critical points must be strictly decreasing
-            return None;
-        }
-
-        let minus_one = Rational::from(-1);
-        if critical_points.iter().any(|c| c <= &minus_one) {
-            // All critical points must be strictly greater than -1
-            return None;
-        }
-
-        // Actual construction
-        let mut x_intercepts = Vec::with_capacity(slopes.len());
-        if critical_points.is_empty() {
-            x_intercepts[0] = mast;
-        } else {
-            let mut value = mast;
-            let mut i = 0;
-            for _ in 0..critical_points.len() {
-                if i > 0 {
-                    value -= (critical_points[i - 1] - critical_points[i]) * slopes[i];
-                }
-                x_intercepts[i] = value - (critical_points[i] * slopes[i]);
-                i += 1;
-            }
-            x_intercepts[i] = value - (critical_points[i - 1] * slopes[i]);
-        }
-
-        Some(Self {
-            critical_points,
-            slopes,
-            x_intercepts,
-        })
-    }
-
     /// Get intercept of mast and the x-axis
     pub fn mast_x_intercept(&self) -> Rational {
         self.x_intercepts[0]
