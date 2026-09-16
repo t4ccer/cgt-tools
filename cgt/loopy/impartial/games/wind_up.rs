@@ -2,11 +2,7 @@
 //!
 //! This game has been proposed at Games-at-Dal 2023 conference by Alfie Davies.
 
-use crate::{
-    display,
-    loopy::impartial::vertex::{UnresolvedVertex, Vertex},
-    numeric::nimber::Nimber,
-};
+use crate::{display, loopy::impartial::vertex::Vertex, numeric::nimber::Nimber};
 use std::{collections::HashSet, fmt::Display};
 
 /// Modular subtraction game
@@ -30,7 +26,11 @@ impl Display for WindUp {
 }
 
 impl WindUp {
-    /// Solve using graph orbiting method.
+    /// Solve using the generalized Sprague-Grundy algorithm of Smith.
+    ///
+    /// See: C. A. B. Smith, Graphs and composite games, J. Combin. Theory 1 (1966), 51-81,
+    /// Section 9, conditions (23a)-(23e) and (26) on pp. 69-71 for the finite values, and the
+    /// `J` function (32) on p. 73 for the finite options of an infinite vertex.
     ///
     /// # Arguments
     ///
@@ -38,103 +38,65 @@ impl WindUp {
     ///
     /// `subtraction_set` - Subtraction set for the game
     pub fn new_using_graph(n: u32, subtraction_set: Vec<u32>) -> Self {
-        let mut graph = vec![UnresolvedVertex::Unresolved; n as usize];
+        let n = n as usize;
+        let followers = |idx: usize| {
+            subtraction_set
+                .iter()
+                .map(move |m| (idx as i64 - i64::from(*m)).rem_euclid(n as i64) as usize)
+        };
 
-        // First zero is trivial - the first element is zero by the game definition
-        graph[0] = UnresolvedVertex::Resolved(Vertex::Value(Nimber::new(0)));
+        let mut labels: Vec<Option<Nimber>> = vec![None; n];
 
-        let n = n as i32;
+        // First element is zero by the game definition
+        labels[0] = Some(Nimber::new(0));
 
-        // First pass - find other zeros
-        // element is a zero if for every move to non-zero position there is a response move to zero
-        for _ in 0..graph.len() {
-            'inner: for idx in 1_i32..(graph.len() as i32) {
-                // Already visited and marked as zero
-                if !matches!(graph[idx as usize], UnresolvedVertex::Unresolved) {
-                    continue;
-                }
-
-                for first_move in &subtraction_set {
-                    // Make a move
-                    let move_vertex = &graph[(idx - *first_move as i32).rem_euclid(n) as usize];
-
-                    // If we can move to zero, we cannot be zero.
-                    if !matches!(move_vertex, UnresolvedVertex::Unresolved) {
-                        continue 'inner;
+        // A vertex gets label k when the mex of its labelled followers is k and every unlabelled
+        // follower has a follower labelled k, so that any attempt to enter a loop can be countered
+        // by moving back to a k. Label k needs followers labelled 0..k so no label can exceed the
+        // size of the subtraction set.
+        for k in 0..=(subtraction_set.len() as u32) {
+            let k = Nimber::new(k);
+            loop {
+                let mut changed = false;
+                for idx in 1..n {
+                    if labels[idx].is_some() {
+                        continue;
                     }
 
-                    // Check if there's a response move to zero
-                    let can_respond_to_zero = subtraction_set.iter().any(|response_move| {
-                        let response_vertex =
-                            &graph[(idx - *first_move as i32 - *response_move as i32).rem_euclid(n)
-                                as usize];
-                        response_vertex.is_zero()
-                    });
+                    let finite = followers(idx).filter_map(|f| labels[f]).collect();
+                    if Nimber::mex(finite) != k {
+                        continue;
+                    }
 
-                    if !can_respond_to_zero {
-                        continue 'inner;
+                    let countered = followers(idx)
+                        .filter(|f| labels[*f].is_none())
+                        .all(|f| followers(f).any(|z| labels[z] == Some(k)));
+                    if countered {
+                        labels[idx] = Some(k);
+                        changed = true;
                     }
                 }
-
-                graph[idx as usize] = UnresolvedVertex::Resolved(Vertex::Value(Nimber::new(0)));
+                if !changed {
+                    break;
+                }
             }
         }
 
-        // Second pass - compute mex for each finite element
-        for _ in 0..graph.len() {
-            'inner: for idx in 1_i32..(graph.len() as i32) {
-                if !matches!(graph[idx as usize], UnresolvedVertex::Unresolved) {
-                    continue;
-                }
-
-                let mut for_mex = Vec::with_capacity(graph.len());
-                for m in &subtraction_set {
-                    let v1 = &graph[(idx - *m as i32).rem_euclid(n) as usize];
-                    match v1 {
-                        UnresolvedVertex::Resolved(Vertex::Value(g)) => for_mex.push(*g),
-                        UnresolvedVertex::Unresolved
-                        | UnresolvedVertex::Resolved(Vertex::Loop(_)) => continue 'inner,
-                    }
-                }
-
-                let g = Nimber::mex(for_mex);
-                graph[idx as usize] = UnresolvedVertex::Resolved(Vertex::Value(g));
-            }
-        }
-
-        // Third pass - compute infinites
-        for _ in 0..graph.len() {
-            for idx in 0_i32..(graph.len() as i32) {
-                // If we're a nimber we cannot be an infinity
-                if matches!(
-                    graph[idx as usize],
-                    UnresolvedVertex::Resolved(Vertex::Value(_))
-                ) {
-                    continue;
-                }
-
-                let mut infinities = vec![];
-
-                for m in &subtraction_set {
-                    let v1 = &graph[(idx - *m as i32).rem_euclid(n) as usize];
-                    if let UnresolvedVertex::Resolved(Vertex::Value(g)) = v1
-                        && !infinities.contains(g)
-                    {
-                        infinities.push(*g);
-                    }
-                }
-
-                graph[idx as usize] = UnresolvedVertex::Resolved(Vertex::Loop(infinities));
-            }
-        }
-
-        let graph: Vec<Vertex> = graph
-            .into_iter()
-            .map(|v| match v {
-                UnresolvedVertex::Resolved(v) => v,
-                UnresolvedVertex::Unresolved => unreachable!("All vertices should be resolved"),
+        let graph = (0..n)
+            .map(|idx| {
+                labels[idx].map_or_else(
+                    || {
+                        let mut escapes: Vec<Nimber> =
+                            followers(idx).filter_map(|f| labels[f]).collect();
+                        escapes.sort_unstable();
+                        escapes.dedup();
+                        Vertex::Loop(escapes)
+                    },
+                    Vertex::Value,
+                )
             })
             .collect();
+
         Self {
             graph,
             subtraction_set,
@@ -266,6 +228,32 @@ mod tests {
         let s2 = WindUp::new_using_sequence(&[0, 1, 2], n, vec![a, b]);
 
         assert_ne!(s1, s2);
+    }
+
+    fn graph_values(n: u32, subtraction_set: Vec<u32>) -> Vec<String> {
+        WindUp::new_using_graph(n, subtraction_set)
+            .graph()
+            .iter()
+            .map(ToString::to_string)
+            .collect()
+    }
+
+    #[test]
+    fn graph_finite_cycle_members() {
+        assert_eq!(
+            graph_values(7, vec![1, 2, 5]),
+            ["0", "*", "*2", "0", "*", "*2", "0"]
+        );
+    }
+
+    #[test]
+    fn graph_loops() {
+        assert_eq!(graph_values(4, vec![2]), ["0", "∞", "*", "∞"]);
+        assert_eq!(
+            graph_values(5, vec![1, 3]),
+            ["0", "∞(0)", "∞(0)", "∞(0)", "0"]
+        );
+        assert_eq!(graph_values(6, vec![2, 3]), ["0", "*", "*", "*2", "0", "0"]);
     }
 
     // TODO: Test conjecture: P(Gr) = Gr iff WindUp(n = a+b, {a,b})
