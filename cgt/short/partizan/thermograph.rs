@@ -340,7 +340,7 @@ impl Thermograph {
                         &mut right_wall_cps,
                         &mut right_wall_slopes,
                         &mut right_wall_x_intercepts,
-                        left_scaffold_crossing_point_r, // it should be left
+                        left_scaffold_crossing_point_r,
                         &0.into(),
                         previous_cave_value_r,
                     );
@@ -389,7 +389,7 @@ impl Thermograph {
                         &mut left_wall_cps,
                         &mut left_wall_slopes,
                         &mut left_wall_x_intercepts,
-                        right_scaffold_crossing_point_r, // it should be right
+                        right_scaffold_crossing_point_r,
                         &Rational::from(0),
                         previous_cave_value_r,
                     );
@@ -398,7 +398,7 @@ impl Thermograph {
                         &mut right_wall_cps,
                         &mut right_wall_slopes,
                         &mut right_wall_x_intercepts,
-                        left_scaffold_crossing_point.as_ref().unwrap(),
+                        right_scaffold_crossing_point_r,
                         &Rational::from(0),
                         previous_cave_value_r,
                     );
