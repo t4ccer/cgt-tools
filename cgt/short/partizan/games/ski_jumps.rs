@@ -142,6 +142,27 @@ where
         false
     }
 
+    /// Check if some skier is blocked by an opposing skier in the same row, so that it can never
+    /// slide off the grid
+    pub fn slide_blocked(&self) -> bool {
+        for y in 0..self.grid.height() {
+            let mut seen_left = false;
+            for x in 0..self.grid.width() {
+                match self.grid.get(x, y) {
+                    Tile::Empty => {}
+                    Tile::LeftJumper | Tile::LeftSlipper => seen_left = true,
+                    Tile::RightJumper | Tile::RightSlipper => {
+                        if seen_left {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+
+        false
+    }
+
     // TODO: Write custom iterators for these, or ideally wait for coroutines to become stable
 
     /// Get all moves that Left player can make
@@ -169,7 +190,10 @@ where
                         }
 
                         // Check jump
-                        if matches!(tile_to_move, Tile::LeftJumper) && y + 2 < self.grid.height() {
+                        if matches!(tile_to_move, Tile::LeftJumper)
+                            && y + 2 < self.grid.height()
+                            && self.grid.get(x, y + 2) == Tile::Empty
+                        {
                             match self.grid.get(x, y + 1) {
                                 Tile::Empty | Tile::LeftJumper | Tile::LeftSlipper => {}
                                 Tile::RightJumper | Tile::RightSlipper => {
@@ -210,7 +234,10 @@ where
                         }
 
                         // Check jump
-                        if matches!(tile_to_move, Tile::RightJumper) && y + 2 < self.grid.height() {
+                        if matches!(tile_to_move, Tile::RightJumper)
+                            && y + 2 < self.grid.height()
+                            && self.grid.get(x, y + 2) == Tile::Empty
+                        {
                             match self.grid.get(x, y + 1) {
                                 Tile::Empty | Tile::RightJumper | Tile::RightSlipper => {}
                                 Tile::LeftJumper | Tile::LeftSlipper => {
@@ -317,9 +344,10 @@ where
     }
 
     fn reductions(&self) -> Option<CanonicalForm> {
-        // If neither player can jump, the optimal move is to move any of the pieces by one tile
-        // so the game value is the difference of sum of distances to the board edge
-        if !self.jump_available() {
+        // If neither player can jump and no skier is blocked by an opposing skier, the optimal
+        // move is to move any of the pieces by one tile so the game value is the difference of sum
+        // of distances to the board edge
+        if !self.jump_available() && !self.slide_blocked() {
             let mut value = 0i64;
             for y in 0..self.grid.height() {
                 for x in 0..self.grid.width() {
@@ -364,5 +392,17 @@ mod tests {
         test_canonical_form!("L....|....R|.....", "1/2");
         test_canonical_form!("L....|R....|.....", "9/2");
         test_canonical_form!("L....|....R|l....", "5");
+        // Check that we can only jump onto empty tile
+        test_canonical_form!("L|R|R", "-1");
+        test_canonical_form!("R|L|L", "1");
+    }
+
+    #[test]
+    fn blocked_slides() {
+        test_canonical_form!(".LR", "0");
+        test_canonical_form!("L.R", "*");
+        test_canonical_form!("L..R", "*2");
+        test_canonical_form!("R.L.R", "-1*");
+        test_canonical_form!("L.R|..L", "1*");
     }
 }
