@@ -440,6 +440,13 @@
 <span class="sig-name descname"><span class="pre">__sub__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">other:</span> <span><span class="pre">CanonicalForm</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span><span class="pre">CanonicalForm</span></span></span></span><a class="headerlink" href="#cgt_py.CanonicalForm.__sub__" title="Link to this definition">¶</a></dt>
 </dl>
 
+<dl class="py method">
+<dt class="sig sig-object py" id="cgt_py.CanonicalForm.cool">
+<span class="sig-name descname"><span class="pre">cool</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">temperature:</span> <span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><span class="pre">Any</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span><span class="pre">CanonicalForm</span></span></span></span><a class="headerlink" href="#cgt_py.CanonicalForm.cool" title="Link to this definition">¶</a></dt>
+<dd><p>Cool the position by <code class="docutils literal notranslate"><span class="pre">temperature</span></code>, given as an integer, a string, or a
+<code class="docutils literal notranslate"><span class="pre">DyadicRationalNumber</span></code></p>
+</dd></dl>
+
 <dl>
 <dt class="sig sig-object py" id="cgt_py.CanonicalForm.birthday">
 <span class="property"><span class="pre">property</span> </span><span class="sig-name descname"><span class="pre">birthday</span></span><span class="pre">:</span> <span><span class="pre">int</span></span><a class="headerlink" href="#cgt_py.CanonicalForm.birthday" title="Link to this definition">¶</a></dt>
@@ -758,6 +765,11 @@
 <dt class="sig sig-object py" id="cgt_py.Graph">
 <span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">Graph</span></span><a class="headerlink" href="#cgt_py.Graph" title="Link to this definition">¶</a></dt>
 <dd><dl class="py method">
+<dt class="sig sig-object py" id="cgt_py.Graph.__eq__">
+<span class="sig-name descname"><span class="pre">__eq__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">other:</span> <span><span class="pre">object</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span><span class="pre">bool</span></span></span></span><a class="headerlink" href="#cgt_py.Graph.__eq__" title="Link to this definition">¶</a></dt>
+</dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="cgt_py.Graph.__new__">
 <span class="sig-name descname"><span class="pre">__new__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">vertices:</span> <span><span class="pre">int</span></span></em>, <em class="sig-param"><span class="pre">edges:</span> <span><span><a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence" title="(in Python v3.14)"><span class="pre">Sequence</span></a></span><span class="pre">[</span><span><span><span class="pre">tuple</span></span><span class="pre">[</span><span><span class="pre">int</span></span><span class="pre">,</span> <span><span class="pre">int</span></span><span class="pre">]</span></span><span class="pre">]</span></span></em>, <em class="sig-param"><span class="pre">directed:</span> <span><span class="pre">bool</span></span> <span class="pre">=</span> <span class="pre">...</span></em>, <em class="sig-param"><span class="pre">white:</span> <span><span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.14)"><span class="pre">Optional</span></a></span><span class="pre">[</span><span><span><a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence" title="(in Python v3.14)"><span class="pre">Sequence</span></a></span><span class="pre">[</span><span><span class="pre">int</span></span><span class="pre">]</span></span><span class="pre">]</span></span> <span class="pre">=</span> <span class="pre">None</span></em>, <em class="sig-param"><span class="pre">blue:</span> <span><span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.14)"><span class="pre">Optional</span></a></span><span class="pre">[</span><span><span><a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence" title="(in Python v3.14)"><span class="pre">Sequence</span></a></span><span class="pre">[</span><span><span class="pre">int</span></span><span class="pre">]</span></span><span class="pre">]</span></span> <span class="pre">=</span> <span class="pre">None</span></em>, <em class="sig-param"><span class="pre">red:</span> <span><span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.14)"><span class="pre">Optional</span></a></span><span class="pre">[</span><span><span><a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence" title="(in Python v3.14)"><span class="pre">Sequence</span></a></span><span class="pre">[</span><span><span class="pre">int</span></span><span class="pre">]</span></span><span class="pre">]</span></span> <span class="pre">=</span> <span class="pre">None</span></em>, <em class="sig-param"><span class="pre">green:</span> <span><span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.14)"><span class="pre">Optional</span></a></span><span class="pre">[</span><span><span><a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence" title="(in Python v3.14)"><span class="pre">Sequence</span></a></span><span class="pre">[</span><span><span class="pre">int</span></span><span class="pre">]</span></span><span class="pre">]</span></span> <span class="pre">=</span> <span class="pre">None</span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span><span class="pre">Graph</span></span></span></span><a class="headerlink" href="#cgt_py.Graph.__new__" title="Link to this definition">¶</a></dt>
 </dl>
@@ -770,6 +782,16 @@
 <dl class="py method">
 <dt class="sig sig-object py" id="cgt_py.Graph._repr_svg_">
 <span class="sig-name descname"><span class="pre">_repr_svg_</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span><span class="pre">str</span></span></span></span><a class="headerlink" href="#cgt_py.Graph._repr_svg_" title="Link to this definition">¶</a></dt>
+</dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cgt_py.Graph.decode_from_traitlet">
+<span class="sig-name descname"><span class="pre">decode_from_traitlet</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">preset_bits:</span> <span><span class="pre">int</span></span></em>, <em class="sig-param"><span class="pre">raw_graph:</span> <span><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span><span class="pre">Graph</span></span></span></span><a class="headerlink" href="#cgt_py.Graph.decode_from_traitlet" title="Link to this definition">¶</a></dt>
+</dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cgt_py.Graph.encode_to_traitlet">
+<span class="sig-name descname"><span class="pre">encode_to_traitlet</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span><span class="pre">str</span></span></span></span><a class="headerlink" href="#cgt_py.Graph.encode_to_traitlet" title="Link to this definition">¶</a></dt>
 </dl>
 
 <dl>
@@ -833,7 +855,22 @@ of opposite arcs, so this only decides how edges are added and reported back</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="cgt_py.Grid">
 <span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">Grid</span></span><a class="headerlink" href="#cgt_py.Grid" title="Link to this definition">¶</a></dt>
-<dd><dl>
+<dd><dl class="py method">
+<dt class="sig sig-object py" id="cgt_py.Grid.__eq__">
+<span class="sig-name descname"><span class="pre">__eq__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">other:</span> <span><span class="pre">object</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span><span class="pre">bool</span></span></span></span><a class="headerlink" href="#cgt_py.Grid.__eq__" title="Link to this definition">¶</a></dt>
+</dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cgt_py.Grid.decode_from_traitlet">
+<span class="sig-name descname"><span class="pre">decode_from_traitlet</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">preset_bits:</span> <span><span class="pre">int</span></span></em>, <em class="sig-param"><span class="pre">raw_grid:</span> <span><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span><span class="pre">Grid</span></span></span></span><a class="headerlink" href="#cgt_py.Grid.decode_from_traitlet" title="Link to this definition">¶</a></dt>
+</dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cgt_py.Grid.encode_to_traitlet">
+<span class="sig-name descname"><span class="pre">encode_to_traitlet</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span><span class="pre">str</span></span></span></span><a class="headerlink" href="#cgt_py.Grid.encode_to_traitlet" title="Link to this definition">¶</a></dt>
+</dl>
+
+<dl>
 <dt class="sig sig-object py" id="cgt_py.Grid.amazons">
 <span class="property"><span class="pre">property</span> </span><span class="sig-name descname"><span class="pre">amazons</span></span><span class="pre">:</span> <span><span class="pre">Amazons</span></span><a class="headerlink" href="#cgt_py.Grid.amazons" title="Link to this definition">¶</a></dt>
 <dd><p>Read-only property.</p>
