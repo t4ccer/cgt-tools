@@ -811,7 +811,7 @@ impl CanonicalForm {
 
         self.right_moves()
             .map(|gr| gr.left_stop())
-            .max()
+            .min()
             .expect("Not a number so must have moves")
     }
 
@@ -1536,6 +1536,10 @@ mod tests {
         assert_stops!("v", "0", "0");
         assert_stops!("*", "0", "0");
         assert_stops!("^", "0", "0");
+        assert_stops!("{{4|1}, {4|1*}|-1, {1|-3}, {1*|-3}}", "1", "-1");
+        assert_stops!("{5|0, {3|2}}", "5", "0");
+        assert_stops!("{{1|0}, 3|-2, {0|-1}}", "3", "-2");
+        assert_stops!("{{4|2}, {4|2*}|{2|*}, {2*|*}}", "2", "2");
     }
 
     macro_rules! assert_cooled {
