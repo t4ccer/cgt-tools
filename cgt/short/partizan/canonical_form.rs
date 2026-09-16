@@ -525,14 +525,14 @@ impl CanonicalForm {
             CanonicalFormInner::Nus(nus) => Self::new_nus(-nus),
             CanonicalFormInner::Moves(moves) => {
                 let new_left_moves = moves
-                    .left
-                    .iter()
-                    .map(|gl| Self::construct_negative(gl))
-                    .collect::<Vec<_>>();
-                let new_right_moves = moves
                     .right
                     .iter()
                     .map(|gr| Self::construct_negative(gr))
+                    .collect::<Vec<_>>();
+                let new_right_moves = moves
+                    .left
+                    .iter()
+                    .map(|gl| Self::construct_negative(gl))
                     .collect::<Vec<_>>();
                 let new_moves = Moves {
                     left: TotalWrapper::from_inner_vec(new_left_moves),
@@ -1363,7 +1363,15 @@ mod tests {
         assert_negative_eq!("0", "0");
         assert_negative_eq!("42", "-42");
         assert_negative_eq!("-42", "42");
-        assert_negative_eq!("{^|*}", "{v|*}");
+        assert_negative_eq!("{^|*}", "{*|v}");
+        assert_negative_eq!("{2|1}", "{-1|-2}");
+        assert_negative_eq!("{1|-1}", "{1|-1}");
+        assert_negative_eq!("{3|0}", "{0|-3}");
+        assert_negative_eq!("{1|0, *}", "{0, *|-1}");
+        assert_negative_eq!(
+            "{{3|0}, {3|*}|{0|-3}, {*|-3}}",
+            "{{3|0}, {3|*}|{0|-3}, {*|-3}}"
+        );
     }
 
     #[test]
