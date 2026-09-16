@@ -978,7 +978,7 @@ impl CanonicalForm {
                         .right
                         .iter()
                         .map(|right_move| {
-                            let greatest = right_move.left_stop().round();
+                            let greatest = right_move.left_stop().floor();
                             if **right_move <= Self::new_integer(greatest) {
                                 greatest - 1
                             } else {

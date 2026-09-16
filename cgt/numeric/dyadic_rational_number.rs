@@ -128,22 +128,42 @@ impl DyadicRationalNumber {
         }
     }
 
-    /// Ceil division
-    pub const fn ceil(self) -> i64 {
-        // TODO: use `div_ceil` when `int_roundings` lands in stable
-        let n = self.numerator();
-        let d = self
-            .denominator()
-            .expect("unreachable: denominator cannot be zero") as i64;
-        (n + d - 1) / d
+    /// Greatest integer not greater than the number
+    pub const fn floor(self) -> i64 {
+        if self.denominator_exponent >= i64::BITS {
+            // Normalized number with such exponent has odd numerator so it is strictly between
+            // -1 and 1
+            if self.numerator < 0 { -1 } else { 0 }
+        } else {
+            self.numerator >> self.denominator_exponent
+        }
     }
 
-    /// Round a dyadic to the nearest integer
+    /// Least integer not less than the number
+    pub const fn ceil(self) -> i64 {
+        -Self {
+            numerator: -self.numerator,
+            denominator_exponent: self.denominator_exponent,
+        }
+        .floor()
+    }
+
+    /// Nearest integer, with halves rounded away from zero
     pub const fn round(self) -> i64 {
-        self.numerator()
-            / self
-                .denominator()
-                .expect("unreachable: denominator cannot be zero") as i64
+        if self.denominator_exponent == 0 {
+            self.numerator
+        } else if self.denominator_exponent >= i64::BITS {
+            // Normalized number with such exponent is strictly between -1/2 and 1/2
+            0
+        } else {
+            let half = 1_i64 << (self.denominator_exponent - 1);
+            let magnitude = (self.numerator.abs() + half) >> self.denominator_exponent;
+            if self.numerator < 0 {
+                -magnitude
+            } else {
+                magnitude
+            }
+        }
     }
 
     /// Arithmetic mean of two rationals
@@ -367,5 +387,53 @@ mod tests {
     #[should_panic]
     fn parsing_works_negative() {
         test_parsing_works("2/3");
+    }
+
+    macro_rules! assert_op {
+        ($input:literal, $op:ident, $expected:expr) => {
+            assert_op!(
+                DyadicRationalNumber::from_str($input).unwrap(),
+                $op,
+                $expected
+            )
+        };
+        ($input:expr, $op:ident, $expected:expr) => {
+            assert_eq!($input.$op(), $expected, "{}.{}()", $input, stringify!($op))
+        };
+    }
+
+    #[test]
+    fn ceil_works() {
+        assert_op!("5/4", ceil, 2);
+        assert_op!("-5/4", ceil, -1);
+        assert_op!("-1/2", ceil, 0);
+        assert_op!("-3/2", ceil, -1);
+        assert_op!("-2", ceil, -2);
+        assert_op!(DyadicRationalNumber::new(1, 100), ceil, 1);
+        assert_op!(DyadicRationalNumber::new(-1, 100), ceil, 0);
+    }
+
+    #[test]
+    fn floor_works() {
+        assert_op!("5/4", floor, 1);
+        assert_op!("-5/4", floor, -2);
+        assert_op!("-1/2", floor, -1);
+        assert_op!("-2", floor, -2);
+        assert_op!(DyadicRationalNumber::new(1, 100), floor, 0);
+        assert_op!(DyadicRationalNumber::new(-1, 100), floor, -1);
+    }
+
+    #[test]
+    fn round_works() {
+        assert_op!("5/4", round, 1);
+        assert_op!("-5/4", round, -1);
+        assert_op!("7/4", round, 2);
+        assert_op!("-7/4", round, -2);
+        assert_op!("1/2", round, 1);
+        assert_op!("-1/2", round, -1);
+        assert_op!("3/2", round, 2);
+        assert_op!("7/16", round, 0);
+        assert_op!("-2", round, -2);
+        assert_op!(DyadicRationalNumber::new(-1, 100), round, 0);
     }
 }
