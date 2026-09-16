@@ -248,7 +248,11 @@ macro_rules! impl_shared_methods {
         where
             Self: Sized,
         {
-            self.idx -= self.len();
+            let remaining = self.len();
+            if remaining == 0 {
+                return None;
+            }
+            self.idx += remaining - 1;
             self.next()
         }
     };
@@ -351,7 +355,7 @@ impl ExactSizeIterator for LeftMovesIter {
     fn len(&self) -> usize {
         let nimber = self.nus.nimber();
         if !self.nus.is_number() && self.nus.up_multiple() == 0 {
-            return nimber.value() as usize - self.idx;
+            return (nimber.value() as usize).saturating_sub(self.idx);
         }
 
         match self.idx {
@@ -476,7 +480,7 @@ impl ExactSizeIterator for RightMovesIter {
     fn len(&self) -> usize {
         let nimber = self.nus.nimber();
         if !self.nus.is_number() && self.nus.up_multiple() == 0 {
-            return nimber.value() as usize - self.idx;
+            return (nimber.value() as usize).saturating_sub(self.idx);
         }
 
         match self.idx {
@@ -697,6 +701,37 @@ mod tests {
                 last
             };
             let fast = nus.moves(player).skip(to_skip).last();
+            manual == fast
+        }
+
+        let tests = 50_000;
+        let mut qc = QuickCheck::new()
+            .max_tests(tests)
+            .min_tests_passed(tests)
+            .tests(tests);
+        qc.quickcheck(test_impl as fn(Nus, Player, usize) -> bool);
+    }
+
+    #[test]
+    fn concrete_moves_iter_last() {
+        fn skip_then_last<I>(mut iter: I, to_skip: usize) -> Option<Nus>
+        where
+            I: Iterator<Item = Nus>,
+        {
+            for _ in 0..to_skip {
+                if iter.next().is_none() {
+                    break;
+                }
+            }
+            iter.last()
+        }
+
+        fn test_impl(nus: Nus, player: Player, to_skip: usize) -> bool {
+            let manual = nus.moves(player).skip(to_skip).last();
+            let fast = match player {
+                Player::Left => skip_then_last(nus.left_moves(), to_skip),
+                Player::Right => skip_then_last(nus.right_moves(), to_skip),
+            };
             manual == fast
         }
 
