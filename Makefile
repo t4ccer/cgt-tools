@@ -1,4 +1,5 @@
-PIP = .venv/bin/pip
+CLEAN_PY_ENV = env -u PYTHONPATH -u _PYTHON_SYSCONFIGDATA_NAME -u PYTHONHOME
+PIP = $(CLEAN_PY_ENV) .venv/bin/pip
 PYTHON = .venv/bin/python
 WHEELS = target/wheels/venv
 DEPS = target/make
@@ -74,7 +75,7 @@ $(BUNDLE): $(WIDGETS_WASM) cgt_py_widgets/index.js cgt_py_widgets/webpack.config
 
 $(WHEEL_STAMP): $(BUNDLE) $(STUB_STAMP) $(MANIFESTS) $(PY_DEP) cgt_py/pyproject.toml | .venv $(DEPS)
 	rm -rf $(WHEELS)
-	env -C ./cgt_py maturin build --interpreter ../$(PYTHON) --out ../$(WHEELS)
+	$(CLEAN_PY_ENV) env -C ./cgt_py maturin build --interpreter ../$(PYTHON) --out ../$(WHEELS)
 	$(call cargo-dep,$(CARGO_DEP_PY))
 	touch $@
 
@@ -84,7 +85,7 @@ $(INSTALL_STAMP): $(WHEEL_STAMP) | .venv $(DEPS)
 
 $(STUB_STAMP): $(BUNDLE) $(MANIFESTS) $(STUB_DEP) cgt_py/pyproject.toml | .venv $(DEPS)
 	rm -rf cgt_py/docs/api
-	PYO3_PYTHON=$(abspath $(PYTHON)) cargo run --quiet -p cgt_py --bin cgt_py_stub_gen
+	$(CLEAN_PY_ENV) PYO3_PYTHON=$(abspath $(PYTHON)) cargo run --quiet -p cgt_py --bin cgt_py_stub_gen
 	$(call cargo-dep,$(CARGO_DEP_STUB))
 	touch $@
 
