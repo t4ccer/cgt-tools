@@ -100,4 +100,11 @@ impl PyCanonicalForm {
     fn right_stop(&self) -> PyDyadicRationalNumber {
         PyDyadicRationalNumber(self.0.right_stop())
     }
+
+    /// Cool the position by `temperature`, given as an integer, a string, or a
+    /// `DyadicRationalNumber`
+    fn cool(&self, temperature: Bound<'_, PyAny>) -> PyResult<PyCanonicalForm> {
+        let temperature = PyDyadicRationalNumber::extract_flexible(&temperature)?;
+        Ok(PyCanonicalForm(self.0.cool(temperature)))
+    }
 }

@@ -11,6 +11,24 @@ use std::{
 #[derive(Clone)]
 pub struct PyDyadicRationalNumber(pub DyadicRationalNumber);
 
+impl PyDyadicRationalNumber {
+    /// Convert a python integer, string, or `DyadicRationalNumber` to a dyadic
+    pub fn extract_flexible(value: &Bound<'_, PyAny>) -> PyResult<DyadicRationalNumber> {
+        if let Ok(integer) = value.extract::<i64>() {
+            Ok(DyadicRationalNumber::from(integer))
+        } else if let Ok(string) = value.extract::<&str>() {
+            DyadicRationalNumber::from_str(string)
+                .map_err(|err| crate::parsing::parse_error(&err, string))
+        } else if let Ok(dyadic) = value.extract::<PyDyadicRationalNumber>() {
+            Ok(dyadic.0)
+        } else {
+            Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "Could not convert to DyadicRationalNumber. Expected integer, string, or DyadicRationalNumber.",
+            ))
+        }
+    }
+}
+
 #[gen_stub_pymethods]
 #[pymethods]
 impl PyDyadicRationalNumber {
@@ -20,23 +38,19 @@ impl PyDyadicRationalNumber {
         numerator: Bound<'_, PyAny>,
         denominator_exponent: Option<u32>,
     ) -> PyResult<PyDyadicRationalNumber> {
-        if let Ok(numerator) = numerator.extract::<i64>() {
-            match denominator_exponent {
-                None => Ok(PyDyadicRationalNumber(DyadicRationalNumber::from(
+        match denominator_exponent {
+            None => Self::extract_flexible(&numerator).map(PyDyadicRationalNumber),
+            Some(denominator_exponent) => {
+                let numerator = numerator.extract::<i64>().map_err(|_| {
+                    PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "Numerator must be an integer when denominator exponent is given.",
+                    )
+                })?;
+                Ok(PyDyadicRationalNumber(DyadicRationalNumber::new(
                     numerator,
-                ))),
-                Some(denominator_exponent) => Ok(PyDyadicRationalNumber(
-                    DyadicRationalNumber::new(numerator, denominator_exponent),
-                )),
+                    denominator_exponent,
+                )))
             }
-        } else if let Ok(string) = numerator.extract::<&str>() {
-            DyadicRationalNumber::from_str(string)
-                .map_err(|err| crate::parsing::parse_error(&err, string))
-                .map(PyDyadicRationalNumber)
-        } else {
-            Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                "Could not convert to DyadicRationalNumber.",
-            ))
         }
     }
 
