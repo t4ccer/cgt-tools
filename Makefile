@@ -1,6 +1,7 @@
 CLEAN_PY_ENV = env -u PYTHONPATH -u _PYTHON_SYSCONFIGDATA_NAME -u PYTHONHOME
 PIP = $(CLEAN_PY_ENV) .venv/bin/pip
 PYTHON = .venv/bin/python
+VENV_CFG = .venv/pyvenv.cfg
 WHEELS = target/wheels/venv
 DEPS = target/make
 
@@ -31,9 +32,11 @@ sed 's|^[^:]*:|$@:|' $(1) > $(DEPS)/$(@F).d; \
 tr ' ' '\n' < $(1) | sed -e '1d' -e '/^$$/d' -e 's|$$|:|' >> $(DEPS)/$(@F).d
 endef
 
-.venv:
-	python3 -m venv .venv
-	$(PIP) install ipykernel
+$(VENV_CFG):
+	python3 -m venv --system-site-packages .venv
+	$(CLEAN_PY_ENV) $(PYTHON) -m ipykernel install --prefix .venv --name cgt --display-name "cgt (NixOS venv)"
+
+.venv: $(VENV_CFG)
 
 $(DEPS):
 	mkdir -p $(DEPS)
@@ -44,6 +47,10 @@ clean:
 
 .PHONY: py
 py: $(INSTALL_STAMP)
+
+.PHONY: notebook
+notebook: $(INSTALL_STAMP)
+	$(CLEAN_PY_ENV) $(PYTHON) -m notebook
 
 .PHONY: stub
 stub: $(STUB_STAMP)
@@ -79,7 +86,7 @@ $(WHEEL_STAMP): $(BUNDLE) $(STUB_STAMP) $(MANIFESTS) $(PY_DEP) cgt_py/pyproject.
 	$(call cargo-dep,$(CARGO_DEP_PY))
 	touch $@
 
-$(INSTALL_STAMP): $(WHEEL_STAMP) | .venv $(DEPS)
+$(INSTALL_STAMP): $(WHEEL_STAMP) $(VENV_CFG) | $(DEPS)
 	$(PIP) install --force-reinstall $(WHEELS)/*.whl
 	touch $@
 

@@ -44,7 +44,7 @@
           ];
         };
 
-        pythonToolchain = pkgs.python313.override {
+        pythonToolchain = pkgs.python314.override {
           packageOverrides = self: super: {
             anywidget = super.anywidget.overridePythonAttrs (oldAttrs: rec {
               version = "0.11.0";
@@ -56,6 +56,16 @@
             });
           };
         };
+
+        pythonEnv = pythonToolchain.withPackages (ps:
+          with ps; [
+            pip
+            jupyter
+            anywidget
+            sphinx
+            myst-parser
+            furo
+          ]);
       in {
         _module.args.pkgs = import self.inputs.nixpkgs {
           inherit system;
@@ -93,20 +103,15 @@
           shellHook = ''
             ${config.pre-commit.shellHook}
             PATH=$PATH:$(pwd)/target/release
+            # Jupyter started from the venv only searches its own prefix for lab extensions,
+            # so it would not find the widget manager installed in the nix python env
+            export JUPYTER_PATH=${pythonEnv}/share/jupyter
           '';
 
           hardeningDisable = ["fortify"];
 
           nativeBuildInputs = [
-            (pythonToolchain.withPackages (ps:
-              with ps; [
-                pip
-                jupyter
-                anywidget
-                sphinx
-                myst-parser
-                furo
-              ]))
+            pythonEnv
             pkgs.maturin
 
             pkgs.cargo-expand
