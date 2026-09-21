@@ -6,19 +6,25 @@ use crate::{
     },
     result::{UnwrapInfallible, Void},
     short::partizan::Player,
-    total::{TotalWrappable, TotalWrapper},
+    total::TotalWrappable,
 };
-use std::{collections::HashMap, error::Error, fmt, sync::RwLock};
+use std::{error::Error, fmt};
 
-/// Comparison of P-free blocking forms
+/// Comparison of P-free forms of a blocking universe
 ///
-/// Dead-ending forms are blocking so the same maintenance and proviso checks decide the order
-/// modulo pf(E) when the inner context is dead-ending and modulo pf(B) when it is blocking
+/// The order modulo pf(U) is decided by the recursive test of "Recursive Comparison Test for
+/// Invertible Subgroups of Blocking Universes" (Theorem `misereGE_iff_promain`), which applies
+/// to any blocking universe containing integers, so it decides the order modulo pf(E) when the
+/// inner context is dead-ending and modulo pf(B) when it is blocking
 pub trait PFreeBlockingContext: BlockingContext + PFreeContext
 where
     Self::IntegerConstructionError: Void,
 {
     fn ge_mod_p_free_blocking(&self, g: &Self::Form, h: &Self::Form) -> bool;
+
+    fn satisfy_promain(&self, g: &Self::Form, h: &Self::Form) -> bool {
+        self.satisfy_proviso(g, h) && self.satisfy_maintenance(g, h)
+    }
 
     fn satisfy_maintenance(&self, g: &Self::Form, h: &Self::Form) -> bool {
         let a = self.moves(g, Player::Right).all(|gr| {
@@ -177,6 +183,31 @@ where
     }
 
     fn reduced(&self, game: &Self::Form) -> Self::Form {
+        // A non-zero end is equal to the form with the missing side filled in by -1 or 1
+        // (Lemma `reduction_plug_end_not_isEnd_left` and its conjugate), and unlike the end
+        // itself that form can be simplified by the reductions below, e.g. {|1} = {-1|1} = 0
+        if self.to_integer(game).is_none() {
+            if self.is_end(game, Player::Left) {
+                let plugged = self
+                    .new(
+                        [self.new_integer(-1).unwrap_infallible()],
+                        self.moves(game, Player::Right).cloned(),
+                    )
+                    .unwrap();
+                return self.reduced(&plugged);
+            }
+
+            if self.is_end(game, Player::Right) {
+                let plugged = self
+                    .new(
+                        self.moves(game, Player::Left).cloned(),
+                        [self.new_integer(1).unwrap_infallible()],
+                    )
+                    .unwrap();
+                return self.reduced(&plugged);
+            }
+        }
+
         let mut left = self.bypass_reversible_moves_l(game);
         self.eliminate_dominated_moves(&mut left, Player::Left);
 
@@ -223,32 +254,18 @@ where
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-enum SeenZero {
-    Once,
-    Multiple,
-}
-
-#[derive(Debug)]
-pub struct PFreeBlockingFormContext<C>
-where
-    C: GameFormContext,
-{
-    not_ge_zero: RwLock<HashMap<TotalWrapper<PFreeBlockingForm<C::Form>>, SeenZero>>,
-    not_zero_ge: RwLock<HashMap<TotalWrapper<PFreeBlockingForm<C::Form>>, SeenZero>>,
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct PFreeBlockingFormContext<C> {
     context: C,
 }
 
-impl<C> PFreeBlockingFormContext<C>
-where
-    C: GameFormContext,
-{
-    pub fn new(context: C) -> Self {
-        Self {
-            context,
-            not_ge_zero: RwLock::new(HashMap::new()),
-            not_zero_ge: RwLock::new(HashMap::new()),
-        }
+impl<C> PFreeBlockingFormContext<C> {
+    pub const fn new(context: C) -> Self {
+        Self { context }
+    }
+
+    pub const fn underlying(&self) -> &C {
+        &self.context
     }
 }
 
@@ -434,95 +451,78 @@ impl<C> PFreeBlockingContext for PFreeBlockingFormContext<C>
 where
     C: BlockingContext + PFreeContext,
     C::IntegerConstructionError: Void,
-    C::Form: TotalWrappable,
 {
     fn ge_mod_p_free_blocking(&self, g: &Self::Form, h: &Self::Form) -> bool {
-        // Relation on integers does not follow from maintenance/proviso so it is hardcoded
-        if let Some(g) = self.to_integer(g)
-            && let Some(h) = self.to_integer(h)
-        {
-            // The order of games is the opposite of order of integers so <= is correct for `ge` check
-            return g <= h;
+        let g_left_end = self.is_end(g, Player::Left);
+        let g_right_end = self.is_end(g, Player::Right);
+        let h_left_end = self.is_end(h, Player::Left);
+        let h_right_end = self.is_end(h, Player::Right);
+
+        // The cases of the theorem are read in order
+
+        if g_left_end && g_right_end {
+            return match self.outcome(h) {
+                Outcome::R => true,
+                Outcome::N => {
+                    let h_not_right_end = self
+                        .new(
+                            self.moves(h, Player::Left)
+                                .filter(|hl| !self.is_end(hl, Player::Right))
+                                .cloned(),
+                            self.moves(h, Player::Right).cloned(),
+                        )
+                        .unwrap();
+                    self.satisfy_promain(g, &h_not_right_end)
+                }
+                Outcome::L => false,
+                Outcome::P => unreachable!("P-free form has outcome P"),
+            };
         }
 
-        if self.satisfy_proviso(g, h) && self.satisfy_maintenance(g, h) {
+        if h_left_end && h_right_end {
+            return match self.outcome(g) {
+                Outcome::L => true,
+                Outcome::N => {
+                    let g_not_left_end = self
+                        .new(
+                            self.moves(g, Player::Left).cloned(),
+                            self.moves(g, Player::Right)
+                                .filter(|gr| !self.is_end(gr, Player::Left))
+                                .cloned(),
+                        )
+                        .unwrap();
+                    self.satisfy_promain(&g_not_left_end, h)
+                }
+                Outcome::R => false,
+                Outcome::P => unreachable!("P-free form has outcome P"),
+            };
+        }
+
+        if g_left_end && h_right_end {
             return true;
         }
 
-        let plug_end = |g,
-                        h,
-                        seen_zero: &RwLock<
-            HashMap<TotalWrapper<PFreeBlockingForm<C::Form>>, SeenZero>,
-        >| {
-            self.to_integer(g).and_then(|g| match g.cmp(&0) {
-                // G = -n = {-1 | -(n - 1)}
-                std::cmp::Ordering::Less => Some(
-                    self.new(
-                        [self.new_integer(-1).unwrap_infallible()],
-                        [self.new_integer(g + 1).unwrap_infallible()],
-                    )
-                    .unwrap(),
-                ),
-                // We need to try plugging the G = 0 to G = {-1|1} but that may loop since G^RL = 0
-                // in the maintenance check
-                std::cmp::Ordering::Equal => {
-                    // NOTE: Race may happen here but worst case we'll just do a redundant check
-                    // and two threads will mark the same game as checked in the HashMap
-                    let not_zero_ge = seen_zero.read().unwrap();
-                    match not_zero_ge.get(TotalWrapper::from_ref(h)) {
-                        // First time we see `h` compared against G = 0
-                        // If we are here that means that maintenance/proviso check of `0 >= h`
-                        // failed so we try again with `{-1|1} >= h`
-                        None => {
-                            drop(not_zero_ge);
-                            seen_zero
-                                .write()
-                                .unwrap()
-                                .insert(TotalWrapper::new(h.clone()), SeenZero::Once);
-                            Some(
-                                self.new(
-                                    [self.new_integer(-1).unwrap_infallible()],
-                                    [self.new_integer(1).unwrap_infallible()],
-                                )
-                                .unwrap(),
-                            )
-                        }
-                        // If we are here that means that we are in the process of checking
-                        // `{-1|1} >= h` holds since we got `0 >= h = false`
-                        // already, so we break the recursion and note that in the HashMap to not take
-                        // the write lock again for that game
-                        Some(SeenZero::Once) => {
-                            drop(not_zero_ge);
-                            seen_zero
-                                .write()
-                                .unwrap()
-                                .insert(TotalWrapper::new(h.clone()), SeenZero::Multiple);
-                            None
-                        }
-                        Some(SeenZero::Multiple) => None,
-                    }
-                }
-                // G = n = {n - 1 | 1}
-                std::cmp::Ordering::Greater => Some(
-                    self.new(
-                        [self.new_integer(g - 1).unwrap_infallible()],
-                        [self.new_integer(1).unwrap_infallible()],
-                    )
-                    .unwrap(),
-                ),
-            })
-        };
-
-        // No need to plug both cause then they are both integers and handled by the case above
-        if let Some(g) = plug_end(g, h, &self.not_ge_zero) {
-            return self.ge_mod_p_free_blocking(&g, h);
+        if g_left_end {
+            let g_plugged = self
+                .new(
+                    [self.new_integer(-1).unwrap_infallible()],
+                    self.moves(g, Player::Right).cloned(),
+                )
+                .unwrap();
+            return self.satisfy_promain(&g_plugged, h);
         }
 
-        if let Some(h) = plug_end(h, g, &self.not_zero_ge) {
-            return self.ge_mod_p_free_blocking(g, &h);
+        if h_right_end {
+            let h_plugged = self
+                .new(
+                    self.moves(h, Player::Left).cloned(),
+                    [self.new_integer(1).unwrap_infallible()],
+                )
+                .unwrap();
+            return self.satisfy_promain(g, &h_plugged);
         }
 
-        false
+        self.satisfy_promain(g, h)
     }
 }
 
@@ -724,5 +724,35 @@ mod tests {
         let h = context.from_str("{0|1}").unwrap();
         assert!(context.eq_mod_p_free_blocking(&one, &h));
         assert!(context.total_eq(&context.reduced(&h), &one));
+    }
+
+    #[test]
+    fn blocking_end_reductions() {
+        let context = PFreeBlockingFormContext::new(PFreeFormContext::new(
+            BlockingFormContext::new(StandardFormContext),
+        ));
+
+        for (end, integer) in [
+            ("{|1}", "0"),
+            ("{-1|}", "0"),
+            ("{|{-1|2}}", "-1"),
+            ("{{-2|1}|}", "1"),
+            ("{|1,{-1|2}}", "0"),
+            ("{|{-2|1}}", "-2"),
+            ("{|0,{-1|2}}", "-1"),
+        ] {
+            let g = context.from_str(end).unwrap();
+            let n = context.from_str(integer).unwrap();
+            assert!(!context.is_dead_ending(&g), "{end} is dead-ending");
+            assert!(
+                context.eq_mod_p_free_blocking(&g, &n),
+                "{end} != {integer} (mod pf(B))"
+            );
+            assert!(
+                context.total_eq(&context.reduced(&g), &n),
+                "reduced {end} = {} is not {integer}",
+                context.display(&context.reduced(&g))
+            );
+        }
     }
 }

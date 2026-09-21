@@ -2,7 +2,7 @@ use crate::io::FilePathOr;
 use anyhow::Result;
 use cgt::{
     misere::game_form::{
-        DeadEndingFormContext, GameFormContext, PFreeBlockingContext, PFreeBlockingFormContext,
+        BlockingFormContext, DeadEndingFormContext, PFreeBlockingContext, PFreeBlockingFormContext,
         PFreeFormContext, StandardFormContext,
     },
     poset::AntichainIterator,
@@ -307,10 +307,6 @@ where
                 return;
             };
 
-            if !context.is_p_free(&non_reduced) || !context.is_dead_ending(&non_reduced) {
-                return;
-            }
-
             let reduced = context.reduced(&non_reduced);
 
             let already_checked = {
@@ -442,6 +438,12 @@ fn progress_style() -> ProgressStyle {
         .progress_chars("#> ")
 }
 
+#[derive(clap::ValueEnum, Debug, Clone, Copy)]
+pub enum Variant {
+    DeadEnding,
+    Blocking,
+}
+
 #[derive(Debug, clap::Parser)]
 pub struct Args {
     /// Day to print
@@ -463,19 +465,18 @@ pub struct Args {
     /// TeX/tikz output path
     #[arg(long, default_value = None)]
     tex: Option<FilePathOr<Stdout>>,
-    // TODO: Support variant
+
+    #[arg(long, value_enum)]
+    variant: Variant,
 }
 
-#[allow(clippy::needless_pass_by_value, clippy::unnecessary_wraps)]
-pub fn run(args: Args) -> Result<()> {
-    if args.txt.is_none() && args.dot.is_none() && args.pdf.is_none() && args.tex.is_none() {
-        eprintln!("Warning: Not generating any output");
-    }
-
-    let context = PFreeBlockingFormContext::new(PFreeFormContext::new(
-        DeadEndingFormContext::new(StandardFormContext),
-    ));
-
+#[allow(clippy::needless_pass_by_value)]
+pub fn go<C>(context: C, args: Args) -> Result<()>
+where
+    C: PFreeBlockingContext + Send + Sync,
+    C::IntegerConstructionError: Void,
+    C::Form: Send + Sync,
+{
     let style = progress_style();
 
     let mut day = vec![context.new_integer(0).unwrap_infallible()];
@@ -556,8 +557,7 @@ pub fn run(args: Args) -> Result<()> {
 
             let graphviz = {
                 eprintln!("Generating Hasse diagram");
-                let bar =
-                    ProgressBar::new(game_count * (game_count - 1) / 2).with_style(style);
+                let bar = ProgressBar::new(game_count * (game_count - 1) / 2).with_style(style);
                 let mut graphviz = Vec::new();
                 // TODO: Reuse `lt` table generated in `compute_partitioned_antichains` if we can remap indices
                 generate_hasse(&context, &mut graphviz, &day_antichains, &bar)?;
@@ -598,4 +598,28 @@ pub fn run(args: Args) -> Result<()> {
     }
 
     Ok(())
+}
+
+#[allow(clippy::needless_pass_by_value, clippy::unnecessary_wraps)]
+pub fn run(args: Args) -> Result<()> {
+    if args.txt.is_none() && args.dot.is_none() && args.pdf.is_none() && args.tex.is_none() {
+        eprintln!("Warning: Not generating any output");
+    }
+
+    match args.variant {
+        Variant::DeadEnding => {
+            let context = PFreeBlockingFormContext::new(PFreeFormContext::new(
+                DeadEndingFormContext::new(StandardFormContext),
+            ));
+
+            go(context, args)
+        }
+        Variant::Blocking => {
+            let context = PFreeBlockingFormContext::new(PFreeFormContext::new(
+                BlockingFormContext::new(StandardFormContext),
+            ));
+
+            go(context, args)
+        }
+    }
 }
