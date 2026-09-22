@@ -3,6 +3,7 @@
 mod blocking;
 mod context;
 mod dead_ending;
+mod dicotic;
 mod interned;
 mod p_free;
 mod p_free_blocking;
@@ -13,6 +14,7 @@ pub use context::{ConstructionError, GameFormContext, ParseError};
 pub use dead_ending::{
     DeadEndingConstructionError, DeadEndingContext, DeadEndingForm, DeadEndingFormContext,
 };
+pub use dicotic::{DicoticContext, DicoticForm, DicoticFormConstructionError, DicoticFormContext};
 pub use interned::{InternedForm, InternedFormContext};
 pub use p_free::{PFreeConstructionError, PFreeContext, PFreeForm, PFreeFormContext};
 pub use p_free_blocking::{

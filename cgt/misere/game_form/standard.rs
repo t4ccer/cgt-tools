@@ -179,3 +179,31 @@ impl std::fmt::Display for StandardForm {
         write!(f, "{}", StandardFormContext.display(self))
     }
 }
+
+#[test]
+fn parse_nus_options() {
+    let context = StandardFormContext;
+    for (nus, braces) in [
+        ("*", "{0|0}"),
+        ("*2", "{0,{0|0}|0,{0|0}}"),
+        ("^", "{0|{0|0}}"),
+        ("v", "{{0|0}|0}"),
+        ("^*", "{0,{0|0}|0}"),
+        ("v*", "{0|0,{0|0}}"),
+        ("{0,*|0,*}", "{0,{0|0}|0,{0|0}}"),
+        ("{ * | v , ^* }", "{{0|0}|{{0|0}|0},{0,{0|0}|0}}"),
+        ("2", "{1|}"),
+        ("-1", "{|0}"),
+        ("1/2", "{0|1}"),
+    ] {
+        let g = context.from_str(nus).unwrap();
+        let h = context.from_str(braces).unwrap();
+        assert!(
+            context.total_eq(&g, &h),
+            "{nus} should parse as {braces}, got {}",
+            context.to_string(&g)
+        );
+    }
+    assert!(context.from_str("").is_err());
+    assert!(context.from_str("{|").is_err());
+}

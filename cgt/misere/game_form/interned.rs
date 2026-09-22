@@ -69,6 +69,7 @@ struct Node {
     right_wins_going_first: AtomicCachedBool,
     is_p_free: AtomicCachedBool,
     is_dead_ending: AtomicCachedBool,
+    is_dicotic: AtomicCachedBool,
 }
 
 /// Hash-consing context for unrestricted game forms
@@ -118,6 +119,7 @@ impl InternedFormContext {
                     right_wins_going_first: AtomicCachedBool::new(CachedBool::NotCached),
                     is_p_free: AtomicCachedBool::new(CachedBool::NotCached),
                     is_dead_ending: AtomicCachedBool::new(CachedBool::NotCached),
+                    is_dicotic: AtomicCachedBool::new(CachedBool::NotCached),
                 };
                 let idx = self.nodes.push(node) as u32;
                 entry.insert(idx);
@@ -194,6 +196,13 @@ impl GameFormContext for InternedFormContext {
         self.node(*game).is_dead_ending.load_or_store(|| {
             Player::forall(|p| !self.is_end(game, p) || self.is_dead_end(game, p))
                 && Player::forall(|p| self.moves(game, p).all(|g| self.is_dead_ending(g)))
+        })
+    }
+
+    fn is_dicotic(&self, game: &Self::Form) -> bool {
+        self.node(*game).is_dicotic.load_or_store(|| {
+            Player::forall(|p| !self.is_end(game, p) || self.is_end(game, p.opposite()))
+                && Player::forall(|p| self.moves(game, p).all(|g| self.is_dicotic(g)))
         })
     }
 

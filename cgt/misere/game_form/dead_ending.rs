@@ -246,22 +246,7 @@ pub trait DeadEndingContext: GameFormContext {
     }
 
     fn satisfy_maintenance(&self, g: &Self::Form, h: &Self::Form) -> bool {
-        let a = self.moves(g, Player::Right).all(|gr| {
-            self.moves(gr, Player::Left)
-                .any(|grl| self.ge_mod_dead_ending(grl, h))
-                || self
-                    .moves(h, Player::Right)
-                    .any(|hr| self.ge_mod_dead_ending(gr, hr))
-        });
-        let b = self.moves(h, Player::Left).all(|hl| {
-            self.moves(hl, Player::Right)
-                .any(|hlr| self.ge_mod_dead_ending(g, hlr))
-                || self
-                    .moves(g, Player::Left)
-                    .any(|gl| self.ge_mod_dead_ending(gl, hl))
-        });
-
-        a && b
+        self.satisfy_maintenance_with(g, h, |x, y| self.ge_mod_dead_ending(x, y))
     }
 
     fn satisfy_proviso(&self, g: &Self::Form, h: &Self::Form) -> bool {

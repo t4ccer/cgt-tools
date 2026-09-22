@@ -1,7 +1,7 @@
 use crate::{
     misere::game_form::Outcome,
-    parsing::{Expected, InputSpan, Parser, SyntaxError, lexeme},
-    short::partizan::Player,
+    parsing::{Expected, InputSpan, Parser, SyntaxError},
+    short::partizan::{Player, canonical_form::nus::Nus},
 };
 use std::{cmp::Ordering, convert::Infallible, error::Error};
 
@@ -316,6 +316,29 @@ pub trait GameFormContext {
             && Player::forall(|p| self.moves(game, p).all(|g| self.is_dead_ending(g)))
     }
 
+    fn satisfy_maintenance_with(
+        &self,
+        g: &Self::Form,
+        h: &Self::Form,
+        ge: impl Fn(&Self::Form, &Self::Form) -> bool,
+    ) -> bool {
+        let right = self.moves(g, Player::Right).all(|gr| {
+            self.moves(h, Player::Right).any(|hr| ge(gr, hr))
+                || self.moves(gr, Player::Left).any(|grl| ge(grl, h))
+        });
+        let left = self.moves(h, Player::Left).all(|hl| {
+            self.moves(g, Player::Left).any(|gl| ge(gl, hl))
+                || self.moves(hl, Player::Right).any(|hlr| ge(g, hlr))
+        });
+
+        right && left
+    }
+
+    fn is_dicotic(&self, game: &Self::Form) -> bool {
+        Player::forall(|p| !self.is_end(game, p) || self.is_end(game, p.opposite()))
+            && Player::forall(|p| self.moves(game, p).all(|g| self.is_dicotic(g)))
+    }
+
     fn is_blocked_end(&self, game: &Self::Form, p: Player) -> bool {
         self.is_end(game, p)
             && self.moves(game, p.opposite()).all(|gr| {
@@ -467,11 +490,36 @@ pub trait GameFormContext {
             let p = p.trim_whitespace();
             Ok((p, self.new(left, right).map_err(ParseError::Dicotic)?))
         } else {
-            let (p, integer) = lexeme!(p, Parser::parse_i32).map_err(|err| {
-                ParseError::MalformedInput(err.expecting(Expected::Description("`{` or a number")))
+            let (p, nus) = Nus::parse(p).map_err(|err| {
+                ParseError::MalformedInput(
+                    err.expecting(Expected::Description("`{` or a number-up-star")),
+                )
             })?;
-            Ok((p, self.new_integer(integer).map_err(ParseError::Integer)?))
+            let p = p.trim_whitespace();
+            match nus.number().to_integer() {
+                Some(integer) if nus.is_integer() => {
+                    let integer = i32::try_from(integer).map_err(|_| {
+                        ParseError::MalformedInput(
+                            p.expected(Expected::Description("an integer that fits in 32 bits")),
+                        )
+                    })?;
+                    Ok((p, self.new_integer(integer).map_err(ParseError::Integer)?))
+                }
+                _ => Ok((p, self.new_nus(nus).map_err(ParseError::Dicotic)?)),
+            }
         }
+    }
+
+    fn new_nus(&self, nus: Nus) -> Result<Self::Form, Self::DicoticConstructionError> {
+        let left = nus
+            .left_moves()
+            .map(|n| self.new_nus(n))
+            .collect::<Result<Vec<_>, _>>()?;
+        let right = nus
+            .right_moves()
+            .map(|n| self.new_nus(n))
+            .collect::<Result<Vec<_>, _>>()?;
+        self.new(left, right)
     }
 
     #[allow(clippy::wrong_self_convention)]
