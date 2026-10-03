@@ -193,7 +193,9 @@ fn Footer() -> impl IntoView {
     view! {
         <footer class="footer">
             <span>
-                "Copyright © 2023-2026 Tomasz Maciosowski, "
+                "Copyright © 2023-2026 "
+                <a href="https://t4ccer.com">"Tomasz Maciosowski"</a>
+                ", "
                 <a href=format!("{REPOSITORY}/blob/main/LICENSE")>"AGPL-3.0"</a>
             </span>
             <span>"Theme adapted from " <a href="https://github.com/thuliteio/doks">"Doks"</a></span>
@@ -210,12 +212,6 @@ fn Home() -> impl IntoView {
             <a class="btn btn-primary" href=GUIDES_URL>
                 "Guides"
             </a>
-            <a class="btn btn-outline" href=PYTHON_DOCS>
-                "Python Docs"
-            </a>
-            <a class="btn btn-outline" href=RUST_DOCS>
-                "Rust Docs"
-            </a>
         </section>
         <div class="bg-dots"></div>
         <section class="features">
@@ -223,11 +219,15 @@ fn Home() -> impl IntoView {
                 <div class="row">
                     <Feature title="Python and Jupyter">
                         <code>"pip install cgt-py"</code>
-                        " brings the library to Python, with interactive widgets for exploring positions in Jupyter."
+                        " brings the library to Python, with interactive widgets for exploring positions in Jupyter. See "
+                        <a href=PYTHON_DOCS>"docs"</a>
+                        "."
                     </Feature>
                     <Feature title="Rust Library">
                         <code>"cargo add cgt"</code>
-                        " for native performance computations and position searches, in parallel and with transposition tables."
+                        " for native performance computations and position searches, in parallel and with transposition tables. See "
+                        <a href=RUST_DOCS>"docs"</a>
+                        "."
                     </Feature>
                     <Feature title="Command Line">
                         <code>"cgt-cli"</code>
