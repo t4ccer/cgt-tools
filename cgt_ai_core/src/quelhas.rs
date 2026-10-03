@@ -1,7 +1,8 @@
 //! Quelhas on a 10 by 10 board: Left crosses out vertical segments of at least two empty
 //! squares, Right horizontal ones, and whoever makes the last move loses.
 
-use crate::ruleset::{InputShape, Player, Ruleset};
+use crate::ruleset::{Input, Player, Ruleset};
+use rand::Rng;
 use std::{fmt, str::FromStr};
 
 pub const BOARD_SIZE: usize = 10;
@@ -425,8 +426,12 @@ impl Ruleset for Quelhas {
         "quelhas"
     }
 
-    fn initial_state(&self) -> State {
+    fn start(&self, _: &mut impl Rng) -> State {
         State::initial()
+    }
+
+    fn fixed_start(&self) -> Option<State> {
+        Some(State::initial())
     }
 
     fn to_move(&self, state: &State) -> Player {
@@ -447,16 +452,13 @@ impl Ruleset for Quelhas {
         state.winner()
     }
 
-    fn input_shape(&self) -> InputShape {
-        InputShape {
+    fn input(&self) -> Input {
+        Input::Grid {
             planes: NUM_PLANES,
             height: BOARD_SIZE,
             width: BOARD_SIZE,
+            policy_planes: NUM_LENGTHS,
         }
-    }
-
-    fn policy_planes(&self) -> usize {
-        NUM_LENGTHS
     }
 
     fn encode(&self, state: &State, out: &mut [f32]) {

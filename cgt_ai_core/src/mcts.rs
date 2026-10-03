@@ -444,12 +444,12 @@ mod tests {
     #[test]
     fn visits_add_up() {
         let mut roots = [
-            Node::new(&Quelhas, Quelhas.initial_state()),
+            Node::new(&Quelhas, State::initial()),
             Node::new(
                 &Quelhas,
                 State {
                     turn: Player::Right,
-                    ..Quelhas.initial_state()
+                    ..State::initial()
                 },
             ),
         ];

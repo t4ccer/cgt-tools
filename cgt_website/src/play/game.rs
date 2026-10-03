@@ -1,17 +1,58 @@
-//! State of a game of Quelhas on the page, and how clicks and replies of the AI change it
+//! State of a game on the page, for any game, and how choices, moves and replies of the AI change
+//! it
 
 use cgt_ai_core::{
     openings::decide_swap,
     protocol::{Budget, Request},
-    quelhas::{Action, Board, State},
-    ruleset::Player,
+    ruleset::{Player, Ruleset},
 };
+use std::collections::VecDeque;
 
 pub const DEFAULT_SIMULATIONS: u32 = 400;
 pub const MAX_SIMULATIONS: u32 = 5000;
 pub const DEFAULT_SECONDS: f64 = 1.0;
 pub const MIN_SECONDS: f64 = 0.1;
 pub const MAX_SECONDS: f64 = 60.0;
+
+/// How far from even, in `[-1, 1]`, an even board may be: 5% of the chances of winning
+pub const EVEN: f64 = 0.1;
+/// Boards the network looks at together while searching for an even one
+const BOARDS_AT_ONCE: u64 = 8;
+/// Boards the search for an even one looks at before it gives up
+pub const MAX_BOARDS: u64 = 400;
+
+/// What the page needs to know about a game beyond its rules
+pub trait Game: Ruleset<State: PartialEq> + Copy + Default {
+    /// Names of the sides, Left first
+    const SIDES: [&'static str; 2];
+    /// Whether the second player may swap sides after the first move
+    const PIE_RULE: bool;
+    /// Whether the player who makes the last move loses
+    const LAST_MOVE_LOSES: bool;
+    /// Whether [`Game::settled`] can end games early
+    const SETTLES: bool = false;
+    /// Whether games start from a position dealt at random
+    const DEALT: bool = false;
+
+    /// The position a game starts from: the one `seed` deals, for a game dealt at random, and
+    /// otherwise the one every game starts from
+    fn deal(&self, seed: u64) -> Self::State;
+
+    /// How many moves `side` has in `state`, whether or not it is their turn
+    fn moves_available(&self, state: &Self::State, side: Player) -> usize;
+
+    /// The winner and their margin, once the result is certain before the game ends
+    fn settled(&self, _: &Self::State) -> Option<(Player, usize)> {
+        None
+    }
+}
+
+pub const fn side_name<G: Game>(side: Player) -> &'static str {
+    match side {
+        Player::Left => G::SIDES[0],
+        Player::Right => G::SIDES[1],
+    }
+}
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Opponent {
@@ -42,8 +83,8 @@ pub enum Mode {
 }
 
 /// The choices made before a game starts
-#[derive(Clone, PartialEq, Debug)]
-pub struct Setup {
+#[derive(Clone, Debug)]
+pub struct Setup<G: Game> {
     pub opponent: Option<Opponent>,
     pub starter: Starter,
     /// Address of the model file that plays for the AI
@@ -53,10 +94,14 @@ pub struct Setup {
     pub seconds: f64,
     /// Whether the page shows the moves available and the chances of winning
     pub analysis: bool,
+    /// Whether a game ends as soon as [`Game::settled`] knows its result
+    pub end_settled: bool,
+    pub seed: u64,
+    pub start: G::State,
 }
 
-impl Setup {
-    pub const fn new(ai: String) -> Setup {
+impl<G: Game> Setup<G> {
+    pub fn new(ai: String, seed: u64) -> Setup<G> {
         Setup {
             opponent: None,
             starter: Starter::Human,
@@ -64,7 +109,10 @@ impl Setup {
             unit: Unit::Seconds,
             simulations: DEFAULT_SIMULATIONS,
             seconds: DEFAULT_SECONDS,
-            analysis: true,
+            analysis: false,
+            end_settled: true,
+            seed,
+            start: G::default().deal(seed),
         }
     }
 
@@ -107,16 +155,12 @@ pub enum Controller {
     Ai,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Move {
     pub side: Player,
-    pub action: Action,
-}
-
-impl Move {
-    pub const fn segment(self) -> ((usize, usize), (usize, usize)) {
-        self.action.segment(self.side)
-    }
+    pub action: usize,
+    /// The move as the page writes it, such as `L d3-d6`
+    pub notation: String,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -124,7 +168,11 @@ pub enum Phase {
     /// The game is being set up and has not started
     Setup,
     Playing,
-    Over(Player),
+    Over {
+        winner: Player,
+        /// For a game ended once settled, how many more moves the winner had left
+        margin: Option<usize>,
+    },
     Failed(String),
 }
 
@@ -136,18 +184,18 @@ pub struct Analysis {
     /// Chance of the side to move to win, in `[-1, 1]`
     pub value: f64,
     /// The move the AI would make
-    pub best: Option<Action>,
+    pub best: Option<usize>,
 }
 
 /// What the AI suggests to the person to move
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Hint {
-    Move(Move),
+    Move(String),
     /// Taking over the side of the first move, under the pie rule
     Swap,
 }
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, Debug)]
 pub enum Msg {
     ChooseOpponent(Opponent),
     ChooseStarter(Starter),
@@ -157,11 +205,17 @@ pub enum Msg {
     /// The strength of the AI as typed, in the chosen unit
     StrengthChanged(String),
     ChooseAnalysis(bool),
+    ChooseEndSettled(bool),
+    /// Games start from the position this seed deals from now on
+    ChooseSeed(u64),
+    /// Looks for an even board, dealing boards from this seed on
+    FindEven(u64),
+    StopFinding,
     Start,
     /// Back to the setup of a new game
     NewGame,
-    ClickCell((usize, usize)),
-    HoverCell(Option<(usize, usize)>),
+    /// A person makes the move `action`
+    Play(usize),
     Swap,
     /// Shows the analysis if it is hidden, and hides it otherwise
     ToggleAnalysis,
@@ -175,27 +229,46 @@ pub enum Msg {
         swap: bool,
         value: f64,
     },
+    AiValues {
+        id: u32,
+        values: Vec<f64>,
+    },
     AiError {
         id: u32,
         message: String,
     },
 }
 
-#[derive(Clone, PartialEq, Debug)]
-pub struct Model {
-    pub setup: Setup,
-    pub empty: Board,
+/// A search for a board on which neither side is ahead, which the network screens a few boards
+/// at a time and a search then confirms
+#[derive(Clone, Debug)]
+pub struct Balancing {
+    /// The first seed not dealt yet
+    next: u64,
+    /// Boards looked at so far
+    pub tried: u64,
+    /// Seeds of boards the network finds even, which a search has yet to confirm
+    candidates: VecDeque<u64>,
+    /// The request the AI is working on
+    request: u32,
+    /// The seeds of the boards the network is screening, or the seed of the board a search is
+    /// confirming
+    asked: Vec<u64>,
+    confirming: bool,
+}
+
+#[derive(Clone, Debug)]
+pub struct Model<G: Game> {
+    pub rules: G,
+    pub setup: Setup<G>,
+    pub state: G::State,
     pub moves: Vec<Move>,
-    pub turn: Player,
     pub mode: Mode,
     /// How long the AI searches, fixed when the game starts
     pub budget: Budget,
     pub swapped: bool,
     pub pie_decided: bool,
     pub phase: Phase,
-    /// The square a move of a person starts at, once they have clicked it
-    pub anchor: Option<(usize, usize)>,
-    pub hover: Option<(usize, usize)>,
     pub show_analysis: bool,
     /// What the AI made of each position of the game so far, the last being the current one,
     /// from its searches for its own moves and from analysing the positions people move in
@@ -206,42 +279,42 @@ pub struct Model {
     pub pending: Option<u32>,
     /// The request for an analysis the AI is working on, which unlike a move nobody waits for
     pub analyzing: Option<u32>,
+    pub balancing: Option<Balancing>,
+    /// Why the last search for an even board failed
+    pub balancing_error: Option<String>,
     next_request: u32,
 }
 
-impl Model {
-    /// The empty board of a game still to be set up
-    pub fn new(setup: Setup) -> Model {
+impl<G: Game> Model<G> {
+    /// The starting position of a game still to be set up
+    pub fn new(setup: Setup<G>) -> Model<G> {
         Model {
+            rules: G::default(),
             budget: setup.budget(),
             show_analysis: setup.analysis,
+            state: setup.start,
             setup,
-            empty: Board::FULL,
             moves: Vec::new(),
-            turn: Player::Left,
             mode: Mode::TwoPlayers,
             swapped: false,
             pie_decided: false,
             phase: Phase::Setup,
-            anchor: None,
-            hover: None,
             analyses: vec![None],
             analysis_error: None,
             pending: None,
             analyzing: None,
+            balancing: None,
+            balancing_error: None,
             next_request: 0,
         }
     }
 
-    pub const fn ai_thinking(&self) -> bool {
-        self.pending.is_some()
+    pub fn turn(&self) -> Player {
+        self.rules.to_move(&self.state)
     }
 
-    const fn state(&self, side: Player) -> State {
-        State {
-            empty: self.empty,
-            turn: side,
-        }
+    pub const fn ai_thinking(&self) -> bool {
+        self.pending.is_some()
     }
 
     pub const fn participant_of(&self, side: Player) -> Participant {
@@ -264,51 +337,68 @@ impl Model {
     }
 
     pub fn pie_offered(&self) -> bool {
-        self.moves.len() == 1 && !self.pie_decided && self.phase == Phase::Playing
+        G::PIE_RULE && self.moves.len() == 1 && !self.pie_decided && self.phase == Phase::Playing
     }
 
     pub fn human_to_move(&self) -> bool {
         self.phase == Phase::Playing
             && !self.ai_thinking()
-            && self.controller_of(self.turn) == Controller::Human
+            && self.controller_of(self.turn()) == Controller::Human
     }
 
-    pub fn valid_segment(&self, a: (usize, usize), b: (usize, usize)) -> bool {
-        Action::from_segment(self.turn, a, b)
-            .is_some_and(|action| self.state(self.turn).is_legal(action))
+    pub fn is_legal(&self, action: usize) -> bool {
+        self.rules.legal_actions(&self.state).contains(&action)
     }
 
-    pub fn can_start_at(&self, (row, col): (usize, usize)) -> bool {
-        let (dr, dc) = match self.turn {
-            Player::Left => (1, 0),
-            Player::Right => (0, 1),
-        };
-        let (r, c) = (row as isize, col as isize);
-        self.empty.is_empty(row, col)
-            && (self.empty.is_empty_at(r + dr, c + dc) || self.empty.is_empty_at(r - dr, c - dc))
+    /// A move of the side to move, as the page writes it
+    pub fn notation(&self, action: usize) -> String {
+        let side = side_name::<G>(self.turn());
+        format!(
+            "{} {}",
+            &side[..1],
+            self.rules.describe_action(&self.state, action)
+        )
     }
 
-    pub fn count_legal_moves(&self, side: Player) -> usize {
-        self.state(side).canonical().count_legal_actions()
-    }
-
-    fn apply_move(&mut self, action: Action) {
-        let next = self.state(self.turn).apply(action);
+    fn apply_move(&mut self, action: usize) {
+        let side = self.turn();
+        let notation = self.notation(action);
+        self.state = self.rules.apply(&self.state, action);
         self.pie_decided = self.pie_decided || !self.moves.is_empty();
         self.moves.push(Move {
-            side: self.turn,
+            side,
             action,
+            notation,
         });
-        self.empty = next.empty;
-        self.turn = next.turn;
-        self.anchor = None;
-        self.hover = None;
-        self.phase = next.winner().map_or(Phase::Playing, Phase::Over);
         self.analyzing = None;
-        // The side that cannot move did not make the last move, so it has won
-        self.analyses.push(next.winner().map(|winner| Analysis {
-            side: winner,
-            value: 1.0,
+        let settled = self
+            .setup
+            .end_settled
+            .then(|| self.rules.settled(&self.state))
+            .flatten();
+        let (phase, analysis) = match (self.rules.winner(&self.state), settled) {
+            (Some(winner), _) => (
+                Phase::Over {
+                    winner,
+                    margin: None,
+                },
+                Some(winner),
+            ),
+            (None, Some((winner, margin))) => (
+                Phase::Over {
+                    winner,
+                    margin: Some(margin),
+                },
+                Some(winner),
+            ),
+            (None, None) => (Phase::Playing, None),
+        };
+        self.phase = phase;
+        // The result of a finished game is certain
+        let turn = self.turn();
+        self.analyses.push(analysis.map(|winner| Analysis {
+            side: turn,
+            value: if winner == turn { 1.0 } else { -1.0 },
             best: None,
         }));
     }
@@ -345,34 +435,84 @@ impl Model {
         if self.pie_offered() && decide_swap(current.value) {
             return Some(Hint::Swap);
         }
-        current.best.map(|action| {
-            Hint::Move(Move {
-                side: self.turn,
-                action,
-            })
-        })
+        current.best.map(|action| Hint::Move(self.notation(action)))
     }
 
     fn record(&mut self, value: f64, best: Option<usize>) {
-        let best = best
-            .and_then(Action::from_index)
-            .filter(|&action| self.state(self.turn).is_legal(action));
+        let best = best.filter(|&action| self.is_legal(action));
+        let side = self.turn();
         if let Some(current) = self.analyses.last_mut() {
-            *current = Some(Analysis {
-                side: self.turn,
-                value,
-                best,
-            });
+            *current = Some(Analysis { side, value, best });
         }
-    }
-
-    fn history(&self) -> Vec<usize> {
-        self.moves.iter().map(|m| m.action.index()).collect()
     }
 
     const fn next_id(&mut self) -> u32 {
         self.next_request += 1;
         self.next_request
+    }
+
+    fn bytes(&self, state: &G::State) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        self.rules.write_state(state, &mut bytes);
+        bytes
+    }
+
+    fn position(&self) -> Vec<u8> {
+        self.bytes(&self.state)
+    }
+
+    /// The next request of the search for an even board: a search to confirm the next candidate,
+    /// or else the next few boards for the network to screen
+    fn balancing_request(&mut self) -> Option<(u32, Request)> {
+        let balancing = self.balancing.as_mut()?;
+        let candidate = balancing.candidates.pop_front();
+        if candidate.is_none() && balancing.tried >= MAX_BOARDS {
+            self.balancing_error = Some(format!(
+                "the AI finds none of {} boards even",
+                balancing.tried
+            ));
+            self.balancing = None;
+            return None;
+        }
+        let seeds: Vec<u64> = if let Some(seed) = candidate {
+            vec![seed]
+        } else {
+            let seeds = (balancing.next..balancing.next + BOARDS_AT_ONCE).collect();
+            balancing.next += BOARDS_AT_ONCE;
+            balancing.tried += BOARDS_AT_ONCE;
+            seeds
+        };
+        balancing.confirming = candidate.is_some();
+        balancing.asked.clone_from(&seeds);
+        let id = self.next_id();
+        let mut positions: Vec<Vec<u8>> = seeds
+            .iter()
+            .map(|&seed| self.bytes(&self.rules.deal(seed)))
+            .collect();
+        let budget = self.setup.budget();
+        let balancing = self.balancing.as_mut()?;
+        balancing.request = id;
+        let request = if balancing.confirming {
+            Request::Move {
+                position: positions.pop()?,
+                budget,
+            }
+        } else {
+            Request::Evaluate { positions }
+        };
+        Some((id, request))
+    }
+
+    fn choose_seed(&mut self, seed: u64) {
+        self.setup.seed = seed;
+        self.setup.start = self.rules.deal(seed);
+        if self.phase == Phase::Setup {
+            self.state = self.setup.start;
+        }
+    }
+
+    const fn balancing_asked(&self, id: u32) -> bool {
+        matches!(&self.balancing, Some(balancing) if balancing.request == id)
     }
 
     /// A request to analyse the position a person is to move in, unless that is done or hidden
@@ -388,11 +528,11 @@ impl Model {
         self.analyzing = Some(id);
         // Under the pie rule the best first move is the most balanced one, which the opening table
         // knows
-        let request = if self.moves.is_empty() {
+        let request = if G::PIE_RULE && self.moves.is_empty() {
             Request::Opening
         } else {
             Request::Move {
-                history: self.history(),
+                position: self.position(),
                 budget: self.budget,
             }
         };
@@ -401,20 +541,20 @@ impl Model {
 
     /// The request the AI has to answer after a move, if any
     fn trigger_ai_if_needed(&mut self) -> Option<(u32, Request)> {
-        if self.phase != Phase::Playing || self.controller_of(self.turn) != Controller::Ai {
+        if self.phase != Phase::Playing || self.controller_of(self.turn()) != Controller::Ai {
             self.pending = None;
             return self.analysis_request();
         }
-        let request = if self.moves.is_empty() {
+        let request = if G::PIE_RULE && self.moves.is_empty() {
             Request::Opening
         } else if self.pie_offered() {
             Request::Pie {
-                first: self.moves[0].action.index(),
+                first: self.moves[0].action,
                 budget: self.budget,
             }
         } else {
             Request::Move {
-                history: self.history(),
+                position: self.position(),
                 budget: self.budget,
             }
         };
@@ -457,6 +597,69 @@ impl Model {
                 self.setup.analysis = analysis;
                 None
             }
+            Msg::ChooseEndSettled(end_settled) => {
+                self.setup.end_settled = end_settled;
+                None
+            }
+            Msg::ChooseSeed(seed) => {
+                self.choose_seed(seed);
+                None
+            }
+            Msg::FindEven(seed) => {
+                if !G::DEALT || self.phase != Phase::Setup {
+                    return None;
+                }
+                self.balancing = Some(Balancing {
+                    next: seed,
+                    tried: 0,
+                    candidates: VecDeque::new(),
+                    request: 0,
+                    asked: Vec::new(),
+                    confirming: false,
+                });
+                self.balancing_error = None;
+                self.balancing_request()
+            }
+            Msg::StopFinding => {
+                self.balancing = None;
+                None
+            }
+            Msg::AiValues { id, values } => {
+                if !self.balancing_asked(id) {
+                    return None;
+                }
+                let balancing = self.balancing.as_mut()?;
+                balancing.candidates.extend(
+                    balancing
+                        .asked
+                        .iter()
+                        .zip(values)
+                        .filter(|&(_, value)| value.abs() <= EVEN)
+                        .map(|(&seed, _)| seed),
+                );
+                self.balancing_request()
+            }
+            Msg::AiMove { id, value, .. } if self.balancing_asked(id) => {
+                let balancing = self.balancing.as_ref()?;
+                match balancing.asked[..] {
+                    [seed] if balancing.confirming && value.abs() <= EVEN => {
+                        self.choose_seed(seed);
+                        self.balancing = None;
+                        None
+                    }
+                    _ => self.balancing_request(),
+                }
+            }
+            Msg::AiError { id, message } if self.balancing_asked(id) => {
+                // A board where the side to move is stuck has no move to search for
+                if self.balancing.as_ref().is_some_and(|b| b.confirming) {
+                    self.balancing_request()
+                } else {
+                    self.balancing = None;
+                    self.balancing_error = Some(message);
+                    None
+                }
+            }
             Msg::ToggleAnalysis => {
                 self.show_analysis = !self.show_analysis;
                 self.analysis_request()
@@ -470,6 +673,13 @@ impl Model {
                     next_request,
                     ..Model::new(self.setup.clone())
                 };
+                // A dealt board may leave the side to move without a move
+                if let Some(winner) = self.rules.winner(&self.state) {
+                    self.phase = Phase::Over {
+                        winner,
+                        margin: None,
+                    };
+                }
                 self.trigger_ai_if_needed()
             }
             Msg::NewGame => {
@@ -480,34 +690,19 @@ impl Model {
                 };
                 None
             }
-            Msg::ClickCell(cell) => {
-                if !self.human_to_move() {
+            Msg::Play(action) => {
+                if !self.human_to_move() || !self.is_legal(action) {
                     return None;
                 }
-                match self.anchor {
-                    Some(anchor) if anchor == cell => self.anchor = None,
-                    Some(anchor) if self.valid_segment(anchor, cell) => {
-                        let action = Action::from_segment(self.turn, anchor, cell)?;
-                        self.apply_move(action);
-                        return self.trigger_ai_if_needed();
-                    }
-                    _ if self.can_start_at(cell) => self.anchor = Some(cell),
-                    Some(_) => self.anchor = None,
-                    None => {}
-                }
-                None
-            }
-            Msg::HoverCell(cell) => {
-                self.hover = cell;
-                None
+                self.apply_move(action);
+                self.trigger_ai_if_needed()
             }
             Msg::Swap => {
-                if !(self.pie_offered() && self.controller_of(self.turn) == Controller::Human) {
+                if !(self.pie_offered() && self.controller_of(self.turn()) == Controller::Human) {
                     return None;
                 }
                 self.swapped = true;
                 self.pie_decided = true;
-                self.anchor = None;
                 self.trigger_ai_if_needed()
             }
             Msg::AiMove { id, action, value } if self.analyzing == Some(id) => {
@@ -520,14 +715,12 @@ impl Model {
                 if self.pending != Some(id) {
                     return None;
                 }
-                let action = Action::from_index(action)
-                    .filter(|&action| self.state(self.turn).is_legal(action));
-                let Some(action) = action.filter(|_| self.phase == Phase::Playing) else {
+                if self.phase != Phase::Playing || !self.is_legal(action) {
                     self.phase = Phase::Failed("the AI suggested an illegal move".into());
                     self.pending = None;
                     return None;
-                };
-                self.record(value, Some(action.index()));
+                }
+                self.record(value, Some(action));
                 self.apply_move(action);
                 self.trigger_ai_if_needed()
             }
@@ -560,13 +753,24 @@ impl Model {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use cgt_ai_core::quelhas::{Action, Board, Quelhas, State};
 
     fn action(side: Player, start: (usize, usize), end: (usize, usize)) -> usize {
         Action::from_segment(side, start, end).unwrap().index()
     }
 
-    fn started(opponent: Opponent, starter: Starter) -> (Model, Option<(u32, Request)>) {
-        let mut model = Model::new(Setup::new("ai".into()));
+    fn position(state: &State) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        Quelhas.write_state(state, &mut bytes);
+        bytes
+    }
+
+    fn new() -> Model<Quelhas> {
+        Model::new(Setup::new("ai".into(), 0))
+    }
+
+    fn started(opponent: Opponent, starter: Starter) -> (Model<Quelhas>, Option<(u32, Request)>) {
+        let mut model = new();
         model.update(Msg::ChooseOpponent(opponent));
         model.update(Msg::ChooseStarter(starter));
         model.update(Msg::ChooseUnit(Unit::Simulations));
@@ -575,13 +779,15 @@ mod tests {
         (model, request)
     }
 
+    const BUDGET: Budget = Budget::Simulations(DEFAULT_SIMULATIONS);
+
     #[test]
     fn games_start_once_set_up() {
-        let mut model = Model::new(Setup::new("ai".into()));
+        let mut model = new();
         assert_eq!(model.update(Msg::Start), None);
         assert_eq!(model.phase, Phase::Setup);
-        model.update(Msg::ClickCell((2, 3)));
-        assert_eq!(model.anchor, None);
+        model.update(Msg::Play(action(Player::Left, (2, 3), (5, 3))));
+        assert!(model.moves.is_empty());
 
         // The person moves first, and the AI thinks for a second, at first analysing the
         // person's options
@@ -589,7 +795,6 @@ mod tests {
         let (_, request) = model.update(Msg::Start).unwrap();
         assert_eq!(request, Request::Opening);
         assert!(model.human_to_move());
-        assert_eq!(model.phase, Phase::Playing);
         assert_eq!(model.mode, Mode::HumanFirst);
         assert_eq!(model.budget, Budget::Millis(1000));
 
@@ -610,8 +815,8 @@ mod tests {
 
     #[test]
     fn strengths_stay_in_range() {
-        let mut setup = Model::new(Setup::new("ai".into()));
-        setup.update(Msg::ChooseUnit(Unit::Simulations));
+        let mut model = new();
+        model.update(Msg::ChooseUnit(Unit::Simulations));
         for (raw, simulations) in [
             ("0", 1),
             ("123.4", 123),
@@ -619,43 +824,43 @@ mod tests {
             ("x", MAX_SIMULATIONS),
             ("NaN", MAX_SIMULATIONS),
         ] {
-            setup.update(Msg::StrengthChanged(raw.into()));
-            assert_eq!(setup.setup.simulations, simulations, "{raw}");
+            model.update(Msg::StrengthChanged(raw.into()));
+            assert_eq!(model.setup.simulations, simulations, "{raw}");
         }
-        setup.update(Msg::ChooseUnit(Unit::Seconds));
+        model.update(Msg::ChooseUnit(Unit::Seconds));
         for (raw, seconds) in [("0", "0.1"), ("0.5", "0.5"), ("1000", "60"), ("NaN", "60")] {
-            setup.update(Msg::StrengthChanged(raw.into()));
-            assert_eq!(setup.setup.strength(), seconds, "{raw}");
+            model.update(Msg::StrengthChanged(raw.into()));
+            assert_eq!(model.setup.strength(), seconds, "{raw}");
         }
-        assert_eq!(setup.setup.simulations, MAX_SIMULATIONS);
     }
 
     #[test]
-    fn clicking_the_first_square_again_cancels_the_move() {
-        let (mut model, _) = started(Opponent::Human, Starter::Human);
-        model.update(Msg::ClickCell((2, 3)));
-        assert_eq!(model.anchor, Some((2, 3)));
-        model.update(Msg::ClickCell((2, 3)));
-        assert_eq!(model.anchor, None);
+    fn people_move_only_legally_and_in_turn() {
+        let (mut model, _) = started(Opponent::Ai, Starter::Human);
+        // A horizontal line is not a move of Left
+        model.update(Msg::Play(action(Player::Right, (0, 0), (0, 3)) + 1000));
         assert!(model.moves.is_empty());
+        let first = action(Player::Left, (2, 3), (5, 3));
+        let (_, request) = model.update(Msg::Play(first)).unwrap();
+        assert_eq!(
+            request,
+            Request::Pie {
+                first,
+                budget: BUDGET
+            }
+        );
+        assert_eq!(model.moves[0].notation, "L d3-d6");
+        // The AI is to move
+        model.update(Msg::Play(action(Player::Right, (0, 0), (0, 1))));
+        assert_eq!(model.moves.len(), 1);
     }
 
     #[test]
     fn human_moves_then_ai_is_asked_for_pie() {
         let (mut model, request) = started(Opponent::Ai, Starter::Human);
         assert!(matches!(request, Some((_, Request::Opening))));
-        assert_eq!(model.update(Msg::ClickCell((2, 3))), None);
-        assert_eq!(model.anchor, Some((2, 3)));
-        let (id, request) = model.update(Msg::ClickCell((5, 3))).unwrap();
-        let budget = Budget::Simulations(DEFAULT_SIMULATIONS);
-        assert_eq!(
-            request,
-            Request::Pie {
-                first: action(Player::Left, (2, 3), (5, 3)),
-                budget,
-            }
-        );
-        assert_eq!(model.turn, Player::Right);
+        let first = action(Player::Left, (2, 3), (5, 3));
+        let (id, _) = model.update(Msg::Play(first)).unwrap();
         assert!(!model.human_to_move());
 
         let (_, request) = model
@@ -668,8 +873,8 @@ mod tests {
         assert_eq!(
             request,
             Request::Move {
-                history: vec![action(Player::Left, (2, 3), (5, 3))],
-                budget,
+                position: position(&model.state),
+                budget: BUDGET,
             }
         );
     }
@@ -693,8 +898,8 @@ mod tests {
         assert_eq!(
             request,
             Request::Move {
-                history: vec![first],
-                budget: Budget::Simulations(DEFAULT_SIMULATIONS),
+                position: position(&model.state),
+                budget: BUDGET,
             }
         );
         assert_eq!(model.controller_of(Player::Left), Controller::Human);
@@ -737,23 +942,22 @@ mod tests {
     fn two_people_get_analysis_after_each_move() {
         let (mut model, request) = started(Opponent::Human, Starter::Human);
         assert!(matches!(request, Some((_, Request::Opening))));
-        assert_eq!(model.update(Msg::ClickCell((2, 3))), None);
-        let (id, request) = model.update(Msg::ClickCell((5, 3))).unwrap();
         let first = action(Player::Left, (2, 3), (5, 3));
+        let (id, request) = model.update(Msg::Play(first)).unwrap();
         assert_eq!(
             request,
             Request::Move {
-                history: vec![first],
-                budget: Budget::Simulations(DEFAULT_SIMULATIONS),
+                position: position(&model.state),
+                budget: BUDGET,
             }
         );
         // The analysis does not hold up the next move, and its answer only updates the estimate
         assert!(model.human_to_move());
-        let reply = Action::from_segment(Player::Right, (0, 0), (0, 1)).unwrap();
+        let reply = action(Player::Right, (0, 0), (0, 1));
         assert_eq!(
             model.update(Msg::AiMove {
                 id,
-                action: reply.index(),
+                action: reply,
                 value: 0.4
             }),
             None
@@ -765,12 +969,13 @@ mod tests {
             best: Some(reply),
         });
         assert_eq!(model.estimate(), estimate);
+        assert_eq!(model.hint(), Some(Hint::Move("R a1-b1".into())));
 
         // A move made before the analysis is done makes it stale
-        model.update(Msg::ClickCell((0, 0)));
-        let (stale, _) = model.update(Msg::ClickCell((0, 1))).unwrap();
-        model.update(Msg::ClickCell((8, 0)));
-        let (fresh, _) = model.update(Msg::ClickCell((9, 0))).unwrap();
+        let (stale, _) = model.update(Msg::Play(reply)).unwrap();
+        let (fresh, _) = model
+            .update(Msg::Play(action(Player::Left, (8, 0), (9, 0))))
+            .unwrap();
         model.update(Msg::AiMove {
             id: stale,
             action: 0,
@@ -786,45 +991,32 @@ mod tests {
 
         // Hidden analysis is not asked for, until it is shown again
         model.update(Msg::ToggleAnalysis);
-        model.update(Msg::ClickCell((0, 5)));
-        assert_eq!(model.update(Msg::ClickCell((0, 6))), None);
+        assert_eq!(
+            model.update(Msg::Play(action(Player::Right, (0, 5), (0, 6)))),
+            None
+        );
         assert_eq!(model.moves.len(), 4);
         let (_, request) = model.update(Msg::ToggleAnalysis).unwrap();
-        assert!(matches!(request, Request::Move { history, .. } if history.len() == 4));
+        assert_eq!(
+            request,
+            Request::Move {
+                position: position(&model.state),
+                budget: BUDGET,
+            }
+        );
     }
 
     #[test]
     fn analysis_can_start_hidden() {
-        let mut model = Model::new(Setup::new("ai".into()));
+        let mut model = new();
         model.update(Msg::ChooseOpponent(Opponent::Human));
         model.update(Msg::ChooseAnalysis(false));
-        model.update(Msg::Start);
+        assert_eq!(model.update(Msg::Start), None);
         assert!(!model.show_analysis);
-        model.update(Msg::ClickCell((2, 3)));
-        assert_eq!(model.update(Msg::ClickCell((5, 3))), None);
-    }
-
-    #[test]
-    fn last_move_loses() {
-        let (mut model, _) = started(Opponent::Human, Starter::Human);
-        model.empty = "..########
-                       ##########
-                       ##########
-                       ##########
-                       ##########
-                       ##########
-                       ##########
-                       ##########
-                       ##########
-                       ##########"
-            .parse()
-            .unwrap();
-        model.turn = Player::Right;
-        model.update(Msg::ClickCell((0, 0)));
-        model.update(Msg::ClickCell((0, 1)));
-        assert_eq!(model.phase, Phase::Over(Player::Left));
-        assert_eq!(model.move_chance(0), Some(-1.0));
-        assert_eq!(model.hint(), None);
+        assert_eq!(
+            model.update(Msg::Play(action(Player::Left, (2, 3), (5, 3)))),
+            None
+        );
     }
 
     #[test]
@@ -843,20 +1035,14 @@ mod tests {
         assert_eq!(model.move_chance(0), Some(-0.1));
         assert_eq!(model.hint(), None);
 
-        let reply = Action::from_segment(Player::Right, (5, 2), (5, 4)).unwrap();
+        let reply = action(Player::Right, (5, 2), (5, 4));
         model.update(Msg::AiMove {
             id: analysis,
-            action: reply.index(),
+            action: reply,
             value: 0.3,
         });
         assert_eq!(model.move_chance(0), Some(-0.3));
-        assert_eq!(
-            model.hint(),
-            Some(Hint::Move(Move {
-                side: Player::Right,
-                action: reply
-            }))
-        );
+        assert_eq!(model.hint(), Some(Hint::Move("R c6-e6".into())));
         assert_eq!(model.estimate().map(|e| e.side), Some(Player::Right));
 
         // Under the pie rule a position bad for the side to move is best swapped
@@ -866,9 +1052,38 @@ mod tests {
             best: Some(reply),
         });
         assert_eq!(model.hint(), Some(Hint::Swap));
-        model.update(Msg::ClickCell((5, 2)));
-        model.update(Msg::ClickCell((5, 4)));
+        model.update(Msg::Play(reply));
         assert_eq!(model.move_chance(1), Some(-0.3));
         assert_eq!(model.move_chance(2), None);
+    }
+
+    #[test]
+    fn last_move_loses() {
+        let (mut model, _) = started(Opponent::Human, Starter::Human);
+        model.state = State {
+            empty: "..########
+                    ##########
+                    ##########
+                    ##########
+                    ##########
+                    ##########
+                    ##########
+                    ##########
+                    ##########
+                    ##########"
+                .parse::<Board>()
+                .unwrap(),
+            turn: Player::Right,
+        };
+        model.update(Msg::Play(action(Player::Right, (0, 0), (0, 1))));
+        assert_eq!(
+            model.phase,
+            Phase::Over {
+                winner: Player::Left,
+                margin: None
+            }
+        );
+        assert_eq!(model.move_chance(0), Some(-1.0));
+        assert_eq!(model.hint(), None);
     }
 }

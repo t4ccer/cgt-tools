@@ -1,6 +1,6 @@
 //! The web worker that runs the AI, so that its search does not freeze the page
 
-use super::game::{Model, Msg};
+use super::game::{Game, Model, Msg};
 use cgt_ai_core::protocol::{Envelope, Request, Response};
 use leptos::prelude::*;
 use std::{cell::RefCell, rc::Rc};
@@ -54,7 +54,7 @@ impl Client {
 
 /// Starts the worker for the AI of `model`, and returns the function that applies messages to
 /// `model` and passes the requests they lead to on to the worker
-pub fn connect(model: RwSignal<Model>) -> Callback<Msg> {
+pub fn connect<G: Game>(model: RwSignal<Model<G>>) -> Callback<Msg> {
     let client = Rc::new(RefCell::new(Client {
         worker: None,
         ai: String::new(),
@@ -101,6 +101,7 @@ pub fn connect(model: RwSignal<Model>) -> Callback<Msg> {
             }
             Response::Move { action, value } => Msg::AiMove { id, action, value },
             Response::Pie { swap, value } => Msg::AiPie { id, swap, value },
+            Response::Values(values) => Msg::AiValues { id, values },
             Response::Error(message) => Msg::AiError { id, message },
         };
         client.borrow_mut().current = None;
@@ -132,11 +133,11 @@ pub fn connect(model: RwSignal<Model>) -> Callback<Msg> {
     dispatch
 }
 
-fn send(
+fn send<G: Game>(
     client: &Rc<RefCell<Client>>,
     new_game: bool,
     request: Option<(u32, Request)>,
-    model: RwSignal<Model>,
+    model: RwSignal<Model<G>>,
 ) {
     let mut c = client.borrow_mut();
     let ai = model.with_untracked(|m| m.setup.ai.clone());

@@ -2,7 +2,7 @@ use crate::{
     checkpoint,
     game::{Game, GameCommand},
 };
-use anyhow::Result;
+use anyhow::{Result, bail};
 use burn::tensor::backend::AutodiffBackend;
 use cgt_ai_core::{
     mcts::{Evaluations, Evaluator, Node, SearchConfig, run_mcts},
@@ -53,8 +53,13 @@ fn run<B: AutodiffBackend, R: Ruleset>(
     args: &OpeningsArgs,
     device: B::Device,
 ) -> Result<()> {
+    let (Some(initial), Some(classes)) = (rules.fixed_start(), first_move_classes(rules)) else {
+        bail!(
+            "{} starts from positions dealt at random, so it has no opening table",
+            rules.name()
+        );
+    };
     let net = checkpoint::load_net::<B, R>(rules, &args.checkpoint, &device)?;
-    let classes = first_move_classes(rules);
     let representatives: Vec<usize> = classes.keys().copied().collect();
     let sims = u64::from(args.simulations);
     let bar = ProgressBar::new(representatives.len() as u64 * sims).with_style(
@@ -71,7 +76,6 @@ fn run<B: AutodiffBackend, R: Ruleset>(
         },
         bar: bar.clone(),
     };
-    let initial = rules.initial_state();
     let mut values = BTreeMap::new();
     let mut searched = 0;
     bar.set_message(format!("openings 0/{}", representatives.len()));

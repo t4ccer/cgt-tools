@@ -6,7 +6,7 @@ use cgt_ai_core::{
     mcts::{Evaluator, Leaf, Node, SearchConfig, evaluate_leaves, select_leaf},
     ruleset::{Player, Ruleset, random_position},
 };
-use cgt_ai_model::{GridNet, NetEvaluator};
+use cgt_ai_model::{Net, NetEvaluator};
 use rand::{Rng, RngExt, SeedableRng, rngs::SmallRng};
 use std::{
     sync::atomic::{AtomicUsize, Ordering},
@@ -214,7 +214,7 @@ pub fn play_games<R: Ruleset>(
 /// Plays `num_games` on `cfg.workers` threads, reporting the number of moves played so far.
 pub fn generate<R: Ruleset, B: Backend>(
     rules: &R,
-    net: &GridNet<B>,
+    net: &Net<B>,
     device: &B::Device,
     num_games: usize,
     cfg: &SelfPlayConfig,

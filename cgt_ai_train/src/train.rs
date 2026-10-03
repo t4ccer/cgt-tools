@@ -17,7 +17,7 @@ use burn::{
     train::Interrupter,
 };
 use cgt_ai_core::{mcts::SearchConfig, ruleset::Ruleset};
-use cgt_ai_model::{GridNetConfig, encode_batch};
+use cgt_ai_model::{NetConfig, NetInput, encode_batch};
 use rand::{Rng, RngExt, SeedableRng, rngs::SmallRng};
 use std::{
     path::{Path, PathBuf},
@@ -51,9 +51,11 @@ pub struct TrainArgs {
     /// Self-play threads
     #[arg(long, default_value_t = 4)]
     workers: usize,
-    /// Ignored when --resume-from is set
+    /// Width of the network: channels of a grid network, or features of each vertex in a graph
+    /// network. Ignored when --resume-from is set
     #[arg(long, default_value_t = 64)]
     channels: usize,
+    /// Depth of the network: residual blocks of a grid network, or layers of a graph network.
     /// Ignored when --resume-from is set
     #[arg(long, default_value_t = 6)]
     num_blocks: usize,
@@ -97,7 +99,7 @@ impl GameCommand for TrainArgs {
 }
 
 struct Batch<B: Backend> {
-    x: Tensor<B, 4>,
+    x: NetInput<B>,
     illegal: Tensor<B, 2, Bool>,
     pi: Tensor<B, 2>,
     z: Tensor<B, 1>,
@@ -220,7 +222,7 @@ fn run<B: AutodiffBackend, R: Ruleset>(
         );
         trainer
     } else {
-        let config = GridNetConfig::for_ruleset(rules, args.channels, args.num_blocks);
+        let config = NetConfig::for_ruleset(rules, args.channels, args.num_blocks);
         B::seed(device, args.seed);
         Trainer {
             net: config.init(device),

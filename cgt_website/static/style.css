@@ -1126,6 +1126,57 @@ pre.code code {
   stroke: var(--right);
 }
 
+.fjords-edge {
+  stroke: var(--board-line);
+  stroke-width: 1.5;
+}
+
+.vertex {
+  fill: var(--bg);
+  stroke: var(--board-line);
+  stroke-width: 1;
+}
+
+.vertex.reach-left {
+  fill: color-mix(in srgb, var(--left) 18%, var(--bg));
+}
+
+.vertex.reach-right {
+  fill: color-mix(in srgb, var(--right) 18%, var(--bg));
+}
+
+.vertex.reach-both {
+  fill: color-mix(
+    in srgb,
+    color-mix(in srgb, var(--left), var(--right)) 18%,
+    var(--bg)
+  );
+}
+
+.vertex.stone-left {
+  fill: var(--left);
+  stroke: var(--left);
+}
+
+.vertex.stone-right {
+  fill: var(--right);
+  stroke: var(--right);
+}
+
+.vertex.last {
+  stroke: var(--heading);
+  stroke-width: 3;
+}
+
+.vertex.active {
+  cursor: pointer;
+}
+
+.vertex.active:hover {
+  stroke: var(--heading);
+  stroke-width: 2;
+}
+
 .side {
   font-weight: 500;
 }

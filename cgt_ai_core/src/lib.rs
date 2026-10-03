@@ -1,5 +1,6 @@
 //! Game rules and Monte Carlo tree search for AlphaZero-style players.
 
+pub mod fjords;
 pub mod mcts;
 pub mod model_file;
 pub mod openings;

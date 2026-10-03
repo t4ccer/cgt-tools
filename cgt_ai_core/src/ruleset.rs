@@ -4,24 +4,53 @@ pub use cgt::short::partizan::Player;
 use rand::{Rng, RngExt};
 use std::fmt::Debug;
 
-/// Network input: feature planes over a `height` by `width` board.
+/// What the network of a game takes as input, which also decides the kind of network.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct InputShape {
-    pub planes: usize,
-    pub height: usize,
-    pub width: usize,
+pub enum Input {
+    /// `planes` feature planes over a `height` by `width` board, for a convolutional network with
+    /// `policy_planes` planes of policy logits over the same board.
+    Grid {
+        planes: usize,
+        height: usize,
+        width: usize,
+        policy_planes: usize,
+    },
+    /// `features` features of each of the `nodes` vertices of a graph, followed by the
+    /// normalized adjacency matrix of the graph, for a graph convolutional network with one
+    /// policy logit per vertex.
+    Graph { nodes: usize, features: usize },
 }
 
-impl InputShape {
-    pub const fn features_len(self) -> usize {
-        self.planes * self.height * self.width
+impl Input {
+    /// Length of the encoding of one position.
+    pub const fn encoding_len(self) -> usize {
+        match self {
+            Input::Grid {
+                planes,
+                height,
+                width,
+                ..
+            } => planes * height * width,
+            Input::Graph { nodes, features } => nodes * (features + nodes),
+        }
+    }
+
+    pub const fn num_actions(self) -> usize {
+        match self {
+            Input::Grid {
+                height,
+                width,
+                policy_planes,
+                ..
+            } => policy_planes * height * width,
+            Input::Graph { nodes, .. } => nodes,
+        }
     }
 }
 
 /// Rules of a two-player game without draws, as seen by the search and the network.
 ///
-/// Actions are indices into the policy output of the network, which has `policy_planes` planes
-/// over the same board as the input.
+/// Actions are indices into the policy output of the network, see [`Input`].
 pub trait Ruleset: Clone + Send + Sync + 'static {
     /// Position, including whose turn it is.
     type State: Copy + Debug + Send + Sync + 'static;
@@ -29,7 +58,12 @@ pub trait Ruleset: Clone + Send + Sync + 'static {
     /// Name used on the command line and stored in checkpoints.
     fn name(&self) -> &'static str;
 
-    fn initial_state(&self) -> Self::State;
+    /// A position to start a game from, drawn with `rng` for games that are dealt at random.
+    fn start(&self, rng: &mut impl Rng) -> Self::State;
+
+    /// The position every game starts from, for games that have one, which the pie rule and
+    /// opening tables need.
+    fn fixed_start(&self) -> Option<Self::State>;
 
     fn to_move(&self, state: &Self::State) -> Player;
 
@@ -41,16 +75,14 @@ pub trait Ruleset: Clone + Send + Sync + 'static {
     /// Winner of a finished game, `None` while the game goes on.
     fn winner(&self, state: &Self::State) -> Option<Player>;
 
-    fn input_shape(&self) -> InputShape;
-
-    fn policy_planes(&self) -> usize;
+    fn input(&self) -> Input;
 
     fn num_actions(&self) -> usize {
-        let shape = self.input_shape();
-        self.policy_planes() * shape.height * shape.width
+        self.input().num_actions()
     }
 
-    /// Writes the network input for `state` as seen by the player to move.
+    /// Writes the network input for `state` as seen by the player to move, laid out as
+    /// [`Ruleset::input`] says.
     fn encode(&self, state: &Self::State, out: &mut [f32]);
 
     /// Number of symmetries of the rules used for data augmentation, the identity (`0`)
@@ -76,10 +108,10 @@ pub trait Ruleset: Clone + Send + Sync + 'static {
     fn read_state(&self, bytes: &[u8]) -> Option<Self::State>;
 }
 
-/// Plays up to `plies` random legal moves from the initial position, stopping early if the
-/// game ends.
+/// Plays up to `plies` random legal moves from a starting position, stopping early if the game
+/// ends.
 pub fn random_position<R: Ruleset>(rules: &R, plies: usize, rng: &mut impl Rng) -> R::State {
-    let mut state = rules.initial_state();
+    let mut state = rules.start(rng);
     for _ in 0..plies {
         let actions = rules.legal_actions(&state);
         if actions.is_empty() {

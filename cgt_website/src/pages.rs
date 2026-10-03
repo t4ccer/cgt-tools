@@ -1,7 +1,7 @@
 use crate::{
     ThemeToggle,
     guides::{self, GUIDES_URL, Guide},
-    play::{self, PLAY_URL},
+    play::pages::{self as play, GamePage, PLAY_URL},
     python_docs::{self, PythonApi},
 };
 use hydration_context::SsrSharedContext;
@@ -24,15 +24,15 @@ struct Nav {
 }
 
 /// Every page of the site as its path relative to the site root and its HTML, with a Python API
-/// reference for each of `python_apis`, a page for each of `guides`, and the Quelhas page if there
-/// are `models`, by their names and addresses, to play against
+/// reference for each of `python_apis`, a page for each of `guides`, and a page for each game of
+/// `play`, with the models to play it against by their names and addresses
 pub fn pages(
     mut python_apis: Vec<PythonApi>,
     guides: Vec<Guide>,
-    models: Vec<(String, String)>,
+    play: Vec<(&'static GamePage, Vec<(String, String)>)>,
 ) -> Vec<(String, String)> {
     let nav = Nav {
-        play: !models.is_empty(),
+        play: !play.is_empty(),
     };
     let mut pages = vec![(
         "index.html".to_owned(),
@@ -41,15 +41,23 @@ pub fn pages(
         }),
     )];
     if nav.play {
+        let games: Vec<&GamePage> = play.iter().map(|&(game, _)| game).collect();
         pages.push((
             "play/index.html".to_owned(),
-            render("Play - cgt-tools".to_owned(), "docs", nav, play::index_page),
-        ));
-        pages.push((
-            "play/quelhas/index.html".to_owned(),
-            render("Quelhas - cgt-tools".to_owned(), "docs", nav, move || {
-                play::quelhas_page(models)
+            render("Play - cgt-tools".to_owned(), "docs", nav, move || {
+                play::index_page(&games)
             }),
+        ));
+    }
+    for (game, models) in play {
+        pages.push((
+            format!("play/{}/index.html", game.name),
+            render(
+                format!("{} - cgt-tools", game.title),
+                "docs",
+                nav,
+                move || game.page(models),
+            ),
         ));
     }
     let links = guides.iter().map(Guide::link).collect::<Vec<_>>();

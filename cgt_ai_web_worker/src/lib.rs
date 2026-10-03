@@ -4,7 +4,8 @@
 
 use burn::backend::{Flex, flex::FlexDevice};
 use cgt_ai_core::{
-    mcts::{Node, SearchConfig, run_mcts},
+    fjords::Fjords,
+    mcts::{Evaluator, Node, SearchConfig, run_mcts},
     openings::{OpeningTable, decide_swap},
     protocol::{Budget, Request, Response},
     quelhas::Quelhas,
@@ -46,16 +47,10 @@ impl<R: Ruleset> Engine<R> {
         &self.evaluator.rules
     }
 
-    fn after(&self, history: &[usize]) -> Result<R::State, String> {
-        history
-            .iter()
-            .try_fold(self.rules().initial_state(), |state, &action| {
-                if self.rules().legal_actions(&state).contains(&action) {
-                    Ok(self.rules().apply(&state, action))
-                } else {
-                    Err(format!("action {action} is not legal"))
-                }
-            })
+    fn position(&self, bytes: &[u8]) -> Result<R::State, String> {
+        self.rules()
+            .read_state(bytes)
+            .ok_or_else(|| format!("not a position of {}", self.rules().name()))
     }
 
     fn opening(&mut self) -> Result<Response, String> {
@@ -105,7 +100,14 @@ impl<R: Ruleset> Engine<R> {
     }
 
     fn pie(&mut self, first: usize, budget: Budget) -> Result<Response, String> {
-        let state = self.after(&[first])?;
+        let start = self
+            .rules()
+            .fixed_start()
+            .ok_or_else(|| format!("{} is not played with the pie rule", self.rules().name()))?;
+        if !self.rules().legal_actions(&start).contains(&first) {
+            return Err(format!("action {first} is not a legal first move"));
+        }
+        let state = self.rules().apply(&start, first);
         let value = self
             .openings
             .as_ref()
@@ -117,8 +119,30 @@ impl<R: Ruleset> Engine<R> {
         })
     }
 
-    fn best_move(&mut self, history: &[usize], budget: Budget) -> Result<Response, String> {
-        let root = self.search(self.after(history)?, budget);
+    fn evaluate(&mut self, positions: &[Vec<u8>]) -> Result<Response, String> {
+        let states = positions
+            .iter()
+            .map(|position| self.position(position))
+            .collect::<Result<Vec<_>, _>>()?;
+        let values = self.evaluator.evaluate(&states);
+        Ok(Response::Values(
+            states
+                .iter()
+                .zip(values.values())
+                .map(|(state, &value)| {
+                    // The network only learned positions with moves left
+                    match self.rules().winner(state) {
+                        Some(winner) if winner == self.rules().to_move(state) => 1.0,
+                        Some(_) => -1.0,
+                        None => f64::from(value),
+                    }
+                })
+                .collect(),
+        ))
+    }
+
+    fn best_move(&mut self, position: &[u8], budget: Budget) -> Result<Response, String> {
+        let root = self.search(self.position(position)?, budget);
         if root.is_terminal() {
             return Err("the game is over".to_owned());
         }
@@ -134,7 +158,8 @@ impl<R: Ruleset> Player for Engine<R> {
         match request {
             Request::Opening => self.opening(),
             Request::Pie { first, budget } => self.pie(first, budget),
-            Request::Move { history, budget } => self.best_move(&history, budget),
+            Request::Move { position, budget } => self.best_move(&position, budget),
+            Request::Evaluate { positions } => self.evaluate(&positions),
         }
         .unwrap_or_else(Response::Error)
     }
@@ -149,6 +174,7 @@ pub fn load(bytes: &[u8], seed: u64) -> Result<Box<dyn Player>, String> {
     let file = ModelFile::from_bytes(bytes)?;
     match file.header.game.as_str() {
         game if game == Quelhas.name() => Ok(Box::new(Engine::new(Quelhas, file, seed)?)),
+        game if game == Fjords.name() => Ok(Box::new(Engine::new(Fjords, file, seed)?)),
         game => Err(format!(
             "the model plays {game}, which this worker does not know"
         )),
@@ -249,11 +275,15 @@ mod worker {
 mod tests {
     use super::*;
     use burn_store::{BurnpackStore, ModuleSnapshot};
-    use cgt_ai_core::quelhas::{Action, State};
-    use cgt_ai_model::{GridNetConfig, ModelHeader};
+    use cgt_ai_core::{
+        fjords,
+        quelhas::{Action, State},
+        ruleset::random_position,
+    };
+    use cgt_ai_model::{ModelHeader, NetConfig};
 
-    fn model(openings: Option<OpeningTable>) -> Vec<u8> {
-        let network = GridNetConfig::for_ruleset(&Quelhas, 4, 1);
+    fn model<R: Ruleset>(rules: &R, openings: Option<OpeningTable>) -> Vec<u8> {
+        let network = NetConfig::for_ruleset(rules, 4, 1);
         let mut store = BurnpackStore::from_bytes(None);
         network
             .init::<Flex>(&FlexDevice)
@@ -261,7 +291,7 @@ mod tests {
             .unwrap();
         ModelFile {
             header: ModelHeader {
-                game: Quelhas.name().to_owned(),
+                game: rules.name().to_owned(),
                 network,
                 openings,
             },
@@ -279,21 +309,26 @@ mod tests {
         }
     }
 
-    #[test]
-    fn moves_are_legal() {
-        let mut player = load(&model(None), 0).unwrap();
-        let first = State::initial().legal_actions()[7].index();
-        let state = Quelhas.apply(&Quelhas.initial_state(), first);
+    fn position<R: Ruleset>(rules: &R, state: &R::State) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        rules.write_state(state, &mut bytes);
+        bytes
+    }
+
+    fn plays_legal_moves<R: Ruleset>(rules: &R) {
+        let mut player = load(&model(rules, None), 0).unwrap();
+        let mut rng = SmallRng::seed_from_u64(3);
+        let state = random_position(rules, 5, &mut rng);
         for budget in [Budget::Simulations(16), Budget::Millis(20)] {
             let start = Instant::now();
             let response = player.handle(Request::Move {
-                history: vec![first],
+                position: position(rules, &state),
                 budget,
             });
             let Response::Move { action, .. } = response else {
                 panic!("{response:?}");
             };
-            assert!(Quelhas.legal_actions(&state).contains(&action));
+            assert!(rules.legal_actions(&state).contains(&action));
             if budget == Budget::Millis(20) {
                 assert!(start.elapsed() >= Duration::from_millis(20));
             }
@@ -301,11 +336,29 @@ mod tests {
     }
 
     #[test]
-    fn illegal_history_is_an_error() {
-        let mut player = load(&model(None), 0).unwrap();
-        let first = Action::new(10, 0, 0).unwrap().index();
+    fn moves_are_legal() {
+        plays_legal_moves(&Quelhas);
+        plays_legal_moves(&Fjords);
+    }
+
+    #[test]
+    fn bad_positions_are_errors() {
+        let mut player = load(&model(&Fjords, None), 0).unwrap();
         let response = player.handle(Request::Move {
-            history: vec![first, first],
+            position: position(&Quelhas, &State::initial()),
+            budget: Budget::Simulations(16),
+        });
+        assert!(matches!(response, Response::Error(_)), "{response:?}");
+        // Fjords deals its boards at random, so it has no first move to swap after
+        let response = player.handle(Request::Pie {
+            first: 0,
+            budget: Budget::Simulations(16),
+        });
+        assert!(matches!(response, Response::Error(_)), "{response:?}");
+        let mut player = load(&model(&Fjords, None), 0).unwrap();
+        let over = fjords::State::deal(0, 0.0);
+        let response = player.handle(Request::Move {
+            position: position(&Fjords, &over),
             budget: Budget::Simulations(16),
         });
         assert!(matches!(response, Response::Error(_)), "{response:?}");
@@ -313,7 +366,7 @@ mod tests {
 
     #[test]
     fn openings_come_from_the_table() {
-        let mut player = load(&model(None), 0).unwrap();
+        let mut player = load(&model(&Quelhas, None), 0).unwrap();
         assert!(matches!(
             player.handle(Request::Opening),
             Response::Error(_)
@@ -323,7 +376,7 @@ mod tests {
             Action::new(2, 0, 0).unwrap().index(),
             Action::new(3, 0, 0).unwrap().index(),
         );
-        let mut player = load(&model(Some(table(&[(balanced, 0.1)]))), 0).unwrap();
+        let mut player = load(&model(&Quelhas, Some(table(&[(balanced, 0.1)]))), 0).unwrap();
         assert_eq!(
             player.handle(Request::Opening),
             Response::Move {
@@ -331,7 +384,7 @@ mod tests {
                 value: -0.1
             }
         );
-        let mut player = load(&model(Some(table(&[(lopsided, -0.9)]))), 0).unwrap();
+        let mut player = load(&model(&Quelhas, Some(table(&[(lopsided, -0.9)]))), 0).unwrap();
         assert_eq!(
             player.handle(Request::Pie {
                 first: lopsided,
@@ -342,6 +395,26 @@ mod tests {
                 value: -0.9
             }
         );
+    }
+
+    #[test]
+    fn positions_are_evaluated_at_once() {
+        let mut player = load(&model(&Fjords, None), 0).unwrap();
+        let positions = [
+            fjords::State::deal(1, fjords::EDGE_PROBABILITY),
+            fjords::State::deal(0, 0.0),
+            fjords::State::deal(2, fjords::EDGE_PROBABILITY),
+        ];
+        let response = player.handle(Request::Evaluate {
+            positions: positions.iter().map(|s| position(&Fjords, s)).collect(),
+        });
+        let Response::Values(values) = response else {
+            panic!("{response:?}");
+        };
+        assert_eq!(values.len(), 3);
+        // Without edges the side to move is stuck and has lost
+        assert!((values[1] + 1.0).abs() < f64::EPSILON);
+        assert!(values.iter().all(|v| v.abs() <= 1.0));
     }
 
     #[test]

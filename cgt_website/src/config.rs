@@ -3,6 +3,7 @@ use serde::{
     de::{MapAccess, Visitor},
 };
 use std::{
+    collections::BTreeMap,
     fmt, fs, io,
     path::{Path, PathBuf},
 };
@@ -15,16 +16,9 @@ pub struct Config {
     /// Guides in the order they are listed in on the site, as Markdown files or Jupyter notebooks
     #[serde(default)]
     pub guides: Vec<PathBuf>,
+    /// Models to play each game against, by the name of the game, see [`Models`]
     #[serde(default)]
-    pub play: Play,
-}
-
-#[derive(Default, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Play {
-    /// Models to play Quelhas against, see [`Models`]
-    #[serde(default)]
-    pub quelhas: Models,
+    pub play: BTreeMap<String, Models>,
 }
 
 /// Model files by the names the site shows them under, in the order they are written in, which is
@@ -87,7 +81,7 @@ impl Config {
         for guide in &mut config.guides {
             *guide = dir.join(&*guide);
         }
-        for (name, source) in &mut config.play.quelhas.0 {
+        for (name, source) in config.play.values_mut().flat_map(|models| &mut models.0) {
             // The name ends up in the address of the file
             if name.is_empty()
                 || !name
@@ -129,7 +123,7 @@ mod tests {
             config.guides,
             [PathBuf::from("a.md"), PathBuf::from("b.ipynb")]
         );
-        let models = &config.play.quelhas.0;
+        let models = &config.play["quelhas"].0;
         assert_eq!(models.len(), 2);
         assert!(
             matches!(&models[0], (name, Source::Url(url)) if name == "strong" && url == "https://example.com/strong.bin")

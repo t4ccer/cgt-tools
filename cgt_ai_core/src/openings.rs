@@ -36,12 +36,13 @@ pub fn decide_swap(second_player_value: f64) -> bool {
     second_player_value < 0.0
 }
 
-/// First moves grouped into orbits of the symmetries, keyed by the smallest member.
+/// First moves grouped into orbits of the symmetries, keyed by the smallest member, or `None`
+/// for games without a fixed starting position.
 ///
-/// Assumes every symmetry maps the initial position to itself.
-pub fn first_move_classes<R: Ruleset>(rules: &R) -> BTreeMap<usize, Vec<usize>> {
+/// Assumes every symmetry maps the starting position to itself.
+pub fn first_move_classes<R: Ruleset>(rules: &R) -> Option<BTreeMap<usize, Vec<usize>>> {
     let mut classes = BTreeMap::new();
-    for action in rules.legal_actions(&rules.initial_state()) {
+    for action in rules.legal_actions(&rules.fixed_start()?) {
         let mut orbit: Vec<usize> = (0..rules.num_symmetries())
             .map(|symmetry| rules.transform_action(action, symmetry))
             .collect();
@@ -49,5 +50,5 @@ pub fn first_move_classes<R: Ruleset>(rules: &R) -> BTreeMap<usize, Vec<usize>> 
         orbit.dedup();
         classes.entry(orbit[0]).or_insert(orbit);
     }
-    classes
+    Some(classes)
 }

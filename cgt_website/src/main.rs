@@ -81,7 +81,26 @@ fn main() -> io::Result<()> {
         usage();
     };
     let config = Config::read(&config)?;
-    let models = cgt_website::read_models(&config.play.quelhas.0)?;
+    let mut play = Vec::new();
+    for (name, models) in &config.play {
+        let game = cgt_website::GAMES
+            .iter()
+            .find(|game| game.name == name)
+            .ok_or_else(|| {
+                let known: Vec<&str> = cgt_website::GAMES.iter().map(|game| game.name).collect();
+                io::Error::other(format!(
+                    "the configuration has models of {name}, but the site only has pages for {}",
+                    known.join(", ")
+                ))
+            })?;
+        play.push((game, cgt_website::read_models(game, &models.0)?));
+    }
+    // The order of the list of games
+    play.sort_by_key(|(game, _)| {
+        cgt_website::GAMES
+            .iter()
+            .position(|other| other.name == game.name)
+    });
     let guides = cgt_website::read_guides(&config.guides, &python)?;
     cgt_website::log("Writing the pages");
     for (path, contents) in ASSETS {
@@ -90,14 +109,25 @@ fn main() -> io::Result<()> {
     for (path, contents) in guides.iter().flat_map(cgt_website::Guide::files) {
         write(&site.join(path), &contents)?;
     }
-    for (path, contents) in models.iter().filter_map(cgt_website::Model::file) {
+    for (path, contents) in play
+        .iter()
+        .flat_map(|(_, models)| models)
+        .filter_map(cgt_website::AiModel::file)
+    {
         write(&site.join(path), contents)?;
     }
-    let models = models
+    let play = play
         .into_iter()
-        .map(|model| (model.name, model.url))
+        .filter(|(_, models)| !models.is_empty())
+        .map(|(game, models)| {
+            let models = models
+                .into_iter()
+                .map(|model| (model.name, model.url))
+                .collect();
+            (game, models)
+        })
         .collect();
-    for (path, html) in cgt_website::pages(python_apis, guides, models) {
+    for (path, html) in cgt_website::pages(python_apis, guides, play) {
         write(&site.join(path), html.as_bytes())?;
     }
     println!("Created website in `{}`", site.display());

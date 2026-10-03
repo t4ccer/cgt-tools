@@ -28,7 +28,7 @@ burn = { workspace = true, features = [
   "metrics",
   "tch",
 ] }
-burn-store = { workspace = true }
+burn-store = { workspace = true, features = ["pytorch"] }
 clap = { version = "4.5", features = ["derive"] }
 ctrlc = "3.5.0"
 indicatif = "0.18.4"

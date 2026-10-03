@@ -1,151 +1,139 @@
-//! Residual policy and value network for games played on a board.
+//! Policy and value networks for games, of the kind each game's
+//! [`Input`](cgt_ai_core::ruleset::Input) asks for.
+
+mod graph;
+mod grid;
+
+pub use graph::{GraphConv, GraphNet, GraphNetConfig, GraphNetRecord};
+pub use grid::{GridNet, GridNetConfig, GridNetRecord, ResidualBlock};
 
 use burn::{
-    config::Config,
     module::Module,
-    nn::{
-        BatchNorm, BatchNormConfig, Linear, LinearConfig, PaddingConfig2d,
-        conv::{Conv2d, Conv2dConfig},
-    },
-    tensor::{
-        Bytes, Tensor, TensorData,
-        activation::{relu, tanh},
-        backend::Backend,
-    },
+    tensor::{Bytes, Tensor, TensorData, backend::Backend},
 };
 use burn_store::{BurnpackStore, ModuleSnapshot};
 use cgt_ai_core::{
     mcts::{Evaluations, Evaluator},
     model_file,
     openings::OpeningTable,
-    ruleset::Ruleset,
+    ruleset::{Input, Ruleset},
 };
 use serde::{Deserialize, Serialize};
 
+/// The network of a game, which [`NetConfig::for_ruleset`] picks by the input of the game.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct GridNetConfig {
-    pub planes: usize,
-    pub height: usize,
-    pub width: usize,
-    pub policy_planes: usize,
-    pub channels: usize,
-    pub num_blocks: usize,
-    pub head_channels: usize,
+pub enum NetConfig {
+    Grid(GridNetConfig),
+    Graph(GraphNetConfig),
 }
 
-impl Config for GridNetConfig {}
+impl NetConfig {
+    /// The network for `rules`, `num_blocks` layers deep and `channels` wide.
+    pub fn for_ruleset<R: Ruleset>(rules: &R, channels: usize, num_blocks: usize) -> NetConfig {
+        match rules.input() {
+            Input::Grid {
+                planes,
+                height,
+                width,
+                policy_planes,
+            } => NetConfig::Grid(GridNetConfig {
+                planes,
+                height,
+                width,
+                policy_planes,
+                channels,
+                num_blocks,
+                head_channels: 32,
+            }),
+            Input::Graph { nodes, features } => NetConfig::Graph(GraphNetConfig {
+                nodes,
+                features,
+                channels,
+                num_blocks,
+                head_channels: channels / 2,
+            }),
+        }
+    }
 
-fn conv(channels_in: usize, channels_out: usize, kernel: usize, bias: bool) -> Conv2dConfig {
-    let pad = kernel / 2;
-    Conv2dConfig::new([channels_in, channels_out], [kernel, kernel])
-        .with_padding(PaddingConfig2d::Explicit(pad, pad, pad, pad))
-        .with_bias(bias)
+    pub const fn channels(&self) -> usize {
+        match self {
+            NetConfig::Grid(config) => config.channels,
+            NetConfig::Graph(config) => config.channels,
+        }
+    }
+
+    pub const fn num_blocks(&self) -> usize {
+        match self {
+            NetConfig::Grid(config) => config.num_blocks,
+            NetConfig::Graph(config) => config.num_blocks,
+        }
+    }
+
+    pub const fn head_channels(&self) -> usize {
+        match self {
+            NetConfig::Grid(config) => config.head_channels,
+            NetConfig::Graph(config) => config.head_channels,
+        }
+    }
+
+    #[must_use]
+    pub const fn with_head_channels(self, head_channels: usize) -> NetConfig {
+        match self {
+            NetConfig::Grid(config) => NetConfig::Grid(GridNetConfig {
+                head_channels,
+                ..config
+            }),
+            NetConfig::Graph(config) => NetConfig::Graph(GraphNetConfig {
+                head_channels,
+                ..config
+            }),
+        }
+    }
+
+    pub fn init<B: Backend>(&self, device: &B::Device) -> Net<B> {
+        match self {
+            NetConfig::Grid(config) => Net::Grid(config.init(device)),
+            NetConfig::Graph(config) => Net::Graph(config.init(device)),
+        }
+    }
 }
 
-fn global_pool<B: Backend>(h: Tensor<B, 4>) -> Tensor<B, 2> {
-    let [batch, channels, height, width] = h.dims();
-    let flat = h.reshape([batch, channels, height * width]);
-    let mean = flat.clone().mean_dim(2).reshape([batch, channels]);
-    let max = flat.max_dim(2).reshape([batch, channels]);
-    Tensor::cat(vec![mean, max], 1)
-}
-
+// A program holds a network or two, so boxing the larger one would only add indirection
+#[allow(clippy::large_enum_variant)]
 #[derive(Module, Debug)]
-pub struct ResidualBlock<B: Backend> {
-    conv1: Conv2d<B>,
-    bn1: BatchNorm<B>,
-    conv2: Conv2d<B>,
-    bn2: BatchNorm<B>,
-    // Misère outcomes hinge on board-wide parity and move counts, which
-    // local convolutions can only see after many layers.
-    pool_fc: Option<Linear<B>>,
+pub enum Net<B: Backend> {
+    Grid(GridNet<B>),
+    Graph(GraphNet<B>),
 }
 
-impl<B: Backend> ResidualBlock<B> {
-    fn new(channels: usize, use_global_pool: bool, device: &B::Device) -> ResidualBlock<B> {
-        ResidualBlock {
-            conv1: conv(channels, channels, 3, false).init(device),
-            bn1: BatchNormConfig::new(channels).init(device),
-            conv2: conv(channels, channels, 3, false).init(device),
-            bn2: BatchNormConfig::new(channels).init(device),
-            pool_fc: use_global_pool
-                .then(|| LinearConfig::new(2 * channels, channels).init(device)),
-        }
-    }
-
-    fn forward(&self, x: Tensor<B, 4>) -> Tensor<B, 4> {
-        let mut h = relu(self.bn1.forward(self.conv1.forward(x.clone())));
-        if let Some(fc) = &self.pool_fc {
-            let [batch, channels, _, _] = h.dims();
-            h = h.clone() + fc.forward(global_pool(h)).reshape([batch, channels, 1, 1]);
-        }
-        let h = self.bn2.forward(self.conv2.forward(h));
-        relu(x + h)
-    }
+/// A batch of positions encoded for a [`Net`].
+#[derive(Debug, Clone)]
+pub enum NetInput<B: Backend> {
+    Grid(Tensor<B, 4>),
+    Graph {
+        features: Tensor<B, 3>,
+        adjacency: Tensor<B, 3>,
+    },
 }
 
-#[derive(Module, Debug)]
-pub struct GridNet<B: Backend> {
-    stem_conv: Conv2d<B>,
-    stem_bn: BatchNorm<B>,
-    blocks: Vec<ResidualBlock<B>>,
-    policy_conv: Conv2d<B>,
-    policy_bn: BatchNorm<B>,
-    policy_out: Conv2d<B>,
-    value_conv: Conv2d<B>,
-    value_bn: BatchNorm<B>,
-    value_fc1: Linear<B>,
-    value_fc2: Linear<B>,
-}
-
-impl GridNetConfig {
-    pub fn for_ruleset<R: Ruleset>(rules: &R, channels: usize, num_blocks: usize) -> GridNetConfig {
-        let shape = rules.input_shape();
-        GridNetConfig {
-            planes: shape.planes,
-            height: shape.height,
-            width: shape.width,
-            policy_planes: rules.policy_planes(),
-            channels,
-            num_blocks,
-            head_channels: 32,
+impl<B: Backend> Net<B> {
+    /// Policy logits `[batch, num_actions]` and values `[batch]` in `[-1, 1]`.
+    ///
+    /// # Panics
+    ///
+    /// When `input` is encoded for the other kind of network.
+    pub fn forward(&self, input: NetInput<B>) -> (Tensor<B, 2>, Tensor<B, 1>) {
+        match (self, input) {
+            (Net::Grid(net), NetInput::Grid(x)) => net.forward(x),
+            (
+                Net::Graph(net),
+                NetInput::Graph {
+                    features,
+                    adjacency,
+                },
+            ) => net.forward(features, &adjacency),
+            _ => panic!("the input is encoded for another kind of network"),
         }
-    }
-
-    pub fn init<B: Backend>(&self, device: &B::Device) -> GridNet<B> {
-        let (c, hc) = (self.channels, self.head_channels);
-        GridNet {
-            stem_conv: conv(self.planes, c, 3, false).init(device),
-            stem_bn: BatchNormConfig::new(c).init(device),
-            blocks: (0..self.num_blocks)
-                .map(|i| ResidualBlock::new(c, i % 2 == 1, device))
-                .collect(),
-            policy_conv: conv(c, hc, 1, false).init(device),
-            policy_bn: BatchNormConfig::new(hc).init(device),
-            policy_out: conv(hc, self.policy_planes, 1, true).init(device),
-            value_conv: conv(c, hc, 1, false).init(device),
-            value_bn: BatchNormConfig::new(hc).init(device),
-            value_fc1: LinearConfig::new(2 * hc, 128).init(device),
-            value_fc2: LinearConfig::new(128, 1).init(device),
-        }
-    }
-}
-
-impl<B: Backend> GridNet<B> {
-    /// Policy logits `[batch, policy_planes * height * width]` and values `[batch]` in
-    /// `[-1, 1]`.
-    pub fn forward(&self, x: Tensor<B, 4>) -> (Tensor<B, 2>, Tensor<B, 1>) {
-        let batch = x.dims()[0];
-        let mut h = relu(self.stem_bn.forward(self.stem_conv.forward(x)));
-        for block in &self.blocks {
-            h = block.forward(h);
-        }
-        let policy = relu(self.policy_bn.forward(self.policy_conv.forward(h.clone())));
-        let policy_logits = self.policy_out.forward(policy).flatten(1, 3);
-        let value = relu(self.value_bn.forward(self.value_conv.forward(h)));
-        let value = relu(self.value_fc1.forward(global_pool(value)));
-        let value = tanh(self.value_fc2.forward(value)).reshape([batch]);
-        (policy_logits, value)
     }
 
     /// Loads weights saved in the Burnpack format.
@@ -153,7 +141,7 @@ impl<B: Backend> GridNet<B> {
     /// # Errors
     ///
     /// When the bytes are not a Burnpack file or do not hold every weight of this network.
-    pub fn load_bytes(mut self, bytes: Vec<u8>) -> Result<GridNet<B>, String> {
+    pub fn load_bytes(mut self, bytes: Vec<u8>) -> Result<Net<B>, String> {
         let mut store = BurnpackStore::from_bytes(Some(Bytes::from_bytes_vec(bytes)));
         let result = self.load_from(&mut store).map_err(|e| e.to_string())?;
         if !result.missing.is_empty() || !result.errors.is_empty() {
@@ -166,27 +154,54 @@ impl<B: Backend> GridNet<B> {
     }
 }
 
+/// Encodes `states` as the input of the network of `rules`.
 pub fn encode_batch<R: Ruleset, B: Backend>(
     rules: &R,
     states: &[R::State],
     device: &B::Device,
-) -> Tensor<B, 4> {
-    let shape = rules.input_shape();
-    let len = shape.features_len();
-    let mut x = vec![0.0; states.len() * len];
-    for (state, out) in states.iter().zip(x.chunks_mut(len)) {
+) -> NetInput<B> {
+    let input = rules.input();
+    let len = input.encoding_len();
+    let mut encoded = vec![0.0; states.len() * len];
+    for (state, out) in states.iter().zip(encoded.chunks_mut(len)) {
         rules.encode(state, out);
     }
-    Tensor::from_data(
-        TensorData::new(x, [states.len(), shape.planes, shape.height, shape.width]),
-        device,
-    )
+    let batch = states.len();
+    match input {
+        Input::Grid {
+            planes,
+            height,
+            width,
+            ..
+        } => NetInput::Grid(Tensor::from_data(
+            TensorData::new(encoded, [batch, planes, height, width]),
+            device,
+        )),
+        Input::Graph { nodes, features } => {
+            let (mut x, mut adjacency) = (
+                Vec::with_capacity(batch * nodes * features),
+                Vec::with_capacity(batch * nodes * nodes),
+            );
+            for position in encoded.chunks(len) {
+                let (f, a) = position.split_at(nodes * features);
+                x.extend_from_slice(f);
+                adjacency.extend_from_slice(a);
+            }
+            NetInput::Graph {
+                features: Tensor::from_data(TensorData::new(x, [batch, nodes, features]), device),
+                adjacency: Tensor::from_data(
+                    TensorData::new(adjacency, [batch, nodes, nodes]),
+                    device,
+                ),
+            }
+        }
+    }
 }
 
 #[derive(Debug)]
 pub struct NetEvaluator<R: Ruleset, B: Backend> {
     pub rules: R,
-    pub net: GridNet<B>,
+    pub net: Net<B>,
     pub device: B::Device,
 }
 
@@ -213,7 +228,7 @@ impl<R: Ruleset, B: Backend> Evaluator<R> for NetEvaluator<R, B> {
 pub struct ModelHeader {
     /// [`Ruleset::name`] of the game the network plays.
     pub game: String,
-    pub network: GridNetConfig,
+    pub network: NetConfig,
     /// For a game played with the pie rule, the values of the first moves.
     pub openings: Option<OpeningTable>,
 }
@@ -223,7 +238,7 @@ pub struct ModelHeader {
 #[derive(Debug, Clone)]
 pub struct ModelFile {
     pub header: ModelHeader,
-    /// The weights of the network in the Burnpack format, see [`GridNet::load_bytes`].
+    /// The weights of the network in the Burnpack format, see [`Net::load_bytes`].
     pub weights: Vec<u8>,
 }
 
@@ -249,7 +264,7 @@ impl ModelFile {
     /// # Errors
     ///
     /// When the weights do not fit the network the header describes.
-    pub fn load_net<B: Backend>(self, device: &B::Device) -> Result<GridNet<B>, String> {
+    pub fn load_net<B: Backend>(self, device: &B::Device) -> Result<Net<B>, String> {
         self.header
             .network
             .init(device)
@@ -263,62 +278,85 @@ mod tests {
     use super::*;
     use burn::backend::{Flex, flex::FlexDevice};
     use cgt_ai_core::{
+        fjords::{self, Fjords},
         quelhas::{Board, Quelhas, State},
         ruleset::Player,
     };
 
-    #[test]
-    fn output_shapes() {
+    fn evaluate<R: Ruleset>(rules: R, states: &[R::State]) {
         let device = FlexDevice;
-        let net = GridNetConfig::for_ruleset(&Quelhas, 16, 2).init::<Flex>(&device);
-        let states = [
-            State::initial(),
-            State {
-                empty: Board::from_bits(0b1011),
-                turn: Player::Right,
-            },
-        ];
-        let mut evaluator = NetEvaluator {
-            rules: Quelhas,
-            net,
-            device,
-        };
-        let evals = evaluator.evaluate(&states);
-        assert_eq!(evals.all_logits().len(), 2 * Quelhas.num_actions());
+        let net = NetConfig::for_ruleset(&rules, 16, 2).init::<Flex>(&device);
+        let num_actions = rules.num_actions();
+        let mut evaluator = NetEvaluator { rules, net, device };
+        let evals = evaluator.evaluate(states);
+        assert_eq!(evals.all_logits().len(), states.len() * num_actions);
         assert!(evals.values().iter().all(|v| v.abs() <= 1.0));
     }
 
     #[test]
-    fn model_file_roundtrip() {
+    fn output_shapes() {
+        evaluate(
+            Quelhas,
+            &[
+                State::initial(),
+                State {
+                    empty: Board::from_bits(0b1011),
+                    turn: Player::Right,
+                },
+            ],
+        );
+        evaluate(
+            Fjords,
+            &[
+                fjords::State::deal(1, fjords::EDGE_PROBABILITY),
+                fjords::State::deal(2, 0.5),
+            ],
+        );
+    }
+
+    fn roundtrip<R: Ruleset>(rules: &R, state: R::State, openings: Option<OpeningTable>) {
         let device = FlexDevice;
-        let config = GridNetConfig::for_ruleset(&Quelhas, 8, 1);
+        let config = NetConfig::for_ruleset(rules, 8, 1);
         let net = config.init::<Flex>(&device);
         let mut store = BurnpackStore::from_bytes(None);
         net.save_into(&mut store).unwrap();
         let file = ModelFile {
             header: ModelHeader {
-                game: Quelhas.name().to_owned(),
+                game: rules.name().to_owned(),
                 network: config,
-                openings: Some(OpeningTable {
-                    game: Quelhas.name().to_owned(),
-                    checkpoint: "test".to_owned(),
-                    simulations: 1,
-                    values: [(3, 0.25)].into(),
-                }),
+                openings,
             },
             weights: store.get_bytes().unwrap().to_vec(),
         };
 
         let read = ModelFile::from_bytes(&file.to_bytes()).unwrap();
         assert_eq!(read.header.network, config);
-        assert_eq!(read.header.openings.as_ref().unwrap().value(3), Some(0.25));
         let loaded = read.load_net::<Flex>(&device).unwrap();
-        let x = encode_batch::<_, Flex>(&Quelhas, &[State::initial()], &device);
+        let x = encode_batch::<_, Flex>(rules, &[state], &device);
         let (expected, _) = net.forward(x.clone());
         let (actual, _) = loaded.forward(x);
         expected.into_data().assert_eq(&actual.into_data(), true);
 
         assert!(ModelFile::from_bytes(b"cgt-ai").is_err());
         assert!(ModelFile::from_bytes(&file.weights).is_err());
+    }
+
+    #[test]
+    fn model_files_roundtrip() {
+        roundtrip(
+            &Quelhas,
+            State::initial(),
+            Some(OpeningTable {
+                game: Quelhas.name().to_owned(),
+                checkpoint: "test".to_owned(),
+                simulations: 1,
+                values: [(3, 0.25)].into(),
+            }),
+        );
+        roundtrip(
+            &Fjords,
+            fjords::State::deal(3, fjords::EDGE_PROBABILITY),
+            None,
+        );
     }
 }

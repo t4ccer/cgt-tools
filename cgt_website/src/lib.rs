@@ -10,13 +10,11 @@ mod guides;
 mod jupyter;
 #[cfg(feature = "ssr")]
 mod pages;
-#[cfg(feature = "ssr")]
-mod play;
+pub mod play;
 #[cfg(feature = "ssr")]
 mod process;
 #[cfg(feature = "ssr")]
 mod python_docs;
-pub mod quelhas;
 
 #[cfg(feature = "ssr")]
 pub use config::Config;
@@ -25,7 +23,7 @@ pub use guides::{Guide, read_guides};
 #[cfg(feature = "ssr")]
 pub use pages::pages;
 #[cfg(feature = "ssr")]
-pub use play::{Model, read_models};
+pub use play::pages::{AiModel, GAMES, GamePage, read_models};
 
 /// Prints a progress message with the time since the first message, because running the guides
 /// makes a build take a while

@@ -1,38 +1,25 @@
-//! Quelhas against an AI that runs in the browser
+//! The panel of a game page, the same for every game: the setup of a game, its state, the
+//! analysis of the AI and the moves made
 
-pub mod game;
-#[cfg(feature = "hydrate")]
-mod worker;
-
-use cgt_ai_core::protocol::Budget;
-use cgt_ai_core::{
-    quelhas::{Action, BOARD_SIZE, cell_name},
-    ruleset::Player,
+use super::game::{
+    Controller, Game, Hint, MAX_SECONDS, MAX_SIMULATIONS, MIN_SECONDS, Mode, Model, Msg, Opponent,
+    Participant, Phase, Setup, Starter, Unit, side_name,
 };
-use game::{
-    Controller, Hint, MAX_SECONDS, MAX_SIMULATIONS, MIN_SECONDS, Mode, Model, Move, Msg, Opponent,
-    Participant, Phase, Setup, Starter, Unit,
-};
+use cgt_ai_core::{protocol::Budget, ruleset::Player};
 use leptos::prelude::*;
 
-const CELL_SIZE: f64 = 44.0;
-const MARGIN: f64 = 26.0;
-
-const fn side_class(side: Player) -> &'static str {
+pub const fn side_class(side: Player) -> &'static str {
     match side {
         Player::Left => "left",
         Player::Right => "right",
     }
 }
 
-const fn side_name(side: Player) -> &'static str {
-    match side {
-        Player::Left => "Left",
-        Player::Right => "Right",
-    }
+fn side_view<G: Game>(side: Player) -> impl IntoView {
+    view! { <span class=format!("side side-{}", side_class(side))>{side_name::<G>(side)}</span> }
 }
 
-const fn participant_name(model: &Model, side: Player) -> &'static str {
+const fn participant_name<G: Game>(model: &Model<G>, side: Player) -> &'static str {
     match (
         model.mode,
         model.participant_of(side),
@@ -45,8 +32,9 @@ const fn participant_name(model: &Model, side: Player) -> &'static str {
     }
 }
 
-fn side_view(side: Player) -> impl IntoView {
-    view! { <span class=format!("side side-{}", side_class(side))>{side_name(side)}</span> }
+/// A chance of winning in `[-1, 1]` as a percentage
+fn percent(value: f64) -> String {
+    format!("{}%", (50.0 * (value + 1.0)).round())
 }
 
 /// A row of buttons of which the one for `chosen` is pressed
@@ -84,17 +72,17 @@ fn toggle<T: Copy + PartialEq + Send + Sync + 'static>(
 /// Puts the strength of the AI back into the field it was typed into, once typing is done,
 /// because a number out of range is clamped to a value the field would not otherwise show
 #[cfg(feature = "hydrate")]
-fn show_strength(event: &leptos::ev::Event, model: RwSignal<Model>) {
+fn show_strength<G: Game>(event: &leptos::ev::Event, model: RwSignal<Model<G>>) {
     event_target::<web_sys::HtmlInputElement>(event)
         .set_value(&model.with_untracked(|m| m.setup.strength()));
 }
 
 #[cfg(not(feature = "hydrate"))]
-const fn show_strength(_: &leptos::ev::Event, _: RwSignal<Model>) {}
+const fn show_strength<G: Game>(_: &leptos::ev::Event, _: RwSignal<Model<G>>) {}
 
 /// Who plays, and with which model and how long the AI searches, as the page shows it during the
 /// game
-fn opponent_summary(m: &Model, models: &[(String, String)]) -> String {
+fn opponent_summary<G: Game>(m: &Model<G>, models: &[(String, String)]) -> String {
     if m.mode == Mode::TwoPlayers && !m.show_analysis {
         return "Player vs Player".to_owned();
     }
@@ -113,22 +101,6 @@ fn opponent_summary(m: &Model, models: &[(String, String)]) -> String {
     } else {
         format!("Player vs AI{name}, {strength} per move")
     }
-}
-
-/// A move as the page writes it, such as `L d3-d6`
-fn notation(m: Move) -> String {
-    let (start, end) = m.segment();
-    format!(
-        "{} {}-{}",
-        if m.side == Player::Left { "L" } else { "R" },
-        cell_name(start.0, start.1),
-        cell_name(end.0, end.1)
-    )
-}
-
-/// A chance of winning in `[-1, 1]` as a percentage
-fn percent(value: f64) -> String {
-    format!("{}%", (50.0 * (value + 1.0)).round())
 }
 
 #[component]
@@ -154,39 +126,24 @@ fn HelpIcon() -> impl IntoView {
     }
 }
 
-fn cell_center((r, c): (usize, usize)) -> (f64, f64) {
-    (
-        (c as f64 + 0.5).mul_add(CELL_SIZE, MARGIN),
-        (r as f64 + 0.5).mul_add(CELL_SIZE, MARGIN),
-    )
-}
-
-fn stroke(m: Move, class: &'static str) -> impl IntoView {
-    let (start, end) = m.segment();
-    let (x1, y1) = cell_center(start);
-    let (x2, y2) = cell_center(end);
-    view! {
-        <line
-            class=format!("stroke stroke-{} {class}", side_class(m.side))
-            x1=x1
-            y1=y1
-            x2=x2
-            y2=y2
-        ></line>
-    }
-}
-
-/// A game of Quelhas against one of the AIs in `models`, given by their names and the addresses
-/// of their model files, the first being the default
-#[island]
-pub fn QuelhasGame(models: Vec<(String, String)>) -> impl IntoView {
+/// A game page: the board, which `board` draws and plays moves on, next to the panel. The setup
+/// of a game offers the AIs in `models`, given by their names and the addresses of their model
+/// files, the first being the default, starts from the board dealt by `seed`, and shows the
+/// steps of `setup_steps`, which choose what the game is played on, after the choice of
+/// opponent.
+pub fn game_view<G: Game>(
+    models: Vec<(String, String)>,
+    seed: u64,
+    board: impl FnOnce(RwSignal<Model<G>>, Callback<Msg>) -> AnyView,
+    setup_steps: impl Fn(RwSignal<Model<G>>, Callback<Msg>) -> AnyView + Copy + Send + Sync + 'static,
+) -> impl IntoView {
     let first = models
         .first()
         .map(|(_, url)| url.clone())
         .unwrap_or_default();
-    let model = RwSignal::new(Model::new(Setup::new(first)));
+    let model = RwSignal::new(Model::new(Setup::<G>::new(first, seed)));
     #[cfg(feature = "hydrate")]
-    let dispatch = worker::connect(model);
+    let dispatch = super::worker::connect(model);
     #[cfg(not(feature = "hydrate"))]
     let dispatch = Callback::new(move |msg: Msg| {
         model.update(|m| {
@@ -196,23 +153,31 @@ pub fn QuelhasGame(models: Vec<(String, String)>) -> impl IntoView {
 
     let status = move || {
         model.with(|m| match &m.phase {
-            Phase::Over(winner) => view! {
-                {participant_name(m, *winner)}
-                " ("
-                {side_view(*winner)}
-                ") won, "
-                {participant_name(m, winner.opposite())}
-                " made the last move"
+            Phase::Over { winner, margin } => {
+                let loser = participant_name(m, winner.opposite());
+                let reason = match margin {
+                    Some(margin) if *margin > 0 => format!(" by {margin}, once settled"),
+                    Some(_) => ", once settled".to_owned(),
+                    None if G::LAST_MOVE_LOSES => format!(", {loser} made the last move"),
+                    None => format!(", {loser} cannot move"),
+                };
+                view! {
+                    {participant_name(m, *winner)}
+                    " ("
+                    {side_view::<G>(*winner)}
+                    ") won"
+                    {reason}
+                }
+                .into_any()
             }
-            .into_any(),
             Phase::Failed(err) => {
                 view! { <span class="play-error">{format!("Error: {err}")}</span> }.into_any()
             }
             Phase::Setup => ().into_any(),
             Phase::Playing => view! {
-                {side_view(m.turn)}
+                {side_view::<G>(m.turn())}
                 " to move: "
-                {participant_name(m, m.turn)}
+                {participant_name(m, m.turn())}
                 {m.ai_thinking().then_some(" (thinking…)")}
             }
             .into_any(),
@@ -221,9 +186,11 @@ pub fn QuelhasGame(models: Vec<(String, String)>) -> impl IntoView {
     let moves_available = move || {
         model.with(|m| {
             format!(
-                "Moves available: Left {}, Right {}",
-                m.count_legal_moves(Player::Left),
-                m.count_legal_moves(Player::Right)
+                "Moves available: {} {}, {} {}",
+                G::SIDES[0],
+                m.rules.moves_available(&m.state, Player::Left),
+                G::SIDES[1],
+                m.rules.moves_available(&m.state, Player::Right)
             )
         })
     };
@@ -232,7 +199,7 @@ pub fn QuelhasGame(models: Vec<(String, String)>) -> impl IntoView {
             let updating = m.analyzing.is_some();
             let estimate = match m.estimate() {
                 Some(e) => view! {
-                    {side_view(e.side)}
+                    {side_view::<G>(e.side)}
                     " wins with "
                     {percent(e.value)}
                     {updating.then_some(" (updating…)")}
@@ -244,163 +211,13 @@ pub fn QuelhasGame(models: Vec<(String, String)>) -> impl IntoView {
             Some(view! { <p class="play-detail">"AI estimate: " {estimate}</p> })
         })
     };
-    let analysis_error = move || {
-        model.with(|m| {
-            m.analysis_error.clone().map(|err| {
-                view! { <p class="play-detail play-error">{format!("Analysis failed: {err}")}</p> }
-            })
-        })
-    };
-    let pie = move || {
-        model.with(|m| {
-            (m.pie_offered() && m.controller_of(m.turn) == Controller::Human && !m.ai_thinking())
-                .then(|| {
-                    view! {
-                        <div class="play-pie">
-                            <button
-                                class="btn btn-primary btn-sm"
-                                on:click=move |_| dispatch.run(Msg::Swap)
-                            >
-                                "Swap sides"
-                            </button>
-                            <span>"or move to keep playing Right"</span>
-                        </div>
-                    }
-                })
-        })
-    };
-
-    let cells = (0..BOARD_SIZE)
-        .flat_map(|r| (0..BOARD_SIZE).map(move |c| (r, c)))
-        .map(|cell| {
-            let crossed = move || model.with(|m| !m.empty.is_empty(cell.0, cell.1));
-            let selected = move || model.with(|m| m.anchor == Some(cell));
-            let start = move |side| {
-                model.with(|m| m.turn == side && m.human_to_move() && m.can_start_at(cell))
-            };
-            let active = move || {
-                model.with(|m| m.human_to_move() && (m.can_start_at(cell) || m.anchor.is_some()))
-            };
-            view! {
-                <rect
-                    class="cell"
-                    class:crossed=crossed
-                    class:selected=selected
-                    class:start-left=move || start(Player::Left)
-                    class:start-right=move || start(Player::Right)
-                    class:active=active
-                    x=(cell.1 as f64).mul_add(CELL_SIZE, MARGIN)
-                    y=(cell.0 as f64).mul_add(CELL_SIZE, MARGIN)
-                    width=CELL_SIZE
-                    height=CELL_SIZE
-                    on:click=move |_| dispatch.run(Msg::ClickCell(cell))
-                    on:mouseover=move |_| dispatch.run(Msg::HoverCell(Some(cell)))
-                ></rect>
-            }
-        })
-        .collect_view();
-
-    let labels = (0..BOARD_SIZE)
-        .map(|i| {
-            let along = (i as f64 + 0.5).mul_add(CELL_SIZE, MARGIN);
-            let label = |x: f64, y: f64, text: String| {
-                view! {
-                    <text class="board-label" x=x y=y>
-                        {text}
-                    </text>
-                }
-            };
-            let column = cell_name(0, i);
-            view! {
-                {label(along, MARGIN / 2.0, column[..1].to_owned())}
-                {label(MARGIN / 2.0, along, (i + 1).to_string())}
-            }
-        })
-        .collect_view();
-
-    let strokes = move || {
-        model.with(|m| {
-            let last = m.moves.len().saturating_sub(1);
-            m.moves
-                .iter()
-                .enumerate()
-                .map(|(i, &mv)| stroke(mv, if i == last { "last" } else { "" }))
-                .collect_view()
-        })
-    };
-    let preview = move || {
-        model.with(|m| match (m.anchor, m.hover) {
-            (Some(anchor), Some(hover)) if m.human_to_move() && m.valid_segment(anchor, hover) => {
-                Action::from_segment(m.turn, anchor, hover).map(|action| {
-                    stroke(
-                        Move {
-                            side: m.turn,
-                            action,
-                        },
-                        "preview",
-                    )
-                })
-            }
-            _ => None,
-        })
-    };
-
-    let size = (BOARD_SIZE as f64).mul_add(CELL_SIZE, MARGIN) + 6.0;
-    let board = view! {
-        <svg
-            class="board"
-            viewBox=format!("0 0 {size} {size}")
-            role="img"
-            aria-label="Quelhas board"
-            on:mouseout=move |_| dispatch.run(Msg::HoverCell(None))
-        >
-            {labels}
-            {cells}
-            {strokes}
-            {preview}
-        </svg>
-    }
-    .into_any();
-
-    let move_list = move || {
-        model.with(|m| {
-            m.moves
-                .iter()
-                .enumerate()
-                .map(|(index, &mv)| {
-                    let chance =
-                        m.show_analysis
-                            .then(|| m.move_chance(index))
-                            .flatten()
-                            .map(|chance| {
-                                let title = format!(
-                                    "Chance of {} to win after this move",
-                                    side_name(mv.side)
-                                );
-                                view! {
-                                    " "
-                                    <span class="move-chance" title=title>
-                                        {percent(chance)}
-                                    </span>
-                                }
-                            });
-                    view! {
-                        <li class=format!("side-{}", side_class(mv.side))>
-                            {notation(mv)}
-                            {chance}
-                        </li>
-                    }
-                })
-                .collect_view()
-        })
-    };
     let hint = move || {
         model.with(|m| {
             let suggestion = match m.hint() {
-                Some(Hint::Move(mv)) => {
-                    view! { <span class=format!("side-{}", side_class(mv.side))>{notation(mv)}</span> }
-                        .into_any()
+                Some(Hint::Move(notation)) => view! {
+                    <span class=format!("side-{}", side_class(m.turn()))>{notation}</span>
                 }
+                .into_any(),
                 Some(Hint::Swap) => "Swap sides".into_any(),
                 None if m.human_to_move() && m.analyzing.is_some() => "analysing…".into_any(),
                 None => return None,
@@ -418,6 +235,64 @@ pub fn QuelhasGame(models: Vec<(String, String)>) -> impl IntoView {
             })
         })
     };
+    let analysis_error = move || {
+        model.with(|m| {
+            m.analysis_error.clone().map(|err| {
+                view! { <p class="play-detail play-error">{format!("Analysis failed: {err}")}</p> }
+            })
+        })
+    };
+    let pie = move || {
+        model.with(|m| {
+            (m.pie_offered() && m.controller_of(m.turn()) == Controller::Human && !m.ai_thinking())
+                .then(|| {
+                    view! {
+                        <div class="play-pie">
+                            <button
+                                class="btn btn-primary btn-sm"
+                                on:click=move |_| dispatch.run(Msg::Swap)
+                            >
+                                "Swap sides"
+                            </button>
+                            <span>
+                                {format!("or move to keep playing {}", side_name::<G>(m.turn()))}
+                            </span>
+                        </div>
+                    }
+                })
+        })
+    };
+    let move_list = move || {
+        model.with(|m| {
+            m.moves
+                .iter()
+                .enumerate()
+                .map(|(index, mv)| {
+                    let chance =
+                        m.show_analysis
+                            .then(|| m.move_chance(index))
+                            .flatten()
+                            .map(|chance| {
+                                let title = format!(
+                                    "Chance of {} to win after this move",
+                                    side_name::<G>(mv.side)
+                                );
+                                view! {
+                                    " "
+                                    <span class="move-chance" title=title>
+                                        {percent(chance)}
+                                    </span>
+                                }
+                            });
+                    view! {
+                        <li class=format!("side-{}", side_class(mv.side))>
+                            {mv.notation.clone()} {chance}
+                        </li>
+                    }
+                })
+                .collect_view()
+        })
+    };
     let swapped_note = move || {
         model.with(|m| m.swapped).then(|| {
             view! { <p class="play-detail">"Sides were swapped after the first move."</p> }
@@ -432,6 +307,7 @@ pub fn QuelhasGame(models: Vec<(String, String)>) -> impl IntoView {
     let ai = Memo::new(move |_| model.with(|m| m.setup.ai.clone()));
     let ready = Memo::new(move |_| model.with(|m| m.setup.mode().is_some()));
     let analysis = Memo::new(move |_| model.with(|m| Some(m.setup.analysis)));
+    let end_settled = Memo::new(move |_| model.with(|m| Some(m.setup.end_settled)));
     let show_analysis = Memo::new(move |_| model.with(|m| m.show_analysis));
 
     let ai_choice = move || {
@@ -508,6 +384,7 @@ pub fn QuelhasGame(models: Vec<(String, String)>) -> impl IntoView {
                         move |o| dispatch.run(Msg::ChooseOpponent(o)),
                     )}
                 </fieldset>
+                {setup_steps(model, dispatch)}
                 {move || {
                     (opponent.get() == Some(Opponent::Ai))
                         .then(|| {
@@ -520,14 +397,6 @@ pub fn QuelhasGame(models: Vec<(String, String)>) -> impl IntoView {
                                         move |s| dispatch.run(Msg::ChooseStarter(s)),
                                     )}
                                 </fieldset>
-                            }
-                            .into_any()
-                        })
-                }}
-                {move || {
-                    (opponent.get() == Some(Opponent::Ai))
-                        .then(|| {
-                            view! {
                                 <fieldset>
                                     <legend>"Difficulty"</legend>
                                     {ai_choice}
@@ -535,7 +404,7 @@ pub fn QuelhasGame(models: Vec<(String, String)>) -> impl IntoView {
                                     {strength}
                                 </fieldset>
                             }
-                            .into_any()
+                                .into_any()
                         })
                 }}
                 {move || {
@@ -566,8 +435,21 @@ pub fn QuelhasGame(models: Vec<(String, String)>) -> impl IntoView {
                                             })
                                     }}
                                 </fieldset>
+                                {G::SETTLES
+                                    .then(|| {
+                                        view! {
+                                            <fieldset>
+                                                <legend>"End of game"</legend>
+                                                {toggle(
+                                                    &[(true, "Once settled"), (false, "Play it out")],
+                                                    end_settled,
+                                                    move |e| dispatch.run(Msg::ChooseEndSettled(e)),
+                                                )}
+                                            </fieldset>
+                                        }
+                                    })}
                             }
-                            .into_any()
+                                .into_any()
                         })
                 }}
                 {move || {
@@ -580,10 +462,10 @@ pub fn QuelhasGame(models: Vec<(String, String)>) -> impl IntoView {
                                     class="btn btn-primary play-start"
                                     on:click=move |_| dispatch.run(Msg::Start)
                                 >
-                                    "Start Game"
+                                    "Start"
                                 </button>
                             }
-                            .into_any()
+                                .into_any()
                         })
                 }}
             </div>
@@ -638,7 +520,7 @@ pub fn QuelhasGame(models: Vec<(String, String)>) -> impl IntoView {
 
     view! {
         <div class="play-layout">
-            <div class="play-board">{board}</div>
+            <div class="play-board">{board(model, dispatch)}</div>
             <div class="play-panel">{move || if setting_up.get() { setup() } else { game() }}</div>
         </div>
     }
