@@ -4,7 +4,7 @@ use crate::{
     log,
 };
 use leptos::prelude::*;
-use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag};
+use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag, TagEnd};
 use serde::Deserialize;
 use serde_json::Value;
 use std::{
@@ -199,7 +199,8 @@ fn element_end(events: &[Event<'_>], start: usize) -> usize {
 }
 
 /// Gives level 2 and 3 headings anchors, recording the level 2 ones in `headings`, resolves
-/// images attached to the cell, and highlights fenced code
+/// images attached to the cell, highlights fenced code, and puts tables in a box that scrolls
+/// sideways when they are wider than the page
 fn prepare_markdown<'a>(
     events: &[Event<'a>],
     attachments: &BTreeMap<String, BTreeMap<String, Text>>,
@@ -248,6 +249,16 @@ fn prepare_markdown<'a>(
                     title: title.clone(),
                     id: id.clone(),
                 }));
+                i += 1;
+            }
+            event @ Event::Start(Tag::Table(_)) => {
+                prepared.push(Event::Html("<div class=\"table-scroll\">".into()));
+                prepared.push(event.clone());
+                i += 1;
+            }
+            event @ Event::End(TagEnd::Table) => {
+                prepared.push(event.clone());
+                prepared.push(Event::Html("</div>".into()));
                 i += 1;
             }
             Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(language))) => {

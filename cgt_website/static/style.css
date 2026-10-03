@@ -915,9 +915,13 @@ h3:hover .anchor {
   color: var(--muted);
 }
 
+.table-scroll {
+  margin: 0 0 1rem;
+  overflow-x: auto;
+}
+
 .nb-markdown table {
   width: 100%;
-  margin: 0 0 1rem;
   font-size: 0.9375em;
   border-collapse: collapse;
 }
