@@ -11,7 +11,8 @@ classifiers = [
   "Programming Language :: Python :: Implementation :: CPython",
   "Programming Language :: Python :: Implementation :: PyPy",
 ]
-# dependencies = ["anywidget"]
+# 0.9 is the first anywidget that runs widget modules written as `export default { render }`
+dependencies = ["anywidget>=0.9"]
 
 [tool.maturin]
 features = ["pyo3/extension-module"]

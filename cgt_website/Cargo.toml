@@ -31,14 +31,17 @@ hydrate = [
 ]
 ssr = [
   "leptos/ssr",
+  "dep:base64",
   "dep:hydration_context",
   "dep:pulldown-cmark",
   "dep:semver",
   "dep:serde",
   "dep:serde_json",
+  "dep:syntect",
 ]
 
 [dependencies]
+base64 = { version = "0.22.1", optional = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }
 hydration_context = { version = "0.3.1", optional = true }
 leptos = { version = "0.8.21", features = ["islands"] }
@@ -48,8 +51,17 @@ pulldown-cmark = { version = "0.13.4", default-features = false, features = [
 semver = { version = "1.0.28", optional = true }
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
+syntect = { version = "5.3.0", default-features = false, features = [
+  "default-syntaxes",
+  "html",
+  "regex-fancy",
+], optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 web-sys = { workspace = true, optional = true, features = [
+  "DomRect",
+  "DomTokenList",
+  "EventTarget",
   "MediaQueryList",
+  "NodeList",
   "Storage",
 ] }

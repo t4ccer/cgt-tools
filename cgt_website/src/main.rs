@@ -36,7 +36,9 @@ fn write(path: &Path, contents: &[u8]) -> io::Result<()> {
 }
 
 fn usage() -> ! {
-    eprintln!("usage: cgt_website <output directory> [<version>=<api_reference.json>]...");
+    eprintln!(
+        "usage: cgt_website <output directory> [--python <python>] [<version>=<api_reference.json>]..."
+    );
     std::process::exit(2);
 }
 
@@ -50,6 +52,7 @@ fn read_python_api(arg: &str) -> io::Result<PythonApi> {
     let file = File::open(path).map_err(|err| io::Error::new(err.kind(), with_path(&err)))?;
     let package: Package = serde_json::from_reader(BufReader::new(file))
         .map_err(|err| io::Error::other(with_path(&err)))?;
+    cgt_website::log(format!("Read the Python API of {version} from `{path}`"));
     Ok(PythonApi {
         version: version.to_owned(),
         package,
@@ -61,13 +64,28 @@ fn main() -> io::Result<()> {
     let Some(site) = args.nth(1).map(PathBuf::from) else {
         usage();
     };
-    let python_apis = args
-        .map(|arg| read_python_api(&arg))
-        .collect::<io::Result<Vec<_>>>()?;
+    cgt_website::log(format!("Building the website in `{}`", site.display()));
+    let mut python = PathBuf::from("python3");
+    let mut python_apis = Vec::new();
+    while let Some(arg) = args.next() {
+        if arg == "--python" {
+            python = args.next().map_or_else(|| usage(), PathBuf::from);
+        } else {
+            python_apis.push(read_python_api(&arg)?);
+        }
+    }
+    let guides = cgt_website::read_guides(
+        Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/guides")),
+        &python,
+    )?;
+    cgt_website::log("Writing the pages");
     for (path, contents) in ASSETS {
         write(&site.join(path), contents)?;
     }
-    for (path, html) in cgt_website::pages(python_apis) {
+    for (path, contents) in guides.iter().flat_map(cgt_website::Guide::files) {
+        write(&site.join(path), &contents)?;
+    }
+    for (path, html) in cgt_website::pages(python_apis, guides) {
         write(&site.join(path), html.as_bytes())?;
     }
     println!("Created website in `{}`", site.display());

@@ -19,7 +19,7 @@ env:
 
 jobs:
   bundle:
-    name: Bundle, stubs and docs
+    name: Bundle and stubs
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -59,9 +59,6 @@ jobs:
             exit 1
           fi
 
-      - name: Build website
-        run: make site
-
       - name: Upload Python build inputs
         uses: actions/upload-artifact@v4
         with:
@@ -69,13 +66,7 @@ jobs:
           path: |
             cgt_py/widget/bundle.js
             cgt_py/cgt_py.pyi
-
-      - name: Upload website
-        uses: actions/upload-artifact@v4
-        with:
-          name: website
-          path: target/website
-          include-hidden-files: true
+            cgt_py/docs/api/api_reference.json
 
   rust:
     name: Rust
@@ -222,6 +213,67 @@ jobs:
           name: dist-sdist
           path: cgt_py/dist
 
+  # The site runs every guide in Jupyter and Chrome, which the runner has, against the wheel built
+  # for it, so this also tests the guides
+  website:
+    name: Website
+    needs: [bundle, wheels-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Download Python build inputs
+        uses: actions/download-artifact@v4
+        with:
+          name: python-inputs
+          path: cgt_py
+
+      - name: Download wheels
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-x86_64-unknown-linux-gnu
+          path: dist
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install wasm-pack
+        uses: jetli/wasm-pack-action@v0.4.0
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      # Installed from the file, so that its dependencies come from what the wheel declares. The
+      # notebook package brings the kernel that runs the guides
+      - name: Install cgt-py
+        run: pip install dist/cgt_py-*-cp313-cp313-manylinux*_x86_64.whl notebook
+
+      - name: Install Chrome
+        id: chrome
+        uses: browser-actions/setup-chrome@v2
+        with:
+          install-dependencies: true
+
+      - name: Build website
+        run: make site SITE_DEPS= PYTHON=python
+        env:
+          CHROME: ${{ steps.chrome.outputs.chrome-path }}
+
+      - name: Upload website
+        uses: actions/upload-artifact@v4
+        with:
+          name: website
+          path: target/website
+          include-hidden-files: true
+
   tag:
     name: Check tag matches manifests
     if: startsWith(github.ref, 'refs/tags/v')
@@ -242,7 +294,7 @@ jobs:
 
   publish-docs:
     name: Publish docs
-    needs: [bundle, rust]
+    needs: [website, rust]
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:

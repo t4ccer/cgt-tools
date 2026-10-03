@@ -1,5 +1,6 @@
 use crate::{
     ThemeToggle,
+    guides::{self, GUIDES_URL, Guide},
     python_docs::{self, PythonApi},
 };
 use hydration_context::SsrSharedContext;
@@ -16,12 +17,31 @@ const DESCRIPTION: &str = "Combinatorial Game Theory toolkit in Rust and Python"
 const THEME_SCRIPT: &str = r#"try{const t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t}catch(_){}"#;
 
 /// Every page of the site as its path relative to the site root and its HTML, with a Python API
-/// reference for each of `python_apis`
-pub fn pages(mut python_apis: Vec<PythonApi>) -> Vec<(String, String)> {
+/// reference for each of `python_apis` and a page for each of `guides`
+pub fn pages(mut python_apis: Vec<PythonApi>, guides: Vec<Guide>) -> Vec<(String, String)> {
     let mut pages = vec![(
         "index.html".to_owned(),
         render("cgt-tools".to_owned(), "home", || view! { <Home /> }),
     )];
+    let links = guides.iter().map(Guide::link).collect::<Vec<_>>();
+    {
+        let links = links.clone();
+        pages.push((
+            "guides/index.html".to_owned(),
+            render("Guides - cgt-tools".to_owned(), "docs", move || {
+                guides::index_page(&links)
+            }),
+        ));
+    }
+    for guide in guides {
+        let path = format!("guides/{}/index.html", guide.slug);
+        let title = format!("{} - cgt-tools", guide.title());
+        let links = links.clone();
+        pages.push((
+            path,
+            render(title, "docs", move || guides::page(&guide, &links)),
+        ));
+    }
     let latest = python_docs::sort_versions(&mut python_apis);
     let versions = python_apis
         .iter()
@@ -56,9 +76,11 @@ pub fn pages(mut python_apis: Vec<PythonApi>) -> Vec<(String, String)> {
     pages
 }
 
+/// A page that sends visitors to `url`. The script keeps the fragment of the address, which the
+/// refresh would drop, so links into a section of the target still work
 fn redirect(url: &str) -> String {
     format!(
-        "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>cgt-tools</title><meta http-equiv=\"refresh\" content=\"0; url={url}\"></head><body><a href=\"{url}\">{url}</a></body></html>\n"
+        "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>cgt-tools</title><script>location.replace(\"{url}\" + location.hash)</script><meta http-equiv=\"refresh\" content=\"0; url={url}\"></head><body><a href=\"{url}\">{url}</a></body></html>\n"
     )
 }
 
@@ -113,6 +135,9 @@ fn Header() -> impl IntoView {
                 "cgt-tools"
             </a>
             <nav class="navbar-nav">
+                <a class="nav-link" href=GUIDES_URL>
+                    "Guides"
+                </a>
                 <a class="nav-link" href=PYTHON_DOCS>
                     "Python"
                 </a>
@@ -147,7 +172,7 @@ fn Home() -> impl IntoView {
         <section class="hero">
             <h1>"cgt-tools"</h1>
             <p class="lead">{DESCRIPTION}</p>
-            <a class="btn btn-primary"> // TODO
+            <a class="btn btn-primary" href=GUIDES_URL>
                 "Guides"
             </a>
             <a class="btn btn-outline" href=PYTHON_DOCS>

@@ -114,6 +114,7 @@
               # Jupyter started from the venv only searches its own prefix for lab extensions,
               # so it would not find the widget manager installed in the nix python env
               export JUPYTER_PATH=${pythonEnv}/share/jupyter
+              export CHROME=${pkgs.chromium}/bin/chromium
             '';
 
             hardeningDisable = ["fortify"];
@@ -141,6 +142,7 @@
               pkgs.wasm-pack
               pkgs.webpack-cli
               pkgs.miniserve
+              pkgs.chromium
 
               pkgs.pkg-config
               pkgs.SDL2

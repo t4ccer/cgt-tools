@@ -61,6 +61,15 @@
   --note-link: hsl(234 54% 20%);
   --caution-bg: hsl(41 82% 87%);
   --caution-link: hsl(41 39% 22%);
+  --hl-keyword: #000;
+  --hl-keyword-weight: 700;
+  --hl-constant: #000;
+  --hl-string: #d14;
+  --hl-number: #099;
+  --hl-comment: #998;
+  --hl-function: #900;
+  --hl-builtin: #0086b3;
+  --stderr: hsl(339 70% 40%);
 }
 
 /* The dark palette is repeated because it applies both when the system asks for it and when the
@@ -88,6 +97,15 @@
     --note-link: hsl(234 100% 87%);
     --caution-bg: hsl(41 39% 22%);
     --caution-link: hsl(41 82% 87%);
+    --hl-keyword: #ff7b72;
+    --hl-keyword-weight: 400;
+    --hl-constant: #79c0ff;
+    --hl-string: #a5d6ff;
+    --hl-number: #a5d6ff;
+    --hl-comment: #8b949e;
+    --hl-function: #d2a8ff;
+    --hl-builtin: #79c0ff;
+    --stderr: hsl(339 82% 75%);
   }
 }
 
@@ -113,6 +131,15 @@
   --note-link: hsl(234 100% 87%);
   --caution-bg: hsl(41 39% 22%);
   --caution-link: hsl(41 82% 87%);
+  --hl-keyword: #ff7b72;
+  --hl-keyword-weight: 400;
+  --hl-constant: #79c0ff;
+  --hl-string: #a5d6ff;
+  --hl-number: #a5d6ff;
+  --hl-comment: #8b949e;
+  --hl-function: #d2a8ff;
+  --hl-builtin: #79c0ff;
+  --stderr: hsl(339 82% 75%);
 }
 
 *,
@@ -341,6 +368,12 @@ code {
 .btn:hover,
 .btn:focus {
   text-decoration: none;
+}
+
+.btn-sm {
+  margin: 0;
+  padding: 0.25rem 1rem;
+  font-size: 1rem;
 }
 
 .btn-primary {
@@ -797,4 +830,159 @@ h3:hover .anchor {
 
 .dropdown-item .tag {
   margin-left: auto;
+}
+
+.section-nav li.active > a {
+  font-weight: 500;
+  color: var(--primary);
+}
+
+.section-nav li ul {
+  border-left: 0;
+}
+
+.section-nav li ul a {
+  margin: 0.375rem 0;
+  padding-left: 2rem;
+  font-size: 0.9375rem;
+}
+
+.section-nav li ul a.active {
+  color: var(--primary);
+}
+
+.guide-list {
+  margin: 0 0 1rem;
+  padding: 0 0 0 1.25rem;
+  list-style: none;
+  border-left: 1px solid var(--border);
+}
+
+.guide-list li {
+  padding: 0.75rem 0;
+}
+
+.guide-list li + li {
+  border-top: 1px dashed var(--border);
+}
+
+.guide-list a {
+  font-weight: 500;
+}
+
+.guide-list p {
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+}
+
+.nb-markdown table {
+  width: 100%;
+  margin: 0 0 1rem;
+  font-size: 0.9375em;
+  border-collapse: collapse;
+}
+
+.nb-markdown th,
+.nb-markdown td {
+  padding: 0.375rem 0.5rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.nb-markdown pre,
+.nb-code {
+  margin: 0 0 1.5rem;
+}
+
+.nb-markdown pre,
+pre.code {
+  padding: 1rem 1.25rem;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  line-height: 1.5;
+  background: var(--pre-bg);
+  border: 1px solid var(--pre-border);
+}
+
+.nb-code pre.code {
+  margin: 0;
+}
+
+.nb-markdown pre code,
+pre.code code {
+  margin: 0;
+  padding: 0;
+  font-size: inherit;
+  background: none;
+}
+
+.nb-output {
+  padding: 0.75rem 1.25rem;
+  overflow-x: auto;
+  border: 1px solid var(--pre-border);
+  border-top: 0;
+}
+
+.nb-output > * {
+  margin: 0;
+}
+
+.nb-output > * + * {
+  margin-top: 0.5rem;
+}
+
+.nb-output pre {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  white-space: pre-wrap;
+}
+
+.nb-stderr {
+  color: var(--stderr);
+}
+
+/* Outputs are drawn for the white background of Jupyter */
+.nb-output img,
+.nb-html svg {
+  max-width: 100%;
+  height: auto;
+  background: #fff;
+}
+
+.hl-keyword,
+.hl-storage {
+  font-weight: var(--hl-keyword-weight);
+  color: var(--hl-keyword);
+}
+
+.hl-constant.hl-language {
+  color: var(--hl-constant);
+}
+
+.hl-string {
+  color: var(--hl-string);
+}
+
+.hl-constant.hl-numeric {
+  color: var(--hl-number);
+}
+
+.hl-comment {
+  font-style: italic;
+  color: var(--hl-comment);
+}
+
+.hl-entity.hl-name.hl-function {
+  font-weight: var(--hl-keyword-weight);
+  color: var(--hl-function);
+}
+
+.hl-support.hl-function.hl-builtin {
+  color: var(--hl-builtin);
+}
+
+.hl-storage.hl-type.hl-string {
+  font-weight: inherit;
+  color: var(--hl-string);
 }

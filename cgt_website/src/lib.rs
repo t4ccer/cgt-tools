@@ -1,12 +1,31 @@
 //! Static website of cgt-tools, rendered to HTML at build time and hydrated in islands mode
 
 #[cfg(feature = "ssr")]
+mod chrome;
+#[cfg(feature = "ssr")]
+mod guides;
+#[cfg(feature = "ssr")]
+mod jupyter;
+#[cfg(feature = "ssr")]
 mod pages;
+#[cfg(feature = "ssr")]
+mod process;
 #[cfg(feature = "ssr")]
 mod python_docs;
 
 #[cfg(feature = "ssr")]
+pub use guides::{Guide, read_guides};
+#[cfg(feature = "ssr")]
 pub use pages::pages;
+
+/// Prints a progress message with the time since the first message, because running the guides
+/// makes a build take a while
+#[cfg(feature = "ssr")]
+pub fn log(message: impl std::fmt::Display) {
+    static START: std::sync::LazyLock<std::time::Instant> =
+        std::sync::LazyLock::new(std::time::Instant::now);
+    eprintln!("[{:>6.1}s] {message}", START.elapsed().as_secs_f64());
+}
 #[cfg(feature = "ssr")]
 pub use python_docs::{Package, PythonApi};
 
@@ -58,6 +77,70 @@ fn toggle_theme() {
     if let Ok(Some(storage)) = window.local_storage() {
         let _ = storage.set_item("theme", theme);
     }
+}
+
+/// Marks the link to the section being read in a table of contents
+#[island]
+pub fn ScrollSpy() -> impl IntoView {
+    #[cfg(feature = "hydrate")]
+    spy_on_scroll();
+}
+
+#[cfg(feature = "hydrate")]
+fn spy_on_scroll() {
+    use wasm_bindgen::{JsCast, closure::Closure};
+
+    /// How far below the top of the window a heading counts as reached, past the sticky navbar
+    const REACHED: f64 = 100.0;
+
+    let update = || {
+        let document = document();
+        let Ok(links) = document.query_selector_all(".section-nav a[href^='#']") else {
+            return;
+        };
+        let links = (0..links.length())
+            .filter_map(|i| links.item(i)?.dyn_into::<web_sys::Element>().ok())
+            .collect::<Vec<_>>();
+        let headings = links
+            .iter()
+            .filter_map(|link| {
+                let id = link.get_attribute("href")?.strip_prefix('#')?.to_owned();
+                let top = document
+                    .get_element_by_id(&id)?
+                    .get_bounding_client_rect()
+                    .top();
+                Some((id, top))
+            })
+            .collect::<Vec<_>>();
+        let window = window();
+        let height = window
+            .inner_height()
+            .ok()
+            .and_then(|height| height.as_f64());
+        let scrolled = window.scroll_y().ok();
+        let page = document
+            .document_element()
+            .map(|root| f64::from(root.scroll_height()));
+        // The last sections may be too short to ever reach the top
+        let at_bottom = matches!((height, scrolled, page), (Some(height), Some(scrolled), Some(page)) if height + scrolled >= page - 2.0);
+        let current = if at_bottom {
+            headings.last()
+        } else {
+            headings.iter().rev().find(|(_, top)| *top <= REACHED)
+        }
+        .map(|(id, _)| format!("#{id}"));
+        for link in &links {
+            let active = current.is_some() && link.get_attribute("href") == current;
+            let _ = link.class_list().toggle_with_force("active", active);
+        }
+    };
+    update();
+    let listener = Closure::<dyn Fn()>::new(update);
+    for event in ["scroll", "resize"] {
+        let _ = window().add_event_listener_with_callback(event, listener.as_ref().unchecked_ref());
+    }
+    // The listeners live as long as the page
+    listener.forget();
 }
 
 #[component]

@@ -16,6 +16,9 @@ STUB_STAMP = $(DEPS)/stub.stamp
 SITE = target/website
 API_JSON = cgt_py/docs/api/api_reference.json
 API_SNAPSHOTS = cgt_website/python-api
+# The site runs the guides with $(PYTHON), so it also needs the wheel installed there. CI brings its
+# own stub and python and empties this
+SITE_DEPS ?= $(STUB_STAMP) $(INSTALL_STAMP)
 
 CARGO_DEP_WIDGETS = target/wasm32-unknown-unknown/release/cgt_py_widgets.d
 CARGO_DEP_PY = target/debug/libcgt_py.d
@@ -55,8 +58,9 @@ notebook: $(INSTALL_STAMP)
 stub: $(STUB_STAMP)
 
 .PHONY: site
-site: $(STUB_STAMP)
-	cargo run --quiet --release -p cgt_website --features ssr -- $(SITE) unstable=$(API_JSON) \
+site: $(SITE_DEPS)
+	$(CLEAN_PY_ENV) cargo run --release -p cgt_website --features ssr -- $(SITE) \
+	  --python $(PYTHON) unstable=$(API_JSON) \
 	  $(foreach api,$(wildcard $(API_SNAPSHOTS)/*.json),$(basename $(notdir $(api)))=$(api))
 	wasm-pack build ./cgt_website --target web --no-typescript --no-pack \
 	  --out-dir $(abspath $(SITE))/pkg --out-name cgt_website -- --features hydrate
@@ -87,12 +91,13 @@ $(WHEEL_STAMP): $(BUNDLE) $(STUB_STAMP) $(MANIFESTS) $(PY_DEP) cgt_py/pyproject.
 	touch $@
 
 $(INSTALL_STAMP): $(WHEEL_STAMP) $(VENV_CFG) | $(DEPS)
-	$(PIP) install --force-reinstall $(WHEELS)/*.whl
+	# Without --no-deps, --force-reinstall would replace the jupyter stack from nix with PyPI's
+	$(PIP) install --force-reinstall --no-deps $(WHEELS)/*.whl
 	touch $@
 
 $(STUB_STAMP): $(BUNDLE) $(MANIFESTS) $(STUB_DEP) cgt_py/pyproject.toml | .venv $(DEPS)
 	rm -rf cgt_py/docs/api
-	$(CLEAN_PY_ENV) PYO3_PYTHON=$(abspath $(PYTHON)) cargo run --quiet -p cgt_py --bin cgt_py_stub_gen
+	$(CLEAN_PY_ENV) PYO3_PYTHON=$(abspath $(PYTHON)) cargo run -p cgt_py --bin cgt_py_stub_gen
 	$(call cargo-dep,$(CARGO_DEP_STUB))
 	touch $@
 
