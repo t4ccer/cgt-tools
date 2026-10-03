@@ -18,6 +18,7 @@ use burn::{
 };
 use cgt_ai_core::{games::GameId, mcts::SearchConfig, ruleset::Ruleset};
 use cgt_ai_model::{NetConfig, NetInput, encode_batch};
+use clap::builder::RangedU64ValueParser;
 use rand::{Rng, RngExt, SeedableRng, rngs::SmallRng};
 use std::{
     path::{Path, PathBuf},
@@ -64,7 +65,7 @@ pub struct TrainArgs {
     /// Expected number of times each position is trained on
     #[arg(long, default_value_t = 4.0)]
     sample_reuse: f64,
-    #[arg(long, default_value_t = 300_000)]
+    #[arg(long, default_value_t = 300_000, value_parser = positive())]
     replay_buffer_size: usize,
     #[arg(long, default_value_t = 10_000)]
     min_buffer_size: usize,
@@ -74,9 +75,9 @@ pub struct TrainArgs {
     weight_decay: f32,
     #[arg(long, default_value = "checkpoints")]
     checkpoint_dir: PathBuf,
-    #[arg(long, default_value_t = 5)]
+    #[arg(long, default_value_t = 5, value_parser = positive())]
     checkpoint_every: usize,
-    #[arg(long, default_value_t = 25)]
+    #[arg(long, default_value_t = 25, value_parser = positive())]
     buffer_save_every: usize,
     #[arg(long, default_value_t = 0)]
     seed: u64,
@@ -90,6 +91,11 @@ pub struct TrainArgs {
     /// Print one line per iteration instead of showing the TUI
     #[arg(long)]
     no_tui: bool,
+}
+
+/// Parses a count that must be at least one, such as how often something happens
+fn positive() -> RangedU64ValueParser<usize> {
+    RangedU64ValueParser::new().range(1..)
 }
 
 impl GameCommand for TrainArgs {
