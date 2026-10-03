@@ -8,6 +8,7 @@ members = [
   "cgt_ai_core",
   "cgt_ai_model",
   "cgt_ai_train",
+  "cgt_ai_web_worker",
   "cgt_website",
 ]
 exclude = ["vendor"]
@@ -129,3 +130,8 @@ path = "./cgt/lib.rs"
 [profile.release]
 # lto = true
 panic = "abort"
+
+[profile.wasm-release]
+inherits = "release"
+lto = true
+codegen-units = 1

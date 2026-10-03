@@ -29,7 +29,8 @@ enum Command {
     Arena(arena::ArenaArgs),
     /// Search every first move deeply and write the opening table used with the pie rule
     Openings(openings::OpeningsArgs),
-    /// Write a checkpoint's network in the format used for inference
+    /// Write a checkpoint's network and an opening table as one model file, which the website
+    /// plays with
     Export(export::ExportArgs),
 }
 

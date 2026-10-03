@@ -14,6 +14,7 @@ INSTALL_STAMP = $(DEPS)/install.stamp
 STUB_STAMP = $(DEPS)/stub.stamp
 
 SITE = target/website
+SITE_CONFIG ?= cgt_website/website.toml
 API_JSON = cgt_py/docs/api/api_reference.json
 API_SNAPSHOTS = cgt_website/python-api
 # The site runs the guides with $(PYTHON), so it also needs the wheel installed there. CI brings its
@@ -60,10 +61,16 @@ stub: $(STUB_STAMP)
 .PHONY: site
 site: $(SITE_DEPS)
 	$(CLEAN_PY_ENV) cargo run --release -p cgt_website --features ssr -- $(SITE) \
-	  --python $(PYTHON) unstable=$(API_JSON) \
+	  --config $(SITE_CONFIG) --python $(PYTHON) unstable=$(API_JSON) \
 	  $(foreach api,$(wildcard $(API_SNAPSHOTS)/*.json),$(basename $(notdir $(api)))=$(api))
 	wasm-pack build ./cgt_website --target web --no-typescript --no-pack \
 	  --out-dir $(abspath $(SITE))/pkg --out-name cgt_website -- --features hydrate
+	# The CPU backend of Burn runs the network of the AI with SIMD instructions only when the target
+	# allows them
+	RUSTFLAGS="-C target-feature=+simd128" wasm-pack build ./cgt_ai_web_worker --target web \
+	  --no-typescript --no-pack --profile wasm-release \
+	  --out-dir $(abspath $(SITE))/pkg --out-name cgt_ai_web_worker
+	cp cgt_ai_web_worker/worker.js $(SITE)/pkg/worker.js
 	# gh-pages is published with `git add`, which would skip everything this ignores
 	rm -f $(SITE)/pkg/.gitignore
 

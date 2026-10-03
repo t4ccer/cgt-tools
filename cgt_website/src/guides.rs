@@ -7,7 +7,12 @@ use leptos::prelude::*;
 use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag};
 use serde::Deserialize;
 use serde_json::Value;
-use std::{collections::BTreeMap, fs, io, path::Path, sync::LazyLock};
+use std::{
+    collections::BTreeMap,
+    fs, io,
+    path::{Path, PathBuf},
+    sync::LazyLock,
+};
 use syntect::{
     html::{ClassStyle, ClassedHTMLGenerator},
     parsing::SyntaxSet,
@@ -478,40 +483,27 @@ impl Guide {
     }
 }
 
-/// The guides in the order they are listed in, by their file names in `guides/`. A Markdown
-/// guide is shown as it is written, and a notebook is first run to fill in its outputs
-const GUIDES: &[&str] = &["python-installation.md", "custom-widgets.ipynb"];
-
-/// Reads the guides of [`GUIDES`] from `dir`. Notebooks are run with `python`, which needs the
-/// `notebook` package and `cgt_py`
+/// Reads the guides at `paths`, in that order. A Markdown guide is shown as it is written, and a
+/// notebook is first run with `python`, which needs the `notebook` package and `cgt_py`, to fill
+/// in its outputs
 ///
 /// # Errors
 ///
-/// When a guide cannot be read or run, a cell raises, a guide does not start with a title, or
-/// `dir` holds a guide missing from [`GUIDES`]
-pub fn read_guides(dir: &Path, python: &Path) -> io::Result<Vec<Guide>> {
-    for entry in fs::read_dir(dir)? {
-        let path = entry?.path();
-        let is_guide = path
-            .extension()
-            .is_some_and(|extension| extension == "md" || extension == "ipynb");
-        let name = path.file_name().and_then(|name| name.to_str());
-        if is_guide && !name.is_some_and(|name| GUIDES.contains(&name)) {
-            return Err(io::Error::other(format!(
-                "{} is not listed in `GUIDES`",
-                path.display()
-            )));
-        }
-    }
-
+/// When a guide cannot be read or run, a cell raises, a guide does not start with a title, or two
+/// guides have the same file name
+pub fn read_guides(paths: &[PathBuf], python: &Path) -> io::Result<Vec<Guide>> {
     let mut jupyter = None;
-    let mut guides = Vec::with_capacity(GUIDES.len());
-    for name in GUIDES {
-        let path = dir.join(name);
+    let mut guides: Vec<Guide> = Vec::with_capacity(paths.len());
+    for path in paths {
         let error = |err: String| io::Error::other(format!("{}: {err}", path.display()));
-        let contents = fs::read_to_string(&path).map_err(|err| error(err.to_string()))?;
-        log(format!("Reading guide `{name}`"));
-        let guide = match name.rsplit_once('.') {
+        let contents = fs::read_to_string(path).map_err(|err| error(err.to_string()))?;
+        log(format!("Reading guide `{}`", path.display()));
+        let name = path.file_name().and_then(|name| name.to_str());
+        let guide = match name.and_then(|name| name.rsplit_once('.')) {
+            // The slug names the directory of the page
+            Some((slug, _)) if guides.iter().any(|guide| guide.slug == slug) => {
+                Err(format!("another guide is also called `{slug}`"))
+            }
             Some((slug, "md")) => Guide::from_markdown(slug, &contents),
             Some((slug, "ipynb")) => {
                 let mut running = match jupyter.take() {

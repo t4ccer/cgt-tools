@@ -16,6 +16,8 @@ use burn::{
 use burn_store::{BurnpackStore, ModuleSnapshot};
 use cgt_ai_core::{
     mcts::{Evaluations, Evaluator},
+    model_file,
+    openings::OpeningTable,
     ruleset::Ruleset,
 };
 use serde::{Deserialize, Serialize};
@@ -206,6 +208,56 @@ impl<R: Ruleset, B: Backend> Evaluator<R> for NetEvaluator<R, B> {
     }
 }
 
+/// What a model file says about the network it holds and how to play with it.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModelHeader {
+    /// [`Ruleset::name`] of the game the network plays.
+    pub game: String,
+    pub network: GridNetConfig,
+    /// For a game played with the pie rule, the values of the first moves.
+    pub openings: Option<OpeningTable>,
+}
+
+/// A trained network in a single file, with everything needed to play with it, so that one
+/// download stands for one player.
+#[derive(Debug, Clone)]
+pub struct ModelFile {
+    pub header: ModelHeader,
+    /// The weights of the network in the Burnpack format, see [`GridNet::load_bytes`].
+    pub weights: Vec<u8>,
+}
+
+impl ModelFile {
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let header = serde_json::to_vec(&self.header).expect("the header serializes to JSON");
+        model_file::join(&header, &self.weights)
+    }
+
+    /// # Errors
+    ///
+    /// When `bytes` are not a model file.
+    pub fn from_bytes(bytes: &[u8]) -> Result<ModelFile, String> {
+        let (header, weights) = model_file::split(bytes).ok_or("not a cgt AI model file")?;
+        Ok(ModelFile {
+            header: serde_json::from_slice(header).map_err(|e| format!("bad model header: {e}"))?,
+            weights: weights.to_vec(),
+        })
+    }
+
+    /// The network with the weights of this file.
+    ///
+    /// # Errors
+    ///
+    /// When the weights do not fit the network the header describes.
+    pub fn load_net<B: Backend>(self, device: &B::Device) -> Result<GridNet<B>, String> {
+        self.header
+            .network
+            .init(device)
+            .load_bytes(self.weights)
+            .map_err(|e| format!("bad weights: {e}"))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -234,5 +286,39 @@ mod tests {
         let evals = evaluator.evaluate(&states);
         assert_eq!(evals.all_logits().len(), 2 * Quelhas.num_actions());
         assert!(evals.values().iter().all(|v| v.abs() <= 1.0));
+    }
+
+    #[test]
+    fn model_file_roundtrip() {
+        let device = FlexDevice;
+        let config = GridNetConfig::for_ruleset(&Quelhas, 8, 1);
+        let net = config.init::<Flex>(&device);
+        let mut store = BurnpackStore::from_bytes(None);
+        net.save_into(&mut store).unwrap();
+        let file = ModelFile {
+            header: ModelHeader {
+                game: Quelhas.name().to_owned(),
+                network: config,
+                openings: Some(OpeningTable {
+                    game: Quelhas.name().to_owned(),
+                    checkpoint: "test".to_owned(),
+                    simulations: 1,
+                    values: [(3, 0.25)].into(),
+                }),
+            },
+            weights: store.get_bytes().unwrap().to_vec(),
+        };
+
+        let read = ModelFile::from_bytes(&file.to_bytes()).unwrap();
+        assert_eq!(read.header.network, config);
+        assert_eq!(read.header.openings.as_ref().unwrap().value(3), Some(0.25));
+        let loaded = read.load_net::<Flex>(&device).unwrap();
+        let x = encode_batch::<_, Flex>(&Quelhas, &[State::initial()], &device);
+        let (expected, _) = net.forward(x.clone());
+        let (actual, _) = loaded.forward(x);
+        expected.into_data().assert_eq(&actual.into_data(), true);
+
+        assert!(ModelFile::from_bytes(b"cgt-ai").is_err());
+        assert!(ModelFile::from_bytes(&file.weights).is_err());
     }
 }

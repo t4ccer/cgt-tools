@@ -1,6 +1,7 @@
 use crate::{
     ThemeToggle,
     guides::{self, GUIDES_URL, Guide},
+    play::{self, PLAY_URL},
     python_docs::{self, PythonApi},
 };
 use hydration_context::SsrSharedContext;
@@ -16,19 +17,47 @@ const DESCRIPTION: &str = "Combinatorial Game Theory toolkit in Rust and Python"
 /// does not flash in the system scheme while the islands load
 const THEME_SCRIPT: &str = r#"try{const t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t}catch(_){}"#;
 
+/// Which sections the navigation bar links to
+#[derive(Clone, Copy)]
+struct Nav {
+    play: bool,
+}
+
 /// Every page of the site as its path relative to the site root and its HTML, with a Python API
-/// reference for each of `python_apis` and a page for each of `guides`
-pub fn pages(mut python_apis: Vec<PythonApi>, guides: Vec<Guide>) -> Vec<(String, String)> {
+/// reference for each of `python_apis`, a page for each of `guides`, and the Quelhas page if there
+/// are `models`, by their names and addresses, to play against
+pub fn pages(
+    mut python_apis: Vec<PythonApi>,
+    guides: Vec<Guide>,
+    models: Vec<(String, String)>,
+) -> Vec<(String, String)> {
+    let nav = Nav {
+        play: !models.is_empty(),
+    };
     let mut pages = vec![(
         "index.html".to_owned(),
-        render("cgt-tools".to_owned(), "home", || view! { <Home /> }),
+        render("cgt-tools".to_owned(), "home", nav, move || {
+            view! { <Home play=nav.play /> }
+        }),
     )];
+    if nav.play {
+        pages.push((
+            "play/index.html".to_owned(),
+            render("Play - cgt-tools".to_owned(), "docs", nav, play::index_page),
+        ));
+        pages.push((
+            "play/quelhas/index.html".to_owned(),
+            render("Quelhas - cgt-tools".to_owned(), "docs", nav, move || {
+                play::quelhas_page(models)
+            }),
+        ));
+    }
     let links = guides.iter().map(Guide::link).collect::<Vec<_>>();
     {
         let links = links.clone();
         pages.push((
             "guides/index.html".to_owned(),
-            render("Guides - cgt-tools".to_owned(), "docs", move || {
+            render("Guides - cgt-tools".to_owned(), "docs", nav, move || {
                 guides::index_page(&links)
             }),
         ));
@@ -39,7 +68,7 @@ pub fn pages(mut python_apis: Vec<PythonApi>, guides: Vec<Guide>) -> Vec<(String
         let links = links.clone();
         pages.push((
             path,
-            render(title, "docs", move || guides::page(&guide, &links)),
+            render(title, "docs", nav, move || guides::page(&guide, &links)),
         ));
     }
     let latest = python_docs::sort_versions(&mut python_apis);
@@ -56,9 +85,12 @@ pub fn pages(mut python_apis: Vec<PythonApi>, guides: Vec<Guide>) -> Vec<(String
         let latest = latest.clone();
         pages.push((
             "python/docs/index.html".to_owned(),
-            render("Python API - cgt-tools".to_owned(), "docs", move || {
-                python_docs::index_page(&versions, latest.as_deref())
-            }),
+            render(
+                "Python API - cgt-tools".to_owned(),
+                "docs",
+                nav,
+                move || python_docs::index_page(&versions, latest.as_deref()),
+            ),
         ));
     }
     for api in python_apis {
@@ -68,7 +100,7 @@ pub fn pages(mut python_apis: Vec<PythonApi>, guides: Vec<Guide>) -> Vec<(String
         let latest = latest.clone();
         pages.push((
             path,
-            render(title, "docs", move || {
+            render(title, "docs", nav, move || {
                 python_docs::page(&api, &versions, latest.as_deref())
             }),
         ));
@@ -87,6 +119,7 @@ fn redirect(url: &str) -> String {
 fn render<V>(
     title: String,
     body_class: &'static str,
+    nav: Nav,
     page: impl FnOnce() -> V + Send + 'static,
 ) -> String
 where
@@ -95,7 +128,7 @@ where
     let owner = Owner::new_root(Some(Arc::new(SsrSharedContext::new_islands())));
     owner.with(|| {
         let options = LeptosOptions::builder().output_name("cgt_website").build();
-        view! { <Shell options title body_class>{page()}</Shell> }.to_html()
+        view! { <Shell options title body_class nav>{page()}</Shell> }.to_html()
     })
 }
 
@@ -104,6 +137,7 @@ fn Shell(
     options: LeptosOptions,
     title: String,
     body_class: &'static str,
+    nav: Nav,
     children: Children,
 ) -> impl IntoView {
     view! {
@@ -119,7 +153,7 @@ fn Shell(
                 <HydrationScripts options islands=true />
             </head>
             <body class=body_class>
-                <Header />
+                <Header nav />
                 <main>{children()}</main>
                 <Footer />
             </body>
@@ -128,7 +162,7 @@ fn Shell(
 }
 
 #[component]
-fn Header() -> impl IntoView {
+fn Header(nav: Nav) -> impl IntoView {
     view! {
         <header class="navbar">
             <a class="navbar-brand" href="/">
@@ -138,6 +172,15 @@ fn Header() -> impl IntoView {
                 <a class="nav-link" href=GUIDES_URL>
                     "Guides"
                 </a>
+                {nav
+                    .play
+                    .then(|| {
+                        view! {
+                            <a class="nav-link" href=PLAY_URL>
+                                "Play"
+                            </a>
+                        }
+                    })}
                 <a class="nav-link" href=PYTHON_DOCS>
                     "Python"
                 </a>
@@ -167,7 +210,7 @@ fn Footer() -> impl IntoView {
 }
 
 #[component]
-fn Home() -> impl IntoView {
+fn Home(play: bool) -> impl IntoView {
     view! {
         <section class="hero">
             <h1>"cgt-tools"</h1>
@@ -202,7 +245,15 @@ fn Home() -> impl IntoView {
                         "Train AlphaZero-style computer players for combinatorial games."
                     </Feature>
                     <Feature title="Play Combinatorial Games">
-                        "Coming soon!"
+                        {if play {
+                            view! {
+                                <a href=PLAY_URL>"Play"</a>
+                                " combinatorial games against an AI that runs in your browser or another player." // TODO: (locally or online)
+                            }
+                                .into_any()
+                        } else {
+                            "Coming soon!".into_any()
+                        }}
                     </Feature>
                 </div>
             </div>

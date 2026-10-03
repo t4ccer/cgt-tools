@@ -1,0 +1,47 @@
+[package]
+name = "cgt_ai_web_worker"
+version = "0.11.0"
+edition = "2024"
+authors = ["Tomasz Maciosowski <t4ccer@gmail.com>"]
+license = "AGPL-3.0"
+readme = "../README.md"
+repository = "https://github.com/t4ccer/cgt-tools"
+description = "Web worker that plays combinatorial games in the browser with AlphaZero-style networks"
+homepage = "https://cgt.tools"
+keywords = ["cgt", "alphazero", "wasm"]
+categories = ["mathematics", "science", "games", "wasm"]
+publish = false
+rust-version = "1.92"
+
+[lints]
+workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+cgt_ai_core = { path = "../cgt_ai_core" }
+cgt_ai_model = { path = "../cgt_ai_model" }
+burn = { workspace = true, features = ["std", "flex", "simd"] }
+rand = { workspace = true, features = ["std"] }
+serde_json = { workspace = true }
+web-time = "1.1.0"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+console_error_panic_hook = "0.1.7"
+# rand (through burn) enables getrandom, which needs to be told how to get randomness in a browser
+getrandom = { version = "0.4.3", features = ["wasm_js"] }
+js-sys = "0.3.104"
+wasm-bindgen = { workspace = true }
+wasm-bindgen-futures = { workspace = true }
+web-sys = { workspace = true, features = [
+  "DedicatedWorkerGlobalScope",
+  "MessageEvent",
+  "Response",
+  "UrlSearchParams",
+  "WorkerGlobalScope",
+  "WorkerLocation",
+] }
+
+[dev-dependencies]
+burn-store = { workspace = true }

@@ -70,6 +70,11 @@
   --hl-function: #900;
   --hl-builtin: #0086b3;
   --stderr: hsl(339 70% 40%);
+  --left: #2563eb;
+  --right: #dc2626;
+  --board-line: #9ca3af;
+  --board-crossed: #d4d4d4;
+  --board-selected: #fde68a;
 }
 
 /* The dark palette is repeated because it applies both when the system asks for it and when the
@@ -106,6 +111,11 @@
     --hl-function: #d2a8ff;
     --hl-builtin: #79c0ff;
     --stderr: hsl(339 82% 75%);
+    --left: hsl(217 91% 70%);
+    --right: hsl(0 84% 70%);
+    --board-line: hsl(224 6% 40%);
+    --board-crossed: hsl(224 8% 30%);
+    --board-selected: hsl(45 55% 36%);
   }
 }
 
@@ -140,6 +150,11 @@
   --hl-function: #d2a8ff;
   --hl-builtin: #79c0ff;
   --stderr: hsl(339 82% 75%);
+  --left: hsl(217 91% 70%);
+  --right: hsl(0 84% 70%);
+  --board-line: hsl(224 6% 40%);
+  --board-crossed: hsl(224 8% 30%);
+  --board-selected: hsl(45 55% 36%);
 }
 
 *,
@@ -332,6 +347,23 @@ code {
   }
 }
 
+/* Phones have no room for the links next to the brand and the icons */
+@media (max-width: 575.98px) {
+  .navbar {
+    flex-wrap: wrap;
+  }
+
+  .navbar-brand {
+    margin-right: auto;
+  }
+
+  .navbar-nav {
+    order: 1;
+    flex-basis: 100%;
+    margin-left: -0.5rem;
+  }
+}
+
 .hero {
   margin-top: -1rem;
   padding: 5rem 1.5rem 1rem;
@@ -358,11 +390,13 @@ code {
   display: inline-block;
   margin: 1rem 0.25rem;
   padding: 0.5rem 2rem;
+  font-family: inherit;
   font-size: 1.25rem;
   line-height: 1.5;
   text-align: center;
   border: 1px solid var(--primary);
   border-radius: 50rem;
+  cursor: pointer;
 }
 
 .btn:hover,
@@ -483,6 +517,12 @@ code {
 /* The navbar is sticky, so anchored targets would otherwise end up under it */
 .docs-content [id] {
   scroll-margin-top: 5rem;
+}
+
+@media (max-width: 575.98px) {
+  .docs-content [id] {
+    scroll-margin-top: 7.5rem;
+  }
 }
 
 @media (min-width: 992px) {
@@ -985,4 +1025,268 @@ pre.code code {
 .hl-storage.hl-type.hl-string {
   font-weight: inherit;
   color: var(--hl-string);
+}
+
+.play {
+  padding-bottom: 3rem;
+}
+
+.play h1 {
+  font-size: calc(1.375rem + 1.5vw);
+}
+
+@media (min-width: 1200px) {
+  .play h1 {
+    font-size: 2.5rem;
+  }
+}
+
+.play > .lead {
+  max-width: 43rem;
+  margin-bottom: 2rem;
+}
+
+.play-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.5rem 3rem;
+  align-items: start;
+}
+
+@media (min-width: 992px) {
+  .play-layout {
+    grid-template-columns: minmax(0, 34rem) minmax(16rem, 1fr);
+  }
+}
+
+.board {
+  display: block;
+  width: 100%;
+  max-width: 34rem;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.cell {
+  fill: var(--bg);
+  stroke: var(--board-line);
+  stroke-width: 1;
+}
+
+.cell.active {
+  cursor: pointer;
+}
+
+.cell.start-left {
+  fill: color-mix(in srgb, var(--left) 12%, var(--bg));
+}
+
+.cell.start-right {
+  fill: color-mix(in srgb, var(--right) 12%, var(--bg));
+}
+
+/* Not `.anchor`, which hides the links next to headings */
+.cell.selected {
+  fill: var(--board-selected);
+}
+
+.cell.crossed {
+  fill: var(--board-crossed);
+}
+
+.board-label {
+  font-size: 13px;
+  fill: var(--muted);
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+.stroke {
+  stroke-width: 6;
+  stroke-linecap: round;
+  opacity: 0.75;
+  pointer-events: none;
+}
+
+.stroke.last {
+  stroke-width: 8;
+  opacity: 1;
+}
+
+.stroke.preview {
+  stroke-width: 8;
+  opacity: 0.35;
+}
+
+.stroke-left {
+  stroke: var(--left);
+}
+
+.stroke-right {
+  stroke: var(--right);
+}
+
+.side {
+  font-weight: 500;
+}
+
+.side-left {
+  color: var(--left);
+}
+
+.side-right {
+  color: var(--right);
+}
+
+.play-panel h2 {
+  margin: 1.75rem 0 0.75rem;
+  font-size: 1.25rem;
+}
+
+.play-status {
+  margin-bottom: 0.25rem;
+  font-weight: 700;
+  color: var(--heading);
+}
+
+.play-detail {
+  margin-bottom: 0.25rem;
+  color: var(--muted);
+}
+
+.play-error {
+  color: var(--stderr);
+}
+
+.play-pie,
+.play-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+}
+
+.play-pie {
+  margin: 0.75rem 0;
+}
+
+.play-buttons {
+  gap: 0.5rem;
+}
+
+.play-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  max-width: 25rem;
+  margin: 0 0 0.5rem;
+  white-space: nowrap;
+}
+
+.play-field select,
+.play-field input {
+  width: 11rem;
+  min-height: 2.5rem;
+  padding: 0.375rem 0.75rem;
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--control-border);
+  border-radius: 0.375rem;
+}
+
+.move-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+  gap: 0 1rem;
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  list-style-position: inside;
+}
+
+.play-setup h2 {
+  margin-top: 0;
+}
+
+.play-setup fieldset {
+  min-width: 0;
+  margin: 0 0 1.25rem;
+  padding: 0;
+  border: 0;
+}
+
+.play-setup legend {
+  margin-bottom: 0.5rem;
+  padding: 0;
+  font-weight: 500;
+  color: var(--heading);
+}
+
+.play-setup .play-field {
+  margin-bottom: 0;
+}
+
+/* Which rows a step shows depends on the other choices, so any two get the same gap */
+.play-setup fieldset > * + * {
+  margin-top: 0.75rem;
+}
+
+.play-setup legend + * {
+  margin-top: 0;
+}
+
+.btn.play-start {
+  margin: 0.25rem 0 0;
+}
+
+.move-chance {
+  color: var(--muted);
+}
+
+.best-move {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  cursor: help;
+}
+
+.best-move:focus {
+  outline: none;
+}
+
+.best-move:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.best-move-tip {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 1;
+  display: none;
+  margin-top: 0.25rem;
+  padding: 0.25rem 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  white-space: nowrap;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--control-border);
+  border-radius: 0.375rem;
+  box-shadow: 0 0.5rem 1rem rgb(0 0 0 / 15%);
+}
+
+.best-move:hover .best-move-tip,
+.best-move:focus .best-move-tip {
+  display: block;
+}
+
+.play-rules {
+  max-width: 43rem;
+  margin-top: 1rem;
 }

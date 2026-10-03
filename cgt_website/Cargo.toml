@@ -26,6 +26,8 @@ required-features = ["ssr"]
 hydrate = [
   "leptos/hydrate",
   "dep:console_error_panic_hook",
+  "dep:js-sys",
+  "dep:serde_json",
   "dep:wasm-bindgen",
   "dep:web-sys",
 ]
@@ -35,33 +37,47 @@ ssr = [
   "dep:hydration_context",
   "dep:pulldown-cmark",
   "dep:semver",
-  "dep:serde",
   "dep:serde_json",
   "dep:syntect",
+  "dep:toml",
 ]
 
 [dependencies]
+cgt_ai_core = { path = "../cgt_ai_core" }
 base64 = { version = "0.22.1", optional = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }
 hydration_context = { version = "0.3.1", optional = true }
+js-sys = { version = "0.3.104", optional = true }
 leptos = { version = "0.8.21", features = ["islands"] }
 pulldown-cmark = { version = "0.13.4", default-features = false, features = [
   "html",
 ], optional = true }
 semver = { version = "1.0.28", optional = true }
-serde = { workspace = true, optional = true }
+# Props of islands are serialized into the page
+serde = { workspace = true }
 serde_json = { workspace = true, optional = true }
 syntect = { version = "5.3.0", default-features = false, features = [
   "default-syntaxes",
   "html",
   "regex-fancy",
 ], optional = true }
+toml = { version = "1.1.4", default-features = false, features = [
+  "parse",
+  "preserve_order",
+  "serde",
+  "std",
+], optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 web-sys = { workspace = true, optional = true, features = [
   "DomRect",
   "DomTokenList",
+  "ErrorEvent",
   "EventTarget",
   "MediaQueryList",
+  "MessageEvent",
   "NodeList",
   "Storage",
+  "Worker",
+  "WorkerOptions",
+  "WorkerType",
 ] }

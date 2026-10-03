@@ -2,10 +2,9 @@ use crate::{
     checkpoint,
     game::{Game, GameCommand},
 };
-use anyhow::{Result, ensure};
+use anyhow::{Context, Result, ensure};
 use burn::{
     backend::{Flex, flex::FlexDevice},
-    config::Config,
     module::AutodiffModule,
     optim::AdamWConfig,
     tensor::backend::AutodiffBackend,
@@ -13,9 +12,10 @@ use burn::{
 use burn_store::{BurnpackStore, ModuleSnapshot};
 use cgt_ai_core::{
     mcts::Evaluator,
+    openings::OpeningTable,
     ruleset::{Ruleset, random_position},
 };
-use cgt_ai_model::NetEvaluator;
+use cgt_ai_model::{ModelFile, ModelHeader, NetEvaluator};
 use rand::{RngExt, SeedableRng, rngs::SmallRng};
 use std::path::PathBuf;
 
@@ -25,9 +25,13 @@ pub struct ExportArgs {
     pub game: Game,
     #[arg(long)]
     checkpoint: PathBuf,
-    /// Receives `<game>.bpk` (weights) and `<game>.json` (network shape)
+    /// Opening table written by `openings`, which a player needs for its first move in a game
+    /// played with the pie rule
     #[arg(long)]
-    out_dir: PathBuf,
+    openings: Option<PathBuf>,
+    /// Receives the network, its shape and the opening table as one model file
+    #[arg(long)]
+    out: PathBuf,
 }
 
 impl GameCommand for ExportArgs {
@@ -43,21 +47,42 @@ fn run<B: AutodiffBackend, R: Ruleset>(
 ) -> Result<()> {
     let trainer = checkpoint::load::<B, R>(&rules, &args.checkpoint, &device, &AdamWConfig::new())?;
     let net = trainer.net.valid();
-    std::fs::create_dir_all(&args.out_dir)?;
-    let weights = args.out_dir.join(format!("{}.bpk", rules.name()));
-    let mut store = BurnpackStore::from_file(&weights).overwrite(true);
+    let openings = match &args.openings {
+        Some(path) => {
+            let table: OpeningTable = serde_json::from_slice(
+                &std::fs::read(path).with_context(|| format!("reading {}", path.display()))?,
+            )?;
+            ensure!(
+                table.game == rules.name(),
+                "{} is an opening table of {}, not {}",
+                path.display(),
+                table.game,
+                rules.name()
+            );
+            Some(table)
+        }
+        None => None,
+    };
+    let mut store = BurnpackStore::from_bytes(None);
     net.save_into(&mut store)?;
-    trainer
-        .config
-        .save(args.out_dir.join(format!("{}.json", rules.name())))?;
-    println!("exported {}", weights.display());
+    let file = ModelFile {
+        header: ModelHeader {
+            game: rules.name().to_owned(),
+            network: trainer.config,
+            openings,
+        },
+        weights: store.get_bytes()?.to_vec(),
+    };
+    if let Some(parent) = args.out.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::write(&args.out, file.to_bytes())?;
+    println!("exported {}", args.out.display());
 
     // the export is read back on the CPU backend the browser uses, to catch any
     // weights the format would not round-trip
-    let exported = trainer
-        .config
-        .init::<Flex>(&FlexDevice)
-        .load_bytes(std::fs::read(&weights)?)
+    let exported = ModelFile::from_bytes(&std::fs::read(&args.out)?)
+        .and_then(|file| file.load_net::<Flex>(&FlexDevice))
         .map_err(anyhow::Error::msg)?;
     let mut rng = SmallRng::seed_from_u64(0);
     let states: Vec<R::State> = (0..64)

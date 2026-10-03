@@ -845,7 +845,9 @@ dependencies = [
  "burn-backend",
  "burn-ir",
  "burn-std",
+ "bytemuck",
  "const-random",
+ "itertools 0.14.0",
  "libm",
  "macerator",
  "matrixmultiply",
@@ -855,6 +857,7 @@ dependencies = [
  "portable-atomic",
  "portable-atomic-util",
  "rand 0.10.2",
+ "seq-macro",
 ]
 
 [[package]]
@@ -1223,6 +1226,7 @@ dependencies = [
  "burn-store",
  "cgt_ai_core",
  "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -1241,6 +1245,25 @@ dependencies = [
  "rand 0.10.2",
  "serde_json",
  "tch",
+]
+
+[[package]]
+name = "cgt_ai_web_worker"
+version = "0.11.0"
+dependencies = [
+ "burn",
+ "burn-store",
+ "cgt_ai_core",
+ "cgt_ai_model",
+ "console_error_panic_hook",
+ "getrandom 0.4.3",
+ "js-sys",
+ "rand 0.10.2",
+ "serde_json",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+ "web-time",
 ]
 
 [[package]]
@@ -1310,14 +1333,17 @@ name = "cgt_website"
 version = "0.11.0"
 dependencies = [
  "base64 0.22.1",
+ "cgt_ai_core",
  "console_error_panic_hook",
  "hydration_context",
+ "js-sys",
  "leptos",
  "pulldown-cmark",
  "semver",
  "serde",
  "serde_json",
  "syntect",
+ "toml",
  "wasm-bindgen",
  "web-sys",
 ]

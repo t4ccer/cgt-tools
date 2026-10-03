@@ -29,3 +29,16 @@ $ cargo run --release --package cgt_ai_train -- train --game quelhas --checkpoin
 ```
 
 Both write `quelhas_iter<N>.mpk` and `latest.mpk` to the checkpoint directory. Ctrl-C stops at the next safe point and saves `interrupted.mpk` and `latest.mpk` together with the replay buffer, and a second Ctrl-C exits at once. Running the same command with `--resume-from checkpoints/latest.mpk` added continues from there, reloading the replay buffer, with `--iterations` and `--time-limit` counting from the restart.
+
+## Playing on the website
+
+The website plays with a model file, which holds the network, its shape and the opening table that a game with the pie rule starts from. `openings` searches every first move deeply, and `export` puts its table into the model file, checking that the exported network gives the same outputs as the checkpoint:
+
+```console
+$ cargo run --release --package cgt_ai_train -- openings --game quelhas \
+    --checkpoint checkpoints/latest.mpk --out checkpoints/openings.json
+$ cargo run --release --package cgt_ai_train -- export --game quelhas \
+    --checkpoint checkpoints/latest.mpk --openings checkpoints/openings.json --out checkpoints/quelhas.bin
+```
+
+[`cgt_website`](../cgt_website) describes how the site picks up model files.

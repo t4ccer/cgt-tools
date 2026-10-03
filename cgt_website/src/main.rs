@@ -1,4 +1,4 @@
-use cgt_website::{Package, PythonApi};
+use cgt_website::{Config, Package, PythonApi};
 use std::{
     fs::{self, File},
     io::{self, BufReader},
@@ -37,7 +37,7 @@ fn write(path: &Path, contents: &[u8]) -> io::Result<()> {
 
 fn usage() -> ! {
     eprintln!(
-        "usage: cgt_website <output directory> [--python <python>] [<version>=<api_reference.json>]..."
+        "usage: cgt_website <output directory> --config <website.toml> [--python <python>] [<version>=<api_reference.json>]..."
     );
     std::process::exit(2);
 }
@@ -65,19 +65,24 @@ fn main() -> io::Result<()> {
         usage();
     };
     cgt_website::log(format!("Building the website in `{}`", site.display()));
+    let mut config = None;
     let mut python = PathBuf::from("python3");
     let mut python_apis = Vec::new();
     while let Some(arg) = args.next() {
-        if arg == "--python" {
+        if arg == "--config" {
+            config = Some(args.next().map_or_else(|| usage(), PathBuf::from));
+        } else if arg == "--python" {
             python = args.next().map_or_else(|| usage(), PathBuf::from);
         } else {
             python_apis.push(read_python_api(&arg)?);
         }
     }
-    let guides = cgt_website::read_guides(
-        Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/guides")),
-        &python,
-    )?;
+    let Some(config) = config else {
+        usage();
+    };
+    let config = Config::read(&config)?;
+    let models = cgt_website::read_models(&config.play.quelhas.0)?;
+    let guides = cgt_website::read_guides(&config.guides, &python)?;
     cgt_website::log("Writing the pages");
     for (path, contents) in ASSETS {
         write(&site.join(path), contents)?;
@@ -85,7 +90,14 @@ fn main() -> io::Result<()> {
     for (path, contents) in guides.iter().flat_map(cgt_website::Guide::files) {
         write(&site.join(path), &contents)?;
     }
-    for (path, html) in cgt_website::pages(python_apis, guides) {
+    for (path, contents) in models.iter().filter_map(cgt_website::Model::file) {
+        write(&site.join(path), contents)?;
+    }
+    let models = models
+        .into_iter()
+        .map(|model| (model.name, model.url))
+        .collect();
+    for (path, html) in cgt_website::pages(python_apis, guides, models) {
         write(&site.join(path), html.as_bytes())?;
     }
     println!("Created website in `{}`", site.display());
