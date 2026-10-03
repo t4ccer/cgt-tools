@@ -140,14 +140,14 @@ impl<B: Backend> Net<B> {
     ///
     /// # Errors
     ///
-    /// When the bytes are not a Burnpack file or do not hold every weight of this network.
+    /// When the bytes are not a Burnpack file or do not hold exactly the weights of this network.
     pub fn load_bytes(mut self, bytes: Vec<u8>) -> Result<Net<B>, String> {
         let mut store = BurnpackStore::from_bytes(Some(Bytes::from_bytes_vec(bytes)));
         let result = self.load_from(&mut store).map_err(|e| e.to_string())?;
-        if !result.missing.is_empty() || !result.errors.is_empty() {
+        if !result.missing.is_empty() || !result.unused.is_empty() || !result.errors.is_empty() {
             return Err(format!(
-                "missing {:?}, errors {:?}",
-                result.missing, result.errors
+                "missing {:?}, unused {:?}, errors {:?}",
+                result.missing, result.unused, result.errors
             ));
         }
         Ok(self)
@@ -162,10 +162,6 @@ pub fn encode_batch<R: Ruleset, B: Backend>(
 ) -> NetInput<B> {
     let input = rules.input();
     let len = input.encoding_len();
-    let mut encoded = vec![0.0; states.len() * len];
-    for (state, out) in states.iter().zip(encoded.chunks_mut(len)) {
-        rules.encode(state, out);
-    }
     let batch = states.len();
     match input {
         Input::Grid {
@@ -173,16 +169,24 @@ pub fn encode_batch<R: Ruleset, B: Backend>(
             height,
             width,
             ..
-        } => NetInput::Grid(Tensor::from_data(
-            TensorData::new(encoded, [batch, planes, height, width]),
-            device,
-        )),
+        } => {
+            let mut encoded = vec![0.0; batch * len];
+            for (state, out) in states.iter().zip(encoded.chunks_mut(len)) {
+                rules.encode(state, out);
+            }
+            NetInput::Grid(Tensor::from_data(
+                TensorData::new(encoded, [batch, planes, height, width]),
+                device,
+            ))
+        }
         Input::Graph { nodes, features } => {
             let (mut x, mut adjacency) = (
                 Vec::with_capacity(batch * nodes * features),
                 Vec::with_capacity(batch * nodes * nodes),
             );
-            for position in encoded.chunks(len) {
+            let mut position = vec![0.0; len];
+            for state in states {
+                rules.encode(state, &mut position);
                 let (f, a) = position.split_at(nodes * features);
                 x.extend_from_slice(f);
                 adjacency.extend_from_slice(a);
@@ -339,6 +343,25 @@ mod tests {
 
         assert!(ModelFile::from_bytes(b"cgt-ai").is_err());
         assert!(ModelFile::from_bytes(&file.weights).is_err());
+    }
+
+    #[test]
+    fn weights_must_fit_the_header() {
+        let device = FlexDevice;
+        let mut store = BurnpackStore::from_bytes(None);
+        NetConfig::for_ruleset(&Quelhas, 8, 2)
+            .init::<Flex>(&device)
+            .save_into(&mut store)
+            .unwrap();
+        let file = ModelFile {
+            header: ModelHeader {
+                game: Quelhas.name().to_owned(),
+                network: NetConfig::for_ruleset(&Quelhas, 8, 1),
+                openings: None,
+            },
+            weights: store.get_bytes().unwrap().to_vec(),
+        };
+        assert!(file.load_net::<Flex>(&device).is_err());
     }
 
     #[test]
