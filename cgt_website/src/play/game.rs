@@ -116,6 +116,11 @@ impl<G: Game> Setup<G> {
         }
     }
 
+    /// Whether the site has a model of the game for the AI to play and analyse with
+    pub const fn has_ai(&self) -> bool {
+        !self.ai.is_empty()
+    }
+
     /// The game these choices make, once the opponent is chosen
     pub const fn mode(&self) -> Option<Mode> {
         match (self.opponent, self.starter) {
@@ -567,7 +572,9 @@ impl<G: Game> Model<G> {
     pub fn update(&mut self, msg: Msg) -> Option<(u32, Request)> {
         match msg {
             Msg::ChooseOpponent(opponent) => {
-                self.setup.opponent = Some(opponent);
+                if opponent == Opponent::Human || self.setup.has_ai() {
+                    self.setup.opponent = Some(opponent);
+                }
                 None
             }
             Msg::ChooseStarter(starter) => {
@@ -594,7 +601,7 @@ impl<G: Game> Model<G> {
                 None
             }
             Msg::ChooseAnalysis(analysis) => {
-                self.setup.analysis = analysis;
+                self.setup.analysis = analysis && self.setup.has_ai();
                 None
             }
             Msg::ChooseEndSettled(end_settled) => {
@@ -606,7 +613,10 @@ impl<G: Game> Model<G> {
                 None
             }
             Msg::FindEven(seed) => {
-                if self.rules.fixed_start().is_some() || self.phase != Phase::Setup {
+                if self.rules.fixed_start().is_some()
+                    || self.phase != Phase::Setup
+                    || !self.setup.has_ai()
+                {
                     return None;
                 }
                 self.balancing = Some(Balancing {
@@ -661,7 +671,7 @@ impl<G: Game> Model<G> {
                 }
             }
             Msg::ToggleAnalysis => {
-                self.show_analysis = !self.show_analysis;
+                self.show_analysis = !self.show_analysis && self.setup.has_ai();
                 self.analysis_request()
             }
             Msg::Start => {
@@ -812,6 +822,24 @@ mod tests {
         assert_eq!(model.phase, Phase::Setup);
         assert!(!model.ai_thinking());
         assert_eq!(model.setup.starter, Starter::Ai);
+    }
+
+    #[test]
+    fn games_without_ai_are_between_people() {
+        let mut model = Model::<Quelhas>::new(Setup::new(String::new(), 0));
+        model.update(Msg::ChooseOpponent(Opponent::Ai));
+        assert_eq!(model.setup.opponent, None);
+        model.update(Msg::ChooseOpponent(Opponent::Human));
+        model.update(Msg::ChooseAnalysis(true));
+        assert_eq!(model.update(Msg::Start), None);
+        assert!(!model.show_analysis);
+        assert_eq!(model.update(Msg::ToggleAnalysis), None);
+        assert!(!model.show_analysis);
+        assert_eq!(
+            model.update(Msg::Play(action(Player::Left, (2, 3), (5, 3)))),
+            None
+        );
+        assert_eq!(model.moves.len(), 1);
     }
 
     #[test]

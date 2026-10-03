@@ -127,7 +127,10 @@ pub fn connect<G: Game>(model: RwSignal<Model<G>>) -> Callback<Msg> {
         c.on_error = Some(on_error);
     }
     let ai = model.with_untracked(|m| m.setup.ai.clone());
-    if let Err(err) = client.borrow_mut().restart(ai) {
+    // Without a model the page never asks the AI anything
+    if !ai.is_empty()
+        && let Err(err) = client.borrow_mut().restart(ai)
+    {
         leptos::logging::error!("could not start the AI worker: {err:?}");
     }
     dispatch

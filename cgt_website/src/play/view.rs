@@ -341,6 +341,7 @@ pub fn game_view<G: Game>(
     let analysis = Memo::new(move |_| model.with(|m| Some(m.setup.analysis)));
     let end_settled = Memo::new(move |_| model.with(|m| Some(m.setup.end_settled)));
     let show_analysis = Memo::new(move |_| model.with(|m| m.show_analysis));
+    let has_ai = model.with_untracked(|m| m.setup.has_ai());
 
     let ai_choice = move || {
         models.with_value(|models| {
@@ -411,7 +412,11 @@ pub fn game_view<G: Game>(
                 <fieldset>
                     <legend>"Opponent"</legend>
                     {toggle(
-                        &[(Opponent::Ai, "Player vs AI"), (Opponent::Human, "Player vs Player (local)")],
+                        if has_ai {
+                            &[(Opponent::Ai, "Player vs AI"), (Opponent::Human, "Player vs Player (local)")]
+                        } else {
+                            &[(Opponent::Human, "Player vs Player (local)")]
+                        },
                         opponent,
                         move |o| dispatch.run(Msg::ChooseOpponent(o)),
                     )}
@@ -445,28 +450,33 @@ pub fn game_view<G: Game>(
                         .is_some()
                         .then(|| {
                             view! {
-                                <fieldset>
-                                    <legend>"Analysis"</legend>
-                                    {toggle(
-                                        &[(true, "Show"), (false, "Hide")],
-                                        analysis,
-                                        move |a| dispatch.run(Msg::ChooseAnalysis(a)),
-                                    )}
-                                    // Without an AI to play against, a model of its own analyses
-                                    // the game
-                                    {move || {
-                                        (opponent.get() == Some(Opponent::Human)
-                                            && analysis.get() == Some(true))
-                                            .then(|| {
-                                                view! {
-                                                    {ai_choice}
-                                                    {unit_choice}
-                                                    {strength}
-                                                }
-                                                    .into_any()
-                                            })
-                                    }}
-                                </fieldset>
+                                {has_ai
+                                    .then(|| {
+                                        view! {
+                                        <fieldset>
+                                            <legend>"Analysis"</legend>
+                                            {toggle(
+                                                &[(true, "Show"), (false, "Hide")],
+                                                analysis,
+                                                move |a| dispatch.run(Msg::ChooseAnalysis(a)),
+                                            )}
+                                            // Without an AI to play against, a model of its own analyses
+                                            // the game
+                                            {move || {
+                                                (opponent.get() == Some(Opponent::Human)
+                                                    && analysis.get() == Some(true))
+                                                    .then(|| {
+                                                        view! {
+                                                            {ai_choice}
+                                                            {unit_choice}
+                                                            {strength}
+                                                        }
+                                                            .into_any()
+                                                    })
+                                            }}
+                                        </fieldset>
+                                        }
+                                    })}
                                 {G::SETTLES
                                     .then(|| {
                                         view! {
@@ -533,14 +543,21 @@ pub fn game_view<G: Game>(
                     >
                         "New game"
                     </button>
-                    <button
-                        type="button"
-                        class="btn btn-outline btn-sm"
-                        aria-pressed=move || show_analysis.get().to_string()
-                        on:click=move |_| dispatch.run(Msg::ToggleAnalysis)
-                    >
-                        {move || if show_analysis.get() { "Hide analysis" } else { "Show analysis" }}
-                    </button>
+                    {has_ai
+                        .then(|| {
+                            view! {
+                                <button
+                                    type="button"
+                                    class="btn btn-outline btn-sm"
+                                    aria-pressed=move || show_analysis.get().to_string()
+                                    on:click=move |_| dispatch.run(Msg::ToggleAnalysis)
+                                >
+                                    {move || {
+                                        if show_analysis.get() { "Hide analysis" } else { "Show analysis" }
+                                    }}
+                                </button>
+                            }
+                        })}
                 </div>
                 <h2>"Moves"</h2>
                 <ol class="move-list">{move_list}</ol>

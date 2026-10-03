@@ -71,6 +71,9 @@ impl GamePage {
             .iter()
             .map(|paragraph| view! { <p>{*paragraph}</p> })
             .collect_view();
+        let ai = (!models.is_empty()).then_some(
+            " The AI is a neural network trained by self-play, which picks its moves with a Monte Carlo tree search in your browser. More simulations make it stronger, and slower.",
+        );
         view! {
             <div class="container play">
                 <h1>{self.title}</h1>
@@ -80,10 +83,7 @@ impl GamePage {
                     <h2>"Rules"</h2>
                     {rules}
                     <h2>"Playing"</h2>
-                    <p>
-                        {self.moving}
-                        " The AI is a neural network trained by self-play, which picks its moves with a Monte Carlo tree search in your browser. More simulations make it stronger, and slower."
-                    </p>
+                    <p>{self.moving} {ai}</p>
                 </section>
             </div>
         }
@@ -191,7 +191,7 @@ pub fn index_page(games: &[&GamePage]) -> impl IntoView + use<> {
             <div class="docs-content">
                 <h1>"Play"</h1>
                 <p class="lead">
-                    "Combinatorial games against AI players trained with cgt-tools, which run in your browser."
+                    "Combinatorial games to play against another player or against AI players trained with cgt-tools, which run in your browser."
                 </p>
                 <ul class="guide-list">{items}</ul>
             </div>

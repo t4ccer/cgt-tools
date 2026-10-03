@@ -81,29 +81,28 @@ fn main() -> io::Result<()> {
         usage();
     };
     let config = Config::read(&config)?;
-    let mut play = Vec::new();
-    for (name, models) in &config.play {
-        let game = cgt_website::GAMES
-            .iter()
-            .find(|game| game.name() == name)
-            .ok_or_else(|| {
-                let known: Vec<&str> = cgt_website::GAMES
-                    .iter()
-                    .map(cgt_website::GamePage::name)
-                    .collect();
-                io::Error::other(format!(
-                    "the configuration has models of {name}, but the site only has pages for {}",
-                    known.join(", ")
-                ))
-            })?;
-        play.push((game, cgt_website::read_models(game, &models.0)?));
+    let known: Vec<&str> = cgt_website::GAMES
+        .iter()
+        .map(cgt_website::GamePage::name)
+        .collect();
+    if let Some(name) = config
+        .play
+        .keys()
+        .find(|name| !known.contains(&name.as_str()))
+    {
+        return Err(io::Error::other(format!(
+            "the configuration has models of {name}, but the site only has pages for {}",
+            known.join(", ")
+        )));
     }
-    // The order of the list of games
-    play.sort_by_key(|(game, _)| {
-        cgt_website::GAMES
-            .iter()
-            .position(|other| other.game == game.game)
-    });
+    let mut play = Vec::new();
+    for game in cgt_website::GAMES {
+        let models = config
+            .play
+            .get(game.name())
+            .map_or(&[][..], |models| &models.0);
+        play.push((game, cgt_website::read_models(game, models)?));
+    }
     let guides = cgt_website::read_guides(&config.guides, &python)?;
     cgt_website::log("Writing the pages");
     for (path, contents) in ASSETS {
@@ -121,7 +120,6 @@ fn main() -> io::Result<()> {
     }
     let play = play
         .into_iter()
-        .filter(|(_, models)| !models.is_empty())
         .map(|(game, models)| {
             let models = models
                 .into_iter()

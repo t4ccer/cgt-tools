@@ -144,7 +144,9 @@ fn seed_step(
                     "Random"
                 </button>
                 {move || {
-                    if tried.get().is_some() {
+                    if !model.with(|m| m.setup.has_ai()) {
+                        ().into_any()
+                    } else if tried.get().is_some() {
                         view! {
                             <button
                                 type="button"
@@ -379,6 +381,12 @@ mod tests {
             None
         );
         assert_eq!(model.setup.seed, DEFAULT_SEED);
+
+        // Without a model there is no AI to judge boards
+        let mut model = Model::<Fjords>::new(Setup::new(String::new(), DEFAULT_SEED));
+        assert_eq!(model.update(Msg::FindEven(0)), None);
+        assert!(model.balancing.is_none());
+        let mut model = Model::<Fjords>::new(Setup::new("ai".into(), DEFAULT_SEED));
 
         // Without an even board among the most boards it deals, the search gives up
         let mut request = model.update(Msg::FindEven(0));
