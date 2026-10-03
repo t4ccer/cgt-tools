@@ -4,11 +4,10 @@
 
 use burn::backend::{Flex, flex::FlexDevice};
 use cgt_ai_core::{
-    fjords::Fjords,
+    games::{GameId, WithRules},
     mcts::{Evaluator, Node, SearchConfig, run_mcts},
     openings::{OpeningTable, decide_swap},
     protocol::{Budget, Request, Response},
-    quelhas::Quelhas,
     ruleset::Ruleset,
 };
 use cgt_ai_model::{ModelFile, NetEvaluator};
@@ -171,14 +170,27 @@ impl<R: Ruleset> Player for Engine<R> {
 ///
 /// When `bytes` are not a model file of a known game.
 pub fn load(bytes: &[u8], seed: u64) -> Result<Box<dyn Player>, String> {
-    let file = ModelFile::from_bytes(bytes)?;
-    match file.header.game.as_str() {
-        game if game == Quelhas.name() => Ok(Box::new(Engine::new(Quelhas, file, seed)?)),
-        game if game == Fjords.name() => Ok(Box::new(Engine::new(Fjords, file, seed)?)),
-        game => Err(format!(
-            "the model plays {game}, which this worker does not know"
-        )),
+    struct Load {
+        file: ModelFile,
+        seed: u64,
     }
+
+    impl WithRules for Load {
+        type Output = Result<Box<dyn Player>, String>;
+
+        fn run<R: Ruleset>(self, rules: R) -> Self::Output {
+            Ok(Box::new(Engine::new(rules, self.file, self.seed)?))
+        }
+    }
+
+    let file = ModelFile::from_bytes(bytes)?;
+    let game = GameId::from_name(&file.header.game).ok_or_else(|| {
+        format!(
+            "the model plays {}, which this worker does not know",
+            file.header.game
+        )
+    })?;
+    game.with(Load { file, seed })
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -276,8 +288,8 @@ mod tests {
     use super::*;
     use burn_store::{BurnpackStore, ModuleSnapshot};
     use cgt_ai_core::{
-        fjords,
-        quelhas::{Action, State},
+        fjords::{self, Fjords},
+        quelhas::{Action, Quelhas, State},
         ruleset::random_position,
     };
     use cgt_ai_model::{ModelHeader, NetConfig};

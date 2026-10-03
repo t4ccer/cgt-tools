@@ -85,9 +85,12 @@ fn main() -> io::Result<()> {
     for (name, models) in &config.play {
         let game = cgt_website::GAMES
             .iter()
-            .find(|game| game.name == name)
+            .find(|game| game.name() == name)
             .ok_or_else(|| {
-                let known: Vec<&str> = cgt_website::GAMES.iter().map(|game| game.name).collect();
+                let known: Vec<&str> = cgt_website::GAMES
+                    .iter()
+                    .map(cgt_website::GamePage::name)
+                    .collect();
                 io::Error::other(format!(
                     "the configuration has models of {name}, but the site only has pages for {}",
                     known.join(", ")
@@ -99,7 +102,7 @@ fn main() -> io::Result<()> {
     play.sort_by_key(|(game, _)| {
         cgt_website::GAMES
             .iter()
-            .position(|other| other.name == game.name)
+            .position(|other| other.game == game.game)
     });
     let guides = cgt_website::read_guides(&config.guides, &python)?;
     cgt_website::log("Writing the pages");

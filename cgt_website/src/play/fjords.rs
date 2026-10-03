@@ -2,7 +2,7 @@
 
 use super::{
     game::{EVEN, Game, MAX_BOARDS, Model, Msg},
-    view::game_view,
+    view::{axis_labels, game_view},
 };
 use cgt_ai_core::{
     fjords::{BOARD_SIZE, Fjords, NUM_VERTICES, State, coordinates, edge, num_edges},
@@ -15,7 +15,6 @@ impl Game for Fjords {
     const PIE_RULE: bool = false;
     const LAST_MOVE_LOSES: bool = false;
     const SETTLES: bool = true;
-    const DEALT: bool = true;
 
     fn deal(&self, seed: u64) -> State {
         State::deal(seed, EDGE_PROBABILITY)
@@ -249,23 +248,10 @@ fn board(model: RwSignal<Model<Fjords>>, dispatch: Callback<Msg>) -> AnyView {
             }
         })
         .collect_view();
-    let labels = (0..BOARD_SIZE)
-        .map(|i| {
-            let label = |x: f64, y: f64, text: String| {
-                view! {
-                    <text class="board-label" x=x y=y>
-                        {text}
-                    </text>
-                }
-            };
-            let (column, _) = position(i);
-            let (_, row) = position(i * BOARD_SIZE);
-            view! {
-                {label(column, MARGIN / 2.0 - 4.0, char::from(b'a' + i as u8).to_string())}
-                {label(MARGIN / 2.0 - 8.0, row, (i + 1).to_string())}
-            }
-        })
-        .collect_view();
+    let labels = axis_labels(
+        (0..BOARD_SIZE).map(|i| (position(i).0, MARGIN / 2.0 - 4.0)),
+        (0..BOARD_SIZE).map(|i| (MARGIN / 2.0 - 8.0, position(i * BOARD_SIZE).1)),
+    );
 
     let (right, bottom) = position(NUM_VERTICES - 1);
     let (width, height) = (right + RADIUS + 6.0, bottom + RADIUS + 6.0);

@@ -31,12 +31,12 @@ pub trait Game: Ruleset<State: PartialEq> + Copy + Default {
     const LAST_MOVE_LOSES: bool;
     /// Whether [`Game::settled`] can end games early
     const SETTLES: bool = false;
-    /// Whether games start from a position dealt at random
-    const DEALT: bool = false;
-
-    /// The position a game starts from: the one `seed` deals, for a game dealt at random, and
-    /// otherwise the one every game starts from
-    fn deal(&self, seed: u64) -> Self::State;
+    /// The position a game starts from: the one every game starts from, or for a game dealt at
+    /// random, the one `seed` deals
+    fn deal(&self, _: u64) -> Self::State {
+        self.fixed_start()
+            .expect("a game not dealt at random starts from a fixed position")
+    }
 
     /// How many moves `side` has in `state`, whether or not it is their turn
     fn moves_available(&self, state: &Self::State, side: Player) -> usize;
@@ -606,7 +606,7 @@ impl<G: Game> Model<G> {
                 None
             }
             Msg::FindEven(seed) => {
-                if !G::DEALT || self.phase != Phase::Setup {
+                if self.rules.fixed_start().is_some() || self.phase != Phase::Setup {
                     return None;
                 }
                 self.balancing = Some(Balancing {
@@ -774,6 +774,7 @@ mod tests {
         model.update(Msg::ChooseOpponent(opponent));
         model.update(Msg::ChooseStarter(starter));
         model.update(Msg::ChooseUnit(Unit::Simulations));
+        model.update(Msg::ChooseAnalysis(true));
         let request = model.update(Msg::Start);
         assert_eq!(model.phase, Phase::Playing);
         (model, request)
@@ -789,12 +790,12 @@ mod tests {
         model.update(Msg::Play(action(Player::Left, (2, 3), (5, 3))));
         assert!(model.moves.is_empty());
 
-        // The person moves first, and the AI thinks for a second, at first analysing the
-        // person's options
+        // The person moves first and the AI thinks for a second, and without analysis it has
+        // nothing to do until the person has moved
         model.update(Msg::ChooseOpponent(Opponent::Ai));
-        let (_, request) = model.update(Msg::Start).unwrap();
-        assert_eq!(request, Request::Opening);
+        assert_eq!(model.update(Msg::Start), None);
         assert!(model.human_to_move());
+        assert!(!model.show_analysis);
         assert_eq!(model.mode, Mode::HumanFirst);
         assert_eq!(model.budget, Budget::Millis(1000));
 

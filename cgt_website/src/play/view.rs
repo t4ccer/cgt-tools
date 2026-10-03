@@ -5,7 +5,10 @@ use super::game::{
     Controller, Game, Hint, MAX_SECONDS, MAX_SIMULATIONS, MIN_SECONDS, Mode, Model, Msg, Opponent,
     Participant, Phase, Setup, Starter, Unit, side_name,
 };
-use cgt_ai_core::{protocol::Budget, ruleset::Player};
+use cgt_ai_core::{
+    protocol::Budget,
+    ruleset::{Player, column_name},
+};
 use leptos::prelude::*;
 
 pub const fn side_class(side: Player) -> &'static str {
@@ -29,6 +32,35 @@ const fn participant_name<G: Game>(model: &Model<G>, side: Player) -> &'static s
         (Mode::TwoPlayers, Participant::Second, _) => "Player 2",
         (_, _, Controller::Human) => "You",
         (_, _, Controller::Ai) => "AI",
+    }
+}
+
+/// Letters over the columns and numbers beside the rows of a board, centred on `columns` and
+/// `rows`
+pub fn axis_labels(
+    columns: impl IntoIterator<Item = (f64, f64)>,
+    rows: impl IntoIterator<Item = (f64, f64)>,
+) -> impl IntoView {
+    let label = |(x, y): (f64, f64), text: String| {
+        view! {
+            <text class="board-label" x=x y=y>
+                {text}
+            </text>
+        }
+    };
+    let columns = columns
+        .into_iter()
+        .enumerate()
+        .map(|(i, at)| label(at, column_name(i).to_string()))
+        .collect_view();
+    let rows = rows
+        .into_iter()
+        .enumerate()
+        .map(|(i, at)| label(at, (i + 1).to_string()))
+        .collect_view();
+    view! {
+        {columns}
+        {rows}
     }
 }
 

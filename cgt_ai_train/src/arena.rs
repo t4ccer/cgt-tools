@@ -1,10 +1,11 @@
 use crate::{
     checkpoint,
-    game::{Game, GameCommand},
+    game::{GameCommand, game_parser},
 };
 use anyhow::Result;
 use burn::tensor::backend::AutodiffBackend;
 use cgt_ai_core::{
+    games::GameId,
     mcts::{Node, SearchConfig, run_mcts},
     ruleset::{Player, Ruleset, random_position},
 };
@@ -15,8 +16,8 @@ use std::path::Path;
 
 #[derive(clap::Args, Debug)]
 pub struct ArenaArgs {
-    #[arg(long, value_enum)]
-    pub game: Game,
+    #[arg(long, value_parser = game_parser())]
+    pub game: GameId,
     /// Checkpoint path or 'random'
     player_a: String,
     /// Checkpoint path or 'random'

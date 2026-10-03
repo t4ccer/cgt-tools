@@ -1,10 +1,11 @@
 use crate::{
     checkpoint,
-    game::{Game, GameCommand},
+    game::{GameCommand, game_parser},
 };
 use anyhow::{Result, bail};
 use burn::tensor::backend::AutodiffBackend;
 use cgt_ai_core::{
+    games::GameId,
     mcts::{Evaluations, Evaluator, Node, SearchConfig, run_mcts},
     openings::{OpeningTable, first_move_classes},
     ruleset::Ruleset,
@@ -15,8 +16,8 @@ use std::{collections::BTreeMap, path::PathBuf};
 
 #[derive(clap::Args, Debug)]
 pub struct OpeningsArgs {
-    #[arg(long, value_enum)]
-    pub game: Game,
+    #[arg(long, value_parser = game_parser())]
+    pub game: GameId,
     #[arg(long)]
     checkpoint: PathBuf,
     #[arg(long, default_value = "openings.json")]

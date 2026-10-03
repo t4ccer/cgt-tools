@@ -51,7 +51,7 @@ pub fn pages(
     }
     for (game, models) in play {
         pages.push((
-            format!("play/{}/index.html", game.name),
+            format!("play/{}/index.html", game.name()),
             render(
                 format!("{} - cgt-tools", game.title),
                 "docs",

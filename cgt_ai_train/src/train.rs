@@ -1,6 +1,6 @@
 use crate::{
     checkpoint::{self, Trainer},
-    game::{Game, GameCommand},
+    game::{GameCommand, game_parser},
     replay::ReplayBuffer,
     report::{IterationReport, Phase, Reporter},
     self_play::{SelfPlayConfig, generate},
@@ -16,7 +16,7 @@ use burn::{
     },
     train::Interrupter,
 };
-use cgt_ai_core::{mcts::SearchConfig, ruleset::Ruleset};
+use cgt_ai_core::{games::GameId, mcts::SearchConfig, ruleset::Ruleset};
 use cgt_ai_model::{NetConfig, NetInput, encode_batch};
 use rand::{Rng, RngExt, SeedableRng, rngs::SmallRng};
 use std::{
@@ -26,8 +26,8 @@ use std::{
 
 #[derive(clap::Args, Debug)]
 pub struct TrainArgs {
-    #[arg(long, value_enum)]
-    pub game: Game,
+    #[arg(long, value_parser = game_parser())]
+    pub game: GameId,
     /// How many MORE iterations to run this invocation
     #[arg(long, default_value_t = 20)]
     iterations: usize,

@@ -2,10 +2,10 @@
 
 use super::{
     game::{Game, Model, Msg},
-    view::{game_view, side_class},
+    view::{axis_labels, game_view, side_class},
 };
 use cgt_ai_core::{
-    quelhas::{Action, BOARD_SIZE, Quelhas, State, cell_name},
+    quelhas::{Action, BOARD_SIZE, Quelhas, State},
     ruleset::Player,
 };
 use leptos::prelude::*;
@@ -14,10 +14,6 @@ impl Game for Quelhas {
     const SIDES: [&'static str; 2] = ["Left", "Right"];
     const PIE_RULE: bool = true;
     const LAST_MOVE_LOSES: bool = true;
-
-    fn deal(&self, _: u64) -> State {
-        State::initial()
-    }
 
     fn moves_available(&self, state: &State, side: Player) -> usize {
         State {
@@ -117,8 +113,8 @@ fn board(model: RwSignal<Model<Quelhas>>, dispatch: Callback<Msg>) -> AnyView {
                     class="cell"
                     class:crossed=crossed
                     class:selected=selected
-                    class:start-left=move || can_start(Player::Left)
-                    class:start-right=move || can_start(Player::Right)
+                    class:reach-left=move || can_start(Player::Left)
+                    class:reach-right=move || can_start(Player::Right)
                     class:active=active
                     x=(cell.1 as f64).mul_add(CELL_SIZE, MARGIN)
                     y=(cell.0 as f64).mul_add(CELL_SIZE, MARGIN)
@@ -138,23 +134,11 @@ fn board(model: RwSignal<Model<Quelhas>>, dispatch: Callback<Msg>) -> AnyView {
         })
         .collect_view();
 
-    let labels = (0..BOARD_SIZE)
-        .map(|i| {
-            let along = (i as f64 + 0.5).mul_add(CELL_SIZE, MARGIN);
-            let label = |x: f64, y: f64, text: String| {
-                view! {
-                    <text class="board-label" x=x y=y>
-                        {text}
-                    </text>
-                }
-            };
-            let column = cell_name(0, i);
-            view! {
-                {label(along, MARGIN / 2.0, column[..1].to_owned())}
-                {label(MARGIN / 2.0, along, (i + 1).to_string())}
-            }
-        })
-        .collect_view();
+    let along = |i: usize| (i as f64 + 0.5).mul_add(CELL_SIZE, MARGIN);
+    let labels = axis_labels(
+        (0..BOARD_SIZE).map(|i| (along(i), MARGIN / 2.0)),
+        (0..BOARD_SIZE).map(|i| (MARGIN / 2.0, along(i))),
+    );
 
     let strokes = move || {
         model.with(|m| {

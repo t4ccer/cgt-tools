@@ -5,7 +5,7 @@
 //! Left plays blue and Right plays red. A game starts from a board dealt at random: every edge is
 //! drawn with some probability, and each side gets [`START_VERTICES`] vertices.
 
-use crate::ruleset::{Input, Player, Ruleset};
+use crate::ruleset::{Input, Player, Ruleset, coordinate_name, read_turn, write_turn};
 use rand::{Rng, RngExt};
 use std::sync::LazyLock;
 
@@ -331,12 +331,6 @@ pub fn encode(state: &State, out: &mut [f32]) {
     }
 }
 
-/// Name of `vertex` on the board, its column as a letter and its row as a number
-pub fn vertex_name(vertex: usize) -> String {
-    let (q, r) = coordinates(vertex);
-    format!("{}{}", char::from(b'a' + q as u8), r + 1)
-}
-
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Fjords;
 
@@ -404,7 +398,8 @@ impl Ruleset for Fjords {
 
     fn describe_action(&self, _: &State, action: usize) -> String {
         if action < NUM_VERTICES {
-            vertex_name(action)
+            let (q, r) = coordinates(action);
+            coordinate_name(q, r)
         } else {
             format!("invalid action {action}")
         }
@@ -424,7 +419,7 @@ impl Ruleset for Fjords {
         for word in state.edges {
             out.extend_from_slice(&word.to_le_bytes());
         }
-        out.push(u8::from(state.turn == Player::Right));
+        write_turn(state.turn, out);
     }
 
     fn read_state(&self, bytes: &[u8]) -> Option<State> {
@@ -435,11 +430,10 @@ impl Ruleset for Fjords {
         let (left, right) = (words.next()?, words.next()?);
         let edges = [words.next()?, words.next()?, words.next()?];
         let extra = num_edges()..3 * 64;
-        let turn = match bytes.get(40..)? {
-            [0] => Player::Left,
-            [1] => Player::Right,
-            _ => return None,
+        let &[turn] = bytes.get(40..)? else {
+            return None;
         };
+        let turn = read_turn(turn)?;
         let state = State {
             left,
             right,
@@ -546,17 +540,10 @@ mod tests {
     }
 
     #[test]
-    fn turning_around_maps_legal_moves() {
+    fn turning_around_twice_changes_nothing() {
         for seed in 0..20 {
             let state = State::deal(seed, EDGE_PROBABILITY);
             let turned = Fjords.transform_state(&state, 1);
-            let mut mapped: Vec<usize> = state
-                .legal_actions()
-                .into_iter()
-                .map(|a| Fjords.transform_action(a, 1))
-                .collect();
-            mapped.sort_unstable();
-            assert_eq!(mapped, turned.legal_actions());
             assert_eq!(Fjords.transform_state(&turned, 1), state);
         }
     }
@@ -582,13 +569,10 @@ mod tests {
     }
 
     #[test]
-    fn state_bytes_roundtrip() {
-        let state = State::deal(9, EDGE_PROBABILITY)
-            .apply(State::deal(9, EDGE_PROBABILITY).legal_actions()[0]);
+    fn rules_hold() {
+        crate::ruleset::check(&Fjords);
         let mut bytes = Vec::new();
-        Fjords.write_state(&state, &mut bytes);
-        assert_eq!(bytes.len(), Fjords.state_bytes());
-        assert_eq!(Fjords.read_state(&bytes), Some(state));
+        Fjords.write_state(&State::deal(9, EDGE_PROBABILITY), &mut bytes);
         bytes[0] = 0xff;
         bytes[8] = 0xff;
         assert_eq!(Fjords.read_state(&bytes), None);

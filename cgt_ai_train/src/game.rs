@@ -1,27 +1,39 @@
 use anyhow::Result;
 use burn::tensor::backend::AutodiffBackend;
-use cgt_ai_core::{fjords::Fjords, quelhas::Quelhas, ruleset::Ruleset};
-use clap::ValueEnum;
-
-#[derive(Clone, Copy, Debug, ValueEnum)]
-pub enum Game {
-    Quelhas,
-    Fjords,
-}
+use cgt_ai_core::{
+    games::{GameId, WithRules},
+    ruleset::Ruleset,
+};
+use clap::builder::{PossibleValuesParser, TypedValueParser};
 
 pub trait GameCommand {
     fn run<B: AutodiffBackend, R: Ruleset>(self, rules: R, device: B::Device) -> Result<()>;
 }
 
-impl Game {
-    pub fn run<B: AutodiffBackend>(
-        self,
-        command: impl GameCommand,
-        device: B::Device,
-    ) -> Result<()> {
-        match self {
-            Game::Quelhas => command.run::<B, _>(Quelhas, device),
-            Game::Fjords => command.run::<B, _>(Fjords, device),
-        }
+/// Parses the `--game` option, which takes the name of a game
+pub fn game_parser() -> impl TypedValueParser<Value = GameId> {
+    PossibleValuesParser::new(GameId::ALL.map(GameId::name))
+        .map(|name| GameId::from_name(&name).expect("only the names of games are accepted"))
+}
+
+struct Run<C, B: AutodiffBackend> {
+    command: C,
+    device: B::Device,
+}
+
+impl<C: GameCommand, B: AutodiffBackend> WithRules for Run<C, B> {
+    type Output = Result<()>;
+
+    fn run<R: Ruleset>(self, rules: R) -> Result<()> {
+        self.command.run::<B, R>(rules, self.device)
     }
+}
+
+/// Runs `command` for the rules of `game`
+pub fn run<B: AutodiffBackend>(
+    game: GameId,
+    command: impl GameCommand,
+    device: B::Device,
+) -> Result<()> {
+    game.with(Run::<_, B> { command, device })
 }

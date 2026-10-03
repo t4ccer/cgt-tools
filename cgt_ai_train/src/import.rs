@@ -1,6 +1,6 @@
 use crate::{
     checkpoint::{self, Trainer},
-    game::{Game, GameCommand},
+    game::{GameCommand, game_parser},
 };
 use anyhow::{Context, Result, bail, ensure};
 use burn::{optim::AdamWConfig, tensor::backend::AutodiffBackend};
@@ -8,14 +8,17 @@ use burn_store::{
     ModuleSnapshot, PytorchStore,
     pytorch::{PytorchReader, PytorchStoreError},
 };
-use cgt_ai_core::ruleset::{Input, Ruleset};
+use cgt_ai_core::{
+    games::GameId,
+    ruleset::{Input, Ruleset},
+};
 use cgt_ai_model::{GraphNetConfig, NetConfig};
 use std::path::PathBuf;
 
 #[derive(clap::Args, Debug)]
 pub struct ImportArgs {
-    #[arg(long, value_enum)]
-    pub game: Game,
+    #[arg(long, value_parser = game_parser())]
+    pub game: GameId,
     /// Checkpoint of the `PyTorch` graph network of haaland3000, as its `train.py` saves them
     #[arg(long)]
     pytorch: PathBuf,

@@ -1073,16 +1073,25 @@ pre.code code {
   stroke-width: 1;
 }
 
-.cell.active {
+/* Where each side can move, on any board */
+.board .reach-left {
+  fill: color-mix(in srgb, var(--left) 15%, var(--bg));
+}
+
+.board .reach-right {
+  fill: color-mix(in srgb, var(--right) 15%, var(--bg));
+}
+
+.board .reach-both {
+  fill: color-mix(
+    in srgb,
+    color-mix(in srgb, var(--left), var(--right)) 15%,
+    var(--bg)
+  );
+}
+
+.board .active {
   cursor: pointer;
-}
-
-.cell.start-left {
-  fill: color-mix(in srgb, var(--left) 12%, var(--bg));
-}
-
-.cell.start-right {
-  fill: color-mix(in srgb, var(--right) 12%, var(--bg));
 }
 
 /* Not `.anchor`, which hides the links next to headings */
@@ -1137,22 +1146,6 @@ pre.code code {
   stroke-width: 1;
 }
 
-.vertex.reach-left {
-  fill: color-mix(in srgb, var(--left) 18%, var(--bg));
-}
-
-.vertex.reach-right {
-  fill: color-mix(in srgb, var(--right) 18%, var(--bg));
-}
-
-.vertex.reach-both {
-  fill: color-mix(
-    in srgb,
-    color-mix(in srgb, var(--left), var(--right)) 18%,
-    var(--bg)
-  );
-}
-
 .vertex.stone-left {
   fill: var(--left);
   stroke: var(--left);
@@ -1166,10 +1159,6 @@ pre.code code {
 .vertex.last {
   stroke: var(--heading);
   stroke-width: 3;
-}
-
-.vertex.active {
-  cursor: pointer;
 }
 
 .vertex.active:hover {

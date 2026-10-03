@@ -1,6 +1,6 @@
 use crate::{
     checkpoint,
-    game::{Game, GameCommand},
+    game::{GameCommand, game_parser},
 };
 use anyhow::{Context, Result, ensure};
 use burn::{
@@ -11,6 +11,7 @@ use burn::{
 };
 use burn_store::{BurnpackStore, ModuleSnapshot};
 use cgt_ai_core::{
+    games::GameId,
     mcts::Evaluator,
     openings::OpeningTable,
     ruleset::{Ruleset, random_position},
@@ -21,8 +22,8 @@ use std::path::PathBuf;
 
 #[derive(clap::Args, Debug)]
 pub struct ExportArgs {
-    #[arg(long, value_enum)]
-    pub game: Game,
+    #[arg(long, value_parser = game_parser())]
+    pub game: GameId,
     #[arg(long)]
     checkpoint: PathBuf,
     /// Opening table written by `openings`, which a player needs for its first move in a game

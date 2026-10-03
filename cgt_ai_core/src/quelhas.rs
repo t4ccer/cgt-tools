@@ -1,7 +1,7 @@
 //! Quelhas on a 10 by 10 board: Left crosses out vertical segments of at least two empty
 //! squares, Right horizontal ones, and whoever makes the last move loses.
 
-use crate::ruleset::{Input, Player, Ruleset};
+use crate::ruleset::{Input, Player, Ruleset, coordinate_name, read_turn, write_turn};
 use rand::Rng;
 use std::{fmt, str::FromStr};
 
@@ -412,10 +412,6 @@ pub fn encode(board: Board, out: &mut [f32]) {
     }
 }
 
-pub fn cell_name(row: usize, col: usize) -> String {
-    format!("{}{}", char::from(b'a' + col as u8), row + 1)
-}
-
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Quelhas;
 
@@ -484,7 +480,7 @@ impl Ruleset for Quelhas {
             || format!("invalid action {action}"),
             |a| {
                 let ((r0, c0), (r1, c1)) = a.segment(state.turn);
-                format!("{}-{}", cell_name(r0, c0), cell_name(r1, c1))
+                format!("{}-{}", coordinate_name(c0, r0), coordinate_name(c1, r1))
             },
         )
     }
@@ -499,7 +495,7 @@ impl Ruleset for Quelhas {
 
     fn write_state(&self, state: &State, out: &mut Vec<u8>) {
         out.extend_from_slice(&state.empty.bits().to_le_bytes());
-        out.push(u8::from(state.turn == Player::Right));
+        write_turn(state.turn, out);
     }
 
     fn read_state(&self, bytes: &[u8]) -> Option<State> {
@@ -508,14 +504,12 @@ impl Ruleset for Quelhas {
         if bits & !Board::FULL.0 != 0 {
             return None;
         }
-        let turn = match turn {
-            [0] => Player::Left,
-            [1] => Player::Right,
-            _ => return None,
+        let &[turn] = turn else {
+            return None;
         };
         Some(State {
             empty: Board(bits),
-            turn,
+            turn: read_turn(turn)?,
         })
     }
 }
@@ -594,33 +588,8 @@ mod tests {
     }
 
     #[test]
-    fn symmetries_map_legal_actions() {
-        let board: Board = SCATTERED.parse().unwrap();
-        for turn in [Player::Left, Player::Right] {
-            let state = State { empty: board, turn };
-            for symmetry in 0..Quelhas.num_symmetries() {
-                let flipped = Quelhas.transform_state(&state, symmetry);
-                let mut mapped: Vec<usize> = Quelhas
-                    .legal_actions(&state)
-                    .into_iter()
-                    .map(|a| Quelhas.transform_action(a, symmetry))
-                    .collect();
-                mapped.sort_unstable();
-                assert_eq!(mapped, Quelhas.legal_actions(&flipped));
-            }
-        }
-    }
-
-    #[test]
-    fn state_bytes_roundtrip() {
-        let board: Board = SCATTERED.parse().unwrap();
-        for turn in [Player::Left, Player::Right] {
-            let state = State { empty: board, turn };
-            let mut bytes = Vec::new();
-            Quelhas.write_state(&state, &mut bytes);
-            assert_eq!(bytes.len(), Quelhas.state_bytes());
-            assert_eq!(Quelhas.read_state(&bytes), Some(state));
-        }
+    fn rules_hold() {
+        crate::ruleset::check(&Quelhas);
         assert_eq!(Quelhas.read_state(&[0xff; 17]), None);
     }
 }

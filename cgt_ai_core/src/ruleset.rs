@@ -121,3 +121,72 @@ pub fn random_position<R: Ruleset>(rules: &R, plies: usize, rng: &mut impl Rng) 
     }
     state
 }
+
+/// The letter of the `column`th column of a board, `a` first.
+pub fn column_name(column: usize) -> char {
+    char::from(b'a' + column as u8)
+}
+
+/// A square or vertex of a board, as the letter of its column and the number of its row, such as
+/// `c5`.
+pub fn coordinate_name(column: usize, row: usize) -> String {
+    format!("{}{}", column_name(column), row + 1)
+}
+
+/// Appends whose turn it is in a position, for [`Ruleset::write_state`].
+pub fn write_turn(turn: Player, out: &mut Vec<u8>) {
+    out.push(u8::from(turn == Player::Right));
+}
+
+/// Whose turn the byte [`write_turn`] wrote says it is.
+pub const fn read_turn(byte: u8) -> Option<Player> {
+    match byte {
+        0 => Some(Player::Left),
+        1 => Some(Player::Right),
+        _ => None,
+    }
+}
+
+/// Checks on positions from all stages of games what the search, the training and the web
+/// worker rely on of `rules`.
+#[cfg(test)]
+pub fn check<R: Ruleset>(rules: &R)
+where
+    R::State: PartialEq,
+{
+    use rand::{SeedableRng, rngs::SmallRng};
+
+    let mut rng = SmallRng::seed_from_u64(0);
+    for plies in 0..2 * rules.typical_game_length() {
+        let state = random_position(rules, plies, &mut rng);
+        let actions = rules.legal_actions(&state);
+        assert!(actions.windows(2).all(|pair| pair[0] < pair[1]));
+        assert!(actions.iter().all(|&a| a < rules.num_actions()));
+        // A game ends exactly when the player to move is stuck
+        assert_eq!(rules.winner(&state).is_some(), actions.is_empty());
+        assert!(
+            actions
+                .iter()
+                .all(|&a| !rules.describe_action(&state, a).is_empty())
+        );
+
+        let mut encoded = vec![0.0; rules.input().encoding_len()];
+        rules.encode(&state, &mut encoded);
+
+        let mut bytes = Vec::new();
+        rules.write_state(&state, &mut bytes);
+        assert_eq!(bytes.len(), rules.state_bytes());
+        assert!(rules.read_state(&bytes) == Some(state));
+
+        assert!(rules.transform_state(&state, 0) == state);
+        for symmetry in 0..rules.num_symmetries() {
+            let transformed = rules.transform_state(&state, symmetry);
+            let mut mapped: Vec<usize> = actions
+                .iter()
+                .map(|&a| rules.transform_action(a, symmetry))
+                .collect();
+            mapped.sort_unstable();
+            assert_eq!(mapped, rules.legal_actions(&transformed));
+        }
+    }
+}
