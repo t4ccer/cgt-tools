@@ -1,7 +1,8 @@
 use leptos::prelude::*;
+use pulldown_cmark::{Event, LinkType, Parser, Tag, TagEnd};
 use semver::Version;
 use serde::Deserialize;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// Signatures longer than this many characters put every parameter on its own line
 const SIGNATURE_WIDTH: usize = 70;
@@ -42,7 +43,6 @@ pub fn docs_url(version: &str) -> String {
 #[derive(Deserialize)]
 pub struct Package {
     modules: BTreeMap<String, Module>,
-    export_map: BTreeMap<String, String>,
 }
 
 #[derive(Deserialize)]
@@ -169,6 +169,15 @@ struct Section<'a> {
     items: Vec<(&'a Module, &'a Item)>,
 }
 
+impl Class {
+    /// Shown as the signature of the class rather than as one of its members
+    fn constructor(&self) -> Option<&Function> {
+        self.methods
+            .iter()
+            .find(|method| matches!(method.name.as_str(), "__new__" | "__init__"))
+    }
+}
+
 impl Item {
     fn name(&self) -> &str {
         match self {
@@ -211,25 +220,61 @@ fn sections(package: &Package) -> Vec<Section<'_>> {
         .collect()
 }
 
-/// Resolves the names in type expressions of one module to anchors on the page
+/// Fully qualified names of the items and members that have an anchor on the page
+fn anchors(package: &Package) -> BTreeSet<String> {
+    let mut anchors = BTreeSet::new();
+    for module in package.modules.values() {
+        for item in &module.items {
+            let fqn = format!("{}.{}", module.name, item.name());
+            if let Item::Class(class) = item {
+                let constructor = class.constructor().map(|constructor| &constructor.name);
+                let attributes = class.attributes.iter().map(|attribute| &attribute.name);
+                let methods = class
+                    .methods
+                    .iter()
+                    .map(|method| &method.name)
+                    .filter(|name| Some(*name) != constructor);
+                anchors.extend(
+                    attributes
+                        .chain(methods)
+                        .map(|name| format!("{fqn}.{name}")),
+                );
+            }
+            anchors.insert(fqn);
+        }
+    }
+    anchors
+}
+
+/// Resolves names used in one module to anchors on the page
 #[derive(Clone, Copy)]
 struct Links<'a> {
     module: &'a str,
-    exports: &'a BTreeMap<String, String>,
+    anchors: &'a BTreeSet<String>,
 }
 
 impl Links<'_> {
+    fn resolve(self, name: &str) -> Option<String> {
+        [format!("{}.{name}", self.module), name.to_owned()]
+            .into_iter()
+            .find(|fqn| self.anchors.contains(fqn))
+            .map(|fqn| format!("#{fqn}"))
+    }
+
     /// pyo3-stub-gen leaves `link_target` empty even for classes of the module itself, so names
-    /// that the module exports are linked too
+    /// of items on the page are linked too
     fn href(self, ty: &TypeExpr, name: &str) -> Option<String> {
         ty.link_target
             .as_ref()
-            .map(|target| target.fqn.clone())
-            .or_else(|| {
-                let fqn = format!("{}.{name}", self.module);
-                self.exports.contains_key(&fqn).then_some(fqn)
-            })
-            .map(|fqn| format!("#{fqn}"))
+            .map(|target| format!("#{}", target.fqn))
+            .or_else(|| self.resolve(name))
+    }
+
+    /// Resolves code in a docstring that names an item or a member, such as `Snort`,
+    /// `Graph.directed` or `CanonicalForm.cool()`. Bare member names are left alone, because
+    /// docstrings use them for parameters too
+    fn code_href(self, code: &str) -> Option<String> {
+        self.resolve(code.strip_suffix("()").unwrap_or(code))
     }
 }
 
@@ -398,12 +443,40 @@ fn parameters_view(
     .into_any()
 }
 
-fn docstring_view(doc: &str) -> Option<impl IntoView + use<>> {
+fn docstring_view(doc: &str, links: Links<'_>) -> Option<impl IntoView + use<>> {
     if doc.trim().is_empty() {
         return None;
     }
+    let mut in_link = false;
+    let events = Parser::new(doc).flat_map(|event| {
+        let href = match &event {
+            Event::Start(Tag::Link { .. }) => {
+                in_link = true;
+                None
+            }
+            Event::End(TagEnd::Link) => {
+                in_link = false;
+                None
+            }
+            Event::Code(code) if !in_link => links.code_href(code),
+            _ => None,
+        };
+        match href {
+            Some(href) => vec![
+                Event::Start(Tag::Link {
+                    link_type: LinkType::Inline,
+                    dest_url: href.into(),
+                    title: "".into(),
+                    id: "".into(),
+                }),
+                event,
+                Event::End(TagEnd::Link),
+            ],
+            None => vec![event],
+        }
+    });
     let mut html = String::new();
-    pulldown_cmark::html::push_html(&mut html, pulldown_cmark::Parser::new(doc));
+    pulldown_cmark::html::push_html(&mut html, events);
     Some(view! { <div class="docstring" inner_html=html></div> })
 }
 
@@ -440,6 +513,7 @@ fn member_view(
     tag: Option<&'static str>,
     deprecated: Option<&Deprecated>,
     doc: &str,
+    links: Links<'_>,
 ) -> AnyView {
     view! {
         <div class="member" id=id>
@@ -448,17 +522,14 @@ fn member_view(
                 {tag.map(|tag| view! { <span class="tag">{tag}</span> })}
             </div>
             {deprecated_view(deprecated)}
-            {docstring_view(doc)}
+            {docstring_view(doc, links)}
         </div>
     }
     .into_any()
 }
 
 fn class_view(class: &Class, fqn: &str, links: Links<'_>) -> impl IntoView + use<> {
-    let constructor = class
-        .methods
-        .iter()
-        .find(|method| matches!(method.name.as_str(), "__new__" | "__init__"));
+    let constructor = class.constructor();
     let signature = signatures_view(
         Some("class"),
         &class.name,
@@ -505,6 +576,7 @@ fn class_view(class: &Class, fqn: &str, links: Links<'_>) -> impl IntoView + use
             attribute.is_readonly.then_some("read-only"),
             attribute.deprecated.as_ref(),
             &attribute.doc,
+            links,
         )
     });
     let methods = class
@@ -524,6 +596,7 @@ fn class_view(class: &Class, fqn: &str, links: Links<'_>) -> impl IntoView + use
                 None,
                 method.deprecated.as_ref(),
                 &method.doc,
+                links,
             )
         });
     let members = attributes.chain(methods).collect::<Vec<_>>();
@@ -532,7 +605,7 @@ fn class_view(class: &Class, fqn: &str, links: Links<'_>) -> impl IntoView + use
         <pre class="signature">{signature}</pre>
         {bases}
         {deprecated_view(class.deprecated.as_ref())}
-        {docstring_view(&class.doc)}
+        {docstring_view(&class.doc, links)}
         {(!members.is_empty()).then(move || view! { <div class="members">{members}</div> })}
     }
 }
@@ -550,7 +623,7 @@ fn function_view(function: &Function, fqn: &str, links: Links<'_>) -> impl IntoV
             )}
         </pre>
         {deprecated_view(function.deprecated.as_ref())}
-        {docstring_view(&function.doc)}
+        {docstring_view(&function.doc, links)}
     }
 }
 
@@ -566,7 +639,7 @@ fn type_alias_view(alias: &TypeAlias, fqn: &str, links: Links<'_>) -> impl IntoV
                 {type_view(&alias.definition, links)}
             </code>
         </pre>
-        {docstring_view(&alias.doc)}
+        {docstring_view(&alias.doc, links)}
     }
 }
 
@@ -585,14 +658,14 @@ fn variable_view(variable: &Variable, fqn: &str, links: Links<'_>) -> impl IntoV
                 {ty}
             </code>
         </pre>
-        {docstring_view(&variable.doc)}
+        {docstring_view(&variable.doc, links)}
     }
 }
 
-fn item_view(module: &Module, item: &Item, exports: &BTreeMap<String, String>) -> AnyView {
+fn item_view(module: &Module, item: &Item, anchors: &BTreeSet<String>) -> AnyView {
     let links = Links {
         module: &module.name,
-        exports,
+        anchors,
     };
     let fqn = format!("{}.{}", module.name, item.name());
     match item {
@@ -671,6 +744,7 @@ fn version_switcher(
 /// The reference of one version of the Python API, with a switcher between `versions`
 pub fn page(api: &PythonApi, versions: &[String], latest: Option<&str>) -> impl IntoView + use<> {
     let sections = sections(&api.package);
+    let anchors = anchors(&api.package);
     let notice = (latest != Some(api.version.as_str())).then(|| {
         let this = if api.release().is_some() {
             format!("This is the documentation of {}.", api.version)
@@ -690,7 +764,13 @@ pub fn page(api: &PythonApi, versions: &[String], latest: Option<&str>) -> impl 
         .package
         .modules
         .values()
-        .filter_map(|module| docstring_view(&module.doc))
+        .filter_map(|module| {
+            let links = Links {
+                module: &module.name,
+                anchors: &anchors,
+            };
+            docstring_view(&module.doc, links)
+        })
         .collect_view();
     let content = sections
         .iter()
@@ -698,7 +778,7 @@ pub fn page(api: &PythonApi, versions: &[String], latest: Option<&str>) -> impl 
             let items = section
                 .items
                 .iter()
-                .map(|(module, item)| item_view(module, item, &api.package.export_map))
+                .map(|(module, item)| item_view(module, item, &anchors))
                 .collect_view();
             view! {
                 <h2 id=section.id>{section.title}</h2>
