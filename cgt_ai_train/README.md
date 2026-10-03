@@ -30,6 +30,15 @@ $ cargo run --release --package cgt_ai_train -- train --game quelhas --checkpoin
 
 Both write `quelhas_iter<N>.mpk` and `quelhas_latest.mpk` to the checkpoint directory, every file named after the game. Ctrl-C stops at the next safe point and saves `quelhas_interrupted.mpk` and `quelhas_latest.mpk` together with the replay buffer, `quelhas_replay_buffer.bin`, and a second Ctrl-C exits at once. Running the same command with `--resume-from checkpoints/quelhas_latest.mpk` added continues from there, reloading the replay buffer, with `--iterations` and `--time-limit` counting from the restart.
 
+The quick preset of Fjords trains a 64x3 graph network in about 5 minutes, at roughly 7 s per iteration. A graph network over the 64 vertices is cheaper to evaluate than the grid network of Quelhas, so it gets through about 42 iterations. In timed head-to-head runs it beat a 128x4 network and a 64x3 network searching 128 simulations 35 to 25 each, won all 60 games against a random player, and 16 of 40 against the 512x7 network. Its files are named after Fjords, so it can share `checkpoints/quick` with the Quelhas preset.
+
+```console
+$ cargo run --release --package cgt_ai_train -- train --game fjords --checkpoint-dir checkpoints/quick \
+    --channels 64 --num-blocks 3 --games-per-iteration 256 --simulations 64 --fast-simulations 0 \
+    --workers 4 --parallel-games 64 --batch-size 512 --replay-buffer-size 50000 --min-buffer-size 1500 \
+    --iterations 50 --time-limit 5
+```
+
 ## Playing on the website
 
 The website plays with a model file, which holds the network, its shape and the opening table that a game with the pie rule starts from. `openings` searches every first move deeply, and `export` puts its table into the model file, checking that the exported network gives the same outputs as the checkpoint:
@@ -39,6 +48,13 @@ $ cargo run --release --package cgt_ai_train -- openings --game quelhas \
     --checkpoint checkpoints/quelhas_latest.mpk --out checkpoints/quelhas_openings.json
 $ cargo run --release --package cgt_ai_train -- export --game quelhas \
     --checkpoint checkpoints/quelhas_latest.mpk --openings checkpoints/quelhas_openings.json --out checkpoints/quelhas.bin
+```
+
+Fjords deals a new board for every game and has no pie rule, so its model file goes without an opening table:
+
+```console
+$ cargo run --release --package cgt_ai_train -- export --game fjords \
+    --checkpoint checkpoints/quick/fjords_latest.mpk --out checkpoints/fjords_quick.bin
 ```
 
 [`cgt_website`](../cgt_website) describes how the site picks up model files.

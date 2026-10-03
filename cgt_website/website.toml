@@ -1,7 +1,7 @@
 guides = ["guides/python-installation.md", "guides/custom-widgets.ipynb"]
 
 [play.quelhas]
-quick = { path = "../checkpoints/quick/quelhas.bin" }
+easy = { path = "./checkpoints/quelhas_easy.bin" }
 
 [play.fjords]
-# haaland3000 = { path = "../checkpoints/fjords/haaland3000_v2.bin" }
+easy = { path = "./checkpoints/fjords_easy.bin" }
