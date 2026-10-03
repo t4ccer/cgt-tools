@@ -127,12 +127,22 @@ html {
 }
 
 body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  /* On mobile, 100vh is the height with the browser toolbars hidden, which would push the footer
+     of a short page below the fold */
+  min-height: 100svh;
   margin: 0;
   font-family: var(--font-sans);
   font-size: 1rem;
   line-height: 1.5;
   color: var(--text);
   background: var(--bg);
+}
+
+main {
+  flex-grow: 1;
 }
 
 h1,
