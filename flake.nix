@@ -32,6 +32,7 @@
         pkgs,
         lib,
         system,
+        self',
         ...
       }: let
         rustToolchain = pkgs.rust-bin.fromRustupToolchain {
@@ -108,58 +109,62 @@
           };
         };
 
-        devShells.default = pkgs.mkShell {
-          shellHook = ''
-            ${config.pre-commit.shellHook}
-            PATH=$PATH:$(pwd)/target/release
-            # Jupyter started from the venv only searches its own prefix for lab extensions,
-            # so it would not find the widget manager installed in the nix python env
-            export JUPYTER_PATH=${pythonEnv}/share/jupyter
-          '';
+        devShells = {
+          default = pkgs.mkShell {
+            shellHook = ''
+              ${config.pre-commit.shellHook}
+              PATH=$PATH:$(pwd)/target/release
+              # Jupyter started from the venv only searches its own prefix for lab extensions,
+              # so it would not find the widget manager installed in the nix python env
+              export JUPYTER_PATH=${pythonEnv}/share/jupyter
+            '';
 
-          hardeningDisable = ["fortify"];
+            hardeningDisable = ["fortify"];
 
-          nativeBuildInputs = [
-            pythonEnv
-            pkgs.maturin
+            nativeBuildInputs = [
+              pythonEnv
+              pkgs.maturin
 
-            pkgs.cargo-expand
-            pkgs.cargo-flamegraph
-            pkgs.cargo-nextest
-            pkgs.cargo-tarpaulin
-            rustToolchain
+              pkgs.cargo-expand
+              pkgs.cargo-flamegraph
+              pkgs.cargo-nextest
+              pkgs.cargo-tarpaulin
+              rustToolchain
 
-            pkgs.alejandra
-            pkgs.dot2tex
-            pkgs.fd
-            pkgs.graphviz
-            pkgs.hyperfine
-            pkgs.kdePackages.kcachegrind
-            pkgs.lldb
-            pkgs.texlive.combined.scheme-full
-            pkgs.valgrind
+              pkgs.alejandra
+              pkgs.dot2tex
+              pkgs.fd
+              pkgs.graphviz
+              pkgs.hyperfine
+              pkgs.kdePackages.kcachegrind
+              pkgs.lldb
+              pkgs.texlive.combined.scheme-full
+              pkgs.valgrind
 
-            pkgs.wasm-pack
-            pkgs.webpack-cli
+              pkgs.wasm-pack
+              pkgs.webpack-cli
+              pkgs.miniserve
 
-            pkgs.pkg-config
-            pkgs.SDL2
-          ];
-        };
-        devShells.ai = pkgs.mkShell {
-          shellHook = ''
-            export LD_LIBRARY_PATH=/run/opengl-driver/lib:${libtorch}/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
-          '';
-
-          nativeBuildInputs = [
-            rustToolchain
-          ];
-
-          env = {
-            LIBTORCH = libtorch;
-            LIBTORCH_INCLUDE = libtorch.dev;
-            LIBTORCH_LIB = libtorch;
+              pkgs.pkg-config
+              pkgs.SDL2
+            ];
           };
+
+          ai = self'.devShells.default.overrideAttrs (final: prev: {
+            shellHook =
+              (prev.shellHook or "")
+              + ''
+                export LD_LIBRARY_PATH=/run/opengl-driver/lib:${libtorch}/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
+              '';
+
+            env =
+              (prev.env or {})
+              // {
+                LIBTORCH = libtorch;
+                LIBTORCH_INCLUDE = libtorch.dev;
+                LIBTORCH_LIB = libtorch;
+              };
+          });
         };
         formatter = pkgs.alejandra;
       };

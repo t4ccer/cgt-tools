@@ -57,8 +57,11 @@ stub: $(STUB_STAMP)
 
 .PHONY: site
 site:
-	mkdir -p $(SITE)
-	cp -r website/. $(SITE)/
+	cargo run --quiet --release -p cgt_website --features ssr -- $(SITE)
+	wasm-pack build ./cgt_website --target web --no-typescript --no-pack \
+	  --out-dir $(abspath $(SITE))/pkg --out-name cgt_website -- --features hydrate
+	# gh-pages is published with `git add`, which would skip everything this ignores
+	rm -f $(SITE)/pkg/.gitignore
 
 .PHONY: docs
 docs: $(DOCS_OUT)/index.html

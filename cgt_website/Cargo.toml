@@ -1,0 +1,42 @@
+[package]
+name = "cgt_website"
+version = "0.11.0"
+edition = "2024"
+authors = ["Tomasz Maciosowski <t4ccer@gmail.com>"]
+license = "AGPL-3.0"
+readme = "README.md"
+repository = "https://github.com/t4ccer/cgt-tools"
+homepage = "https://cgt.tools"
+keywords = ["cgt"]
+categories = ["mathematics", "science"]
+publish = false
+description = "Static website of cgt-tools, rendered with Leptos in islands mode"
+
+[lints]
+workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "cgt_website"
+required-features = ["ssr"]
+
+[features]
+hydrate = [
+  "leptos/hydrate",
+  "dep:console_error_panic_hook",
+  "dep:wasm-bindgen",
+  "dep:web-sys",
+]
+ssr = ["leptos/ssr", "dep:hydration_context"]
+
+[dependencies]
+console_error_panic_hook = { version = "0.1.7", optional = true }
+hydration_context = { version = "0.3.1", optional = true }
+leptos = { version = "0.8.21", features = ["islands"] }
+wasm-bindgen = { workspace = true, optional = true }
+web-sys = { workspace = true, optional = true, features = [
+  "MediaQueryList",
+  "Storage",
+] }
