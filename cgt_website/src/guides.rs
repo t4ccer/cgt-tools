@@ -28,7 +28,6 @@ pub struct Guide {
     pub slug: String,
     title: String,
     lead: String,
-    summary: String,
     blocks: Vec<Block>,
     /// Level 2 headings as their anchors and texts
     headings: Vec<(String, String)>,
@@ -45,7 +44,7 @@ pub struct Guide {
 pub struct GuideLink {
     slug: String,
     title: String,
-    summary: String,
+    lead: String,
 }
 
 enum Block {
@@ -363,7 +362,6 @@ fn cleared(raw: &str) -> serde_json::Result<String> {
 struct Builder {
     title: Option<String>,
     lead: String,
-    summary: String,
     headings: Vec<(String, String)>,
     blocks: Vec<Block>,
 }
@@ -384,7 +382,6 @@ impl Builder {
             events.drain(..end);
             if matches!(events.first(), Some(Event::Start(Tag::Paragraph))) {
                 let end = element_end(&events, 0);
-                self.summary = plain_text(&events[1..end - 1]);
                 self.lead = to_html(events.drain(..end).skip(1).take(end - 2));
             }
         }
@@ -404,7 +401,6 @@ impl Builder {
                 .title
                 .ok_or("the guide must start with a level 1 heading, its title")?,
             lead: self.lead,
-            summary: self.summary,
             blocks: self.blocks,
             headings: self.headings,
             download,
@@ -469,7 +465,7 @@ impl Guide {
         GuideLink {
             slug: self.slug.clone(),
             title: self.title.clone(),
-            summary: self.summary.clone(),
+            lead: self.lead.clone(),
         }
     }
 
@@ -688,7 +684,7 @@ pub fn index_page(guides: &[GuideLink]) -> impl IntoView + use<> {
             view! {
                 <li>
                     <a href=guide_url(&guide.slug)>{guide.title.clone()}</a>
-                    <p>{guide.summary.clone()}</p>
+                    <p inner_html=guide.lead.clone()></p>
                 </li>
             }
         })
