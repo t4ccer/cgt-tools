@@ -68,11 +68,8 @@ pub fn pages(
         .iter()
         .map(|api| api.version.clone())
         .collect::<Vec<_>>();
-    if let Some(target) = latest.as_ref().or_else(|| versions.first()) {
-        pages.push((
-            "python/docs/latest/index.html".to_owned(),
-            redirect(&python_docs::docs_url(target)),
-        ));
+    let shown_as_latest = latest.clone().or_else(|| versions.first().cloned());
+    if !versions.is_empty() {
         let versions = versions.clone();
         let latest = latest.clone();
         pages.push((
@@ -85,6 +82,22 @@ pub fn pages(
     for api in python_apis {
         let path = format!("python/docs/{}/index.html", api.version);
         let title = format!("Python API {} - cgt-tools", api.version);
+        let api = Arc::new(api);
+        if shown_as_latest.as_ref() == Some(&api.version) {
+            let script = replace_url(&python_docs::docs_url(&api.version));
+            let api = api.clone();
+            let versions = versions.clone();
+            let latest = latest.clone();
+            pages.push((
+                "python/docs/latest/index.html".to_owned(),
+                render(title.clone(), "docs", move || {
+                    view! {
+                        <script inner_html=script></script>
+                        {python_docs::page(&api, &versions, latest.as_deref())}
+                    }
+                }),
+            ));
+        }
         let versions = versions.clone();
         let latest = latest.clone();
         pages.push((
@@ -97,12 +110,10 @@ pub fn pages(
     pages
 }
 
-/// A page that sends visitors to `url`. The script keeps the fragment of the address, which the
-/// refresh would drop, so links into a section of the target still work
-fn redirect(url: &str) -> String {
-    format!(
-        "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>cgt-tools</title><script>location.replace(\"{url}\" + location.hash)</script><meta http-equiv=\"refresh\" content=\"0; url={url}\"></head><body><a href=\"{url}\">{url}</a></body></html>\n"
-    )
+/// Shows `url` in the address bar, keeping the query and the fragment, for a copy of the page at
+/// `url` that is served at another address
+fn replace_url(url: &str) -> String {
+    format!("history.replaceState(history.state,\"\",\"{url}\"+location.search+location.hash)")
 }
 
 fn render<V>(
