@@ -82,7 +82,13 @@ pub struct Node<R: Ruleset> {
 
 impl<R: Ruleset> Node<R> {
     pub fn new(rules: &R, state: R::State) -> Node<R> {
-        let terminal = rules.winner(&state).map(|winner| {
+        let actions = rules.legal_actions(&state);
+        // Finding the winner costs about as much as generating the moves, and a game is only
+        // over once the player to move is stuck
+        let terminal = actions.is_empty().then(|| {
+            let winner = rules
+                .winner(&state)
+                .expect("a game is over exactly when the player to move has no move");
             if winner == rules.to_move(&state) {
                 1.0
             } else {
@@ -91,7 +97,7 @@ impl<R: Ruleset> Node<R> {
         });
         Node {
             state,
-            actions: rules.legal_actions(&state),
+            actions,
             terminal,
             priors: Vec::new(),
             edge_visits: Vec::new(),
