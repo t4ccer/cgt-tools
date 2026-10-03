@@ -29,12 +29,25 @@ hydrate = [
   "dep:wasm-bindgen",
   "dep:web-sys",
 ]
-ssr = ["leptos/ssr", "dep:hydration_context"]
+ssr = [
+  "leptos/ssr",
+  "dep:hydration_context",
+  "dep:pulldown-cmark",
+  "dep:semver",
+  "dep:serde",
+  "dep:serde_json",
+]
 
 [dependencies]
 console_error_panic_hook = { version = "0.1.7", optional = true }
 hydration_context = { version = "0.3.1", optional = true }
 leptos = { version = "0.8.21", features = ["islands"] }
+pulldown-cmark = { version = "0.13.4", default-features = false, features = [
+  "html",
+], optional = true }
+semver = { version = "1.0.28", optional = true }
+serde = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 web-sys = { workspace = true, optional = true, features = [
   "MediaQueryList",

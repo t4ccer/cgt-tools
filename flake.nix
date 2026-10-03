@@ -72,9 +72,6 @@
             pip
             jupyter
             anywidget
-            sphinx
-            myst-parser
-            furo
           ]);
       in {
         _module.args.pkgs = import self.inputs.nixpkgs {

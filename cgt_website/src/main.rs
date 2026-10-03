@@ -1,5 +1,7 @@
+use cgt_website::{Package, PythonApi};
 use std::{
-    fs, io,
+    fs::{self, File},
+    io::{self, BufReader},
     path::{Path, PathBuf},
 };
 
@@ -33,15 +35,39 @@ fn write(path: &Path, contents: &[u8]) -> io::Result<()> {
     fs::write(path, contents)
 }
 
-fn main() -> io::Result<()> {
-    let Some(site) = std::env::args_os().nth(1).map(PathBuf::from) else {
-        eprintln!("usage: cgt_website <output directory>");
-        std::process::exit(2);
+fn usage() -> ! {
+    eprintln!("usage: cgt_website <output directory> [<version>=<api_reference.json>]...");
+    std::process::exit(2);
+}
+
+/// Reads an argument of the form `<version>=<path>`, where `path` is the `api_reference.json` that
+/// pyo3-stub-gen wrote for `version`
+fn read_python_api(arg: &str) -> io::Result<PythonApi> {
+    let Some((version, path)) = arg.split_once('=') else {
+        usage();
     };
+    let with_path = |err: &dyn std::fmt::Display| format!("{path}: {err}");
+    let file = File::open(path).map_err(|err| io::Error::new(err.kind(), with_path(&err)))?;
+    let package: Package = serde_json::from_reader(BufReader::new(file))
+        .map_err(|err| io::Error::other(with_path(&err)))?;
+    Ok(PythonApi {
+        version: version.to_owned(),
+        package,
+    })
+}
+
+fn main() -> io::Result<()> {
+    let mut args = std::env::args();
+    let Some(site) = args.nth(1).map(PathBuf::from) else {
+        usage();
+    };
+    let python_apis = args
+        .map(|arg| read_python_api(&arg))
+        .collect::<io::Result<Vec<_>>>()?;
     for (path, contents) in ASSETS {
         write(&site.join(path), contents)?;
     }
-    for (path, html) in cgt_website::pages() {
+    for (path, html) in cgt_website::pages(python_apis) {
         write(&site.join(path), html.as_bytes())?;
     }
     println!("Created website in `{}`", site.display());

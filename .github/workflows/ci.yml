@@ -44,22 +44,23 @@ jobs:
       - name: Install webpack
         run: npm install --global webpack webpack-cli
 
-      - name: Install Sphinx
-        run: pip install sphinx myst-parser furo
-
       - name: Create virtualenv
         run: python -m venv .venv
 
       - name: Build widget bundle and type stubs
         run: make stub
 
-      - name: Build docs
+      - name: Check Python API snapshot
+        if: startsWith(github.ref, 'refs/tags/v')
         run: |
-          make docs DOCS_NAME=unstable
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            make docs DOCS_NAME="$GITHUB_REF_NAME"
-            make docs-latest DOCS_NAME="$GITHUB_REF_NAME"
+          snapshot="cgt_website/python-api/$GITHUB_REF_NAME.json"
+          if ! cmp cgt_py/docs/api/api_reference.json "$snapshot"; then
+            echo "::error::$snapshot does not match the API of $GITHUB_REF_NAME, run make python-api"
+            exit 1
           fi
+
+      - name: Build website
+        run: make site
 
       - name: Upload Python build inputs
         uses: actions/upload-artifact@v4
@@ -262,7 +263,6 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./site
           publish_branch: gh-pages
-          keep_files: true
 
   publish-crates:
     name: Publish to crates.io

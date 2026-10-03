@@ -1,0 +1,3183 @@
+{
+  "name": "cgt-py",
+  "modules": {
+    "cgt_py": {
+      "name": "cgt_py",
+      "doc": "",
+      "items": [
+        {
+          "kind": "Class",
+          "name": "Amazons",
+          "doc": "",
+          "bases": [],
+          "methods": [
+            {
+              "name": "__new__",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [
+                    {
+                      "name": "position",
+                      "type_": {
+                        "display": "str",
+                        "link_target": null,
+                        "children": []
+                      },
+                      "default": null
+                    }
+                  ],
+                  "return_type": {
+                    "display": "Amazons",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            },
+            {
+              "name": "__repr__",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [],
+                  "return_type": {
+                    "display": "str",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            },
+            {
+              "name": "_repr_svg_",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [],
+                  "return_type": {
+                    "display": "str",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            }
+          ],
+          "attributes": [
+            {
+              "name": "canonical_form",
+              "doc": "",
+              "type_": {
+                "display": "CanonicalForm",
+                "link_target": null,
+                "children": []
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "grid",
+              "doc": "",
+              "type_": {
+                "display": "Grid",
+                "link_target": null,
+                "children": []
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "left_options",
+              "doc": "",
+              "type_": {
+                "display": "list[Amazons]",
+                "link_target": null,
+                "children": [
+                  {
+                    "display": "Amazons",
+                    "link_target": null,
+                    "children": []
+                  }
+                ]
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "right_options",
+              "doc": "",
+              "type_": {
+                "display": "list[Amazons]",
+                "link_target": null,
+                "children": [
+                  {
+                    "display": "Amazons",
+                    "link_target": null,
+                    "children": []
+                  }
+                ]
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "sensible_left_options",
+              "doc": "",
+              "type_": {
+                "display": "list[Amazons]",
+                "link_target": null,
+                "children": [
+                  {
+                    "display": "Amazons",
+                    "link_target": null,
+                    "children": []
+                  }
+                ]
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "sensible_right_options",
+              "doc": "",
+              "type_": {
+                "display": "list[Amazons]",
+                "link_target": null,
+                "children": [
+                  {
+                    "display": "Amazons",
+                    "link_target": null,
+                    "children": []
+                  }
+                ]
+              },
+              "is_property": true,
+              "is_readonly": true
+            }
+          ],
+          "deprecated": null
+        },
+        {
+          "kind": "Class",
+          "name": "BipartiteSnort",
+          "doc": "",
+          "bases": [],
+          "methods": [
+            {
+              "name": "__new__",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [
+                    {
+                      "name": "blue",
+                      "type_": {
+                        "display": "int",
+                        "link_target": null,
+                        "children": []
+                      },
+                      "default": null
+                    },
+                    {
+                      "name": "red",
+                      "type_": {
+                        "display": "int",
+                        "link_target": null,
+                        "children": []
+                      },
+                      "default": null
+                    },
+                    {
+                      "name": "edges",
+                      "type_": {
+                        "display": "Sequence[tuple[int, int]]",
+                        "link_target": null,
+                        "children": [
+                          {
+                            "display": "tuple[int, int]",
+                            "link_target": null,
+                            "children": [
+                              {
+                                "display": "int",
+                                "link_target": null,
+                                "children": []
+                              },
+                              {
+                                "display": "int",
+                                "link_target": null,
+                                "children": []
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      "default": null
+                    }
+                  ],
+                  "return_type": {
+                    "display": "BipartiteSnort",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            },
+            {
+              "name": "__repr__",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [],
+                  "return_type": {
+                    "display": "str",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            },
+            {
+              "name": "_repr_svg_",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [],
+                  "return_type": {
+                    "display": "str",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            }
+          ],
+          "attributes": [
+            {
+              "name": "blue",
+              "doc": "",
+              "type_": {
+                "display": "int",
+                "link_target": null,
+                "children": []
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "canonical_form",
+              "doc": "",
+              "type_": {
+                "display": "CanonicalForm",
+                "link_target": null,
+                "children": []
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "edges",
+              "doc": "",
+              "type_": {
+                "display": "list[tuple[int, int]]",
+                "link_target": null,
+                "children": [
+                  {
+                    "display": "tuple[int, int]",
+                    "link_target": null,
+                    "children": [
+                      {
+                        "display": "int",
+                        "link_target": null,
+                        "children": []
+                      },
+                      {
+                        "display": "int",
+                        "link_target": null,
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "graph",
+              "doc": "",
+              "type_": {
+                "display": "Graph",
+                "link_target": null,
+                "children": []
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "left_options",
+              "doc": "",
+              "type_": {
+                "display": "list[BipartiteSnort]",
+                "link_target": null,
+                "children": [
+                  {
+                    "display": "BipartiteSnort",
+                    "link_target": null,
+                    "children": []
+                  }
+                ]
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "red",
+              "doc": "",
+              "type_": {
+                "display": "int",
+                "link_target": null,
+                "children": []
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "right_options",
+              "doc": "",
+              "type_": {
+                "display": "list[BipartiteSnort]",
+                "link_target": null,
+                "children": [
+                  {
+                    "display": "BipartiteSnort",
+                    "link_target": null,
+                    "children": []
+                  }
+                ]
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "sensible_left_options",
+              "doc": "",
+              "type_": {
+                "display": "list[BipartiteSnort]",
+                "link_target": null,
+                "children": [
+                  {
+                    "display": "BipartiteSnort",
+                    "link_target": null,
+                    "children": []
+                  }
+                ]
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "sensible_right_options",
+              "doc": "",
+              "type_": {
+                "display": "list[BipartiteSnort]",
+                "link_target": null,
+                "children": [
+                  {
+                    "display": "BipartiteSnort",
+                    "link_target": null,
+                    "children": []
+                  }
+                ]
+              },
+              "is_property": true,
+              "is_readonly": true
+            }
+          ],
+          "deprecated": null
+        },
+        {
+          "kind": "Class",
+          "name": "CanonicalForm",
+          "doc": "",
+          "bases": [],
+          "methods": [
+            {
+              "name": "__add__",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [
+                    {
+                      "name": "other",
+                      "type_": {
+                        "display": "CanonicalForm",
+                        "link_target": null,
+                        "children": []
+                      },
+                      "default": null
+                    }
+                  ],
+                  "return_type": {
+                    "display": "CanonicalForm",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            },
+            {
+              "name": "__neg__",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [],
+                  "return_type": {
+                    "display": "CanonicalForm",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            },
+            {
+              "name": "__new__",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [
+                    {
+                      "name": "value",
+                      "type_": {
+                        "display": "Any",
+                        "link_target": null,
+                        "children": []
+                      },
+                      "default": null
+                    }
+                  ],
+                  "return_type": {
+                    "display": "CanonicalForm",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            },
+            {
+              "name": "__repr__",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [],
+                  "return_type": {
+                    "display": "str",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            },
+            {
+              "name": "__richcmp__",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [
+                    {
+                      "name": "other",
+                      "type_": {
+                        "display": "CanonicalForm",
+                        "link_target": null,
+                        "children": []
+                      },
+                      "default": null
+                    },
+                    {
+                      "name": "op",
+                      "type_": {
+                        "display": "int",
+                        "link_target": null,
+                        "children": []
+                      },
+                      "default": null
+                    }
+                  ],
+                  "return_type": {
+                    "display": "bool",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            },
+            {
+              "name": "__sub__",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [
+                    {
+                      "name": "other",
+                      "type_": {
+                        "display": "CanonicalForm",
+                        "link_target": null,
+                        "children": []
+                      },
+                      "default": null
+                    }
+                  ],
+                  "return_type": {
+                    "display": "CanonicalForm",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            },
+            {
+              "name": "cool",
+              "doc": "Cool the position by `temperature`, given as an integer, a string, or a\n`DyadicRationalNumber`",
+              "signatures": [
+                {
+                  "parameters": [
+                    {
+                      "name": "temperature",
+                      "type_": {
+                        "display": "Any",
+                        "link_target": null,
+                        "children": []
+                      },
+                      "default": null
+                    }
+                  ],
+                  "return_type": {
+                    "display": "CanonicalForm",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            }
+          ],
+          "attributes": [
+            {
+              "name": "birthday",
+              "doc": "",
+              "type_": {
+                "display": "int",
+                "link_target": null,
+                "children": []
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "left_options",
+              "doc": "",
+              "type_": {
+                "display": "list[CanonicalForm]",
+                "link_target": null,
+                "children": [
+                  {
+                    "display": "CanonicalForm",
+                    "link_target": null,
+                    "children": []
+                  }
+                ]
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "left_stop",
+              "doc": "",
+              "type_": {
+                "display": "DyadicRationalNumber",
+                "link_target": null,
+                "children": []
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "reduced",
+              "doc": "",
+              "type_": {
+                "display": "CanonicalForm",
+                "link_target": null,
+                "children": []
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "right_options",
+              "doc": "",
+              "type_": {
+                "display": "list[CanonicalForm]",
+                "link_target": null,
+                "children": [
+                  {
+                    "display": "CanonicalForm",
+                    "link_target": null,
+                    "children": []
+                  }
+                ]
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "right_stop",
+              "doc": "",
+              "type_": {
+                "display": "DyadicRationalNumber",
+                "link_target": null,
+                "children": []
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "temperature",
+              "doc": "",
+              "type_": {
+                "display": "DyadicRationalNumber",
+                "link_target": null,
+                "children": []
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "thermograph",
+              "doc": "",
+              "type_": {
+                "display": "Thermograph",
+                "link_target": null,
+                "children": []
+              },
+              "is_property": true,
+              "is_readonly": true
+            }
+          ],
+          "deprecated": null
+        },
+        {
+          "kind": "Class",
+          "name": "Col",
+          "doc": "",
+          "bases": [],
+          "methods": [
+            {
+              "name": "__new__",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [
+                    {
+                      "name": "graph",
+                      "type_": {
+                        "display": "Any",
+                        "link_target": null,
+                        "children": []
+                      },
+                      "default": null
+                    },
+                    {
+                      "name": "edges",
+                      "type_": {
+                        "display": "Optional[Sequence[tuple[int, int]]]",
+                        "link_target": null,
+                        "children": [
+                          {
+                            "display": "Sequence[tuple[int, int]]",
+                            "link_target": null,
+                            "children": [
+                              {
+                                "display": "tuple[int, int]",
+                                "link_target": null,
+                                "children": [
+                                  {
+                                    "display": "int",
+                                    "link_target": null,
+                                    "children": []
+                                  },
+                                  {
+                                    "display": "int",
+                                    "link_target": null,
+                                    "children": []
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      "default": {
+                        "kind": "Simple",
+                        "value": "None"
+                      }
+                    },
+                    {
+                      "name": "white",
+                      "type_": {
+                        "display": "Optional[Sequence[int]]",
+                        "link_target": null,
+                        "children": [
+                          {
+                            "display": "Sequence[int]",
+                            "link_target": null,
+                            "children": [
+                              {
+                                "display": "int",
+                                "link_target": null,
+                                "children": []
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      "default": {
+                        "kind": "Simple",
+                        "value": "None"
+                      }
+                    },
+                    {
+                      "name": "blue",
+                      "type_": {
+                        "display": "Optional[Sequence[int]]",
+                        "link_target": null,
+                        "children": [
+                          {
+                            "display": "Sequence[int]",
+                            "link_target": null,
+                            "children": [
+                              {
+                                "display": "int",
+                                "link_target": null,
+                                "children": []
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      "default": {
+                        "kind": "Simple",
+                        "value": "None"
+                      }
+                    },
+                    {
+                      "name": "red",
+                      "type_": {
+                        "display": "Optional[Sequence[int]]",
+                        "link_target": null,
+                        "children": [
+                          {
+                            "display": "Sequence[int]",
+                            "link_target": null,
+                            "children": [
+                              {
+                                "display": "int",
+                                "link_target": null,
+                                "children": []
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      "default": {
+                        "kind": "Simple",
+                        "value": "None"
+                      }
+                    },
+                    {
+                      "name": "green",
+                      "type_": {
+                        "display": "Optional[Sequence[int]]",
+                        "link_target": null,
+                        "children": [
+                          {
+                            "display": "Sequence[int]",
+                            "link_target": null,
+                            "children": [
+                              {
+                                "display": "int",
+                                "link_target": null,
+                                "children": []
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      "default": {
+                        "kind": "Simple",
+                        "value": "None"
+                      }
+                    }
+                  ],
+                  "return_type": {
+                    "display": "Col",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            },
+            {
+              "name": "__repr__",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [],
+                  "return_type": {
+                    "display": "str",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            },
+            {
+              "name": "_repr_svg_",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [],
+                  "return_type": {
+                    "display": "str",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            }
+          ],
+          "attributes": [
+            {
+              "name": "canonical_form",
+              "doc": "",
+              "type_": {
+                "display": "CanonicalForm",
+                "link_target": null,
+                "children": []
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "graph",
+              "doc": "",
+              "type_": {
+                "display": "Graph",
+                "link_target": null,
+                "children": []
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "left_options",
+              "doc": "",
+              "type_": {
+                "display": "list[Col]",
+                "link_target": null,
+                "children": [
+                  {
+                    "display": "Col",
+                    "link_target": null,
+                    "children": []
+                  }
+                ]
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "right_options",
+              "doc": "",
+              "type_": {
+                "display": "list[Col]",
+                "link_target": null,
+                "children": [
+                  {
+                    "display": "Col",
+                    "link_target": null,
+                    "children": []
+                  }
+                ]
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "sensible_left_options",
+              "doc": "",
+              "type_": {
+                "display": "list[Col]",
+                "link_target": null,
+                "children": [
+                  {
+                    "display": "Col",
+                    "link_target": null,
+                    "children": []
+                  }
+                ]
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "sensible_right_options",
+              "doc": "",
+              "type_": {
+                "display": "list[Col]",
+                "link_target": null,
+                "children": [
+                  {
+                    "display": "Col",
+                    "link_target": null,
+                    "children": []
+                  }
+                ]
+              },
+              "is_property": true,
+              "is_readonly": true
+            }
+          ],
+          "deprecated": null
+        },
+        {
+          "kind": "Class",
+          "name": "DigraphPlacement",
+          "doc": "",
+          "bases": [],
+          "methods": [
+            {
+              "name": "__new__",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [
+                    {
+                      "name": "graph",
+                      "type_": {
+                        "display": "Any",
+                        "link_target": null,
+                        "children": []
+                      },
+                      "default": null
+                    },
+                    {
+                      "name": "edges",
+                      "type_": {
+                        "display": "Optional[Sequence[tuple[int, int]]]",
+                        "link_target": null,
+                        "children": [
+                          {
+                            "display": "Sequence[tuple[int, int]]",
+                            "link_target": null,
+                            "children": [
+                              {
+                                "display": "tuple[int, int]",
+                                "link_target": null,
+                                "children": [
+                                  {
+                                    "display": "int",
+                                    "link_target": null,
+                                    "children": []
+                                  },
+                                  {
+                                    "display": "int",
+                                    "link_target": null,
+                                    "children": []
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      "default": {
+                        "kind": "Simple",
+                        "value": "None"
+                      }
+                    },
+                    {
+                      "name": "blue",
+                      "type_": {
+                        "display": "Optional[Sequence[int]]",
+                        "link_target": null,
+                        "children": [
+                          {
+                            "display": "Sequence[int]",
+                            "link_target": null,
+                            "children": [
+                              {
+                                "display": "int",
+                                "link_target": null,
+                                "children": []
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      "default": {
+                        "kind": "Simple",
+                        "value": "None"
+                      }
+                    },
+                    {
+                      "name": "red",
+                      "type_": {
+                        "display": "Optional[Sequence[int]]",
+                        "link_target": null,
+                        "children": [
+                          {
+                            "display": "Sequence[int]",
+                            "link_target": null,
+                            "children": [
+                              {
+                                "display": "int",
+                                "link_target": null,
+                                "children": []
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      "default": {
+                        "kind": "Simple",
+                        "value": "None"
+                      }
+                    }
+                  ],
+                  "return_type": {
+                    "display": "DigraphPlacement",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            },
+            {
+              "name": "__repr__",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [],
+                  "return_type": {
+                    "display": "str",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            },
+            {
+              "name": "_repr_svg_",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [],
+                  "return_type": {
+                    "display": "str",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            }
+          ],
+          "attributes": [
+            {
+              "name": "canonical_form",
+              "doc": "",
+              "type_": {
+                "display": "CanonicalForm",
+                "link_target": null,
+                "children": []
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "graph",
+              "doc": "",
+              "type_": {
+                "display": "Graph",
+                "link_target": null,
+                "children": []
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "left_options",
+              "doc": "",
+              "type_": {
+                "display": "list[DigraphPlacement]",
+                "link_target": null,
+                "children": [
+                  {
+                    "display": "DigraphPlacement",
+                    "link_target": null,
+                    "children": []
+                  }
+                ]
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "right_options",
+              "doc": "",
+              "type_": {
+                "display": "list[DigraphPlacement]",
+                "link_target": null,
+                "children": [
+                  {
+                    "display": "DigraphPlacement",
+                    "link_target": null,
+                    "children": []
+                  }
+                ]
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "sensible_left_options",
+              "doc": "",
+              "type_": {
+                "display": "list[DigraphPlacement]",
+                "link_target": null,
+                "children": [
+                  {
+                    "display": "DigraphPlacement",
+                    "link_target": null,
+                    "children": []
+                  }
+                ]
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "sensible_right_options",
+              "doc": "",
+              "type_": {
+                "display": "list[DigraphPlacement]",
+                "link_target": null,
+                "children": [
+                  {
+                    "display": "DigraphPlacement",
+                    "link_target": null,
+                    "children": []
+                  }
+                ]
+              },
+              "is_property": true,
+              "is_readonly": true
+            }
+          ],
+          "deprecated": null
+        },
+        {
+          "kind": "Class",
+          "name": "Domineering",
+          "doc": "",
+          "bases": [],
+          "methods": [
+            {
+              "name": "__new__",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [
+                    {
+                      "name": "position",
+                      "type_": {
+                        "display": "str",
+                        "link_target": null,
+                        "children": []
+                      },
+                      "default": null
+                    }
+                  ],
+                  "return_type": {
+                    "display": "Domineering",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            },
+            {
+              "name": "__repr__",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [],
+                  "return_type": {
+                    "display": "str",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            },
+            {
+              "name": "_repr_svg_",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [],
+                  "return_type": {
+                    "display": "str",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            }
+          ],
+          "attributes": [
+            {
+              "name": "canonical_form",
+              "doc": "",
+              "type_": {
+                "display": "CanonicalForm",
+                "link_target": null,
+                "children": []
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "grid",
+              "doc": "",
+              "type_": {
+                "display": "Grid",
+                "link_target": null,
+                "children": []
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "left_options",
+              "doc": "",
+              "type_": {
+                "display": "list[Domineering]",
+                "link_target": null,
+                "children": [
+                  {
+                    "display": "Domineering",
+                    "link_target": null,
+                    "children": []
+                  }
+                ]
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "right_options",
+              "doc": "",
+              "type_": {
+                "display": "list[Domineering]",
+                "link_target": null,
+                "children": [
+                  {
+                    "display": "Domineering",
+                    "link_target": null,
+                    "children": []
+                  }
+                ]
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "sensible_left_options",
+              "doc": "",
+              "type_": {
+                "display": "list[Domineering]",
+                "link_target": null,
+                "children": [
+                  {
+                    "display": "Domineering",
+                    "link_target": null,
+                    "children": []
+                  }
+                ]
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "sensible_right_options",
+              "doc": "",
+              "type_": {
+                "display": "list[Domineering]",
+                "link_target": null,
+                "children": [
+                  {
+                    "display": "Domineering",
+                    "link_target": null,
+                    "children": []
+                  }
+                ]
+              },
+              "is_property": true,
+              "is_readonly": true
+            }
+          ],
+          "deprecated": null
+        },
+        {
+          "kind": "Class",
+          "name": "DyadicRationalNumber",
+          "doc": "",
+          "bases": [],
+          "methods": [
+            {
+              "name": "__add__",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [
+                    {
+                      "name": "other",
+                      "type_": {
+                        "display": "DyadicRationalNumber",
+                        "link_target": null,
+                        "children": []
+                      },
+                      "default": null
+                    }
+                  ],
+                  "return_type": {
+                    "display": "DyadicRationalNumber",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            },
+            {
+              "name": "__float__",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [],
+                  "return_type": {
+                    "display": "float",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            },
+            {
+              "name": "__neg__",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [],
+                  "return_type": {
+                    "display": "DyadicRationalNumber",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            },
+            {
+              "name": "__new__",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [
+                    {
+                      "name": "numerator",
+                      "type_": {
+                        "display": "Any",
+                        "link_target": null,
+                        "children": []
+                      },
+                      "default": null
+                    },
+                    {
+                      "name": "denominator_exponent",
+                      "type_": {
+                        "display": "Optional[int]",
+                        "link_target": null,
+                        "children": [
+                          {
+                            "display": "int",
+                            "link_target": null,
+                            "children": []
+                          }
+                        ]
+                      },
+                      "default": {
+                        "kind": "Simple",
+                        "value": "None"
+                      }
+                    }
+                  ],
+                  "return_type": {
+                    "display": "DyadicRationalNumber",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            },
+            {
+              "name": "__repr__",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [],
+                  "return_type": {
+                    "display": "str",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            },
+            {
+              "name": "__richcmp__",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [
+                    {
+                      "name": "other",
+                      "type_": {
+                        "display": "DyadicRationalNumber",
+                        "link_target": null,
+                        "children": []
+                      },
+                      "default": null
+                    },
+                    {
+                      "name": "op",
+                      "type_": {
+                        "display": "int",
+                        "link_target": null,
+                        "children": []
+                      },
+                      "default": null
+                    }
+                  ],
+                  "return_type": {
+                    "display": "bool",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            },
+            {
+              "name": "__sub__",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [
+                    {
+                      "name": "other",
+                      "type_": {
+                        "display": "DyadicRationalNumber",
+                        "link_target": null,
+                        "children": []
+                      },
+                      "default": null
+                    }
+                  ],
+                  "return_type": {
+                    "display": "DyadicRationalNumber",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            }
+          ],
+          "attributes": [],
+          "deprecated": null
+        },
+        {
+          "kind": "Class",
+          "name": "Fission",
+          "doc": "",
+          "bases": [],
+          "methods": [
+            {
+              "name": "__new__",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [
+                    {
+                      "name": "position",
+                      "type_": {
+                        "display": "str",
+                        "link_target": null,
+                        "children": []
+                      },
+                      "default": null
+                    }
+                  ],
+                  "return_type": {
+                    "display": "Fission",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            },
+            {
+              "name": "__repr__",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [],
+                  "return_type": {
+                    "display": "str",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            },
+            {
+              "name": "_repr_svg_",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [],
+                  "return_type": {
+                    "display": "str",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            }
+          ],
+          "attributes": [
+            {
+              "name": "canonical_form",
+              "doc": "",
+              "type_": {
+                "display": "CanonicalForm",
+                "link_target": null,
+                "children": []
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "grid",
+              "doc": "",
+              "type_": {
+                "display": "Grid",
+                "link_target": null,
+                "children": []
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "left_options",
+              "doc": "",
+              "type_": {
+                "display": "list[Fission]",
+                "link_target": null,
+                "children": [
+                  {
+                    "display": "Fission",
+                    "link_target": null,
+                    "children": []
+                  }
+                ]
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "right_options",
+              "doc": "",
+              "type_": {
+                "display": "list[Fission]",
+                "link_target": null,
+                "children": [
+                  {
+                    "display": "Fission",
+                    "link_target": null,
+                    "children": []
+                  }
+                ]
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "sensible_left_options",
+              "doc": "",
+              "type_": {
+                "display": "list[Fission]",
+                "link_target": null,
+                "children": [
+                  {
+                    "display": "Fission",
+                    "link_target": null,
+                    "children": []
+                  }
+                ]
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "sensible_right_options",
+              "doc": "",
+              "type_": {
+                "display": "list[Fission]",
+                "link_target": null,
+                "children": [
+                  {
+                    "display": "Fission",
+                    "link_target": null,
+                    "children": []
+                  }
+                ]
+              },
+              "is_property": true,
+              "is_readonly": true
+            }
+          ],
+          "deprecated": null
+        },
+        {
+          "kind": "Class",
+          "name": "Graph",
+          "doc": "",
+          "bases": [],
+          "methods": [
+            {
+              "name": "__eq__",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [
+                    {
+                      "name": "other",
+                      "type_": {
+                        "display": "object",
+                        "link_target": null,
+                        "children": []
+                      },
+                      "default": null
+                    }
+                  ],
+                  "return_type": {
+                    "display": "bool",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            },
+            {
+              "name": "__new__",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [
+                    {
+                      "name": "vertices",
+                      "type_": {
+                        "display": "int",
+                        "link_target": null,
+                        "children": []
+                      },
+                      "default": null
+                    },
+                    {
+                      "name": "edges",
+                      "type_": {
+                        "display": "Sequence[tuple[int, int]]",
+                        "link_target": null,
+                        "children": [
+                          {
+                            "display": "tuple[int, int]",
+                            "link_target": null,
+                            "children": [
+                              {
+                                "display": "int",
+                                "link_target": null,
+                                "children": []
+                              },
+                              {
+                                "display": "int",
+                                "link_target": null,
+                                "children": []
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      "default": null
+                    },
+                    {
+                      "name": "directed",
+                      "type_": {
+                        "display": "bool",
+                        "link_target": null,
+                        "children": []
+                      },
+                      "default": {
+                        "kind": "Simple",
+                        "value": "..."
+                      }
+                    },
+                    {
+                      "name": "white",
+                      "type_": {
+                        "display": "Optional[Sequence[int]]",
+                        "link_target": null,
+                        "children": [
+                          {
+                            "display": "Sequence[int]",
+                            "link_target": null,
+                            "children": [
+                              {
+                                "display": "int",
+                                "link_target": null,
+                                "children": []
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      "default": {
+                        "kind": "Simple",
+                        "value": "None"
+                      }
+                    },
+                    {
+                      "name": "blue",
+                      "type_": {
+                        "display": "Optional[Sequence[int]]",
+                        "link_target": null,
+                        "children": [
+                          {
+                            "display": "Sequence[int]",
+                            "link_target": null,
+                            "children": [
+                              {
+                                "display": "int",
+                                "link_target": null,
+                                "children": []
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      "default": {
+                        "kind": "Simple",
+                        "value": "None"
+                      }
+                    },
+                    {
+                      "name": "red",
+                      "type_": {
+                        "display": "Optional[Sequence[int]]",
+                        "link_target": null,
+                        "children": [
+                          {
+                            "display": "Sequence[int]",
+                            "link_target": null,
+                            "children": [
+                              {
+                                "display": "int",
+                                "link_target": null,
+                                "children": []
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      "default": {
+                        "kind": "Simple",
+                        "value": "None"
+                      }
+                    },
+                    {
+                      "name": "green",
+                      "type_": {
+                        "display": "Optional[Sequence[int]]",
+                        "link_target": null,
+                        "children": [
+                          {
+                            "display": "Sequence[int]",
+                            "link_target": null,
+                            "children": [
+                              {
+                                "display": "int",
+                                "link_target": null,
+                                "children": []
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      "default": {
+                        "kind": "Simple",
+                        "value": "None"
+                      }
+                    }
+                  ],
+                  "return_type": {
+                    "display": "Graph",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            },
+            {
+              "name": "__repr__",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [],
+                  "return_type": {
+                    "display": "str",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            },
+            {
+              "name": "_repr_svg_",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [],
+                  "return_type": {
+                    "display": "str",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            },
+            {
+              "name": "decode_from_traitlet",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [
+                    {
+                      "name": "preset_bits",
+                      "type_": {
+                        "display": "int",
+                        "link_target": null,
+                        "children": []
+                      },
+                      "default": null
+                    },
+                    {
+                      "name": "raw_graph",
+                      "type_": {
+                        "display": "str",
+                        "link_target": null,
+                        "children": []
+                      },
+                      "default": null
+                    }
+                  ],
+                  "return_type": {
+                    "display": "Graph",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            },
+            {
+              "name": "encode_to_traitlet",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [],
+                  "return_type": {
+                    "display": "str",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            }
+          ],
+          "attributes": [
+            {
+              "name": "bipartite_snort",
+              "doc": "",
+              "type_": {
+                "display": "BipartiteSnort",
+                "link_target": null,
+                "children": []
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "col",
+              "doc": "",
+              "type_": {
+                "display": "Col",
+                "link_target": null,
+                "children": []
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "colors",
+              "doc": "",
+              "type_": {
+                "display": "VertexColors",
+                "link_target": null,
+                "children": []
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "digraph_placement",
+              "doc": "",
+              "type_": {
+                "display": "DigraphPlacement",
+                "link_target": null,
+                "children": []
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "directed",
+              "doc": "Whether the edges of the graph point one way. Undirected edges are stored as a pair\nof opposite arcs, so this only decides how edges are added and reported back",
+              "type_": {
+                "display": "bool",
+                "link_target": null,
+                "children": []
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "edges",
+              "doc": "",
+              "type_": {
+                "display": "list[tuple[int, int]]",
+                "link_target": null,
+                "children": [
+                  {
+                    "display": "tuple[int, int]",
+                    "link_target": null,
+                    "children": [
+                      {
+                        "display": "int",
+                        "link_target": null,
+                        "children": []
+                      },
+                      {
+                        "display": "int",
+                        "link_target": null,
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "game",
+              "doc": "",
+              "type_": {
+                "display": "Any",
+                "link_target": null,
+                "children": []
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "snort",
+              "doc": "",
+              "type_": {
+                "display": "Snort",
+                "link_target": null,
+                "children": []
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "vertices",
+              "doc": "",
+              "type_": {
+                "display": "int",
+                "link_target": null,
+                "children": []
+              },
+              "is_property": true,
+              "is_readonly": true
+            }
+          ],
+          "deprecated": null
+        },
+        {
+          "kind": "Class",
+          "name": "Grid",
+          "doc": "",
+          "bases": [],
+          "methods": [
+            {
+              "name": "__eq__",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [
+                    {
+                      "name": "other",
+                      "type_": {
+                        "display": "object",
+                        "link_target": null,
+                        "children": []
+                      },
+                      "default": null
+                    }
+                  ],
+                  "return_type": {
+                    "display": "bool",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            },
+            {
+              "name": "decode_from_traitlet",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [
+                    {
+                      "name": "preset_bits",
+                      "type_": {
+                        "display": "int",
+                        "link_target": null,
+                        "children": []
+                      },
+                      "default": null
+                    },
+                    {
+                      "name": "raw_grid",
+                      "type_": {
+                        "display": "str",
+                        "link_target": null,
+                        "children": []
+                      },
+                      "default": null
+                    }
+                  ],
+                  "return_type": {
+                    "display": "Grid",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            },
+            {
+              "name": "encode_to_traitlet",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [],
+                  "return_type": {
+                    "display": "str",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            }
+          ],
+          "attributes": [
+            {
+              "name": "amazons",
+              "doc": "",
+              "type_": {
+                "display": "Amazons",
+                "link_target": null,
+                "children": []
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "domineering",
+              "doc": "",
+              "type_": {
+                "display": "Domineering",
+                "link_target": null,
+                "children": []
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "fission",
+              "doc": "",
+              "type_": {
+                "display": "Fission",
+                "link_target": null,
+                "children": []
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "game",
+              "doc": "",
+              "type_": {
+                "display": "Any",
+                "link_target": null,
+                "children": []
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "konane",
+              "doc": "",
+              "type_": {
+                "display": "Konane",
+                "link_target": null,
+                "children": []
+              },
+              "is_property": true,
+              "is_readonly": true
+            }
+          ],
+          "deprecated": null
+        },
+        {
+          "kind": "Class",
+          "name": "Konane",
+          "doc": "",
+          "bases": [],
+          "methods": [
+            {
+              "name": "__new__",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [
+                    {
+                      "name": "position",
+                      "type_": {
+                        "display": "str",
+                        "link_target": null,
+                        "children": []
+                      },
+                      "default": null
+                    }
+                  ],
+                  "return_type": {
+                    "display": "Konane",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            },
+            {
+              "name": "__repr__",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [],
+                  "return_type": {
+                    "display": "str",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            },
+            {
+              "name": "_repr_svg_",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [],
+                  "return_type": {
+                    "display": "str",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            }
+          ],
+          "attributes": [
+            {
+              "name": "canonical_form",
+              "doc": "",
+              "type_": {
+                "display": "CanonicalForm",
+                "link_target": null,
+                "children": []
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "grid",
+              "doc": "",
+              "type_": {
+                "display": "Grid",
+                "link_target": null,
+                "children": []
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "left_options",
+              "doc": "",
+              "type_": {
+                "display": "list[Konane]",
+                "link_target": null,
+                "children": [
+                  {
+                    "display": "Konane",
+                    "link_target": null,
+                    "children": []
+                  }
+                ]
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "right_options",
+              "doc": "",
+              "type_": {
+                "display": "list[Konane]",
+                "link_target": null,
+                "children": [
+                  {
+                    "display": "Konane",
+                    "link_target": null,
+                    "children": []
+                  }
+                ]
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "sensible_left_options",
+              "doc": "",
+              "type_": {
+                "display": "list[Konane]",
+                "link_target": null,
+                "children": [
+                  {
+                    "display": "Konane",
+                    "link_target": null,
+                    "children": []
+                  }
+                ]
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "sensible_right_options",
+              "doc": "",
+              "type_": {
+                "display": "list[Konane]",
+                "link_target": null,
+                "children": [
+                  {
+                    "display": "Konane",
+                    "link_target": null,
+                    "children": []
+                  }
+                ]
+              },
+              "is_property": true,
+              "is_readonly": true
+            }
+          ],
+          "deprecated": null
+        },
+        {
+          "kind": "Class",
+          "name": "Snort",
+          "doc": "",
+          "bases": [],
+          "methods": [
+            {
+              "name": "__new__",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [
+                    {
+                      "name": "graph",
+                      "type_": {
+                        "display": "Any",
+                        "link_target": null,
+                        "children": []
+                      },
+                      "default": null
+                    },
+                    {
+                      "name": "edges",
+                      "type_": {
+                        "display": "Optional[Sequence[tuple[int, int]]]",
+                        "link_target": null,
+                        "children": [
+                          {
+                            "display": "Sequence[tuple[int, int]]",
+                            "link_target": null,
+                            "children": [
+                              {
+                                "display": "tuple[int, int]",
+                                "link_target": null,
+                                "children": [
+                                  {
+                                    "display": "int",
+                                    "link_target": null,
+                                    "children": []
+                                  },
+                                  {
+                                    "display": "int",
+                                    "link_target": null,
+                                    "children": []
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      "default": {
+                        "kind": "Simple",
+                        "value": "None"
+                      }
+                    },
+                    {
+                      "name": "white",
+                      "type_": {
+                        "display": "Optional[Sequence[int]]",
+                        "link_target": null,
+                        "children": [
+                          {
+                            "display": "Sequence[int]",
+                            "link_target": null,
+                            "children": [
+                              {
+                                "display": "int",
+                                "link_target": null,
+                                "children": []
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      "default": {
+                        "kind": "Simple",
+                        "value": "None"
+                      }
+                    },
+                    {
+                      "name": "blue",
+                      "type_": {
+                        "display": "Optional[Sequence[int]]",
+                        "link_target": null,
+                        "children": [
+                          {
+                            "display": "Sequence[int]",
+                            "link_target": null,
+                            "children": [
+                              {
+                                "display": "int",
+                                "link_target": null,
+                                "children": []
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      "default": {
+                        "kind": "Simple",
+                        "value": "None"
+                      }
+                    },
+                    {
+                      "name": "red",
+                      "type_": {
+                        "display": "Optional[Sequence[int]]",
+                        "link_target": null,
+                        "children": [
+                          {
+                            "display": "Sequence[int]",
+                            "link_target": null,
+                            "children": [
+                              {
+                                "display": "int",
+                                "link_target": null,
+                                "children": []
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      "default": {
+                        "kind": "Simple",
+                        "value": "None"
+                      }
+                    },
+                    {
+                      "name": "green",
+                      "type_": {
+                        "display": "Optional[Sequence[int]]",
+                        "link_target": null,
+                        "children": [
+                          {
+                            "display": "Sequence[int]",
+                            "link_target": null,
+                            "children": [
+                              {
+                                "display": "int",
+                                "link_target": null,
+                                "children": []
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      "default": {
+                        "kind": "Simple",
+                        "value": "None"
+                      }
+                    }
+                  ],
+                  "return_type": {
+                    "display": "Snort",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            },
+            {
+              "name": "__repr__",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [],
+                  "return_type": {
+                    "display": "str",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            },
+            {
+              "name": "_repr_svg_",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [],
+                  "return_type": {
+                    "display": "str",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            }
+          ],
+          "attributes": [
+            {
+              "name": "canonical_form",
+              "doc": "",
+              "type_": {
+                "display": "CanonicalForm",
+                "link_target": null,
+                "children": []
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "graph",
+              "doc": "",
+              "type_": {
+                "display": "Graph",
+                "link_target": null,
+                "children": []
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "left_options",
+              "doc": "",
+              "type_": {
+                "display": "list[Snort]",
+                "link_target": null,
+                "children": [
+                  {
+                    "display": "Snort",
+                    "link_target": null,
+                    "children": []
+                  }
+                ]
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "right_options",
+              "doc": "",
+              "type_": {
+                "display": "list[Snort]",
+                "link_target": null,
+                "children": [
+                  {
+                    "display": "Snort",
+                    "link_target": null,
+                    "children": []
+                  }
+                ]
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "sensible_left_options",
+              "doc": "",
+              "type_": {
+                "display": "list[Snort]",
+                "link_target": null,
+                "children": [
+                  {
+                    "display": "Snort",
+                    "link_target": null,
+                    "children": []
+                  }
+                ]
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "sensible_right_options",
+              "doc": "",
+              "type_": {
+                "display": "list[Snort]",
+                "link_target": null,
+                "children": [
+                  {
+                    "display": "Snort",
+                    "link_target": null,
+                    "children": []
+                  }
+                ]
+              },
+              "is_property": true,
+              "is_readonly": true
+            }
+          ],
+          "deprecated": null
+        },
+        {
+          "kind": "Class",
+          "name": "Thermograph",
+          "doc": "",
+          "bases": [],
+          "methods": [
+            {
+              "name": "__repr__",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [],
+                  "return_type": {
+                    "display": "str",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            },
+            {
+              "name": "_repr_svg_",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [],
+                  "return_type": {
+                    "display": "str",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            }
+          ],
+          "attributes": [],
+          "deprecated": null
+        },
+        {
+          "kind": "Class",
+          "name": "VertexColors",
+          "doc": "",
+          "bases": [],
+          "methods": [
+            {
+              "name": "__repr__",
+              "doc": "",
+              "signatures": [
+                {
+                  "parameters": [],
+                  "return_type": {
+                    "display": "str",
+                    "link_target": null,
+                    "children": []
+                  }
+                }
+              ],
+              "is_async": false,
+              "deprecated": null
+            }
+          ],
+          "attributes": [
+            {
+              "name": "blue",
+              "doc": "",
+              "type_": {
+                "display": "list[int]",
+                "link_target": null,
+                "children": [
+                  {
+                    "display": "int",
+                    "link_target": null,
+                    "children": []
+                  }
+                ]
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "green",
+              "doc": "",
+              "type_": {
+                "display": "list[int]",
+                "link_target": null,
+                "children": [
+                  {
+                    "display": "int",
+                    "link_target": null,
+                    "children": []
+                  }
+                ]
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "red",
+              "doc": "",
+              "type_": {
+                "display": "list[int]",
+                "link_target": null,
+                "children": [
+                  {
+                    "display": "int",
+                    "link_target": null,
+                    "children": []
+                  }
+                ]
+              },
+              "is_property": true,
+              "is_readonly": true
+            },
+            {
+              "name": "white",
+              "doc": "",
+              "type_": {
+                "display": "list[int]",
+                "link_target": null,
+                "children": [
+                  {
+                    "display": "int",
+                    "link_target": null,
+                    "children": []
+                  }
+                ]
+              },
+              "is_property": true,
+              "is_readonly": true
+            }
+          ],
+          "deprecated": null
+        },
+        {
+          "kind": "Function",
+          "name": "AmazonsWidget",
+          "doc": "",
+          "signatures": [
+            {
+              "parameters": [
+                {
+                  "name": "position",
+                  "type_": {
+                    "display": "Optional[Any]",
+                    "link_target": null,
+                    "children": [
+                      {
+                        "display": "Any",
+                        "link_target": null,
+                        "children": []
+                      }
+                    ]
+                  },
+                  "default": {
+                    "kind": "Simple",
+                    "value": "None"
+                  }
+                }
+              ],
+              "return_type": {
+                "display": "Any",
+                "link_target": null,
+                "children": []
+              }
+            }
+          ],
+          "is_async": false,
+          "deprecated": null
+        },
+        {
+          "kind": "Function",
+          "name": "BipartiteSnortWidget",
+          "doc": "",
+          "signatures": [
+            {
+              "parameters": [
+                {
+                  "name": "position",
+                  "type_": {
+                    "display": "Optional[Any]",
+                    "link_target": null,
+                    "children": [
+                      {
+                        "display": "Any",
+                        "link_target": null,
+                        "children": []
+                      }
+                    ]
+                  },
+                  "default": {
+                    "kind": "Simple",
+                    "value": "None"
+                  }
+                }
+              ],
+              "return_type": {
+                "display": "Any",
+                "link_target": null,
+                "children": []
+              }
+            }
+          ],
+          "is_async": false,
+          "deprecated": null
+        },
+        {
+          "kind": "Function",
+          "name": "ColWidget",
+          "doc": "",
+          "signatures": [
+            {
+              "parameters": [
+                {
+                  "name": "position",
+                  "type_": {
+                    "display": "Optional[Any]",
+                    "link_target": null,
+                    "children": [
+                      {
+                        "display": "Any",
+                        "link_target": null,
+                        "children": []
+                      }
+                    ]
+                  },
+                  "default": {
+                    "kind": "Simple",
+                    "value": "None"
+                  }
+                }
+              ],
+              "return_type": {
+                "display": "Any",
+                "link_target": null,
+                "children": []
+              }
+            }
+          ],
+          "is_async": false,
+          "deprecated": null
+        },
+        {
+          "kind": "Function",
+          "name": "DigraphPlacementWidget",
+          "doc": "",
+          "signatures": [
+            {
+              "parameters": [
+                {
+                  "name": "position",
+                  "type_": {
+                    "display": "Optional[Any]",
+                    "link_target": null,
+                    "children": [
+                      {
+                        "display": "Any",
+                        "link_target": null,
+                        "children": []
+                      }
+                    ]
+                  },
+                  "default": {
+                    "kind": "Simple",
+                    "value": "None"
+                  }
+                }
+              ],
+              "return_type": {
+                "display": "Any",
+                "link_target": null,
+                "children": []
+              }
+            }
+          ],
+          "is_async": false,
+          "deprecated": null
+        },
+        {
+          "kind": "Function",
+          "name": "DomineeringWidget",
+          "doc": "",
+          "signatures": [
+            {
+              "parameters": [
+                {
+                  "name": "position",
+                  "type_": {
+                    "display": "Optional[Any]",
+                    "link_target": null,
+                    "children": [
+                      {
+                        "display": "Any",
+                        "link_target": null,
+                        "children": []
+                      }
+                    ]
+                  },
+                  "default": {
+                    "kind": "Simple",
+                    "value": "None"
+                  }
+                }
+              ],
+              "return_type": {
+                "display": "Any",
+                "link_target": null,
+                "children": []
+              }
+            }
+          ],
+          "is_async": false,
+          "deprecated": null
+        },
+        {
+          "kind": "Function",
+          "name": "FissionWidget",
+          "doc": "",
+          "signatures": [
+            {
+              "parameters": [
+                {
+                  "name": "position",
+                  "type_": {
+                    "display": "Optional[Any]",
+                    "link_target": null,
+                    "children": [
+                      {
+                        "display": "Any",
+                        "link_target": null,
+                        "children": []
+                      }
+                    ]
+                  },
+                  "default": {
+                    "kind": "Simple",
+                    "value": "None"
+                  }
+                }
+              ],
+              "return_type": {
+                "display": "Any",
+                "link_target": null,
+                "children": []
+              }
+            }
+          ],
+          "is_async": false,
+          "deprecated": null
+        },
+        {
+          "kind": "Function",
+          "name": "KonaneWidget",
+          "doc": "",
+          "signatures": [
+            {
+              "parameters": [
+                {
+                  "name": "position",
+                  "type_": {
+                    "display": "Optional[Any]",
+                    "link_target": null,
+                    "children": [
+                      {
+                        "display": "Any",
+                        "link_target": null,
+                        "children": []
+                      }
+                    ]
+                  },
+                  "default": {
+                    "kind": "Simple",
+                    "value": "None"
+                  }
+                }
+              ],
+              "return_type": {
+                "display": "Any",
+                "link_target": null,
+                "children": []
+              }
+            }
+          ],
+          "is_async": false,
+          "deprecated": null
+        },
+        {
+          "kind": "Function",
+          "name": "SnortWidget",
+          "doc": "",
+          "signatures": [
+            {
+              "parameters": [
+                {
+                  "name": "position",
+                  "type_": {
+                    "display": "Optional[Any]",
+                    "link_target": null,
+                    "children": [
+                      {
+                        "display": "Any",
+                        "link_target": null,
+                        "children": []
+                      }
+                    ]
+                  },
+                  "default": {
+                    "kind": "Simple",
+                    "value": "None"
+                  }
+                }
+              ],
+              "return_type": {
+                "display": "Any",
+                "link_target": null,
+                "children": []
+              }
+            }
+          ],
+          "is_async": false,
+          "deprecated": null
+        }
+      ],
+      "submodules": []
+    }
+  },
+  "export_map": {
+    "cgt_py.Amazons": "cgt_py",
+    "cgt_py.AmazonsWidget": "cgt_py",
+    "cgt_py.BipartiteSnort": "cgt_py",
+    "cgt_py.BipartiteSnortWidget": "cgt_py",
+    "cgt_py.CanonicalForm": "cgt_py",
+    "cgt_py.Col": "cgt_py",
+    "cgt_py.ColWidget": "cgt_py",
+    "cgt_py.DigraphPlacement": "cgt_py",
+    "cgt_py.DigraphPlacementWidget": "cgt_py",
+    "cgt_py.Domineering": "cgt_py",
+    "cgt_py.DomineeringWidget": "cgt_py",
+    "cgt_py.DyadicRationalNumber": "cgt_py",
+    "cgt_py.Fission": "cgt_py",
+    "cgt_py.FissionWidget": "cgt_py",
+    "cgt_py.Graph": "cgt_py",
+    "cgt_py.Grid": "cgt_py",
+    "cgt_py.Konane": "cgt_py",
+    "cgt_py.KonaneWidget": "cgt_py",
+    "cgt_py.Snort": "cgt_py",
+    "cgt_py.SnortWidget": "cgt_py",
+    "cgt_py.Thermograph": "cgt_py",
+    "cgt_py.VertexColors": "cgt_py"
+  },
+  "config": {
+    "output-dir": "docs/api",
+    "json-output": "api_reference.json",
+    "separate-pages": true,
+    "intro-message": null,
+    "index-title": null,
+    "contents-table": false,
+    "separate-items": false,
+    "generate-index": false
+  }
+}

@@ -1,4 +1,7 @@
-use crate::ThemeToggle;
+use crate::{
+    ThemeToggle,
+    python_docs::{self, PythonApi},
+};
 use hydration_context::SsrSharedContext;
 use leptos::{prelude::*, reactive::owner::Owner};
 use std::sync::Arc;
@@ -12,16 +15,47 @@ const DESCRIPTION: &str = "Combinatorial Game Theory toolkit in Rust and Python"
 /// does not flash in the system scheme while the islands load
 const THEME_SCRIPT: &str = r#"try{const t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t}catch(_){}"#;
 
-/// Every page of the site as its path relative to the site root and its HTML
-pub fn pages() -> Vec<(&'static str, String)> {
-    vec![(
-        "index.html",
-        render("cgt-tools", "home", || view! { <Home /> }),
-    )]
+/// Every page of the site as its path relative to the site root and its HTML, with a Python API
+/// reference for each of `python_apis`
+pub fn pages(mut python_apis: Vec<PythonApi>) -> Vec<(String, String)> {
+    let mut pages = vec![(
+        "index.html".to_owned(),
+        render("cgt-tools".to_owned(), "home", || view! { <Home /> }),
+    )];
+    let latest = python_docs::sort_versions(&mut python_apis);
+    let versions = python_apis
+        .iter()
+        .map(|api| api.version.clone())
+        .collect::<Vec<_>>();
+    if let Some(target) = latest.as_ref().or_else(|| versions.first()) {
+        pages.push((
+            "python/docs/latest/index.html".to_owned(),
+            redirect(&python_docs::docs_url(target)),
+        ));
+    }
+    for api in python_apis {
+        let path = format!("python/docs/{}/index.html", api.version);
+        let title = format!("Python API {} - cgt-tools", api.version);
+        let versions = versions.clone();
+        let latest = latest.clone();
+        pages.push((
+            path,
+            render(title, "docs", move || {
+                python_docs::page(&api, &versions, latest.as_deref())
+            }),
+        ));
+    }
+    pages
+}
+
+fn redirect(url: &str) -> String {
+    format!(
+        "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>cgt-tools</title><meta http-equiv=\"refresh\" content=\"0; url={url}\"></head><body><a href=\"{url}\">{url}</a></body></html>\n"
+    )
 }
 
 fn render<V>(
-    title: &'static str,
+    title: String,
     body_class: &'static str,
     page: impl FnOnce() -> V + Send + 'static,
 ) -> String
@@ -38,7 +72,7 @@ where
 #[component]
 fn Shell(
     options: LeptosOptions,
-    title: &'static str,
+    title: String,
     body_class: &'static str,
     children: Children,
 ) -> impl IntoView {

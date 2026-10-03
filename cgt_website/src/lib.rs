@@ -2,9 +2,13 @@
 
 #[cfg(feature = "ssr")]
 mod pages;
+#[cfg(feature = "ssr")]
+mod python_docs;
 
 #[cfg(feature = "ssr")]
 pub use pages::pages;
+#[cfg(feature = "ssr")]
+pub use python_docs::{Package, PythonApi};
 
 use leptos::prelude::*;
 

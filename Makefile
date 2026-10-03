@@ -14,9 +14,8 @@ INSTALL_STAMP = $(DEPS)/install.stamp
 STUB_STAMP = $(DEPS)/stub.stamp
 
 SITE = target/website
-DOCS_ROOT = $(SITE)/python/docs
-DOCS_NAME ?= v$(VERSION)
-DOCS_OUT = $(DOCS_ROOT)/$(DOCS_NAME)
+API_JSON = cgt_py/docs/api/api_reference.json
+API_SNAPSHOTS = cgt_website/python-api
 
 CARGO_DEP_WIDGETS = target/wasm32-unknown-unknown/release/cgt_py_widgets.d
 CARGO_DEP_PY = target/debug/libcgt_py.d
@@ -56,21 +55,19 @@ notebook: $(INSTALL_STAMP)
 stub: $(STUB_STAMP)
 
 .PHONY: site
-site:
-	cargo run --quiet --release -p cgt_website --features ssr -- $(SITE)
+site: $(STUB_STAMP)
+	cargo run --quiet --release -p cgt_website --features ssr -- $(SITE) unstable=$(API_JSON) \
+	  $(foreach api,$(wildcard $(API_SNAPSHOTS)/*.json),$(basename $(notdir $(api)))=$(api))
 	wasm-pack build ./cgt_website --target web --no-typescript --no-pack \
 	  --out-dir $(abspath $(SITE))/pkg --out-name cgt_website -- --features hydrate
 	# gh-pages is published with `git add`, which would skip everything this ignores
 	rm -f $(SITE)/pkg/.gitignore
 
-.PHONY: docs
-docs: $(DOCS_OUT)/index.html
-
-.PHONY: docs-latest
-docs-latest: | site
-	mkdir -p $(DOCS_ROOT)/latest
-	printf '<meta http-equiv="refresh" content="0; url=../%s/">\n' '$(DOCS_NAME)' \
-	  > $(DOCS_ROOT)/latest/index.html
+# Released versions are rendered from these snapshots, because the stub can only be generated for
+# the checked out version
+.PHONY: python-api
+python-api: $(STUB_STAMP)
+	cp $(API_JSON) $(API_SNAPSHOTS)/v$(VERSION).json
 
 $(WIDGETS_DEP) $(PY_DEP) $(STUB_DEP): ;
 
@@ -98,10 +95,5 @@ $(STUB_STAMP): $(BUNDLE) $(MANIFESTS) $(STUB_DEP) cgt_py/pyproject.toml | .venv 
 	$(CLEAN_PY_ENV) PYO3_PYTHON=$(abspath $(PYTHON)) cargo run --quiet -p cgt_py --bin cgt_py_stub_gen
 	$(call cargo-dep,$(CARGO_DEP_STUB))
 	touch $@
-
-$(DOCS_OUT)/index.html: $(STUB_STAMP) cgt_py/docs/conf.py cgt_py/docs/index.rst | site
-	rm -rf $(DOCS_OUT)
-	sphinx-build --builder html --doctree-dir $(DEPS)/doctrees/$(DOCS_NAME) \
-	  cgt_py/docs $(DOCS_OUT)
 
 -include $(DEPS)/*.d
