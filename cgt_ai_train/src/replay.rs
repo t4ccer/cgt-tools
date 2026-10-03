@@ -121,7 +121,7 @@ impl<R: Ruleset> ReplayBuffer<R> {
         );
         let mut name = vec![0; name_len];
         input.read_exact(&mut name)?;
-        if name != self.rules.name().as_bytes() || state_bytes != self.rules.state_bytes() {
+        if name != self.rules.name().as_bytes() {
             bail!(
                 "{} holds {} positions, not {}",
                 path.display(),
@@ -130,9 +130,10 @@ impl<R: Ruleset> ReplayBuffer<R> {
             );
         }
         ensure!(
-            num_actions == self.num_actions,
-            "{} was written for a different action space",
-            path.display()
+            state_bytes == self.rules.state_bytes() && num_actions == self.num_actions,
+            "{} was written for another version of {}",
+            path.display(),
+            self.rules.name()
         );
 
         let mut states = vec![0; stored * state_bytes];

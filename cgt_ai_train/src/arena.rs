@@ -17,7 +17,7 @@ use std::path::Path;
 #[derive(clap::Args, Debug)]
 pub struct ArenaArgs {
     #[arg(long, value_parser = game_parser())]
-    pub game: GameId,
+    game: GameId,
     /// Checkpoint path or 'random'
     player_a: String,
     /// Checkpoint path or 'random'
@@ -37,6 +37,10 @@ pub struct ArenaArgs {
 }
 
 impl GameCommand for ArenaArgs {
+    fn game(&self) -> GameId {
+        self.game
+    }
+
     fn run<B: AutodiffBackend, R: Ruleset>(self, rules: R, device: B::Device) -> Result<()> {
         run::<B, R>(&rules, &self, &device)
     }

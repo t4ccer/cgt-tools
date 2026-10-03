@@ -40,11 +40,11 @@ enum Command {
 impl Command {
     fn run<B: AutodiffBackend>(self, device: B::Device) -> Result<()> {
         match self {
-            Command::Train(args) => game::run::<B>(args.game, args, device),
-            Command::Arena(args) => game::run::<B>(args.game, args, device),
-            Command::Openings(args) => game::run::<B>(args.game, args, device),
-            Command::Export(args) => game::run::<B>(args.game, args, device),
-            Command::Import(args) => game::run::<B>(args.game, args, device),
+            Command::Train(args) => game::run::<B>(args, device),
+            Command::Arena(args) => game::run::<B>(args, device),
+            Command::Openings(args) => game::run::<B>(args, device),
+            Command::Export(args) => game::run::<B>(args, device),
+            Command::Import(args) => game::run::<B>(args, device),
         }
     }
 }

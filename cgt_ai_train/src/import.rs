@@ -18,7 +18,7 @@ use std::path::PathBuf;
 #[derive(clap::Args, Debug)]
 pub struct ImportArgs {
     #[arg(long, value_parser = game_parser())]
-    pub game: GameId,
+    game: GameId,
     /// Checkpoint of the `PyTorch` graph network of haaland3000, as its `train.py` saves them
     #[arg(long)]
     pytorch: PathBuf,
@@ -28,6 +28,10 @@ pub struct ImportArgs {
 }
 
 impl GameCommand for ImportArgs {
+    fn game(&self) -> GameId {
+        self.game
+    }
+
     fn run<B: AutodiffBackend, R: Ruleset>(self, rules: R, device: B::Device) -> Result<()> {
         run::<B, R>(&rules, &self, &device)
     }

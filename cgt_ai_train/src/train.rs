@@ -28,7 +28,7 @@ use std::{
 #[derive(clap::Args, Debug)]
 pub struct TrainArgs {
     #[arg(long, value_parser = game_parser())]
-    pub game: GameId,
+    game: GameId,
     /// How many MORE iterations to run this invocation
     #[arg(long, default_value_t = 20)]
     iterations: usize,
@@ -99,6 +99,10 @@ fn positive() -> RangedU64ValueParser<usize> {
 }
 
 impl GameCommand for TrainArgs {
+    fn game(&self) -> GameId {
+        self.game
+    }
+
     fn run<B: AutodiffBackend, R: Ruleset>(self, rules: R, device: B::Device) -> Result<()> {
         run::<B, R>(&rules, &self, &device)
     }

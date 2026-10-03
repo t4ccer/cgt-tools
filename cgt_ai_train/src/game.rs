@@ -7,6 +7,9 @@ use cgt_ai_core::{
 use clap::builder::{PossibleValuesParser, TypedValueParser};
 
 pub trait GameCommand {
+    /// The game given on the command line
+    fn game(&self) -> GameId;
+
     fn run<B: AutodiffBackend, R: Ruleset>(self, rules: R, device: B::Device) -> Result<()>;
 }
 
@@ -35,11 +38,7 @@ impl<C: GameCommand, B: AutodiffBackend> WithRules for Run<C, B> {
     }
 }
 
-/// Runs `command` for the rules of `game`
-pub fn run<B: AutodiffBackend>(
-    game: GameId,
-    command: impl GameCommand,
-    device: B::Device,
-) -> Result<()> {
-    game.with(Run::<_, B> { command, device })
+/// Runs `command` for the rules of its game
+pub fn run<B: AutodiffBackend>(command: impl GameCommand, device: B::Device) -> Result<()> {
+    command.game().with(Run::<_, B> { command, device })
 }

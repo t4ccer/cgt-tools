@@ -17,7 +17,7 @@ use std::{collections::BTreeMap, path::PathBuf};
 #[derive(clap::Args, Debug)]
 pub struct OpeningsArgs {
     #[arg(long, value_parser = game_parser())]
-    pub game: GameId,
+    game: GameId,
     #[arg(long)]
     checkpoint: PathBuf,
     /// Defaults to `<game>_openings.json`
@@ -30,6 +30,10 @@ pub struct OpeningsArgs {
 }
 
 impl GameCommand for OpeningsArgs {
+    fn game(&self) -> GameId {
+        self.game
+    }
+
     fn run<B: AutodiffBackend, R: Ruleset>(self, rules: R, device: B::Device) -> Result<()> {
         run::<B, R>(&rules, &self, device)
     }

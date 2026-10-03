@@ -23,7 +23,7 @@ use std::path::PathBuf;
 #[derive(clap::Args, Debug)]
 pub struct ExportArgs {
     #[arg(long, value_parser = game_parser())]
-    pub game: GameId,
+    game: GameId,
     #[arg(long)]
     checkpoint: PathBuf,
     /// Opening table written by `openings`, which a player needs for its first move in a game
@@ -36,6 +36,10 @@ pub struct ExportArgs {
 }
 
 impl GameCommand for ExportArgs {
+    fn game(&self) -> GameId {
+        self.game
+    }
+
     fn run<B: AutodiffBackend, R: Ruleset>(self, rules: R, device: B::Device) -> Result<()> {
         run::<B, R>(rules, &self, device)
     }
