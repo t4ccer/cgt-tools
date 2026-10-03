@@ -7,6 +7,8 @@ use std::collections::{BTreeMap, BTreeSet};
 /// Signatures longer than this many characters put every parameter on its own line
 const SIGNATURE_WIDTH: usize = 70;
 
+const DOCS_URL: &str = "/python/docs/";
+
 /// The API of one version of `cgt_py`
 pub struct PythonApi {
     /// Name of the version, which is also the directory its page is written to
@@ -16,7 +18,21 @@ pub struct PythonApi {
 
 impl PythonApi {
     fn release(&self) -> Option<Version> {
-        Version::parse(self.version.strip_prefix('v')?).ok()
+        release(&self.version)
+    }
+}
+
+fn release(version: &str) -> Option<Version> {
+    Version::parse(version.strip_prefix('v')?).ok()
+}
+
+fn version_tag(version: &str, latest: Option<&str>) -> Option<&'static str> {
+    if Some(version) == latest {
+        Some("latest")
+    } else if release(version).is_none() {
+        Some("unreleased")
+    } else {
+        None
     }
 }
 
@@ -33,7 +49,7 @@ pub fn sort_versions(apis: &mut [PythonApi]) -> Option<String> {
 }
 
 pub fn docs_url(version: &str) -> String {
-    format!("/python/docs/{version}/")
+    format!("{DOCS_URL}{version}/")
 }
 
 // The types below mirror `pyo3_stub_gen::docgen::ir`, which is what `api_reference.json` is
@@ -713,8 +729,8 @@ fn version_switcher(
         .iter()
         .map(|version| {
             let active = version == current;
-            let latest = (Some(version.as_str()) == latest)
-                .then(|| view! { <span class="tag">"latest"</span> });
+            let tag =
+                version_tag(version, latest).map(|tag| view! { <span class="tag">{tag}</span> });
             view! {
                 <li>
                     <a
@@ -724,7 +740,7 @@ fn version_switcher(
                         href=docs_url(version)
                     >
                         {version.clone()}
-                        {latest}
+                        {tag}
                     </a>
                 </li>
             }
@@ -736,8 +752,45 @@ fn version_switcher(
                 <span>"Version " <span class="version-name">{current.to_owned()}</span></span>
                 <SelectorIcon />
             </summary>
-            <ul class="dropdown-menu">{items}</ul>
+            <ul class="dropdown-menu">
+                {items} <li>
+                    <hr />
+                </li> <li>
+                    <a class="dropdown-item" href=DOCS_URL>
+                        "All versions"
+                    </a>
+                </li>
+            </ul>
         </details>
+    }
+}
+
+/// Links to the reference of every version in `versions`
+pub fn index_page(versions: &[String], latest: Option<&str>) -> impl IntoView + use<> {
+    let items = versions
+        .iter()
+        .map(|version| {
+            let tag =
+                version_tag(version, latest).map(|tag| view! { <span class="tag">{tag}</span> });
+            view! {
+                <li>
+                    <a href=docs_url(version)>{version.clone()}</a>
+                    {tag}
+                </li>
+            }
+        })
+        .collect_view();
+    view! {
+        <div class="container">
+            <div class="docs-content">
+                <h1>"Python API"</h1>
+                <p class="lead">
+                    "The reference of the " <code>"cgt_py"</code>
+                    " module, for every release and for the unreleased changes."
+                </p>
+                <ul class="versions">{items}</ul>
+            </div>
+        </div>
     }
 }
 

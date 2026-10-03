@@ -32,6 +32,14 @@ pub fn pages(mut python_apis: Vec<PythonApi>) -> Vec<(String, String)> {
             "python/docs/latest/index.html".to_owned(),
             redirect(&python_docs::docs_url(target)),
         ));
+        let versions = versions.clone();
+        let latest = latest.clone();
+        pages.push((
+            "python/docs/index.html".to_owned(),
+            render("Python API - cgt-tools".to_owned(), "docs", move || {
+                python_docs::index_page(&versions, latest.as_deref())
+            }),
+        ));
     }
     for api in python_apis {
         let path = format!("python/docs/{}/index.html", api.version);
