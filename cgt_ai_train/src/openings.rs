@@ -1,6 +1,6 @@
 use crate::{
     checkpoint,
-    game::{GameCommand, game_parser},
+    game::{GameCommand, file_name, game_parser},
 };
 use anyhow::{Result, bail};
 use burn::tensor::backend::AutodiffBackend;
@@ -20,8 +20,9 @@ pub struct OpeningsArgs {
     pub game: GameId,
     #[arg(long)]
     checkpoint: PathBuf,
-    #[arg(long, default_value = "openings.json")]
-    out: PathBuf,
+    /// Defaults to `<game>_openings.json`
+    #[arg(long)]
+    out: Option<PathBuf>,
     #[arg(long, default_value_t = 2000)]
     simulations: u32,
     #[arg(long, default_value_t = 64)]
@@ -118,11 +119,15 @@ fn run<B: AutodiffBackend, R: Ruleset>(
         simulations: args.simulations,
         values,
     };
-    if let Some(parent) = args.out.parent() {
+    let out = args
+        .out
+        .clone()
+        .unwrap_or_else(|| PathBuf::from(file_name(rules, "openings.json")));
+    if let Some(parent) = out.parent() {
         std::fs::create_dir_all(parent)?;
     }
-    std::fs::write(&args.out, serde_json::to_string_pretty(&table)?)?;
-    println!("wrote {}", args.out.display());
+    std::fs::write(&out, serde_json::to_string_pretty(&table)?)?;
+    println!("wrote {}", out.display());
 
     let value = |a: usize| table.value(a).unwrap_or(f64::NAN);
     let mut ranked = representatives;

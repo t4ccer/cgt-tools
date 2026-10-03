@@ -10,6 +10,12 @@ pub trait GameCommand {
     fn run<B: AutodiffBackend, R: Ruleset>(self, rules: R, device: B::Device) -> Result<()>;
 }
 
+/// `name` prefixed by the name of the game, for the files the tools write, so that files of
+/// different games can share a directory
+pub fn file_name<R: Ruleset>(rules: &R, name: &str) -> String {
+    format!("{}_{name}", rules.name())
+}
+
 /// Parses the `--game` option, which takes the name of a game
 pub fn game_parser() -> impl TypedValueParser<Value = GameId> {
     PossibleValuesParser::new(GameId::ALL.map(GameId::name))

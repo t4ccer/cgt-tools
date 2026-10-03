@@ -1,6 +1,6 @@
 use crate::{
     checkpoint::{self, Trainer},
-    game::{GameCommand, game_parser},
+    game::{GameCommand, file_name, game_parser},
     replay::ReplayBuffer,
     report::{IterationReport, Phase, Reporter},
     self_play::{SelfPlayConfig, generate},
@@ -175,14 +175,12 @@ fn checkpoint_now<B: AutodiffBackend, R: Ruleset>(
     buffer: Option<&ReplayBuffer<R>>,
     name: Option<&str>,
 ) -> Result<PathBuf> {
-    let path = dir.join(name.map_or_else(
-        || format!("{}_iter{}.mpk", rules.name(), trainer.iteration),
-        String::from,
-    ));
+    let name = name.map_or_else(|| format!("iter{}", trainer.iteration), String::from);
+    let path = dir.join(file_name(rules, &format!("{name}.mpk")));
     checkpoint::save(rules, &path, trainer)?;
-    checkpoint::save(rules, &dir.join("latest.mpk"), trainer)?;
+    checkpoint::save(rules, &dir.join(file_name(rules, "latest.mpk")), trainer)?;
     if let Some(buffer) = buffer {
-        buffer.save(&dir.join("replay_buffer.bin"))?;
+        buffer.save(&dir.join(file_name(rules, "replay_buffer.bin")))?;
     }
     Ok(path)
 }
@@ -239,7 +237,9 @@ fn run<B: AutodiffBackend, R: Ruleset>(
 
     std::fs::create_dir_all(&args.checkpoint_dir)?;
     let mut buffer = ReplayBuffer::new(rules.clone(), args.replay_buffer_size);
-    let buffer_path = args.checkpoint_dir.join("replay_buffer.bin");
+    let buffer_path = args
+        .checkpoint_dir
+        .join(file_name(rules, "replay_buffer.bin"));
     if args.resume_from.is_some() && buffer_path.exists() {
         buffer.load(&buffer_path)?;
         println!(
@@ -364,12 +364,14 @@ fn run<B: AutodiffBackend, R: Ruleset>(
             &args.checkpoint_dir,
             &trainer,
             Some(&buffer),
-            Some("interrupted.mpk"),
+            Some("interrupted"),
         )?;
         println!("  saved checkpoint {}", path.display());
         println!(
             "  resume with --resume-from {}",
-            args.checkpoint_dir.join("latest.mpk").display()
+            args.checkpoint_dir
+                .join(file_name(rules, "latest.mpk"))
+                .display()
         );
     }
     Ok(())
