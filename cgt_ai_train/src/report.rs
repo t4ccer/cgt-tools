@@ -113,6 +113,16 @@ const METRICS: [MetricSpec; 6] = [
 
 const USAGE_INTERVAL: Duration = Duration::from_secs(1);
 
+/// Burn's TUI takes the progress of the run to be the iterations done plus the fraction of the top
+/// bar, and works out its ETA as if every iteration had as many units of progress. So the top bar
+/// follows the whole iteration in a fixed number of units, as a top bar that started again for
+/// training would move the bottom bar back.
+const ITERATION_UNITS: usize = 1000;
+
+/// Part of an iteration taken by self-play until an iteration has trained, about what the presets
+/// take
+const SELF_PLAY_SHARE: f64 = 0.75;
+
 struct Usage {
     cpu: CpuUse,
     cpu_id: MetricId,
@@ -152,6 +162,8 @@ struct Tui {
     last_iteration: usize,
     iteration: usize,
     mean_length: f64,
+    /// Part of the last iteration that trained taken by self-play
+    self_play_share: f64,
     checkpoint: Option<(usize, PathBuf)>,
 }
 
@@ -255,6 +267,7 @@ impl Reporter {
                 last_iteration: start_iteration + iterations,
                 iteration: start_iteration + 1,
                 mean_length: typical_game_length as f64,
+                self_play_share: SELF_PLAY_SHARE,
                 checkpoint: None,
             };
             // Burn 0.21's TUI divides by the number of plotted metrics when the
@@ -274,23 +287,24 @@ impl Reporter {
     }
 
     // Burn's progress panel has no labels, so the status lines name the bar
-    // they describe. The top bar follows the current phase and the bottom bar
-    // the whole run.
+    // they describe. The top bar follows the current iteration, self-play and
+    // then training, and the bottom bar the whole run.
     pub fn phase(&mut self, phase: Phase) {
         let Some(tui) = &mut self.tui else { return };
         tui.sample_usage(false);
-        let (tag, progress) = match phase {
+        let share = tui.self_play_share;
+        let (tag, progress, done) = match phase {
             Phase::SelfPlay { moves, games } => {
                 let expected = (games as f64 * tui.mean_length).round() as usize;
-                (
-                    "Top bar: self-play moves",
-                    Progress::new(moves, expected.max(moves).max(1)),
-                )
+                let progress = Progress::new(moves, expected.max(moves).max(1));
+                let done = share * moves as f64 / progress.items_total as f64;
+                ("Top bar: iteration, self-play moves", progress, done)
             }
-            Phase::Training { steps, total } => (
-                "Top bar: training steps",
-                Progress::new(steps, total.max(1)),
-            ),
+            Phase::Training { steps, total } => {
+                let progress = Progress::new(steps, total.max(1));
+                let done = share + (1.0 - share) * steps as f64 / progress.items_total as f64;
+                ("Top bar: iteration, training steps", progress, done)
+            }
         };
         let mut status = vec![
             ProgressType::Detailed {
@@ -299,7 +313,7 @@ impl Reporter {
             },
             ProgressType::Detailed {
                 tag: tag.into(),
-                progress: progress.clone(),
+                progress,
             },
         ];
         if let Some((iteration, _)) = &tui.checkpoint {
@@ -310,7 +324,10 @@ impl Reporter {
         }
         tui.renderer.render_train(
             TrainingProgress {
-                progress: Some(progress),
+                progress: Some(Progress::new(
+                    (done * ITERATION_UNITS as f64) as usize,
+                    ITERATION_UNITS,
+                )),
                 global_progress: Progress::new(tui.iteration, tui.last_iteration),
                 iteration: Some(tui.iteration - tui.first_iteration),
             },
@@ -328,6 +345,10 @@ impl Reporter {
         self.last_line = Some(line);
         if report.mean_length.is_finite() {
             tui.mean_length = report.mean_length;
+        }
+        let time = report.self_play_time + report.train_time;
+        if report.steps > 0 && time > 0.0 {
+            tui.self_play_share = report.self_play_time / time;
         }
         tui.iteration = report.iteration + 1;
         for (id, spec) in tui.metrics.clone() {
