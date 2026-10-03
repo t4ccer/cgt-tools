@@ -1,0 +1,25 @@
+[package]
+name = "cgt_ai_model"
+version = "0.11.0"
+edition = "2024"
+authors = ["Tomasz Maciosowski <t4ccer@gmail.com>"]
+license = "AGPL-3.0"
+readme = "../README.md"
+repository = "https://github.com/t4ccer/cgt-tools"
+description = "Residual policy and value network for AlphaZero-style players of board games"
+homepage = "https://github.com/t4ccer/cgt-tools"
+keywords = ["cgt", "alphazero", "burn"]
+categories = ["mathematics", "science", "games"]
+rust-version = "1.92"
+
+[lints]
+workspace = true
+
+[dependencies]
+cgt_ai_core = { path = "../cgt_ai_core" }
+burn = { workspace = true, features = ["std"] }
+burn-store = { workspace = true }
+serde = { workspace = true }
+
+[dev-dependencies]
+burn = { workspace = true, features = ["std", "flex"] }

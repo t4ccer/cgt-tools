@@ -57,6 +57,15 @@
           };
         };
 
+        pkgsCuda = import inputs.nixpkgs {
+          inherit system;
+          config = {
+            allowUnfree = true;
+            cudaSupport = true;
+          };
+        };
+        libtorch = pkgsCuda.libtorch-bin;
+
         pythonEnv = pythonToolchain.withPackages (ps:
           with ps; [
             pip
@@ -136,6 +145,21 @@
             pkgs.pkg-config
             pkgs.SDL2
           ];
+        };
+        devShells.ai = pkgs.mkShell {
+          shellHook = ''
+            export LD_LIBRARY_PATH=/run/opengl-driver/lib:${libtorch}/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
+          '';
+
+          nativeBuildInputs = [
+            rustToolchain
+          ];
+
+          env = {
+            LIBTORCH = libtorch;
+            LIBTORCH_INCLUDE = libtorch.dev;
+            LIBTORCH_LIB = libtorch;
+          };
         };
         formatter = pkgs.alejandra;
       };

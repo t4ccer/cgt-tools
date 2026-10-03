@@ -1,0 +1,44 @@
+[package]
+name = "cgt_ai_train"
+version = "0.11.0"
+edition = "2024"
+authors = ["Tomasz Maciosowski <t4ccer@gmail.com>"]
+license = "AGPL-3.0"
+readme = "README.md"
+repository = "https://github.com/t4ccer/cgt-tools"
+description = "AlphaZero-style self-play training for combinatorial games"
+homepage = "https://github.com/t4ccer/cgt-tools"
+keywords = ["cgt", "alphazero", "mcts"]
+categories = ["mathematics", "science", "games"]
+rust-version = "1.92"
+
+[lints]
+workspace = true
+
+[dependencies]
+cgt_ai_core = { path = "../cgt_ai_core" }
+cgt_ai_model = { path = "../cgt_ai_model" }
+anyhow = "1.0"
+burn = { workspace = true, features = [
+  "std",
+  "autodiff",
+  "flex",
+  "train",
+  "tui",
+  "metrics",
+  "tch",
+] }
+burn-store = { workspace = true }
+clap = { version = "4.5", features = ["derive"] }
+ctrlc = "3.5.0"
+indicatif = "0.18.4"
+# must match the version burn-train uses for its system metrics
+nvml-wrapper = "0.12.0"
+rand = { workspace = true, features = ["std"] }
+serde_json = { workspace = true }
+# must match the version burn-tch uses
+tch = "0.22.0"
+
+[[bin]]
+name = "cgt-ai-train"
+path = "src/main.rs"
