@@ -426,12 +426,12 @@ impl<'s> Parser<'s> {
             match bs {
                 [b'\t' | b'\r' | b' ', rest @ ..] => {
                     self.location.column += 1;
-                    bs = rest
+                    bs = rest;
                 }
                 [b'\n', rest @ ..] => {
                     self.location.column = 0;
                     self.location.line += 1;
-                    bs = rest
+                    bs = rest;
                 }
                 _ => {
                     return Parser {
