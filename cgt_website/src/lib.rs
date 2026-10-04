@@ -95,30 +95,27 @@ pub fn ScrollSpy() -> impl IntoView {
 
 #[cfg(feature = "hydrate")]
 fn spy_on_scroll() {
+    use std::{cell::Cell, rc::Rc};
     use wasm_bindgen::{JsCast, closure::Closure};
+    use web_sys::Element;
 
     /// How far below the top of the window a heading counts as reached, past the sticky navbar
     const REACHED: f64 = 100.0;
 
-    let update = || {
-        let document = document();
-        let Ok(links) = document.query_selector_all(".section-nav a[href^='#']") else {
-            return;
-        };
-        let links = (0..links.length())
-            .filter_map(|i| links.item(i)?.dyn_into::<web_sys::Element>().ok())
-            .collect::<Vec<_>>();
-        let headings = links
-            .iter()
-            .filter_map(|link| {
-                let id = link.get_attribute("href")?.strip_prefix('#')?.to_owned();
-                let top = document
-                    .get_element_by_id(&id)?
-                    .get_bounding_client_rect()
-                    .top();
-                Some((id, top))
-            })
-            .collect::<Vec<_>>();
+    let document = document();
+    let Ok(links) = document.query_selector_all(".section-nav a[href^='#']") else {
+        return;
+    };
+    // The headings do not change, so each link is paired with its heading once. The same heading
+    // is linked from the sidebar and from the table of contents for small screens
+    let targets: Vec<(Element, Element)> = (0..links.length())
+        .filter_map(|i| {
+            let link = links.item(i)?.dyn_into::<Element>().ok()?;
+            let id = link.get_attribute("href")?.strip_prefix('#')?.to_owned();
+            Some((link, document.get_element_by_id(&id)?))
+        })
+        .collect();
+    let update = move || {
         let window = window();
         let height = window
             .inner_height()
@@ -131,18 +128,34 @@ fn spy_on_scroll() {
         // The last sections may be too short to ever reach the top
         let at_bottom = matches!((height, scrolled, page), (Some(height), Some(scrolled), Some(page)) if height + scrolled >= page - 2.0);
         let current = if at_bottom {
-            headings.last()
+            targets.last()
         } else {
-            headings.iter().rev().find(|(_, top)| *top <= REACHED)
+            targets
+                .iter()
+                .rev()
+                .find(|(_, heading)| heading.get_bounding_client_rect().top() <= REACHED)
         }
-        .map(|(id, _)| format!("#{id}"));
-        for link in &links {
-            let active = current.is_some() && link.get_attribute("href") == current;
+        .map(|(_, heading)| heading);
+        for (link, heading) in &targets {
+            let active = current == Some(heading);
             let _ = link.class_list().toggle_with_force("active", active);
         }
     };
     update();
-    let listener = Closure::<dyn Fn()>::new(update);
+    // Scrolling fires many events per frame, and the links only need updating once a frame
+    let scheduled = Rc::new(Cell::new(false));
+    let frame = {
+        let scheduled = scheduled.clone();
+        Closure::<dyn FnMut()>::new(move || {
+            scheduled.set(false);
+            update();
+        })
+    };
+    let listener = Closure::<dyn FnMut()>::new(move || {
+        if !scheduled.replace(true) {
+            let _ = window().request_animation_frame(frame.as_ref().unchecked_ref());
+        }
+    });
     for event in ["scroll", "resize"] {
         let _ = window().add_event_listener_with_callback(event, listener.as_ref().unchecked_ref());
     }
