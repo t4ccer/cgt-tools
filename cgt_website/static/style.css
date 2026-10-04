@@ -443,14 +443,10 @@ code {
 }
 
 .features {
-  padding: 2rem 0 3rem;
-}
-
-.row {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  margin: 0 -1.5rem;
+  padding: 2rem 0 3rem;
 }
 
 .feature {

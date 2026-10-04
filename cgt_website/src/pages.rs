@@ -214,34 +214,30 @@ fn Home() -> impl IntoView {
             </a>
         </section>
         <div class="bg-dots"></div>
-        <section class="features">
-            <div class="container">
-                <div class="row">
-                    <Feature title="Python and Jupyter">
-                        <code>"pip install cgt-py"</code>
-                        " brings the library to Python, with interactive widgets for exploring positions in Jupyter. See "
-                        <a href=PYTHON_DOCS>"docs"</a>
-                        "."
-                    </Feature>
-                    <Feature title="Rust Library">
-                        <code>"cargo add cgt"</code>
-                        " for native performance computations and position searches, in parallel and with transposition tables. See "
-                        <a href=RUST_DOCS>"docs"</a>
-                        "."
-                    </Feature>
-                    <Feature title="Command Line">
-                        <code>"cgt-cli"</code>
-                        " runs searches from the terminal."
-                    </Feature>
-                    <Feature title="Train AI Players">
-                        "Train AlphaZero-style computer players for combinatorial games."
-                    </Feature>
-                    <Feature title="Play Combinatorial Games">
-                        <a href=PLAY_URL>"Play"</a>
-                        " combinatorial games against an AI that runs in your browser or another player." // TODO: (locally or online)
-                    </Feature>
-                </div>
-            </div>
+        <section class="features container">
+            <Feature title="Python and Jupyter">
+                <code>"pip install cgt-py"</code>
+                " brings the library to Python, with interactive widgets for exploring positions in Jupyter. See "
+                <a href=PYTHON_DOCS>"docs"</a>
+                "."
+            </Feature>
+            <Feature title="Rust Library">
+                <code>"cargo add cgt"</code>
+                " for native performance computations and position searches, in parallel and with transposition tables. See "
+                <a href=RUST_DOCS>"docs"</a>
+                "."
+            </Feature>
+            <Feature title="Command Line">
+                <code>"cgt-cli"</code>
+                " runs searches from the terminal."
+            </Feature>
+            <Feature title="Train AI Players">
+                "Train AlphaZero-style computer players for combinatorial games."
+            </Feature>
+            <Feature title="Play Combinatorial Games">
+                <a href=PLAY_URL>"Play"</a>
+                " combinatorial games against an AI that runs in your browser or another player." // TODO: (locally or online)
+            </Feature>
         </section>
     }
 }
