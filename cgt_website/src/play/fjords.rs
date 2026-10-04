@@ -122,10 +122,11 @@ fn seed_step(
     view! {
         <fieldset>
             <legend>"Board"</legend>
-            <div class="play-field">
+            <label class="play-field">
                 <span>"Seed"</span>
                 <input
                     type="number"
+                    name="seed"
                     min="0"
                     prop:value=move || seed.get().to_string()
                     on:change=move |ev| {
@@ -134,7 +135,7 @@ fn seed_step(
                         }
                     }
                 />
-            </div>
+            </label>
             <div class="play-buttons">
                 <button
                     type="button"

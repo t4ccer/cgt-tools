@@ -363,7 +363,7 @@ pub fn game_view<G: Game>(
                 view! {
                     <label class="play-field">
                         <span>"Model"</span>
-                        <select on:change=move |ev| {
+                        <select name="model" on:change=move |ev| {
                             dispatch.run(Msg::ChooseAi(event_target_value(&ev)));
                         }>{options}</select>
                     </label>
@@ -382,6 +382,7 @@ pub fn game_view<G: Game>(
                     <span>{label}</span>
                     <input
                         type="number"
+                        name="strength"
                         min=min
                         step=step
                         max=max
