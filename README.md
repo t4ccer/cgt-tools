@@ -1,24 +1,24 @@
-# cgt
+# cgt-tools
 
-Combinatorial Game Theory framework and toolkit in Rust and Python.
+Combinatorial Game Theory toolkit in Rust and Python.
+[cgt.tools](https://cgt.tools) has guides, the Python API reference, and games to play against AI players.
 
-## `cgt-gui`
+## Crates
 
-Experimental graphical interface. See [README](./cgt_gui/README.md).
+- [`cgt`](https://docs.rs/cgt/latest/cgt/), at the root of the repository, is the Rust library.
+  It computes canonical forms and thermographs of short games, handles impartial, loopy and misère games, and evaluates and draws positions of games such as Domineering, Snort, Amazons and Konane.
+- [`cgt_derive`](./cgt_derive) has the derive macros of `cgt`.
+- [`cgt_cli`](./cgt_cli) is `cgt-cli`, a command line program that evaluates positions, runs exhaustive and genetic searches, and turns their results into LaTeX tables.
+- [`cgt_py`](./cgt_py) is `cgt-py`, the Python bindings, with Jupyter widgets that show and edit positions.
+- [`cgt_py_widgets`](./cgt_py_widgets) is the frontend of these widgets, compiled to WebAssembly.
+- [`cgt_py_messages`](./cgt_py_messages) has the types that the bindings and the widget frontend exchange.
+- [`cgt_ai_core`](./cgt_ai_core) has the rules of Quelhas and Fjords and the Monte Carlo tree search of AlphaZero-style players.
+- [`cgt_ai_model`](./cgt_ai_model) has the policy and value networks of these players, written with [Burn](https://burn.dev).
+- [`cgt_ai_train`](./cgt_ai_train) trains the networks by self-play and exports them for the website.
+- [`cgt_ai_web_worker`](./cgt_ai_web_worker) plays with an exported network in the browser.
+- [`cgt_website`](./cgt_website) builds [cgt.tools](https://cgt.tools).
 
-## `cgt-cli` utils
-
-Some of the library features are exposed through CLI utility tool. See [CLI README](./cgt_cli/README.md) for installation and usage instructions.
-
-## Rust Library
-
-[Documentation](https://docs.rs/cgt/latest/cgt/)
-
-## Python library (`cgt-py`)
-
-Available on [pypi](https://pypi.org/project/cgt-py)
-
-Python interface is intended as a thin wrapper for interactive exploration using notebook software like [Jupyter](https://jupyter.org/) rather than exhaustive searches of large search spaces.
+`nix develop` provides the tools that all crates need to build.
 
 ## Credits
 
@@ -61,4 +61,5 @@ This program is free software: you can redistribute it and/or modify it under th
 This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 See the GNU Affero General Public License for more details.
 
-You should have received a copy of the GNU Affero General Public License along with this program. If not, see <https://www.gnu.org/licenses/>.
+You should have received a copy of the GNU Affero General Public License along with this program.
+If not, see <https://www.gnu.org/licenses/>.

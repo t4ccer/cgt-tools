@@ -50,7 +50,7 @@ While the environment is active, `python` and `pip` refer to it, so the commands
 The widgets run in Jupyter, which we install next to `cgt-py`, in the same environment, and start from there:
 
 ```console
-$ pip install notebook anywidget
+$ pip install notebook
 $ jupyter notebook
 ```
 
