@@ -20,6 +20,10 @@ pub struct SelfPlayConfig {
     pub full_search_prob: f64,
     pub temperature_moves: usize,
     pub random_opening_prob: f64,
+    /// Share of games that start with one of `balanced_openings`
+    pub balanced_opening_prob: f64,
+    /// First moves from [`Ruleset::fixed_start`]
+    pub balanced_openings: Vec<usize>,
     pub parallel_games: usize,
     pub workers: usize,
     pub search: SearchConfig,
@@ -80,8 +84,7 @@ struct Slot<R: Ruleset> {
 
 impl<R: Ruleset> Slot<R> {
     fn new(rules: &R, cfg: &SelfPlayConfig, rng: &mut impl Rng) -> Slot<R> {
-        let ply = usize::from(rng.random::<f64>() < cfg.random_opening_prob);
-        let state = random_position(rules, ply, rng);
+        let (state, ply) = starting_position(rules, cfg, rng);
         let mut slot = Slot {
             root: Node::new(rules, state),
             ply,
@@ -106,6 +109,30 @@ impl<R: Ruleset> Slot<R> {
     fn search_done(&self) -> bool {
         self.root.is_expanded()
             && (self.root.total_visits() >= self.target || self.root.actions().len() == 1)
+    }
+}
+
+/// The position a game starts from, and how many moves into the game it is.
+fn starting_position<R: Ruleset>(
+    rules: &R,
+    cfg: &SelfPlayConfig,
+    rng: &mut impl Rng,
+) -> (R::State, usize) {
+    let balanced = if cfg.balanced_openings.is_empty() {
+        0.0
+    } else {
+        cfg.balanced_opening_prob
+    };
+    let roll = rng.random::<f64>();
+    if roll < balanced {
+        let start = rules
+            .fixed_start()
+            .expect("balanced openings are first moves from the fixed start");
+        let first = cfg.balanced_openings[rng.random_range(0..cfg.balanced_openings.len())];
+        (rules.apply(&start, first), 1)
+    } else {
+        let ply = usize::from(roll < balanced + cfg.random_opening_prob);
+        (random_position(rules, ply, rng), ply)
     }
 }
 
@@ -277,4 +304,51 @@ pub fn generate<R: Ruleset, B: Backend>(
         stats.merge(s);
     }
     Some((examples, stats))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use cgt_ai_core::quelhas::{Action, Quelhas, State};
+
+    fn config(random: f64, balanced: f64, openings: Vec<usize>) -> SelfPlayConfig {
+        SelfPlayConfig {
+            simulations: 1,
+            fast_simulations: 0,
+            full_search_prob: 1.0,
+            temperature_moves: 0,
+            random_opening_prob: random,
+            balanced_opening_prob: balanced,
+            balanced_openings: openings,
+            parallel_games: 1,
+            workers: 1,
+            search: SearchConfig::default(),
+        }
+    }
+
+    #[test]
+    fn games_start_from_balanced_openings() {
+        let mut rng = SmallRng::seed_from_u64(0);
+        let opening = Action::new(6, 3, 4).unwrap().index();
+        let after = Quelhas.apply(&State::initial(), opening);
+        let cfg = config(0.0, 1.0, vec![opening]);
+        for _ in 0..10 {
+            assert_eq!(starting_position(&Quelhas, &cfg, &mut rng), (after, 1));
+        }
+
+        // Without balanced openings to start from, games start as if there were none
+        let cfg = config(0.5, 0.5, Vec::new());
+        let starts: Vec<usize> = (0..200)
+            .map(|_| starting_position(&Quelhas, &cfg, &mut rng).1)
+            .collect();
+        let random = starts.iter().filter(|&&ply| ply == 1).count();
+        assert!((60..140).contains(&random), "{random}");
+
+        let cfg = config(0.5, 0.5, vec![opening]);
+        for _ in 0..50 {
+            let (state, ply) = starting_position(&Quelhas, &cfg, &mut rng);
+            assert_eq!(ply, 1);
+            assert_eq!(state.turn, Player::Right);
+        }
+    }
 }

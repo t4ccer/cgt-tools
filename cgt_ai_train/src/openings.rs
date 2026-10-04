@@ -6,13 +6,13 @@ use anyhow::{Result, bail};
 use burn::tensor::backend::AutodiffBackend;
 use cgt_ai_core::{
     games::GameId,
-    mcts::{Evaluations, Evaluator, Node, SearchConfig, run_mcts},
-    openings::{OpeningTable, first_move_classes},
+    mcts::{Evaluations, Evaluator},
+    openings::{OpeningTable, most_balanced, search_first_moves},
     ruleset::Ruleset,
 };
 use cgt_ai_model::NetEvaluator;
 use indicatif::{ProgressBar, ProgressStyle};
-use std::{collections::BTreeMap, path::PathBuf};
+use std::path::PathBuf;
 
 #[derive(clap::Args, Debug)]
 pub struct OpeningsArgs {
@@ -59,16 +59,16 @@ fn run<B: AutodiffBackend, R: Ruleset>(
     args: &OpeningsArgs,
     device: B::Device,
 ) -> Result<()> {
-    let (Some(initial), Some(classes)) = (rules.fixed_start(), first_move_classes(rules)) else {
+    let Some(initial) = rules.fixed_start() else {
         bail!(
             "{} starts from positions dealt at random, so it has no opening table",
             rules.name()
         );
     };
     let net = checkpoint::load_net::<B, R>(rules, &args.checkpoint, &device)?;
-    let representatives: Vec<usize> = classes.keys().copied().collect();
+    let first_moves = rules.legal_actions(&initial).len();
     let sims = u64::from(args.simulations);
-    let bar = ProgressBar::new(representatives.len() as u64 * sims).with_style(
+    let bar = ProgressBar::new(first_moves as u64 * sims).with_style(
         ProgressStyle::with_template(
             "{msg} [{wide_bar}] {human_pos}/{human_len} simulations, {elapsed} elapsed, ETA {eta}",
         )?
@@ -82,46 +82,33 @@ fn run<B: AutodiffBackend, R: Ruleset>(
         },
         bar: bar.clone(),
     };
-    let mut values = BTreeMap::new();
-    let mut searched = 0;
-    bar.set_message(format!("openings 0/{}", representatives.len()));
-    for chunk in representatives.chunks(args.batch) {
-        let mut roots: Vec<Node<R>> = chunk
-            .iter()
-            .map(|&a| Node::new(rules, rules.apply(&initial, a)))
-            .collect();
-        run_mcts(
-            rules,
-            &mut evaluator,
-            &mut roots,
-            args.simulations,
-            &SearchConfig::default(),
-            None,
-        );
-        for (a, root) in chunk.iter().zip(&roots) {
-            for &member in &classes[a] {
-                values.insert(member, (root.q() * 1e4).round() / 1e4);
+    bar.set_message(format!("openings 0/{first_moves}"));
+    let values = search_first_moves(
+        rules,
+        &mut evaluator,
+        args.simulations,
+        args.batch,
+        |searched| {
+            // root expansions and terminal leaves make the evaluation count drift
+            // from the simulation count, so resynchronise once a batch is done
+            bar.set_position(searched as u64 * sims);
+            bar.set_message(format!("openings {searched}/{first_moves}"));
+            if bar.is_hidden() {
+                println!("  searched {searched}/{first_moves} first moves");
             }
-        }
-        searched += chunk.len();
-        // root expansions and terminal leaves make the evaluation count drift
-        // from the simulation count, so resynchronise once a batch is done
-        bar.set_position(searched as u64 * sims);
-        bar.set_message(format!("openings {searched}/{}", representatives.len()));
-        if bar.is_hidden() {
-            println!(
-                "  searched {searched}/{} opening classes",
-                representatives.len()
-            );
-        }
-    }
+        },
+    )
+    .expect("a game with a fixed start has first moves to search");
     bar.finish();
 
     let table = OpeningTable {
         game: rules.name().to_string(),
         checkpoint: args.checkpoint.display().to_string(),
         simulations: args.simulations,
-        values,
+        values: values
+            .into_iter()
+            .map(|(a, v)| (a, (v * 1e4).round() / 1e4))
+            .collect(),
     };
     let out = args
         .out
@@ -133,16 +120,9 @@ fn run<B: AutodiffBackend, R: Ruleset>(
     std::fs::write(&out, serde_json::to_string_pretty(&table)?)?;
     println!("wrote {}", out.display());
 
-    let value = |a: usize| table.value(a).unwrap_or(f64::NAN);
-    let mut ranked = representatives;
-    ranked.sort_by(|&a, &b| value(a).abs().total_cmp(&value(b).abs()));
     println!("most balanced first moves (value for the second player, who is to move):");
-    for &a in ranked.iter().take(10) {
-        println!(
-            "  {:9} {:+.3}",
-            rules.describe_action(&initial, a),
-            value(a)
-        );
+    for (a, value) in most_balanced(&table.values, 10) {
+        println!("  {:9} {value:+.3}", rules.describe_action(&initial, a));
     }
     let favoured = table.values.values().filter(|&&v| v > 0.0).count();
     println!(

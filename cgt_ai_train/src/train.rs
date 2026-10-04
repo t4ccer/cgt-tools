@@ -5,7 +5,7 @@ use crate::{
     report::{IterationReport, Phase, Reporter},
     self_play::{SelfPlayConfig, generate},
 };
-use anyhow::Result;
+use anyhow::{Result, ensure};
 use burn::{
     module::{AutodiffModule, Module},
     optim::{AdamWConfig, GradientsParams, Optimizer},
@@ -16,8 +16,13 @@ use burn::{
     },
     train::Interrupter,
 };
-use cgt_ai_core::{games::GameId, mcts::SearchConfig, ruleset::Ruleset};
-use cgt_ai_model::{NetConfig, NetInput, encode_batch};
+use cgt_ai_core::{
+    games::GameId,
+    mcts::SearchConfig,
+    openings::{most_balanced, search_first_moves},
+    ruleset::Ruleset,
+};
+use cgt_ai_model::{NetConfig, NetEvaluator, NetInput, encode_batch};
 use clap::builder::RangedU64ValueParser;
 use rand::{Rng, RngExt, SeedableRng, rngs::SmallRng};
 use std::{
@@ -46,6 +51,15 @@ pub struct TrainArgs {
     temperature_moves: usize,
     #[arg(long, default_value_t = 0.25)]
     random_opening_prob: f64,
+    /// Share of games that start with one of the first moves the network finds most balanced,
+    /// which are the openings of a game played with the pie rule. Only for games with a fixed
+    /// starting position
+    #[arg(long, default_value_t = 0.25)]
+    balanced_opening_prob: f64,
+    /// How many of the most balanced first moves those games start with, chosen again every
+    /// iteration from a search of every first move
+    #[arg(long, default_value_t = 8)]
+    balanced_openings: usize,
     /// Concurrent games per self-play worker
     #[arg(long, default_value_t = 64)]
     parallel_games: usize,
@@ -259,12 +273,18 @@ fn run<B: AutodiffBackend, R: Ruleset>(
         );
     }
 
-    let cfg = SelfPlayConfig {
+    ensure!(
+        args.random_opening_prob + args.balanced_opening_prob <= 1.0,
+        "--random-opening-prob and --balanced-opening-prob add up to more than 1"
+    );
+    let mut cfg = SelfPlayConfig {
         simulations: args.simulations,
         fast_simulations: args.fast_simulations,
         full_search_prob: args.full_search_prob,
         temperature_moves: args.temperature_moves,
         random_opening_prob: args.random_opening_prob,
+        balanced_opening_prob: args.balanced_opening_prob,
+        balanced_openings: Vec::new(),
         parallel_games: args.parallel_games,
         workers: args.workers,
         search: SearchConfig::default(),
@@ -283,6 +303,21 @@ fn run<B: AutodiffBackend, R: Ruleset>(
     for i in 1..=args.iterations {
         let iteration_start = Instant::now();
         let net = trainer.net.valid();
+        if args.balanced_opening_prob > 0.0 {
+            let mut evaluator = NetEvaluator {
+                rules: rules.clone(),
+                net: net.clone(),
+                device: device.clone(),
+            };
+            if let Some(values) =
+                search_first_moves(rules, &mut evaluator, args.simulations, usize::MAX, |_| {})
+            {
+                cfg.balanced_openings = most_balanced(&values, args.balanced_openings)
+                    .into_iter()
+                    .map(|(action, _)| action)
+                    .collect();
+            }
+        }
         let games = args.games_per_iteration;
         let Some((new_examples, stats)) = generate(
             rules,

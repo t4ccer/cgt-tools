@@ -188,7 +188,7 @@ pub struct Analysis {
     pub side: Player,
     /// Chance of the side to move to win, in `[-1, 1]`
     pub value: f64,
-    /// The move the AI would make
+    /// The move the AI would make, which a pie decision leaves to a search that follows it
     pub best: Option<usize>,
 }
 
@@ -453,6 +453,20 @@ impl<G: Game> Model<G> {
         }
     }
 
+    /// Records the move a search found for the current position. Chances that a pie decision
+    /// found for it stay, so that the estimate agrees with the decision.
+    fn record_search(&mut self, value: f64, best: usize) {
+        let value = match self.current() {
+            Some(Analysis {
+                best: None,
+                value: decided,
+                ..
+            }) => decided,
+            _ => value,
+        };
+        self.record(value, Some(best));
+    }
+
     const fn next_id(&mut self) -> u32 {
         self.next_request += 1;
         self.next_request
@@ -524,25 +538,33 @@ impl<G: Game> Model<G> {
 
     /// A request to analyse the position a person is to move in, unless that is done or hidden
     fn analysis_request(&mut self) -> Option<(u32, Request)> {
-        if !self.show_analysis
-            || !self.human_to_move()
-            || self.current().is_some()
-            || self.analyzing.is_some()
-        {
+        if !self.show_analysis || !self.human_to_move() || self.analyzing.is_some() {
             return None;
         }
-        let id = self.next_id();
-        self.analyzing = Some(id);
-        // Under the pie rule the best first move is the most balanced one, which the opening table
-        // knows
-        let request = if G::PIE_RULE && self.moves.is_empty() {
-            Request::Opening
-        } else {
-            Request::Move {
+        let request = match self.current() {
+            // Under the pie rule the best first move is the most balanced one, which the opening
+            // table knows
+            None if G::PIE_RULE && self.moves.is_empty() => Request::Opening,
+            // Whether to swap is answered the way the AI decides it for itself, so that the hint
+            // never disagrees with what the AI would do
+            None if self.pie_offered() => Request::Pie {
+                first: self.moves[0].action,
+                budget: self.budget,
+            },
+            Some(Analysis {
+                best: None, value, ..
+            }) if !(self.pie_offered() && decide_swap(value)) => Request::Move {
                 position: self.position(),
                 budget: self.budget,
-            }
+            },
+            None => Request::Move {
+                position: self.position(),
+                budget: self.budget,
+            },
+            Some(_) => return None,
         };
+        let id = self.next_id();
+        self.analyzing = Some(id);
         Some((id, request))
     }
 
@@ -720,8 +742,15 @@ impl<G: Game> Model<G> {
             Msg::AiMove { id, action, value } if self.analyzing == Some(id) => {
                 self.analyzing = None;
                 self.analysis_error = None;
-                self.record(value, Some(action));
+                self.record_search(value, action);
                 None
+            }
+            Msg::AiPie { id, value, .. } if self.analyzing == Some(id) => {
+                self.analyzing = None;
+                self.analysis_error = None;
+                self.record(value, None);
+                // Unless swapping is best, a search finds the move to keep playing with
+                self.analysis_request()
             }
             Msg::AiMove { id, action, value } => {
                 if self.pending != Some(id) {
@@ -732,7 +761,7 @@ impl<G: Game> Model<G> {
                     self.pending = None;
                     return None;
                 }
-                self.record(value, Some(action));
+                self.record_search(value, action);
                 self.apply_move(action);
                 self.trigger_ai_if_needed()
             }
@@ -906,7 +935,7 @@ mod tests {
         let (id, _) = model.update(Msg::Play(first)).unwrap();
         assert!(!model.human_to_move());
 
-        let (_, request) = model
+        let (id, request) = model
             .update(Msg::AiPie {
                 id,
                 swap: false,
@@ -920,6 +949,39 @@ mod tests {
                 budget: BUDGET,
             }
         );
+        // The chances the AI decided not to swap with stay, whatever its search makes of them
+        let reply = action(Player::Right, (0, 0), (0, 1));
+        model.update(Msg::AiMove {
+            id,
+            action: reply,
+            value: -0.5,
+        });
+        assert_eq!(model.move_chance(0), Some(-0.1));
+        assert_eq!(model.move_chance(1), Some(0.1));
+    }
+
+    #[test]
+    fn people_get_a_move_once_the_ai_swaps() {
+        let (mut model, _) = started(Opponent::Ai, Starter::Human);
+        let (id, _) = model
+            .update(Msg::Play(action(Player::Left, (2, 3), (5, 3))))
+            .unwrap();
+        let (_, request) = model
+            .update(Msg::AiPie {
+                id,
+                swap: true,
+                value: -0.2,
+            })
+            .unwrap();
+        assert_eq!(model.controller_of(Player::Right), Controller::Human);
+        assert_eq!(
+            request,
+            Request::Move {
+                position: position(&model.state),
+                budget: BUDGET,
+            }
+        );
+        assert_eq!(model.hint(), None);
     }
 
     #[test]
@@ -928,13 +990,20 @@ mod tests {
         let (id, request) = request.unwrap();
         assert_eq!(request, Request::Opening);
         let first = action(Player::Left, (0, 0), (1, 0));
-        let (analysis, _) = model
+        let (analysis, request) = model
             .update(Msg::AiMove {
                 id,
                 action: first,
                 value: 0.0,
             })
             .unwrap();
+        assert_eq!(
+            request,
+            Request::Pie {
+                first,
+                budget: BUDGET
+            }
+        );
         assert_eq!(model.analyzing, Some(analysis));
         assert!(model.pie_offered() && model.human_to_move());
         let (_, request) = model.update(Msg::Swap).unwrap();
@@ -1005,19 +1074,34 @@ mod tests {
         let (id, request) = model.update(Msg::Play(first)).unwrap();
         assert_eq!(
             request,
+            Request::Pie {
+                first,
+                budget: BUDGET
+            }
+        );
+        // The analysis does not hold up the next move, and its answer only updates the estimate
+        assert!(model.human_to_move());
+        let (id, request) = model
+            .update(Msg::AiPie {
+                id,
+                swap: false,
+                value: 0.4,
+            })
+            .unwrap();
+        assert_eq!(
+            request,
             Request::Move {
                 position: position(&model.state),
                 budget: BUDGET,
             }
         );
-        // The analysis does not hold up the next move, and its answer only updates the estimate
-        assert!(model.human_to_move());
+        assert_eq!(model.hint(), None);
         let reply = action(Player::Right, (0, 0), (0, 1));
         assert_eq!(
             model.update(Msg::AiMove {
                 id,
                 action: reply,
-                value: 0.4
+                value: -0.3
             }),
             None
         );
@@ -1095,10 +1179,18 @@ mod tests {
         assert_eq!(model.hint(), None);
 
         let reply = action(Player::Right, (5, 2), (5, 4));
+        let (search, _) = model
+            .update(Msg::AiPie {
+                id: analysis,
+                swap: false,
+                value: 0.3,
+            })
+            .unwrap();
+        assert_eq!(model.move_chance(0), Some(-0.3));
         model.update(Msg::AiMove {
-            id: analysis,
+            id: search,
             action: reply,
-            value: 0.3,
+            value: 0.6,
         });
         assert_eq!(model.move_chance(0), Some(-0.3));
         assert_eq!(model.hint(), Some(Hint::Move("R c6-e6".into())));
@@ -1114,6 +1206,43 @@ mod tests {
         model.update(Msg::Play(reply));
         assert_eq!(model.move_chance(1), Some(-0.3));
         assert_eq!(model.move_chance(2), None);
+    }
+
+    #[test]
+    fn the_swap_hint_is_the_ai_decision() {
+        let (mut model, request) = started(Opponent::Ai, Starter::Ai);
+        let (id, _) = request.unwrap();
+        let first = action(Player::Left, (3, 4), (8, 4));
+        let (analysis, _) = model
+            .update(Msg::AiMove {
+                id,
+                action: first,
+                value: -0.1,
+            })
+            .unwrap();
+        // Swapping is best, so no search for a move follows
+        assert_eq!(
+            model.update(Msg::AiPie {
+                id: analysis,
+                swap: true,
+                value: -0.5,
+            }),
+            None
+        );
+        assert_eq!(model.hint(), Some(Hint::Swap));
+        assert_eq!(model.move_chance(0), Some(0.5));
+        assert_eq!(model.analyzing, None);
+        assert_eq!(model.update(Msg::ToggleAnalysis), None);
+        assert_eq!(model.update(Msg::ToggleAnalysis), None);
+
+        // The AI's search as Right does not change the chances the swap was made on
+        let (id, _) = model.update(Msg::Swap).unwrap();
+        model.update(Msg::AiMove {
+            id,
+            action: action(Player::Right, (0, 0), (0, 1)),
+            value: 0.7,
+        });
+        assert_eq!(model.move_chance(0), Some(0.5));
     }
 
     #[test]
