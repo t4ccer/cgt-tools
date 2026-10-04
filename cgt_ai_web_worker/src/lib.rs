@@ -427,6 +427,10 @@ mod tests {
         // Without edges the side to move is stuck and has lost
         assert!((values[1] + 1.0).abs() < f64::EPSILON);
         assert!(values.iter().all(|v| v.abs() <= 1.0));
+        assert_eq!(
+            player.handle(Request::Evaluate { positions: vec![] }),
+            Response::Values(vec![])
+        );
     }
 
     #[test]

@@ -1,5 +1,4 @@
-//! Policy and value networks for games, of the kind each game's
-//! [`Input`](cgt_ai_core::ruleset::Input) asks for.
+//! Policy and value networks for games, of the kind each game's [`Input`] asks for.
 
 mod graph;
 mod grid;
@@ -211,6 +210,10 @@ pub struct NetEvaluator<R: Ruleset, B: Backend> {
 
 impl<R: Ruleset, B: Backend> Evaluator<R> for NetEvaluator<R, B> {
     fn evaluate(&mut self, states: &[R::State]) -> Evaluations {
+        // The CPU backend crashes on a batch of no positions
+        if states.is_empty() {
+            return Evaluations::new(Vec::new(), Vec::new(), self.rules.num_actions());
+        }
         let x = encode_batch(&self.rules, states, &self.device);
         let (logits, values) = self.net.forward(x);
         Evaluations::new(
@@ -316,6 +319,8 @@ mod tests {
                 fjords::State::deal(2, 0.5),
             ],
         );
+        evaluate(Quelhas, &[]);
+        evaluate(Fjords, &[]);
     }
 
     fn roundtrip<R: Ruleset>(rules: &R, state: R::State, openings: Option<OpeningTable>) {

@@ -17,7 +17,7 @@ mod process;
 mod python_docs;
 
 #[cfg(feature = "ssr")]
-pub use config::Config;
+pub use config::{Config, Models, Source};
 #[cfg(feature = "ssr")]
 pub use guides::{Guide, read_guides};
 #[cfg(feature = "ssr")]
