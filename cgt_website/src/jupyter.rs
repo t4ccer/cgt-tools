@@ -60,13 +60,18 @@ pub struct Jupyter {
 }
 
 impl Jupyter {
-    /// Starts a notebook server with `python`, which also runs the kernels
+    /// Starts a notebook server with `python`, which also runs the kernels, with the files of the
+    /// server and the browser in `dir`, which is emptied first and removed at the end
     ///
     /// # Errors
     ///
     /// When the server or the browser cannot be started
-    pub fn start(python: &Path) -> io::Result<Self> {
-        let dir = TempDir(std::env::temp_dir().join(format!("cgt-website-{}", std::process::id())));
+    pub fn start(python: &Path, dir: &Path) -> io::Result<Self> {
+        // A build that panics or is interrupted leaves its files behind, because the release
+        // profile aborts on a panic and a signal ends the process without running any `Drop`
+        let _ = fs::remove_dir_all(dir);
+        fs::create_dir_all(dir)?;
+        let dir = TempDir(dir.to_path_buf());
         let config = dir.0.join("config");
         for (path, contents) in SETTINGS {
             let path = config.join("lab/user-settings").join(path);
@@ -87,6 +92,9 @@ impl Jupyter {
                     "--ServerApp.token=",
                     "--ServerApp.password=",
                     "--ServerApp.port_retries=0",
+                    // Otherwise an interrupt makes the server ask on its standard input, which is
+                    // closed, whether to shut down, and it goes on running
+                    "--ServerApp.answer_yes=True",
                 ])
                 .arg(format!("--ServerApp.port={port}"))
                 .arg(format!(

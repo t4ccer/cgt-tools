@@ -34,17 +34,23 @@ impl Process {
         let stderr = self.0.stderr.take();
         let (found, wait) = mpsc::channel();
         thread::spawn(move || {
-            let mut log = Vec::new();
+            // Kept only until the line is found, to report a process that exits instead
+            let mut log = Some(Vec::new());
             for line in stderr
                 .into_iter()
                 .flat_map(|stderr| BufReader::new(stderr).lines().map_while(Result::ok))
             {
+                let Some(lines) = &mut log else { continue };
                 if let Some(value) = find(&line) {
                     let _ = found.send(Ok(value));
+                    log = None;
+                } else {
+                    lines.push(line);
                 }
-                log.push(line);
             }
-            let _ = found.send(Err(log.join("\n")));
+            if let Some(log) = log {
+                let _ = found.send(Err(log.join("\n")));
+            }
         });
         match wait.recv_timeout(timeout) {
             Ok(Ok(value)) => Ok(value),

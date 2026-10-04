@@ -492,13 +492,13 @@ impl Guide {
 
 /// Reads the guides at `paths`, in that order. A Markdown guide is shown as it is written, and a
 /// notebook is first run with `python`, which needs the `notebook` package and `cgt_py`, to fill
-/// in its outputs
+/// in its outputs, with the files of the notebook server in `work_dir`
 ///
 /// # Errors
 ///
 /// When a guide cannot be read or run, a cell raises, a guide does not start with a title, or two
 /// guides have the same file name
-pub fn read_guides(paths: &[PathBuf], python: &Path) -> io::Result<Vec<Guide>> {
+pub fn read_guides(paths: &[PathBuf], python: &Path, work_dir: &Path) -> io::Result<Vec<Guide>> {
     let mut jupyter = None;
     let mut guides: Vec<Guide> = Vec::with_capacity(paths.len());
     for path in paths {
@@ -517,7 +517,7 @@ pub fn read_guides(paths: &[PathBuf], python: &Path) -> io::Result<Vec<Guide>> {
                     Some(running) => running,
                     None => {
                         log(format!("Starting Jupyter with `{}`", python.display()));
-                        Jupyter::start(python)?
+                        Jupyter::start(python, work_dir)?
                     }
                 };
                 let guide = Guide::from_notebook(slug, &contents, &mut running);

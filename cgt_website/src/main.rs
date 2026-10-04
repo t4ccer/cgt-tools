@@ -103,7 +103,10 @@ fn main() -> io::Result<()> {
             .map_or(&[][..], |models| &models.0);
         play.push((game, cgt_website::read_models(game, models)?));
     }
-    let guides = cgt_website::read_guides(&config.guides, &python)?;
+    // Next to the site rather than in the temporary directory, so that what an interrupted build
+    // leaves behind goes with the next build or clean
+    let guides =
+        cgt_website::read_guides(&config.guides, &python, &site.with_extension("jupyter"))?;
     cgt_website::log("Writing the pages");
     for (path, contents) in ASSETS {
         write(&site.join(path), contents)?;
