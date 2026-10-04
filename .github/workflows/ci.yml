@@ -284,7 +284,7 @@ jobs:
 
       - name: Compare tag against manifest versions
         run: |
-          for manifest in Cargo.toml cgt_derive/Cargo.toml cgt_py/Cargo.toml; do
+          for manifest in $(git ls-files '*Cargo.toml' '*pyproject.toml'); do
             version="$(sed -n 's/^version = "\(.*\)"$/\1/p' "$manifest" | head -1)"
             if [[ "v$version" != "$GITHUB_REF_NAME" ]]; then
               echo "::error::$manifest is $version but the tag is $GITHUB_REF_NAME"
