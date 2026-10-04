@@ -1207,15 +1207,11 @@ pre.code code {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem 1rem;
+  gap: 0.5rem;
 }
 
 .play-pie {
   margin: 0.75rem 0;
-}
-
-.play-buttons {
-  gap: 0.5rem;
 }
 
 .play-field {
