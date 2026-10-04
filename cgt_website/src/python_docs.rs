@@ -241,6 +241,9 @@ fn anchors(package: &Package) -> BTreeSet<String> {
     let mut anchors = BTreeSet::new();
     for module in package.modules.values() {
         for item in &module.items {
+            if matches!(item, Item::Module) {
+                continue;
+            }
             let fqn = format!("{}.{}", module.name, item.name());
             if let Item::Class(class) = item {
                 let constructor = class.constructor().map(|constructor| &constructor.name);
