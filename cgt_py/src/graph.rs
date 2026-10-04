@@ -14,7 +14,7 @@ use cgt::{
         snort::{self, Snort},
     },
 };
-use cgt_py_messages::{GraphPreset, Vertex, VertexColor, layout::arrange};
+use cgt_py_widgets_core::{GraphPreset, Vertex, VertexColor, layout::arrange};
 use pyo3::{
     Bound, IntoPyObjectExt, Py, PyAny, PyResult, Python, exceptions::PyValueError, prelude::*,
     pyclass, pyfunction, pymethods, types::PyDict,

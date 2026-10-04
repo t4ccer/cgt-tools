@@ -2,7 +2,7 @@
 members = [
   "cgt_cli",
   "cgt_py",
-  "cgt_py_messages",
+  "cgt_py_widgets_core",
   "cgt_py_widgets",
   "cgt_derive",
   "cgt_ai_core",

@@ -12,7 +12,7 @@ The [installation guide](https://cgt.tools/guides/python-installation/) sets up 
 ## Building from source
 
 The widgets are written in Rust as well.
-Their frontend, [`cgt_py_widgets`](https://github.com/t4ccer/cgt-tools/tree/main/cgt_py_widgets), is compiled to WebAssembly and bundled into `widget/bundle.js`, which the package embeds, and [`cgt_py_messages`](https://github.com/t4ccer/cgt-tools/tree/main/cgt_py_messages) has the types that the two ends exchange.
+Their frontend, [`cgt_py_widgets`](https://github.com/t4ccer/cgt-tools/tree/main/cgt_py_widgets), is compiled to WebAssembly and bundled into `widget/bundle.js`, which the package embeds, and [`cgt_py_widgets_core`](https://github.com/t4ccer/cgt-tools/tree/main/cgt_py_widgets_core) has the types that the two ends exchange.
 Building it needs `wasm-pack`, `webpack` and `maturin`, which `nix develop` provides.
 From the root of [the repository](https://github.com/t4ccer/cgt-tools),
 

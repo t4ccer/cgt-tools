@@ -5,7 +5,7 @@ use cgt::{
     numeric::v2f::V2f,
     short::partizan::Player,
 };
-use cgt_py_messages::Tile;
+use cgt_py_widgets_core::Tile;
 
 fn axis_position(coordinate: f32, tile_size: f32, length: u8) -> (u8, bool) {
     let line = HtmlCanvas::thick_line_weight();

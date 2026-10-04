@@ -10,7 +10,7 @@ use cgt::{
     result::UnwrapInfallible,
     short::partizan::{Player, games::fission},
 };
-use cgt_py_messages::{GRID_TRAITLET, GridPreset, GridPresetFlag, Tile};
+use cgt_py_widgets_core::{GRID_TRAITLET, GridPreset, GridPresetFlag, Tile};
 use futures_signals::{
     map_ref,
     signal::{Mutable, SignalExt},

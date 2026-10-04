@@ -23,7 +23,7 @@ use cgt::{
         },
     },
 };
-use cgt_py_messages::{
+use cgt_py_widgets_core::{
     GRAPH_TRAITLET, GraphPreset, GraphPresetFlag, Vertex, VertexColor,
     layout::{
         DEFAULT_CANVAS_SIZE, default_bounds, default_circle, default_spring, max_spring_iterations,

@@ -8,7 +8,7 @@ use cgt::{
         transposition_table::ParallelTranspositionTable,
     },
 };
-use cgt_py_messages::GraphPreset;
+use cgt_py_widgets_core::GraphPreset;
 use pyo3::{
     Bound, PyAny, PyResult, exceptions::PyTypeError, pyclass, pymethods, types::PyAnyMethods,
 };
@@ -68,10 +68,14 @@ impl PySnort {
 
     #[getter]
     pub fn graph(&self) -> PyGraph {
-        let mut graph = self.0.graph.as_directed().map(|v| cgt_py_messages::Vertex {
-            color: cgt_py_messages::VertexColor::from(v.color()),
-            position: V2f::ZERO,
-        });
+        let mut graph = self
+            .0
+            .graph
+            .as_directed()
+            .map(|v| cgt_py_widgets_core::Vertex {
+                color: cgt_py_widgets_core::VertexColor::from(v.color()),
+                position: V2f::ZERO,
+            });
         crate::graph::layout_for_svg(&mut graph);
         PyGraph::from_preset_unchecked(GraphPreset::Snort, graph)
     }

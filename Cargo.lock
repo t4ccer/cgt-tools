@@ -1333,18 +1333,10 @@ name = "cgt_py"
 version = "0.11.0"
 dependencies = [
  "cgt",
- "cgt_py_messages",
+ "cgt_py_widgets_core",
  "pyo3",
  "pyo3-stub-gen",
  "serde_json",
-]
-
-[[package]]
-name = "cgt_py_messages"
-version = "0.11.0"
-dependencies = [
- "cgt",
- "serde",
 ]
 
 [[package]]
@@ -1352,13 +1344,21 @@ name = "cgt_py_widgets"
 version = "0.11.0"
 dependencies = [
  "cgt",
- "cgt_py_messages",
+ "cgt_py_widgets_core",
  "futures-signals",
  "serde",
  "serde_json",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
+]
+
+[[package]]
+name = "cgt_py_widgets_core"
+version = "0.11.0"
+dependencies = [
+ "cgt",
+ "serde",
 ]
 
 [[package]]

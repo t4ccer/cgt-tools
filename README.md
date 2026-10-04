@@ -11,7 +11,7 @@ Combinatorial Game Theory toolkit in Rust and Python.
 - [`cgt_cli`](./cgt_cli) is `cgt-cli`, a command line program that evaluates positions, runs exhaustive and genetic searches, and turns their results into LaTeX tables.
 - [`cgt_py`](./cgt_py) is `cgt-py`, the Python bindings, with Jupyter widgets that show and edit positions.
 - [`cgt_py_widgets`](./cgt_py_widgets) is the frontend of these widgets, compiled to WebAssembly.
-- [`cgt_py_messages`](./cgt_py_messages) has the types that the bindings and the widget frontend exchange.
+- [`cgt_py_widgets_core`](./cgt_py_widgets_core) has the types that the bindings and the widget frontend exchange.
 - [`cgt_ai_core`](./cgt_ai_core) has the rules of Quelhas and Fjords and the Monte Carlo tree search of AlphaZero-style players.
 - [`cgt_ai_model`](./cgt_ai_model) has the policy and value networks of these players, written with [Burn](https://burn.dev).
 - [`cgt_ai_train`](./cgt_ai_train) trains the networks by self-play and exports them for the website.

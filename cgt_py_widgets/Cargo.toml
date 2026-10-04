@@ -21,7 +21,7 @@ serde.workspace = true
 serde_json.workspace = true
 web-sys.workspace = true
 wasm-bindgen.workspace = true
-cgt_py_messages = { path = "../cgt_py_messages" }
+cgt_py_widgets_core = { path = "../cgt_py_widgets_core" }
 cgt = { path = "../.", features = ["serde"] }
 wasm-bindgen-futures.workspace = true
 futures-signals.workspace = true

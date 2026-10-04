@@ -8,7 +8,7 @@ use cgt::{
         transposition_table::ParallelTranspositionTable,
     },
 };
-use cgt_py_messages::GraphPreset;
+use cgt_py_widgets_core::GraphPreset;
 use pyo3::{
     Bound, PyAny, PyResult, exceptions::PyTypeError, pyclass, pymethods, types::PyAnyMethods,
 };
@@ -65,8 +65,8 @@ impl PyDigraphPlacement {
 
     #[getter]
     pub fn graph(&self) -> PyGraph {
-        let mut graph = self.0.graph.map(|&color| cgt_py_messages::Vertex {
-            color: cgt_py_messages::VertexColor::from(color),
+        let mut graph = self.0.graph.map(|&color| cgt_py_widgets_core::Vertex {
+            color: cgt_py_widgets_core::VertexColor::from(color),
             position: V2f::ZERO,
         });
         crate::graph::layout_for_svg(&mut graph);

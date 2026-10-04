@@ -7,7 +7,7 @@ use cgt::{
         transposition_table::ParallelTranspositionTable,
     },
 };
-use cgt_py_messages::GraphPreset;
+use cgt_py_widgets_core::GraphPreset;
 use pyo3::{PyErr, PyResult, pyclass, pymethods};
 use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 use std::sync::LazyLock;
@@ -85,8 +85,8 @@ impl PyBipartiteSnort {
             .0
             .graph
             .as_directed()
-            .map(|&color| cgt_py_messages::Vertex {
-                color: cgt_py_messages::VertexColor::from(color),
+            .map(|&color| cgt_py_widgets_core::Vertex {
+                color: cgt_py_widgets_core::VertexColor::from(color),
                 position: V2f::ZERO,
             });
         crate::graph::layout_for_svg(&mut graph);

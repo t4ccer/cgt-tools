@@ -2,7 +2,7 @@ use cgt::{
     grid::{FiniteGrid, Grid as _, vec_grid::VecGrid},
     short::partizan::Player,
 };
-use cgt_py_messages::Tile;
+use cgt_py_widgets_core::Tile;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Move {

@@ -9,7 +9,7 @@ use cgt::{
         konane::{self, Konane},
     },
 };
-use cgt_py_messages::{GridPreset, Tile};
+use cgt_py_widgets_core::{GridPreset, Tile};
 use pyo3::{
     Bound, IntoPyObjectExt, Py, PyAny, PyResult, Python, exceptions::PyValueError, prelude::*,
     pyclass, pyfunction, pymethods, types::PyDict,
