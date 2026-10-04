@@ -5,7 +5,7 @@ use cgt_ai_core::protocol::{Envelope, Request, Response};
 use leptos::prelude::*;
 use std::{cell::RefCell, rc::Rc};
 use wasm_bindgen::{JsCast, prelude::*};
-use web_sys::{ErrorEvent, MessageEvent, Worker, WorkerOptions, WorkerType};
+use web_sys::{ErrorEvent, Event, MessageEvent, Worker, WorkerOptions, WorkerType};
 
 /// The worker script, which `make site` copies next to the islands
 const WORKER: &str = "/pkg/worker.js";
@@ -20,14 +20,22 @@ struct Client {
     /// The request the worker is working on
     current: Option<u32>,
     on_message: Option<Closure<dyn FnMut(MessageEvent)>>,
-    on_error: Option<Closure<dyn FnMut(ErrorEvent)>>,
+    on_error: Option<Closure<dyn FnMut(Event)>>,
 }
 
 impl Client {
-    fn restart(&mut self, ai: String) -> Result<(), JsValue> {
+    /// Stops the worker, and with it every request it was given
+    fn discard(&mut self) {
         if let Some(worker) = self.worker.take() {
             worker.terminate();
         }
+        self.ready = false;
+        self.queued = None;
+        self.current = None;
+    }
+
+    fn restart(&mut self, ai: String) -> Result<(), JsValue> {
+        self.discard();
         let options = WorkerOptions::new();
         options.set_type(WorkerType::Module);
         let model = js_sys::encode_uri_component(&ai);
@@ -36,9 +44,6 @@ impl Client {
         worker.set_onerror(self.on_error.as_ref().map(|c| c.as_ref().unchecked_ref()));
         self.worker = Some(worker);
         self.ai = ai;
-        self.ready = false;
-        self.queued = None;
-        self.current = None;
         Ok(())
     }
 
@@ -72,12 +77,6 @@ pub fn connect<G: Game>(model: RwSignal<Model<G>>) -> Callback<Msg> {
         stored.with_value(|client| send(client, new_game, request, model));
     });
 
-    let fail = move |id: Option<u32>, message: String| {
-        if let Some(id) = id {
-            dispatch.run(Msg::AiError { id, message });
-        }
-    };
-
     let weak = Rc::downgrade(&client);
     let on_message = Closure::<dyn FnMut(MessageEvent)>::new(move |event: MessageEvent| {
         let Some(client) = weak.upgrade() else { return };
@@ -85,8 +84,13 @@ pub fn connect<G: Game>(model: RwSignal<Model<G>>) -> Callback<Msg> {
         let envelope: Envelope<Response> = match serde_json::from_str(&text) {
             Ok(envelope) => envelope,
             Err(err) => {
-                let current = client.borrow().current;
-                return fail(current, format!("malformed reply of the AI: {err}"));
+                if let Some(id) = client.borrow_mut().current.take() {
+                    dispatch.run(Msg::AiError {
+                        id,
+                        message: format!("malformed reply of the AI: {err}"),
+                    });
+                }
+                return;
             }
         };
         let id = envelope.id;
@@ -108,18 +112,18 @@ pub fn connect<G: Game>(model: RwSignal<Model<G>>) -> Callback<Msg> {
         dispatch.run(msg);
     });
     let weak = Rc::downgrade(&client);
-    let on_error = Closure::<dyn FnMut(ErrorEvent)>::new(move |event: ErrorEvent| {
+    let on_error = Closure::<dyn FnMut(Event)>::new(move |event: Event| {
         let Some(client) = weak.upgrade() else { return };
-        let current = client.borrow_mut().current.take();
-        let message = event.message();
-        fail(
-            current,
-            if message.is_empty() {
-                "the AI stopped working".into()
-            } else {
-                message
-            },
-        );
+        // A worker that raised an error may not answer anything any more, so the next request
+        // starts a new one
+        client.borrow_mut().discard();
+        // A worker whose script could not be loaded raises a plain event, without a message
+        let message = event
+            .dyn_ref::<ErrorEvent>()
+            .map(ErrorEvent::message)
+            .filter(|message| !message.is_empty())
+            .unwrap_or_else(|| "the AI could not be loaded".to_owned());
+        dispatch.run(Msg::AiLost(message));
     });
     {
         let mut c = client.borrow_mut();
@@ -147,18 +151,18 @@ fn send<G: Game>(
     // The worker searches one request at a time, so an abandoned search would otherwise delay
     // the next game's first move of the AI
     let abandoned = c.current.is_some() && (new_game || request.is_some());
-    if (ai != c.ai || abandoned)
+    // Only a request starts a worker again after an error, or one that fails to load would be
+    // started again and again
+    let lost = c.worker.is_none() && request.is_some();
+    if (ai != c.ai || abandoned || lost)
         && let Err(err) = c.restart(ai)
     {
         drop(c);
-        if let Some(id) = model.with_untracked(|m| m.pending) {
-            model.update(|m| {
-                m.update(Msg::AiError {
-                    id,
-                    message: format!("could not restart the AI worker: {err:?}"),
-                });
-            });
-        }
+        model.update(|m| {
+            m.update(Msg::AiLost(format!(
+                "could not start the AI worker: {err:?}"
+            )));
+        });
         return;
     }
     if let Some((id, request)) = request {

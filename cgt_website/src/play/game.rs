@@ -242,6 +242,8 @@ pub enum Msg {
         id: u32,
         message: String,
     },
+    /// The AI stopped, and with it every request it was given
+    AiLost(String),
 }
 
 /// A search for a board on which neither side is ahead, which the network screens a few boards
@@ -756,6 +758,18 @@ impl<G: Game> Model<G> {
                 }
                 None
             }
+            Msg::AiLost(message) => {
+                if self.pending.take().is_some() {
+                    self.phase = Phase::Failed(message.clone());
+                }
+                if self.analyzing.take().is_some() {
+                    self.analysis_error = Some(message.clone());
+                }
+                if self.balancing.take().is_some() {
+                    self.balancing_error = Some(message);
+                }
+                None
+            }
         }
     }
 }
@@ -965,6 +979,22 @@ mod tests {
         });
         assert!(matches!(model.phase, Phase::Failed(_)));
         assert!(!model.ai_thinking());
+    }
+
+    #[test]
+    fn a_lost_ai_fails_every_request() {
+        let (mut model, request) = started(Opponent::Ai, Starter::Ai);
+        assert!(request.is_some());
+        assert_eq!(model.update(Msg::AiLost("gone".into())), None);
+        assert_eq!(model.phase, Phase::Failed("gone".into()));
+        assert!(!model.ai_thinking());
+
+        let (mut model, _) = started(Opponent::Human, Starter::Human);
+        assert!(model.analyzing.is_some());
+        assert_eq!(model.update(Msg::AiLost("gone".into())), None);
+        assert_eq!(model.analyzing, None);
+        assert_eq!(model.analysis_error.as_deref(), Some("gone"));
+        assert_eq!(model.phase, Phase::Playing);
     }
 
     #[test]

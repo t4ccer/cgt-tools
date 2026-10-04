@@ -51,14 +51,15 @@ fn click(
     if !m.human_to_move() {
         return (None, None);
     }
-    match start {
-        Some(start) if start == cell => (None, None),
-        Some(start) if segment(m, start, cell).is_some() => {
-            (None, segment(m, start, cell).map(Action::index))
+    if let Some(start) = start {
+        if start == cell {
+            return (None, None);
         }
-        _ if can_start_at(m, cell) => (Some(cell), None),
-        _ => (None, None),
+        if let Some(action) = segment(m, start, cell) {
+            return (None, Some(action.index()));
+        }
     }
+    (can_start_at(m, cell).then_some(cell), None)
 }
 
 const CELL_SIZE: f64 = 44.0;

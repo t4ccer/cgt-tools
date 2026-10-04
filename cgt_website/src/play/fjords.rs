@@ -197,7 +197,37 @@ fn position(vertex: usize) -> (f64, f64) {
     )
 }
 
+/// What the board shows on its vertices besides the edges, as bits indexed by vertex
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct Marks {
+    left: u64,
+    right: u64,
+    reach_left: u64,
+    reach_right: u64,
+    /// The vertices the person to move may claim, none while it is not a person's turn
+    legal: u64,
+    last: Option<usize>,
+}
+
+fn marks(m: &Model<Fjords>) -> Marks {
+    let state = &m.state;
+    Marks {
+        left: state.left,
+        right: state.right,
+        reach_left: state.reachable(Player::Left),
+        reach_right: state.reachable(Player::Right),
+        legal: if m.human_to_move() {
+            state.reachable(m.turn())
+        } else {
+            0
+        },
+        last: m.moves.last().map(|last| last.action),
+    }
+}
+
 fn board(model: RwSignal<Model<Fjords>>, dispatch: Callback<Msg>) -> AnyView {
+    // Computed once per change of the position, rather than by each of the vertices
+    let marks = Memo::new(move |_| model.with(marks));
     let edges = move || {
         model.with(|m| {
             (0..num_edges())
@@ -215,29 +245,26 @@ fn board(model: RwSignal<Model<Fjords>>, dispatch: Callback<Msg>) -> AnyView {
             let (x, y) = position(v);
             let has = move |bits: u64| bits >> v & 1 == 1;
             let classes = move || {
-                model.with(|m| {
-                    let s = &m.state;
-                    let (left, right) = (s.reachable(Player::Left), s.reachable(Player::Right));
-                    let mut classes = vec!["vertex"];
-                    if has(s.left) {
-                        classes.push("stone-left");
-                    } else if has(s.right) {
-                        classes.push("stone-right");
-                    } else if has(left) && has(right) {
-                        classes.push("reach-both");
-                    } else if has(left) {
-                        classes.push("reach-left");
-                    } else if has(right) {
-                        classes.push("reach-right");
-                    }
-                    if m.moves.last().is_some_and(|last| last.action == v) {
-                        classes.push("last");
-                    }
-                    if m.human_to_move() && m.is_legal(v) {
-                        classes.push("active");
-                    }
-                    classes.join(" ")
-                })
+                let marks = marks.get();
+                let mut classes = vec!["vertex"];
+                if has(marks.left) {
+                    classes.push("stone-left");
+                } else if has(marks.right) {
+                    classes.push("stone-right");
+                } else if has(marks.reach_left) && has(marks.reach_right) {
+                    classes.push("reach-both");
+                } else if has(marks.reach_left) {
+                    classes.push("reach-left");
+                } else if has(marks.reach_right) {
+                    classes.push("reach-right");
+                }
+                if marks.last == Some(v) {
+                    classes.push("last");
+                }
+                if has(marks.legal) {
+                    classes.push("active");
+                }
+                classes.join(" ")
             };
             view! {
                 <circle
@@ -399,6 +426,13 @@ mod tests {
         assert!(model.balancing.is_none());
         assert!(model.balancing_error.is_some());
         assert_eq!(model.setup.seed, DEFAULT_SEED);
+
+        // As does an AI that stops
+        let mut model = Model::<Fjords>::new(Setup::new("ai".into(), DEFAULT_SEED));
+        evaluated(model.update(Msg::FindEven(0)));
+        assert_eq!(model.update(Msg::AiLost("gone".into())), None);
+        assert!(model.balancing.is_none());
+        assert_eq!(model.balancing_error.as_deref(), Some("gone"));
     }
 
     #[test]
