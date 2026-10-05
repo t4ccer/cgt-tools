@@ -17,6 +17,12 @@ const DESCRIPTION: &str = "Combinatorial Game Theory toolkit in Rust and Python"
 /// does not flash in the system scheme while the islands load
 const THEME_SCRIPT: &str = r#"try{const t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t}catch(_){}"#;
 
+const PRELOADED_FONTS: &[&str] = &[
+    "/fonts/jost-400.woff2",
+    "/fonts/jost-500.woff2",
+    "/fonts/jost-700.woff2",
+];
+
 /// Every page of the site as its path relative to the site root and its HTML, with a Python API
 /// reference for each of `python_apis`, a page for each of `guides`, and a page for each game of
 /// `play`, with the models to play it against by their names and addresses, if it has any
@@ -147,6 +153,20 @@ fn Shell(
                 <meta name="description" content=DESCRIPTION />
                 <title>{title}</title>
                 <script inner_html=THEME_SCRIPT></script>
+                {PRELOADED_FONTS
+                    .iter()
+                    .map(|&font| {
+                        view! {
+                            <link
+                                rel="preload"
+                                href=font
+                                r#as="font"
+                                r#type="font/woff2"
+                                crossorigin=""
+                            />
+                        }
+                    })
+                    .collect_view()}
                 <link rel="stylesheet" href="/style.css" />
                 <HydrationScripts options islands=true />
             </head>
