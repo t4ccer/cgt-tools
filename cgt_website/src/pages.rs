@@ -19,10 +19,13 @@ const THEME_SCRIPT: &str = r#"try{const t=localStorage.getItem("theme");if(t)doc
 
 const PRELOADED_FONTS: &[&str] = &[
     "/fonts/jost-400.woff2",
-    "/fonts/jost-400-italic.woff2",
     "/fonts/jost-500.woff2",
     "/fonts/jost-700.woff2",
 ];
+
+const ITALIC_FONT: &str = "/fonts/jost-400-italic.woff2";
+
+const ITALIC_ELEMENTS: &[&str] = &["em", "i", "cite", "dfn", "var", "address"];
 
 /// Every page of the site as its path relative to the site root and its HTML, with a Python API
 /// reference for each of `python_apis`, a page for each of `guides`, and a page for each game of
@@ -134,7 +137,21 @@ where
     let owner = Owner::new_root(Some(Arc::new(SsrSharedContext::new_islands())));
     owner.with(|| {
         let options = LeptosOptions::builder().output_name("cgt_website").build();
-        view! { <Shell options title body_class>{page()}</Shell> }.to_html()
+        let main = page().into_view().to_html();
+        let italic = has_italic_element(&main);
+        view! { <Shell options title body_class italic main /> }.to_html()
+    })
+}
+
+fn has_italic_element(html: &str) -> bool {
+    html.split('<').skip(1).any(|tag| {
+        let name = tag
+            .split(|c: char| c == '>' || c == '/' || c.is_ascii_whitespace())
+            .next()
+            .unwrap_or_default();
+        ITALIC_ELEMENTS
+            .iter()
+            .any(|element| name.eq_ignore_ascii_case(element))
     })
 }
 
@@ -143,7 +160,8 @@ fn Shell(
     options: LeptosOptions,
     title: String,
     body_class: &'static str,
-    children: Children,
+    italic: bool,
+    main: String,
 ) -> impl IntoView {
     view! {
         <!DOCTYPE html>
@@ -156,7 +174,9 @@ fn Shell(
                 <script inner_html=THEME_SCRIPT></script>
                 {PRELOADED_FONTS
                     .iter()
-                    .map(|&font| {
+                    .copied()
+                    .chain(italic.then_some(ITALIC_FONT))
+                    .map(|font| {
                         view! {
                             <link
                                 rel="preload"
@@ -173,7 +193,7 @@ fn Shell(
             </head>
             <body class=body_class>
                 <Header />
-                <main>{children()}</main>
+                <main inner_html=main></main>
                 <Footer />
             </body>
         </html>
