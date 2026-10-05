@@ -19,6 +19,7 @@ const THEME_SCRIPT: &str = r#"try{const t=localStorage.getItem("theme");if(t)doc
 
 const PRELOADED_FONTS: &[&str] = &[
     "/fonts/jost-400.woff2",
+    "/fonts/jost-400-italic.woff2",
     "/fonts/jost-500.woff2",
     "/fonts/jost-700.woff2",
 ];
