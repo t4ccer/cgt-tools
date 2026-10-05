@@ -9,7 +9,6 @@ mod arena;
 mod checkpoint;
 mod export;
 mod game;
-mod import;
 mod openings;
 mod replay;
 mod report;
@@ -33,8 +32,6 @@ enum Command {
     /// Write a checkpoint's network and an opening table as one model file, which the website
     /// plays with
     Export(export::ExportArgs),
-    /// Turn a checkpoint of the `PyTorch` networks of haaland3000 into a checkpoint
-    Import(import::ImportArgs),
 }
 
 impl Command {
@@ -44,7 +41,6 @@ impl Command {
             Command::Arena(args) => game::run::<B>(args, device),
             Command::Openings(args) => game::run::<B>(args, device),
             Command::Export(args) => game::run::<B>(args, device),
-            Command::Import(args) => game::run::<B>(args, device),
         }
     }
 }

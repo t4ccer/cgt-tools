@@ -1,7 +1,7 @@
 # `cgt_ai_train`
 
 `cgt-ai-train` trains AlphaZero-style players for the games in [`cgt_ai_core`](../cgt_ai_core) by self-play.
-It also pits networks against each other with `arena`, exports them for the website with `openings` and `export`, and turns the PyTorch networks into checkpoints with `import`.
+It also pits networks against each other with `arena` and exports them for the website with `openings` and `export`.
 
 ```console
 $ cargo run --release --package cgt_ai_train -- train --game quelhas

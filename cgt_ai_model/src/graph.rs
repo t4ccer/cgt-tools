@@ -1,8 +1,5 @@
 //! Graph convolutional network for games played on a graph, see
 //! [`Input::Graph`](cgt_ai_core::ruleset::Input::Graph).
-//!
-//! The fields are named like those of the `PyTorch` network of `haaland3000`, so that its
-//! checkpoints can be imported.
 
 use burn::{
     module::Module,
