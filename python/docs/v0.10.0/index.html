@@ -1,292 +1,106 @@
-<!doctype html>
-<html class="no-js" lang="en" data-content_root="./">
-  <head><meta charset="utf-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="cgt_py" href="api/cgt_py.html">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="Combinatorial Game Theory toolkit in Rust and Python"><title>Python API v0.10.0 - cgt-tools</title><script>try{const t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t}catch(_){}</script><link rel="preload" href="/fonts/jost-400.woff2" as="font" type="font/woff2" crossorigin=""><link rel="preload" href="/fonts/jost-500.woff2" as="font" type="font/woff2" crossorigin=""><link rel="preload" href="/fonts/jost-700.woff2" as="font" type="font/woff2" crossorigin=""><!><link rel="stylesheet" href="/style.css"><link rel="modulepreload" href="/pkg/cgt_website.js"><link rel="preload" href="/pkg/cgt_website_bg.wasm" as="fetch" type="application/wasm" crossorigin=""><script type="module">((root, pkg_path, output_name, wasm_output_name) => {
+	let MOST_RECENT_CHILDREN_CB = [];
 
-    <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
-        <title>cgt-tools 0.10.0</title>
-      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=d111a655" />
-    <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
-    <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
-    
-    
+	function idle(c) {
+		if ("requestIdleCallback" in window) {
+			window.requestIdleCallback(c);
+		} else {
+			c();
+		}
+	}
+	async function hydrateIslands(rootNode, mod) {
+		async function traverse(node) {
+			if (node.nodeType === Node.ELEMENT_NODE) {
+				const tag = node.tagName.toLowerCase();
+				if(tag === 'leptos-island') {
+					const children = [];
+					const id = node.dataset.component || null;
 
+					await hydrateIsland(node, id, mod);
+					
+					for(const child of node.children) {
+						await traverse(child, children);
+					}
+				} else {
+					if (tag === 'leptos-children') {
+						MOST_RECENT_CHILDREN_CB.push(node.$$on_hydrate);
+						for(const child of node.children) {
+							await traverse(child);
+						};
+						// un-set the "most recent children"
+						MOST_RECENT_CHILDREN_CB.pop();
+					} else {
+						for(const child of node.children) {
+							await traverse(child);
+						};
+					}
+				}
+			}
+		}
 
-<style>
-  body {
-    --color-code-background: #f2f2f2;
-  --color-code-foreground: #1e1e1e;
-  
-  }
-  @media not print {
-    body[data-theme="dark"] {
-      --color-code-background: #202020;
-  --color-code-foreground: #d0d0d0;
-  
-    }
-    @media (prefers-color-scheme: dark) {
-      body:not([data-theme="light"]) {
-        --color-code-background: #202020;
-  --color-code-foreground: #d0d0d0;
-  
-      }
-    }
-  }
-</style></head>
-  <body>
-    
-    <script>
-      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
-    </script>
-    
+		await traverse(rootNode);
+	}
+	async function hydrateIsland(el, id, mod) {
+		const islandFn = mod[id];
+		if (islandFn) {
+			const children_cb = MOST_RECENT_CHILDREN_CB[MOST_RECENT_CHILDREN_CB.length-1];
+			if (children_cb) {
+				children_cb();
+			}
+			const res = islandFn(el);
+			if (res && res.then) {
+				await res;
+			}
+		} else {
+			console.warn(`Could not find WASM function for the island ${id}.`);
+		}
+	}
+	idle(() => {
+		import(`${root}/${pkg_path}/${output_name}.js`)
+			.then(mod => {
+				mod.default({module_or_path: `${root}/${pkg_path}/${wasm_output_name}.wasm`}).then(() => {
+					mod.hydrate();
+					hydrateIslands(document.body, mod);
+				});
 
-<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
-  <symbol id="svg-toc" viewBox="0 0 24 24">
-    <title>Contents</title>
-    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
-      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
-    </svg>
-  </symbol>
-  <symbol id="svg-menu" viewBox="0 0 24 24">
-    <title>Menu</title>
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
-      <line x1="3" y1="12" x2="21" y2="12"></line>
-      <line x1="3" y1="6" x2="21" y2="6"></line>
-      <line x1="3" y1="18" x2="21" y2="18"></line>
-    </svg>
-  </symbol>
-  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
-    <title>Expand</title>
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
-      <polyline points="9 18 15 12 9 6"></polyline>
-    </svg>
-  </symbol>
-  <symbol id="svg-sun" viewBox="0 0 24 24">
-    <title>Light mode</title>
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
-      <circle cx="12" cy="12" r="5"></circle>
-      <line x1="12" y1="1" x2="12" y2="3"></line>
-      <line x1="12" y1="21" x2="12" y2="23"></line>
-      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-      <line x1="1" y1="12" x2="3" y2="12"></line>
-      <line x1="21" y1="12" x2="23" y2="12"></line>
-      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-    </svg>
-  </symbol>
-  <symbol id="svg-moon" viewBox="0 0 24 24">
-    <title>Dark mode</title>
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
-      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
-    </svg>
-  </symbol>
-  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
-    <title>Auto light/dark, in light mode</title>
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
-      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
-      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
-      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
-      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
-      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
-      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
-      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
-      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
-      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
-      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
-      <circle cx="14.5" cy="9.55" r="3.6"/>
-    </svg>
-  </symbol>
-  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
-    <title>Auto light/dark, in dark mode</title>
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
-      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
-      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
-      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
-      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
-      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
-      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
-      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
-      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
-      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
-      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
-      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
-    </svg>
-  </symbol>
-  <symbol id="svg-pencil" viewBox="0 0 24 24">
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
-      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
-      <path d="M13.5 6.5l4 4" />
-      <path d="M20 21l2 -2l-2 -2" />
-      <path d="M17 17l-2 2l2 2" />
-    </svg>
-  </symbol>
-  <symbol id="svg-eye" viewBox="0 0 24 24">
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
-      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
-      <path
-        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
-      <path d="M20 21l2 -2l-2 -2" />
-      <path d="M17 17l-2 2l2 2" />
-    </svg>
-  </symbol>
-</svg>
-
-<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
-<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
-<label class="overlay sidebar-overlay" for="__navigation"></label>
-<label class="overlay toc-overlay" for="__toc"></label>
-
-<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
-
-
-
-<div class="page">
-  <header class="mobile-header">
-    <div class="header-left">
-      <label class="nav-overlay-icon" for="__navigation">
-        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
-      </label>
-    </div>
-    <div class="header-center">
-      <a href="#"><div class="brand">cgt-tools 0.10.0</div></a>
-    </div>
-    <div class="header-right">
-      <div class="theme-toggle-container theme-toggle-header">
-        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
-          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
-          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
-          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
-          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
-        </button>
-      </div>
-      <label class="toc-overlay-icon toc-header-icon no-toc" for="__toc">
-        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
-      </label>
-    </div>
-  </header>
-  <aside class="sidebar-drawer">
-    <div class="sidebar-container">
-      
-      <div class="sidebar-sticky"><a class="sidebar-brand" href="#">
-  
-  <span class="sidebar-brand-text">cgt-tools 0.10.0</span>
-  
-</a><form class="sidebar-search-container" method="get" action="search.html" role="search">
-  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
-  <input type="hidden" name="check_keywords" value="yes">
-  <input type="hidden" name="area" value="default">
-</form>
-<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
-  <ul>
-<li class="toctree-l1"><a class="reference internal" href="api/cgt_py.html">cgt_py</a></li>
-</ul>
-
-</div>
-</div>
-
-      </div>
-      
-    </div>
-  </aside>
-  <div class="main">
-    <div class="content">
-      <div class="article-container">
-        <a href="#" class="back-to-top muted-link">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
-          </svg>
-          <span>Back to top</span>
-        </a>
-        <div class="content-icon-container">
-          <div class="view-this-page">
-  <a class="muted-link" href="_sources/index.rst.txt" title="View this page">
-    <svg><use href="#svg-eye"></use></svg>
-    <span class="visually-hidden">View this page</span>
-  </a>
-</div>
-<div class="theme-toggle-container theme-toggle-content">
-            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
-              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
-              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
-              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
-              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
-            </button>
-          </div>
-          <label class="toc-overlay-icon toc-content-icon no-toc" for="__toc">
-            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
-          </label>
-        </div>
-        <article role="main" id="furo-main-content">
-          <section id="cgt-tools-python-api">
-<h1>cgt-tools Python API<a class="headerlink" href="#cgt-tools-python-api" title="Link to this heading">¶</a></h1>
-<p>Python bindings for the <a class="reference external" href="https://cgt.tools">cgt-tools</a> combinatorial game theory framework.
-Every class and function below is implemented in Rust and exposed through the <code class="docutils literal notranslate"><span class="pre">cgt_py</span></code> module.</p>
-<div class="toctree-wrapper compound">
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="api/cgt_py.html">cgt_py</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="api/cgt_py.html#cgt_py-functions">Functions</a></li>
-<li class="toctree-l2"><a class="reference internal" href="api/cgt_py.html#cgt_py-classes">Classes</a></li>
-</ul>
-</li>
-</ul>
-</div>
-</section>
-
-        </article>
-      </div>
-      <footer>
-        
-        <div class="related-pages">
-          <a class="next-page" href="api/cgt_py.html">
-              <div class="page-info">
-                <div class="context">
-                  <span>Next</span>
-                </div>
-                <div class="title">cgt_py</div>
-              </div>
-              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
-            </a>
-          
-        </div>
-        <div class="bottom-of-page">
-          <div class="left-details">
-            <div class="copyright">
-                Copyright &#169; 
-            </div>
-            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
-            
-            <a href="https://github.com/pradyunsg/furo">Furo</a>
-            
-          </div>
-          <div class="right-details">
-            
-          </div>
-        </div>
-        
-      </footer>
-    </div>
-    <aside class="toc-drawer no-toc">
-      
-      
-      
-    </aside>
-  </div>
-</div><script src="_static/documentation_options.js?v=82662543"></script>
-    <script src="_static/doctools.js?v=fd6eb6e6"></script>
-    <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
-    <script src="_static/scripts/furo.js?v=46bd48cc"></script>
-    </body>
-</html>
+				window.__hydrateIsland = (el, id) => hydrateIsland(el, id, mod);
+			})
+	});
+})
+("", "pkg", "cgt_website", "cgt_website_bg");</script></head><body class="docs"><header class="navbar"><a class="navbar-brand" href="/">cgt-tools</a><nav class="navbar-nav"><a href="/guides/" class="nav-link">Guides</a><a href="/play/" class="nav-link">Play</a><a href="/python/docs/latest/" class="nav-link">Python</a><a href="https://docs.rs/cgt/latest/cgt/" class="nav-link">Rust</a></nav><leptos-island data-component="ThemeToggle_3785966790201553852"><button type="button" aria-label="Toggle dark mode" class="nav-link icon-link"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round" class="icon-moon"><path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454l0 .008"></path></svg><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round" class="icon-sun"><path d="M8 12a4 4 0 1 0 8 0a4 4 0 1 0 -8 0"></path><path d="M3 12h1m8 -9v1m8 8h1m-9 8v1m-6.4 -15.4l.7 .7m12.1 -.7l-.7 .7m0 11.4l.7 .7m-12.1 -.7l-.7 .7"></path></svg></button></leptos-island><a href="https://github.com/t4ccer/cgt-tools" aria-label="GitHub repository" class="nav-link icon-link"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5"></path></svg></a></header><main><div class="docs-layout container"><aside class="docs-sidebar"><details class="version-switcher"><summary><span>Version <span class="version-name">v0.10.0</span></span><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M8 9l4 -4l4 4"></path><path d="M16 15l-4 4l-4 -4"></path></svg></summary><ul class="dropdown-menu"><li><a href="/python/docs/unstable/" class="dropdown-item">unstable<span class="tag">unreleased</span></a></li><li><a href="/python/docs/v0.11.0/" class="dropdown-item">v0.11.0<span class="tag">latest</span></a></li><li><a aria-current="page" href="/python/docs/v0.10.0/" class="dropdown-item active">v0.10.0<!></a></li><!><li><hr></li><li><a href="/python/docs/" class="dropdown-item">All versions</a></li></ul></details><hr class="section-divider"><nav class="section-nav"><details open><summary>Classes</summary><ul class="list-nested"><li><a href="#cgt_py.Amazons">Amazons</a></li><li><a href="#cgt_py.BipartiteSnort">BipartiteSnort</a></li><li><a href="#cgt_py.CanonicalForm">CanonicalForm</a></li><li><a href="#cgt_py.Col">Col</a></li><li><a href="#cgt_py.DigraphPlacement">DigraphPlacement</a></li><li><a href="#cgt_py.Domineering">Domineering</a></li><li><a href="#cgt_py.DyadicRationalNumber">DyadicRationalNumber</a></li><li><a href="#cgt_py.Fission">Fission</a></li><li><a href="#cgt_py.Graph">Graph</a></li><li><a href="#cgt_py.Grid">Grid</a></li><li><a href="#cgt_py.Konane">Konane</a></li><li><a href="#cgt_py.Snort">Snort</a></li><li><a href="#cgt_py.Thermograph">Thermograph</a></li><li><a href="#cgt_py.VertexColors">VertexColors</a></li><!></ul></details><details open><summary>Functions</summary><ul class="list-nested"><li><a href="#cgt_py.AmazonsWidget">AmazonsWidget</a></li><li><a href="#cgt_py.BipartiteSnortWidget">BipartiteSnortWidget</a></li><li><a href="#cgt_py.ColWidget">ColWidget</a></li><li><a href="#cgt_py.DigraphPlacementWidget">DigraphPlacementWidget</a></li><li><a href="#cgt_py.DomineeringWidget">DomineeringWidget</a></li><li><a href="#cgt_py.FissionWidget">FissionWidget</a></li><li><a href="#cgt_py.KonaneWidget">KonaneWidget</a></li><li><a href="#cgt_py.SnortWidget">SnortWidget</a></li><!></ul></details><!></nav></aside><div class="docs-content"><details class="toc-mobile"><summary>Contents</summary><nav class="section-nav"><details open><summary>Classes</summary><ul class="list-nested"><li><a href="#cgt_py.Amazons">Amazons</a></li><li><a href="#cgt_py.BipartiteSnort">BipartiteSnort</a></li><li><a href="#cgt_py.CanonicalForm">CanonicalForm</a></li><li><a href="#cgt_py.Col">Col</a></li><li><a href="#cgt_py.DigraphPlacement">DigraphPlacement</a></li><li><a href="#cgt_py.Domineering">Domineering</a></li><li><a href="#cgt_py.DyadicRationalNumber">DyadicRationalNumber</a></li><li><a href="#cgt_py.Fission">Fission</a></li><li><a href="#cgt_py.Graph">Graph</a></li><li><a href="#cgt_py.Grid">Grid</a></li><li><a href="#cgt_py.Konane">Konane</a></li><li><a href="#cgt_py.Snort">Snort</a></li><li><a href="#cgt_py.Thermograph">Thermograph</a></li><li><a href="#cgt_py.VertexColors">VertexColors</a></li><!></ul></details><details open><summary>Functions</summary><ul class="list-nested"><li><a href="#cgt_py.AmazonsWidget">AmazonsWidget</a></li><li><a href="#cgt_py.BipartiteSnortWidget">BipartiteSnortWidget</a></li><li><a href="#cgt_py.ColWidget">ColWidget</a></li><li><a href="#cgt_py.DigraphPlacementWidget">DigraphPlacementWidget</a></li><li><a href="#cgt_py.DomineeringWidget">DomineeringWidget</a></li><li><a href="#cgt_py.FissionWidget">FissionWidget</a></li><li><a href="#cgt_py.KonaneWidget">KonaneWidget</a></li><li><a href="#cgt_py.SnortWidget">SnortWidget</a></li><!></ul></details><!></nav></details><h1>Python API</h1><div class="callout callout-note">This is the documentation of v0.10.0.<!> The latest release is <a href="/python/docs/v0.11.0/">v0.11.0</a>.</div><!><h2 id="classes">Classes</h2><h3 id="cgt_py.Amazons">Amazons<a href="#cgt_py.Amazons" aria-hidden="true" class="anchor">#</a></h3><pre class="signature"><!><code><span class="sig-keyword">class</span> <span class="sig-name">Amazons</span>(<!>position<!>: <!>str<!><!>)<!></code><!></pre><!><!><!><div class="members"><div id="cgt_py.Amazons.canonical_form" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">canonical_form</span>: <a href="#cgt_py.CanonicalForm">CanonicalForm</a></code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Amazons.grid" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">grid</span>: <a href="#cgt_py.Grid">Grid</a></code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Amazons.left_options" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">left_options</span>: <!>list<!>[<!><a href="#cgt_py.Amazons">Amazons</a><!>]</code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Amazons.right_options" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">right_options</span>: <!>list<!>[<!><a href="#cgt_py.Amazons">Amazons</a><!>]</code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Amazons.sensible_left_options" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">sensible_left_options</span>: <!>list<!>[<!><a href="#cgt_py.Amazons">Amazons</a><!>]</code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Amazons.sensible_right_options" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">sensible_right_options</span>: <!>list<!>[<!><a href="#cgt_py.Amazons">Amazons</a><!>]</code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Amazons.__repr__" class="member"><div class="member-signature"><pre><!><code><!><span class="sig-name">__repr__</span>()<!> -&gt; <!>str</code><!></pre><!></div><!><!></div><div id="cgt_py.Amazons._repr_svg_" class="member"><div class="member-signature"><pre><!><code><!><span class="sig-name">_repr_svg_</span>()<!> -&gt; <!>str</code><!></pre><!></div><!><!></div><!></div><h3 id="cgt_py.BipartiteSnort">BipartiteSnort<a href="#cgt_py.BipartiteSnort" aria-hidden="true" class="anchor">#</a></h3><pre class="signature"><!><code><span class="sig-keyword">class</span> <span class="sig-name">BipartiteSnort</span>(
+    <!>blue<!>: <!>int<!>,
+    <!>red<!>: <!>int<!>,
+    <!>edges<!>: <!>Sequence<!>[<!>tuple<!>[<!>int<!>, <!>int<!>]<!>]<!><!>,
+)<!></code><!></pre><!><!><!><div class="members"><div id="cgt_py.BipartiteSnort.blue" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">blue</span>: <!>int</code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.BipartiteSnort.canonical_form" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">canonical_form</span>: <a href="#cgt_py.CanonicalForm">CanonicalForm</a></code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.BipartiteSnort.edges" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">edges</span>: <!>list<!>[<!>tuple<!>[<!>int<!>, <!>int<!>]<!>]</code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.BipartiteSnort.graph" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">graph</span>: <a href="#cgt_py.Graph">Graph</a></code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.BipartiteSnort.left_options" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">left_options</span>: <!>list<!>[<!><a href="#cgt_py.BipartiteSnort">BipartiteSnort</a><!>]</code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.BipartiteSnort.red" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">red</span>: <!>int</code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.BipartiteSnort.right_options" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">right_options</span>: <!>list<!>[<!><a href="#cgt_py.BipartiteSnort">BipartiteSnort</a><!>]</code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.BipartiteSnort.sensible_left_options" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">sensible_left_options</span>: <!>list<!>[<!><a href="#cgt_py.BipartiteSnort">BipartiteSnort</a><!>]</code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.BipartiteSnort.sensible_right_options" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">sensible_right_options</span>: <!>list<!>[<!><a href="#cgt_py.BipartiteSnort">BipartiteSnort</a><!>]</code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.BipartiteSnort.__repr__" class="member"><div class="member-signature"><pre><!><code><!><span class="sig-name">__repr__</span>()<!> -&gt; <!>str</code><!></pre><!></div><!><!></div><div id="cgt_py.BipartiteSnort._repr_svg_" class="member"><div class="member-signature"><pre><!><code><!><span class="sig-name">_repr_svg_</span>()<!> -&gt; <!>str</code><!></pre><!></div><!><!></div><!></div><h3 id="cgt_py.CanonicalForm">CanonicalForm<a href="#cgt_py.CanonicalForm" aria-hidden="true" class="anchor">#</a></h3><pre class="signature"><!><code><span class="sig-keyword">class</span> <span class="sig-name">CanonicalForm</span>(<!>value<!>: <!>Any<!><!>)<!></code><!></pre><!><!><!><div class="members"><div id="cgt_py.CanonicalForm.birthday" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">birthday</span>: <!>int</code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.CanonicalForm.left_options" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">left_options</span>: <!>list<!>[<!><a href="#cgt_py.CanonicalForm">CanonicalForm</a><!>]</code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.CanonicalForm.left_stop" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">left_stop</span>: <a href="#cgt_py.DyadicRationalNumber">DyadicRationalNumber</a></code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.CanonicalForm.reduced" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">reduced</span>: <a href="#cgt_py.CanonicalForm">CanonicalForm</a></code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.CanonicalForm.right_options" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">right_options</span>: <!>list<!>[<!><a href="#cgt_py.CanonicalForm">CanonicalForm</a><!>]</code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.CanonicalForm.right_stop" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">right_stop</span>: <a href="#cgt_py.DyadicRationalNumber">DyadicRationalNumber</a></code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.CanonicalForm.temperature" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">temperature</span>: <a href="#cgt_py.DyadicRationalNumber">DyadicRationalNumber</a></code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.CanonicalForm.thermograph" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">thermograph</span>: <a href="#cgt_py.Thermograph">Thermograph</a></code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.CanonicalForm.__add__" class="member"><div class="member-signature"><pre><!><code><!><span class="sig-name">__add__</span>(<!>other<!>: <a href="#cgt_py.CanonicalForm">CanonicalForm</a><!><!>)<!> -&gt; <a href="#cgt_py.CanonicalForm">CanonicalForm</a></code><!></pre><!></div><!><!></div><div id="cgt_py.CanonicalForm.__neg__" class="member"><div class="member-signature"><pre><!><code><!><span class="sig-name">__neg__</span>()<!> -&gt; <a href="#cgt_py.CanonicalForm">CanonicalForm</a></code><!></pre><!></div><!><!></div><div id="cgt_py.CanonicalForm.__repr__" class="member"><div class="member-signature"><pre><!><code><!><span class="sig-name">__repr__</span>()<!> -&gt; <!>str</code><!></pre><!></div><!><!></div><div id="cgt_py.CanonicalForm.__richcmp__" class="member"><div class="member-signature"><pre><!><code><!><span class="sig-name">__richcmp__</span>(<!>other<!>: <a href="#cgt_py.CanonicalForm">CanonicalForm</a><!>, <!>op<!>: <!>int<!><!>)<!> -&gt; <!>bool</code><!></pre><!></div><!><!></div><div id="cgt_py.CanonicalForm.__sub__" class="member"><div class="member-signature"><pre><!><code><!><span class="sig-name">__sub__</span>(<!>other<!>: <a href="#cgt_py.CanonicalForm">CanonicalForm</a><!><!>)<!> -&gt; <a href="#cgt_py.CanonicalForm">CanonicalForm</a></code><!></pre><!></div><!><!></div><!></div><h3 id="cgt_py.Col">Col<a href="#cgt_py.Col" aria-hidden="true" class="anchor">#</a></h3><pre class="signature"><!><code><span class="sig-keyword">class</span> <span class="sig-name">Col</span>(
+    <!>graph<!>: <!>Any<!>,
+    <!>edges<!>: <!>Optional<!>[<!>Sequence<!>[<!>tuple<!>[<!>int<!>, <!>int<!>]<!>]<!>]<!> = None<!>,
+    <!>white<!>: <!>Optional<!>[<!>Sequence<!>[<!>int<!>]<!>]<!> = None<!>,
+    <!>blue<!>: <!>Optional<!>[<!>Sequence<!>[<!>int<!>]<!>]<!> = None<!>,
+    <!>red<!>: <!>Optional<!>[<!>Sequence<!>[<!>int<!>]<!>]<!> = None<!>,
+    <!>green<!>: <!>Optional<!>[<!>Sequence<!>[<!>int<!>]<!>]<!> = None<!>,
+)<!></code><!></pre><!><!><!><div class="members"><div id="cgt_py.Col.canonical_form" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">canonical_form</span>: <a href="#cgt_py.CanonicalForm">CanonicalForm</a></code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Col.graph" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">graph</span>: <a href="#cgt_py.Graph">Graph</a></code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Col.left_options" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">left_options</span>: <!>list<!>[<!><a href="#cgt_py.Col">Col</a><!>]</code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Col.right_options" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">right_options</span>: <!>list<!>[<!><a href="#cgt_py.Col">Col</a><!>]</code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Col.sensible_left_options" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">sensible_left_options</span>: <!>list<!>[<!><a href="#cgt_py.Col">Col</a><!>]</code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Col.sensible_right_options" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">sensible_right_options</span>: <!>list<!>[<!><a href="#cgt_py.Col">Col</a><!>]</code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Col.__repr__" class="member"><div class="member-signature"><pre><!><code><!><span class="sig-name">__repr__</span>()<!> -&gt; <!>str</code><!></pre><!></div><!><!></div><div id="cgt_py.Col._repr_svg_" class="member"><div class="member-signature"><pre><!><code><!><span class="sig-name">_repr_svg_</span>()<!> -&gt; <!>str</code><!></pre><!></div><!><!></div><!></div><h3 id="cgt_py.DigraphPlacement">DigraphPlacement<a href="#cgt_py.DigraphPlacement" aria-hidden="true" class="anchor">#</a></h3><pre class="signature"><!><code><span class="sig-keyword">class</span> <span class="sig-name">DigraphPlacement</span>(
+    <!>graph<!>: <!>Any<!>,
+    <!>edges<!>: <!>Optional<!>[<!>Sequence<!>[<!>tuple<!>[<!>int<!>, <!>int<!>]<!>]<!>]<!> = None<!>,
+    <!>blue<!>: <!>Optional<!>[<!>Sequence<!>[<!>int<!>]<!>]<!> = None<!>,
+    <!>red<!>: <!>Optional<!>[<!>Sequence<!>[<!>int<!>]<!>]<!> = None<!>,
+)<!></code><!></pre><!><!><!><div class="members"><div id="cgt_py.DigraphPlacement.canonical_form" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">canonical_form</span>: <a href="#cgt_py.CanonicalForm">CanonicalForm</a></code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.DigraphPlacement.graph" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">graph</span>: <a href="#cgt_py.Graph">Graph</a></code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.DigraphPlacement.left_options" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">left_options</span>: <!>list<!>[<!><a href="#cgt_py.DigraphPlacement">DigraphPlacement</a><!>]</code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.DigraphPlacement.right_options" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">right_options</span>: <!>list<!>[<!><a href="#cgt_py.DigraphPlacement">DigraphPlacement</a><!>]</code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.DigraphPlacement.sensible_left_options" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">sensible_left_options</span>: <!>list<!>[<!><a href="#cgt_py.DigraphPlacement">DigraphPlacement</a><!>]</code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.DigraphPlacement.sensible_right_options" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">sensible_right_options</span>: <!>list<!>[<!><a href="#cgt_py.DigraphPlacement">DigraphPlacement</a><!>]</code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.DigraphPlacement.__repr__" class="member"><div class="member-signature"><pre><!><code><!><span class="sig-name">__repr__</span>()<!> -&gt; <!>str</code><!></pre><!></div><!><!></div><div id="cgt_py.DigraphPlacement._repr_svg_" class="member"><div class="member-signature"><pre><!><code><!><span class="sig-name">_repr_svg_</span>()<!> -&gt; <!>str</code><!></pre><!></div><!><!></div><!></div><h3 id="cgt_py.Domineering">Domineering<a href="#cgt_py.Domineering" aria-hidden="true" class="anchor">#</a></h3><pre class="signature"><!><code><span class="sig-keyword">class</span> <span class="sig-name">Domineering</span>(<!>position<!>: <!>str<!><!>)<!></code><!></pre><!><!><!><div class="members"><div id="cgt_py.Domineering.canonical_form" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">canonical_form</span>: <a href="#cgt_py.CanonicalForm">CanonicalForm</a></code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Domineering.grid" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">grid</span>: <a href="#cgt_py.Grid">Grid</a></code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Domineering.left_options" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">left_options</span>: <!>list<!>[<!><a href="#cgt_py.Domineering">Domineering</a><!>]</code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Domineering.right_options" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">right_options</span>: <!>list<!>[<!><a href="#cgt_py.Domineering">Domineering</a><!>]</code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Domineering.sensible_left_options" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">sensible_left_options</span>: <!>list<!>[<!><a href="#cgt_py.Domineering">Domineering</a><!>]</code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Domineering.sensible_right_options" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">sensible_right_options</span>: <!>list<!>[<!><a href="#cgt_py.Domineering">Domineering</a><!>]</code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Domineering.__repr__" class="member"><div class="member-signature"><pre><!><code><!><span class="sig-name">__repr__</span>()<!> -&gt; <!>str</code><!></pre><!></div><!><!></div><div id="cgt_py.Domineering._repr_svg_" class="member"><div class="member-signature"><pre><!><code><!><span class="sig-name">_repr_svg_</span>()<!> -&gt; <!>str</code><!></pre><!></div><!><!></div><!></div><h3 id="cgt_py.DyadicRationalNumber">DyadicRationalNumber<a href="#cgt_py.DyadicRationalNumber" aria-hidden="true" class="anchor">#</a></h3><pre class="signature"><!><code><span class="sig-keyword">class</span> <span class="sig-name">DyadicRationalNumber</span>(
+    <!>numerator<!>: <!>Any<!>,
+    <!>denominator_exponent<!>: <!>Optional<!>[<!>int<!>]<!> = None<!>,
+)<!></code><!></pre><!><!><!><div class="members"><div id="cgt_py.DyadicRationalNumber.__add__" class="member"><div class="member-signature"><pre><!><code><!><span class="sig-name">__add__</span>(<!>other<!>: <a href="#cgt_py.DyadicRationalNumber">DyadicRationalNumber</a><!><!>)<!> -&gt; <a href="#cgt_py.DyadicRationalNumber">DyadicRationalNumber</a></code><!></pre><!></div><!><!></div><div id="cgt_py.DyadicRationalNumber.__float__" class="member"><div class="member-signature"><pre><!><code><!><span class="sig-name">__float__</span>()<!> -&gt; <!>float</code><!></pre><!></div><!><!></div><div id="cgt_py.DyadicRationalNumber.__neg__" class="member"><div class="member-signature"><pre><!><code><!><span class="sig-name">__neg__</span>()<!> -&gt; <a href="#cgt_py.DyadicRationalNumber">DyadicRationalNumber</a></code><!></pre><!></div><!><!></div><div id="cgt_py.DyadicRationalNumber.__repr__" class="member"><div class="member-signature"><pre><!><code><!><span class="sig-name">__repr__</span>()<!> -&gt; <!>str</code><!></pre><!></div><!><!></div><div id="cgt_py.DyadicRationalNumber.__richcmp__" class="member"><div class="member-signature"><pre><!><code><!><span class="sig-name">__richcmp__</span>(<!>other<!>: <a href="#cgt_py.DyadicRationalNumber">DyadicRationalNumber</a><!>, <!>op<!>: <!>int<!><!>)<!> -&gt; <!>bool</code><!></pre><!></div><!><!></div><div id="cgt_py.DyadicRationalNumber.__sub__" class="member"><div class="member-signature"><pre><!><code><!><span class="sig-name">__sub__</span>(<!>other<!>: <a href="#cgt_py.DyadicRationalNumber">DyadicRationalNumber</a><!><!>)<!> -&gt; <a href="#cgt_py.DyadicRationalNumber">DyadicRationalNumber</a></code><!></pre><!></div><!><!></div><!></div><h3 id="cgt_py.Fission">Fission<a href="#cgt_py.Fission" aria-hidden="true" class="anchor">#</a></h3><pre class="signature"><!><code><span class="sig-keyword">class</span> <span class="sig-name">Fission</span>(<!>position<!>: <!>str<!><!>)<!></code><!></pre><!><!><!><div class="members"><div id="cgt_py.Fission.canonical_form" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">canonical_form</span>: <a href="#cgt_py.CanonicalForm">CanonicalForm</a></code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Fission.grid" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">grid</span>: <a href="#cgt_py.Grid">Grid</a></code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Fission.left_options" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">left_options</span>: <!>list<!>[<!><a href="#cgt_py.Fission">Fission</a><!>]</code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Fission.right_options" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">right_options</span>: <!>list<!>[<!><a href="#cgt_py.Fission">Fission</a><!>]</code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Fission.sensible_left_options" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">sensible_left_options</span>: <!>list<!>[<!><a href="#cgt_py.Fission">Fission</a><!>]</code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Fission.sensible_right_options" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">sensible_right_options</span>: <!>list<!>[<!><a href="#cgt_py.Fission">Fission</a><!>]</code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Fission.__repr__" class="member"><div class="member-signature"><pre><!><code><!><span class="sig-name">__repr__</span>()<!> -&gt; <!>str</code><!></pre><!></div><!><!></div><div id="cgt_py.Fission._repr_svg_" class="member"><div class="member-signature"><pre><!><code><!><span class="sig-name">_repr_svg_</span>()<!> -&gt; <!>str</code><!></pre><!></div><!><!></div><!></div><h3 id="cgt_py.Graph">Graph<a href="#cgt_py.Graph" aria-hidden="true" class="anchor">#</a></h3><pre class="signature"><!><code><span class="sig-keyword">class</span> <span class="sig-name">Graph</span>(
+    <!>vertices<!>: <!>int<!>,
+    <!>edges<!>: <!>Sequence<!>[<!>tuple<!>[<!>int<!>, <!>int<!>]<!>]<!>,
+    <!>directed<!>: <!>bool<!> = ...<!>,
+    <!>white<!>: <!>Optional<!>[<!>Sequence<!>[<!>int<!>]<!>]<!> = None<!>,
+    <!>blue<!>: <!>Optional<!>[<!>Sequence<!>[<!>int<!>]<!>]<!> = None<!>,
+    <!>red<!>: <!>Optional<!>[<!>Sequence<!>[<!>int<!>]<!>]<!> = None<!>,
+    <!>green<!>: <!>Optional<!>[<!>Sequence<!>[<!>int<!>]<!>]<!> = None<!>,
+)<!></code><!></pre><!><!><!><div class="members"><div id="cgt_py.Graph.bipartite_snort" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">bipartite_snort</span>: <a href="#cgt_py.BipartiteSnort">BipartiteSnort</a></code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Graph.col" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">col</span>: <a href="#cgt_py.Col">Col</a></code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Graph.colors" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">colors</span>: <a href="#cgt_py.VertexColors">VertexColors</a></code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Graph.digraph_placement" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">digraph_placement</span>: <a href="#cgt_py.DigraphPlacement">DigraphPlacement</a></code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Graph.directed" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">directed</span>: <!>bool</code></pre><span class="tag">read-only</span></div><!><div class="docstring"><p>Whether the edges of the graph point one way. Undirected edges are stored as a pair
+of opposite arcs, so this only decides how edges are added and reported back</p>
+</div></div><div id="cgt_py.Graph.edges" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">edges</span>: <!>list<!>[<!>tuple<!>[<!>int<!>, <!>int<!>]<!>]</code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Graph.game" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">game</span>: <!>Any</code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Graph.snort" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">snort</span>: <a href="#cgt_py.Snort">Snort</a></code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Graph.vertices" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">vertices</span>: <!>int</code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Graph.__repr__" class="member"><div class="member-signature"><pre><!><code><!><span class="sig-name">__repr__</span>()<!> -&gt; <!>str</code><!></pre><!></div><!><!></div><div id="cgt_py.Graph._repr_svg_" class="member"><div class="member-signature"><pre><!><code><!><span class="sig-name">_repr_svg_</span>()<!> -&gt; <!>str</code><!></pre><!></div><!><!></div><!></div><h3 id="cgt_py.Grid">Grid<a href="#cgt_py.Grid" aria-hidden="true" class="anchor">#</a></h3><pre class="signature"><code><span class="sig-keyword">class</span> <span class="sig-name">Grid</span></code></pre><!><!><!><div class="members"><div id="cgt_py.Grid.amazons" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">amazons</span>: <a href="#cgt_py.Amazons">Amazons</a></code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Grid.domineering" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">domineering</span>: <a href="#cgt_py.Domineering">Domineering</a></code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Grid.fission" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">fission</span>: <a href="#cgt_py.Fission">Fission</a></code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Grid.game" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">game</span>: <!>Any</code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Grid.konane" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">konane</span>: <a href="#cgt_py.Konane">Konane</a></code></pre><span class="tag">read-only</span></div><!><!></div><!></div><h3 id="cgt_py.Konane">Konane<a href="#cgt_py.Konane" aria-hidden="true" class="anchor">#</a></h3><pre class="signature"><!><code><span class="sig-keyword">class</span> <span class="sig-name">Konane</span>(<!>position<!>: <!>str<!><!>)<!></code><!></pre><!><!><!><div class="members"><div id="cgt_py.Konane.canonical_form" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">canonical_form</span>: <a href="#cgt_py.CanonicalForm">CanonicalForm</a></code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Konane.grid" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">grid</span>: <a href="#cgt_py.Grid">Grid</a></code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Konane.left_options" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">left_options</span>: <!>list<!>[<!><a href="#cgt_py.Konane">Konane</a><!>]</code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Konane.right_options" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">right_options</span>: <!>list<!>[<!><a href="#cgt_py.Konane">Konane</a><!>]</code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Konane.sensible_left_options" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">sensible_left_options</span>: <!>list<!>[<!><a href="#cgt_py.Konane">Konane</a><!>]</code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Konane.sensible_right_options" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">sensible_right_options</span>: <!>list<!>[<!><a href="#cgt_py.Konane">Konane</a><!>]</code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Konane.__repr__" class="member"><div class="member-signature"><pre><!><code><!><span class="sig-name">__repr__</span>()<!> -&gt; <!>str</code><!></pre><!></div><!><!></div><div id="cgt_py.Konane._repr_svg_" class="member"><div class="member-signature"><pre><!><code><!><span class="sig-name">_repr_svg_</span>()<!> -&gt; <!>str</code><!></pre><!></div><!><!></div><!></div><h3 id="cgt_py.Snort">Snort<a href="#cgt_py.Snort" aria-hidden="true" class="anchor">#</a></h3><pre class="signature"><!><code><span class="sig-keyword">class</span> <span class="sig-name">Snort</span>(
+    <!>graph<!>: <!>Any<!>,
+    <!>edges<!>: <!>Optional<!>[<!>Sequence<!>[<!>tuple<!>[<!>int<!>, <!>int<!>]<!>]<!>]<!> = None<!>,
+    <!>white<!>: <!>Optional<!>[<!>Sequence<!>[<!>int<!>]<!>]<!> = None<!>,
+    <!>blue<!>: <!>Optional<!>[<!>Sequence<!>[<!>int<!>]<!>]<!> = None<!>,
+    <!>red<!>: <!>Optional<!>[<!>Sequence<!>[<!>int<!>]<!>]<!> = None<!>,
+    <!>green<!>: <!>Optional<!>[<!>Sequence<!>[<!>int<!>]<!>]<!> = None<!>,
+)<!></code><!></pre><!><!><!><div class="members"><div id="cgt_py.Snort.canonical_form" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">canonical_form</span>: <a href="#cgt_py.CanonicalForm">CanonicalForm</a></code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Snort.graph" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">graph</span>: <a href="#cgt_py.Graph">Graph</a></code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Snort.left_options" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">left_options</span>: <!>list<!>[<!><a href="#cgt_py.Snort">Snort</a><!>]</code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Snort.right_options" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">right_options</span>: <!>list<!>[<!><a href="#cgt_py.Snort">Snort</a><!>]</code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Snort.sensible_left_options" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">sensible_left_options</span>: <!>list<!>[<!><a href="#cgt_py.Snort">Snort</a><!>]</code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Snort.sensible_right_options" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">sensible_right_options</span>: <!>list<!>[<!><a href="#cgt_py.Snort">Snort</a><!>]</code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.Snort.__repr__" class="member"><div class="member-signature"><pre><!><code><!><span class="sig-name">__repr__</span>()<!> -&gt; <!>str</code><!></pre><!></div><!><!></div><div id="cgt_py.Snort._repr_svg_" class="member"><div class="member-signature"><pre><!><code><!><span class="sig-name">_repr_svg_</span>()<!> -&gt; <!>str</code><!></pre><!></div><!><!></div><!></div><h3 id="cgt_py.Thermograph">Thermograph<a href="#cgt_py.Thermograph" aria-hidden="true" class="anchor">#</a></h3><pre class="signature"><code><span class="sig-keyword">class</span> <span class="sig-name">Thermograph</span></code></pre><!><!><!><div class="members"><div id="cgt_py.Thermograph.__repr__" class="member"><div class="member-signature"><pre><!><code><!><span class="sig-name">__repr__</span>()<!> -&gt; <!>str</code><!></pre><!></div><!><!></div><div id="cgt_py.Thermograph._repr_svg_" class="member"><div class="member-signature"><pre><!><code><!><span class="sig-name">_repr_svg_</span>()<!> -&gt; <!>str</code><!></pre><!></div><!><!></div><!></div><h3 id="cgt_py.VertexColors">VertexColors<a href="#cgt_py.VertexColors" aria-hidden="true" class="anchor">#</a></h3><pre class="signature"><code><span class="sig-keyword">class</span> <span class="sig-name">VertexColors</span></code></pre><!><!><!><div class="members"><div id="cgt_py.VertexColors.blue" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">blue</span>: <!>list<!>[<!>int<!>]</code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.VertexColors.green" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">green</span>: <!>list<!>[<!>int<!>]</code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.VertexColors.red" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">red</span>: <!>list<!>[<!>int<!>]</code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.VertexColors.white" class="member"><div class="member-signature"><pre><code><span class="sig-keyword">property</span> <span class="sig-name">white</span>: <!>list<!>[<!>int<!>]</code></pre><span class="tag">read-only</span></div><!><!></div><div id="cgt_py.VertexColors.__repr__" class="member"><div class="member-signature"><pre><!><code><!><span class="sig-name">__repr__</span>()<!> -&gt; <!>str</code><!></pre><!></div><!><!></div><!></div><!><h2 id="functions">Functions</h2><h3 id="cgt_py.AmazonsWidget">AmazonsWidget<a href="#cgt_py.AmazonsWidget" aria-hidden="true" class="anchor">#</a></h3><pre class="signature"><!><code><!><span class="sig-name">AmazonsWidget</span>(<!>position<!>: <!>Optional<!>[<!>Any<!>]<!> = None<!>)<!> -&gt; <!>Any</code><!></pre><!><!><h3 id="cgt_py.BipartiteSnortWidget">BipartiteSnortWidget<a href="#cgt_py.BipartiteSnortWidget" aria-hidden="true" class="anchor">#</a></h3><pre class="signature"><!><code><!><span class="sig-name">BipartiteSnortWidget</span>(<!>position<!>: <!>Optional<!>[<!>Any<!>]<!> = None<!>)<!> -&gt; <!>Any</code><!></pre><!><!><h3 id="cgt_py.ColWidget">ColWidget<a href="#cgt_py.ColWidget" aria-hidden="true" class="anchor">#</a></h3><pre class="signature"><!><code><!><span class="sig-name">ColWidget</span>(<!>position<!>: <!>Optional<!>[<!>Any<!>]<!> = None<!>)<!> -&gt; <!>Any</code><!></pre><!><!><h3 id="cgt_py.DigraphPlacementWidget">DigraphPlacementWidget<a href="#cgt_py.DigraphPlacementWidget" aria-hidden="true" class="anchor">#</a></h3><pre class="signature"><!><code><!><span class="sig-name">DigraphPlacementWidget</span>(<!>position<!>: <!>Optional<!>[<!>Any<!>]<!> = None<!>)<!> -&gt; <!>Any</code><!></pre><!><!><h3 id="cgt_py.DomineeringWidget">DomineeringWidget<a href="#cgt_py.DomineeringWidget" aria-hidden="true" class="anchor">#</a></h3><pre class="signature"><!><code><!><span class="sig-name">DomineeringWidget</span>(<!>position<!>: <!>Optional<!>[<!>Any<!>]<!> = None<!>)<!> -&gt; <!>Any</code><!></pre><!><!><h3 id="cgt_py.FissionWidget">FissionWidget<a href="#cgt_py.FissionWidget" aria-hidden="true" class="anchor">#</a></h3><pre class="signature"><!><code><!><span class="sig-name">FissionWidget</span>(<!>position<!>: <!>Optional<!>[<!>Any<!>]<!> = None<!>)<!> -&gt; <!>Any</code><!></pre><!><!><h3 id="cgt_py.KonaneWidget">KonaneWidget<a href="#cgt_py.KonaneWidget" aria-hidden="true" class="anchor">#</a></h3><pre class="signature"><!><code><!><span class="sig-name">KonaneWidget</span>(<!>position<!>: <!>Optional<!>[<!>Any<!>]<!> = None<!>)<!> -&gt; <!>Any</code><!></pre><!><!><h3 id="cgt_py.SnortWidget">SnortWidget<a href="#cgt_py.SnortWidget" aria-hidden="true" class="anchor">#</a></h3><pre class="signature"><!><code><!><span class="sig-name">SnortWidget</span>(<!>position<!>: <!>Optional<!>[<!>Any<!>]<!> = None<!>)<!> -&gt; <!>Any</code><!></pre><!><!><!><!></div></div></main><footer class="footer"><span>Copyright © 2023-2026 <a href="https://t4ccer.com">Tomasz Maciosowski</a>, <a href="https://github.com/t4ccer/cgt-tools/blob/main/LICENSE">AGPL-3.0</a></span><span>Theme adapted from <a href="https://github.com/thuliteio/doks">Doks</a></span></footer></body></html>

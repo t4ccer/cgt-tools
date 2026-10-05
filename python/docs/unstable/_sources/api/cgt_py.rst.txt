@@ -1,4 +1,0 @@
-cgt_py
-======
-
-.. pyo3-api:: cgt_py

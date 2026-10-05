@@ -1,0 +1,70 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="Combinatorial Game Theory toolkit in Rust and Python"><title>Play - cgt-tools</title><script>try{const t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t}catch(_){}</script><link rel="preload" href="/fonts/jost-400.woff2" as="font" type="font/woff2" crossorigin=""><link rel="preload" href="/fonts/jost-500.woff2" as="font" type="font/woff2" crossorigin=""><link rel="preload" href="/fonts/jost-700.woff2" as="font" type="font/woff2" crossorigin=""><!><link rel="stylesheet" href="/style.css"><link rel="modulepreload" href="/pkg/cgt_website.js"><link rel="preload" href="/pkg/cgt_website_bg.wasm" as="fetch" type="application/wasm" crossorigin=""><script type="module">((root, pkg_path, output_name, wasm_output_name) => {
+	let MOST_RECENT_CHILDREN_CB = [];
+
+	function idle(c) {
+		if ("requestIdleCallback" in window) {
+			window.requestIdleCallback(c);
+		} else {
+			c();
+		}
+	}
+	async function hydrateIslands(rootNode, mod) {
+		async function traverse(node) {
+			if (node.nodeType === Node.ELEMENT_NODE) {
+				const tag = node.tagName.toLowerCase();
+				if(tag === 'leptos-island') {
+					const children = [];
+					const id = node.dataset.component || null;
+
+					await hydrateIsland(node, id, mod);
+					
+					for(const child of node.children) {
+						await traverse(child, children);
+					}
+				} else {
+					if (tag === 'leptos-children') {
+						MOST_RECENT_CHILDREN_CB.push(node.$$on_hydrate);
+						for(const child of node.children) {
+							await traverse(child);
+						};
+						// un-set the "most recent children"
+						MOST_RECENT_CHILDREN_CB.pop();
+					} else {
+						for(const child of node.children) {
+							await traverse(child);
+						};
+					}
+				}
+			}
+		}
+
+		await traverse(rootNode);
+	}
+	async function hydrateIsland(el, id, mod) {
+		const islandFn = mod[id];
+		if (islandFn) {
+			const children_cb = MOST_RECENT_CHILDREN_CB[MOST_RECENT_CHILDREN_CB.length-1];
+			if (children_cb) {
+				children_cb();
+			}
+			const res = islandFn(el);
+			if (res && res.then) {
+				await res;
+			}
+		} else {
+			console.warn(`Could not find WASM function for the island ${id}.`);
+		}
+	}
+	idle(() => {
+		import(`${root}/${pkg_path}/${output_name}.js`)
+			.then(mod => {
+				mod.default({module_or_path: `${root}/${pkg_path}/${wasm_output_name}.wasm`}).then(() => {
+					mod.hydrate();
+					hydrateIslands(document.body, mod);
+				});
+
+				window.__hydrateIsland = (el, id) => hydrateIsland(el, id, mod);
+			})
+	});
+})
+("", "pkg", "cgt_website", "cgt_website_bg");</script></head><body class="docs"><header class="navbar"><a class="navbar-brand" href="/">cgt-tools</a><nav class="navbar-nav"><a href="/guides/" class="nav-link">Guides</a><a href="/play/" class="nav-link">Play</a><a href="/python/docs/latest/" class="nav-link">Python</a><a href="https://docs.rs/cgt/latest/cgt/" class="nav-link">Rust</a></nav><leptos-island data-component="ThemeToggle_3785966790201553852"><button type="button" aria-label="Toggle dark mode" class="nav-link icon-link"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round" class="icon-moon"><path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454l0 .008"></path></svg><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round" class="icon-sun"><path d="M8 12a4 4 0 1 0 8 0a4 4 0 1 0 -8 0"></path><path d="M3 12h1m8 -9v1m8 8h1m-9 8v1m-6.4 -15.4l.7 .7m12.1 -.7l-.7 .7m0 11.4l.7 .7m-12.1 -.7l-.7 .7"></path></svg></button></leptos-island><a href="https://github.com/t4ccer/cgt-tools" aria-label="GitHub repository" class="nav-link icon-link"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5"></path></svg></a></header><main><div class="container"><div class="docs-content"><h1>Play</h1><p class="lead">Combinatorial games to play against another player or against AI players trained with cgt-tools, which run in your browser.</p><ul class="guide-list"><li><a href="/play/quelhas/">Quelhas</a><p>Domineering where a move crosses out a whole line of squares, the last move loses, and the second player may swap sides after the first move.</p></li><li><a href="/play/fjords/">Fjords</a><p>Claim vertices joined to your own on a board dealt at random, until one player has nowhere left to go.</p></li><!></ul></div></div></main><footer class="footer"><span>Copyright © 2023-2026 <a href="https://t4ccer.com">Tomasz Maciosowski</a>, <a href="https://github.com/t4ccer/cgt-tools/blob/main/LICENSE">AGPL-3.0</a></span><span>Theme adapted from <a href="https://github.com/thuliteio/doks">Doks</a></span></footer></body></html>
